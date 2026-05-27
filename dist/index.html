@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="FinanceTracker is a local-first monthly finance tracker that stores your budget in this browser."
+    />
+    <title>FinanceTracker Local Ledger</title>
+    <script type="module" crossorigin src="/assets/index-8pJKStXk.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-nssXNmaR.css">
+  </head>
+  <body>
+    <div id="root">
+      <main
+        style="
+          min-height: 100vh;
+          display: grid;
+          place-items: center;
+          margin: 0;
+          padding: 24px;
+          background: #051424;
+          color: #d4e4fa;
+          font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        "
+      >
+        <section
+          style="
+            max-width: 560px;
+            border: 1px solid rgba(198, 198, 203, 0.16);
+            border-radius: 8px;
+            background: #122131;
+            padding: 24px;
+            box-shadow: 0 14px 32px rgba(28, 43, 38, 0.08);
+          "
+        >
+          <h1 style="margin: 0 0 10px; font-size: 26px; line-height: 1.1;">FinanceTracker runs from the local dev server</h1>
+          <p style="margin: 0 0 16px; color: #9ea8b7; line-height: 1.5;">
+            If you opened this file directly, start the app with <code>npm run dev -- --port 5173</code>, then open
+            <a href="http://127.0.0.1:5173/" style="color: #00dfc1; font-weight: 700;">http://127.0.0.1:5173/</a>.
+          </p>
+          <p style="margin: 0; color: #9ea8b7; line-height: 1.5;">
+            Vite compiles the React and TypeScript source in the browser during development; the raw source HTML cannot do that from a
+            <code>file://</code> URL.
+          </p>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
