@@ -166,6 +166,7 @@ function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [authWorking, setAuthWorking] = useState(false);
   const [cloudHydrated, setCloudHydrated] = useState(false);
+  const authUserIdRef = useRef<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("loading");
   const [incomeDraft, setIncomeDraft] = useState<IncomeDraft>(initialIncomeDraft);
   const [expenseDraft, setExpenseDraft] = useState<ExpenseDraft>(initialExpenseDraft);
@@ -307,7 +308,10 @@ function App() {
 
       try {
         const currentSession = await getCurrentSession();
-        if (alive) setSession(currentSession);
+        if (alive) {
+          authUserIdRef.current = currentSession?.user?.id ?? null;
+          setSession(currentSession);
+        }
       } catch {
         if (alive) setToast("Auth check failed");
       } finally {
@@ -318,7 +322,13 @@ function App() {
     void loadSession();
     const subscription = supabase?.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
-      setCloudHydrated(false);
+      // Supabase re-emits SIGNED_IN/TOKEN_REFRESHED on tab refocus; only
+      // re-open the vault when the signed-in user actually changes.
+      const nextUserId = nextSession?.user?.id ?? null;
+      if (authUserIdRef.current !== nextUserId) {
+        authUserIdRef.current = nextUserId;
+        setCloudHydrated(false);
+      }
     }).data.subscription;
 
     return () => {
