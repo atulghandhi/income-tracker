@@ -1155,12 +1155,9 @@ function App() {
 
       <aside className="sideNav" aria-label="Primary">
         <div className="brandCluster">
-          <div className="logoTile" aria-hidden="true">
-            <WalletCards size={20} />
-          </div>
+          <img src="/icon.svg" alt="" width="36" height="36" style={{borderRadius: '10px', flexShrink: 0}} aria-hidden="true" />
           <div>
-            <h1>FinanceTracker</h1>
-            <p>Supabase Vault</p>
+            <h1>The Income Tracker</h1>
           </div>
         </div>
 
@@ -1570,31 +1567,12 @@ function App() {
                 />
               </section>
 
-              <section className="projectionPanel" aria-label="Annual calculation">
-                <div className="sectionHeading">
-                  <div>
-                    <h2>Annual projection</h2>
-                    <p>Automatic from the selected monthly plan</p>
-                  </div>
-                  <div className="tabs" role="tablist" aria-label="Projection view">
-                    <button className={projectionView === "overview" ? "selected" : ""} type="button" onClick={() => setProjectionView("overview")}>
-                      Overview
-                    </button>
-                    <button className={projectionView === "category" ? "selected" : ""} type="button" onClick={() => setProjectionView("category")}>
-                      By category
-                    </button>
-                    <button className={projectionView === "month" ? "selected" : ""} type="button" onClick={() => setProjectionView("month")}>
-                      By month
-                    </button>
-                  </div>
-                </div>
-
-                <div className="annualGrid">
-                  <AnnualSnapshot projection={projection} privacy={ledger.privacyMode} formatter={moneyFormatter} />
-                  <SavingsGauge projection={projection} target={ledger.savingsTarget} onTargetChange={(value) => updateLedger((current) => ({ ...current, savingsTarget: value }))} />
-                  <ProjectionDetail view={projectionView} projection={projection} categoryRows={categoryRows} monthlyBars={monthlyBars} privacy={ledger.privacyMode} formatter={moneyFormatter} />
-                </div>
-              </section>
+              <div className="annualInsightsCta">
+                <button className="commandButton" type="button" onClick={() => setActiveView("insights")}>
+                  <LineChart size={16} />
+                  See annual insights
+                </button>
+              </div>
             </section>
           )}
 
@@ -1811,6 +1789,31 @@ function App() {
                   </div>
                 </article>
               </section>
+
+              <section className="projectionPanel" aria-label="Annual calculation">
+                <div className="sectionHeading">
+                  <div>
+                    <h2>Annual projection</h2>
+                    <p>Automatic from the selected monthly plan</p>
+                  </div>
+                  <div className="tabs" role="tablist" aria-label="Projection view">
+                    <button className={projectionView === "overview" ? "selected" : ""} type="button" onClick={() => setProjectionView("overview")}>
+                      Overview
+                    </button>
+                    <button className={projectionView === "category" ? "selected" : ""} type="button" onClick={() => setProjectionView("category")}>
+                      By category
+                    </button>
+                    <button className={projectionView === "month" ? "selected" : ""} type="button" onClick={() => setProjectionView("month")}>
+                      By month
+                    </button>
+                  </div>
+                </div>
+                <div className="annualGrid">
+                  <AnnualSnapshot projection={projection} privacy={ledger.privacyMode} formatter={moneyFormatter} />
+                  <SavingsGauge projection={projection} target={ledger.savingsTarget} onTargetChange={(value) => updateLedger((current) => ({ ...current, savingsTarget: value }))} />
+                  <ProjectionDetail view={projectionView} projection={projection} categoryRows={categoryRows} monthlyBars={monthlyBars} privacy={ledger.privacyMode} formatter={moneyFormatter} />
+                </div>
+              </section>
             </section>
           )}
 
@@ -2025,12 +2028,9 @@ function AuthGate({
     <main className="authShell" aria-label="Authentication">
       <section className="authPanel">
         <div className="authBrand">
-          <div className="logoTile" aria-hidden="true">
-            <WalletCards size={22} />
-          </div>
+          <img src="/icon.svg" alt="" width="36" height="36" style={{borderRadius: '10px', flexShrink: 0}} aria-hidden="true" />
           <div>
-            <h1>FinanceTracker</h1>
-            <p>Supabase Vault</p>
+            <h1>The Income Tracker</h1>
           </div>
         </div>
         <div className="authCopy">

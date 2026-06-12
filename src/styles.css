@@ -1505,6 +1505,14 @@ textarea:focus,
   border-top: 1px solid var(--line);
 }
 
+.annualInsightsCta {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
 .sectionHeading {
   justify-content: space-between;
   gap: 18px;
@@ -3325,7 +3333,8 @@ hr {
     height: 2px;
   }
 
-  .localIdentity {
+  .localIdentity,
+  .navCta {
     display: none;
   }
 
