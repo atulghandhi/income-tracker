@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, DragEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode, Ref } from "react";
 import {
+  AlertCircle,
   ArrowDown,
   ArrowUp,
   BarChart3,
@@ -10,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleHelp,
+  Cloud,
   CreditCard,
   Database,
   Download,
@@ -22,6 +24,7 @@ import {
   Info,
   LayoutDashboard,
   LineChart,
+  LogOut,
   Pencil,
   Plus,
   ReceiptText,
@@ -59,6 +62,17 @@ import {
 } from "./finance";
 import { buildRulePattern, parseBankCsv, sortImportRows, type CsvImportRow } from "./importer";
 import { loadLedgerState, saveLedgerState } from "./storage";
+import {
+  getCurrentSession,
+  isSupabaseConfigured,
+  loadCloudLedgerState,
+  saveCloudLedgerState,
+  signInWithGoogle,
+  signOut,
+  supabase,
+  upsertUserProfile,
+  type AuthSession,
+} from "./supabase";
 import type {
   CategoryRule,
   CurrencyCode,
@@ -80,6 +94,7 @@ import type {
 
 type ProjectionView = "overview" | "category" | "month";
 type AppView = "dashboard" | "ledger" | "accounts" | "insights" | "settings";
+type SaveState = "loading" | "saved" | "saving" | "offline";
 type NetWorthHorizon = 12 | 24 | 60;
 type InsightChartView = "inflow-outflow" | "cash-flow" | "net-worth";
 type ExpenseDropPreview =
@@ -147,7 +162,11 @@ const initialDebtDraft: DebtDraft = {
 function App() {
   const [ledger, setLedger] = useState<LedgerState>(() => createInitialState());
   const [hydrated, setHydrated] = useState(false);
-  const [saveState, setSaveState] = useState<"loading" | "saved" | "saving" | "offline">("loading");
+  const [session, setSession] = useState<AuthSession | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authWorking, setAuthWorking] = useState(false);
+  const [cloudHydrated, setCloudHydrated] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>("loading");
   const [incomeDraft, setIncomeDraft] = useState<IncomeDraft>(initialIncomeDraft);
   const [expenseDraft, setExpenseDraft] = useState<ExpenseDraft>(initialExpenseDraft);
   const [debtDraft, setDebtDraft] = useState<DebtDraft>(initialDebtDraft);
@@ -157,7 +176,7 @@ function App() {
   const [activeView, setActiveView] = useState<AppView>("ledger");
   const [animationsEnabled, setAnimationsEnabled] = useState(true);
   const [query, setQuery] = useState("");
-  const [toast, setToast] = useState("Loading local budget");
+  const [toast, setToast] = useState("Loading secure vault");
   const [draggingExpenseId, setDraggingExpenseId] = useState<string | null>(null);
   const [groupingSourceId, setGroupingSourceId] = useState<string | null>(null);
   const [dropPreview, setDropPreview] = useState<ExpenseDropPreview>(null);
@@ -172,6 +191,7 @@ function App() {
   const expenseAmountInputRef = useRef<HTMLInputElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const csvInputRef = useRef<HTMLInputElement | null>(null);
+  const user = session?.user ?? null;
 
   const currentMonth = ledger.months[ledger.selectedMonth] ?? seedMonthFromPrevious();
   const moneyFormatter = useMemo(() => getCurrencyFormatter(ledger.currency), [ledger.currency]);
@@ -255,9 +275,9 @@ function App() {
         if (!alive) return;
         if (stored) {
           setLedger(normalizeState(stored));
-          setToast("Restored from IndexedDB");
+          setToast("Local cache ready");
         } else {
-          setToast("Blank ledger ready");
+          setToast("Secure vault ready");
         }
       } catch {
         setToast("Using this browser only");
@@ -277,23 +297,96 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!hydrated) return;
+    let alive = true;
+
+    async function loadSession() {
+      if (!supabase) {
+        setAuthLoading(false);
+        return;
+      }
+
+      try {
+        const currentSession = await getCurrentSession();
+        if (alive) setSession(currentSession);
+      } catch {
+        if (alive) setToast("Auth check failed");
+      } finally {
+        if (alive) setAuthLoading(false);
+      }
+    }
+
+    void loadSession();
+    const subscription = supabase?.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      setCloudHydrated(false);
+    }).data.subscription;
+
+    return () => {
+      alive = false;
+      subscription?.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated || !user) return;
+    let alive = true;
+
+    async function hydrateCloudLedger() {
+      setSaveState("loading");
+      setToast("Opening cloud vault");
+
+      try {
+        await upsertUserProfile(user);
+        const cloudState = await loadCloudLedgerState();
+        if (!alive) return;
+
+        if (cloudState) {
+          setLedger(normalizeState(cloudState));
+          setToast("Cloud vault restored");
+        } else {
+          await saveCloudLedgerState(user.id, ledger);
+          if (!alive) return;
+          setToast("Local ledger secured in cloud");
+        }
+
+        setCloudHydrated(true);
+        setSaveState("saved");
+      } catch {
+        if (!alive) return;
+        setCloudHydrated(true);
+        setSaveState("offline");
+        setToast("Cloud unavailable; local cache active");
+      }
+    }
+
+    void hydrateCloudLedger();
+
+    return () => {
+      alive = false;
+    };
+  }, [hydrated, user?.id]);
+
+  useEffect(() => {
+    if (!hydrated || authLoading || (user && !cloudHydrated)) return;
 
     setSaveState("saving");
     const timeout = window.setTimeout(() => {
       saveLedgerState(ledger)
-        .then(() => {
+        .then(async () => {
+          if (user) {
+            await saveCloudLedgerState(user.id, ledger);
+          }
           setSaveState("saved");
-          setToast("Saved locally");
+          setToast(user ? "Saved to Supabase" : "Saved locally");
         })
         .catch(() => {
           setSaveState("offline");
-          setToast("Browser storage fallback active");
+          setToast(user ? "Cloud sync paused" : "Browser storage fallback active");
         });
     }, 240);
 
     return () => window.clearTimeout(timeout);
-  }, [ledger, hydrated]);
+  }, [ledger, hydrated, authLoading, cloudHydrated, user?.id]);
 
   useEffect(() => {
     if (!categoryMenu) return;
@@ -909,6 +1002,29 @@ function App() {
     focusNextFrame(incomeSourceInputRef);
   }
 
+  async function handleSignIn() {
+    setAuthWorking(true);
+    setToast("Redirecting to Google");
+    try {
+      await signInWithGoogle();
+    } catch {
+      setAuthWorking(false);
+      setToast("Google sign-in unavailable");
+    }
+  }
+
+  async function handleSignOut() {
+    setAuthWorking(true);
+    try {
+      await signOut();
+      setToast("Signed out");
+    } catch {
+      setToast("Sign out failed");
+    } finally {
+      setAuthWorking(false);
+    }
+  }
+
   function focusSearch() {
     searchInputRef.current?.focus();
     searchInputRef.current?.select();
@@ -986,6 +1102,23 @@ function App() {
       : insightChartView === "net-worth"
         ? "Net worth outlook"
         : "Inflows vs outflows";
+  const userName =
+    (typeof user?.user_metadata.name === "string" && user.user_metadata.name) ||
+    user?.email?.split("@")[0] ||
+    "Secure user";
+  const userAvatar = typeof user?.user_metadata.avatar_url === "string" ? user.user_metadata.avatar_url : "";
+
+  if (authLoading || !hydrated) {
+    return <AuthGate mode="loading" onSignIn={handleSignIn} working={authWorking} configured={isSupabaseConfigured()} />;
+  }
+
+  if (!user) {
+    return <AuthGate mode="signin" onSignIn={handleSignIn} working={authWorking} configured={isSupabaseConfigured()} />;
+  }
+
+  if (!cloudHydrated) {
+    return <AuthGate mode="opening" onSignIn={handleSignIn} working configured={isSupabaseConfigured()} />;
+  }
 
   return (
     <div className={`appShell ${ledger.privacyMode ? "privacy-on" : ""} ${animationsEnabled ? "motion-on" : "motion-off"}`}>
@@ -1017,7 +1150,7 @@ function App() {
           </div>
           <div>
             <h1>FinanceTracker</h1>
-            <p>Local-first Vault</p>
+            <p>Supabase Vault</p>
           </div>
         </div>
 
@@ -1042,12 +1175,14 @@ function App() {
         </nav>
 
         <div className="localIdentity">
-          <div className="identityMark">
-            <ShieldCheck size={17} />
-          </div>
+          {userAvatar ? <img className="identityAvatar" src={userAvatar} alt="" referrerPolicy="no-referrer" /> : (
+            <div className="identityMark">
+              <ShieldCheck size={17} />
+            </div>
+          )}
           <div>
-            <strong>Local vault</strong>
-            <span>Browser only</span>
+            <strong>{userName}</strong>
+            <span>{user.email}</span>
           </div>
         </div>
       </aside>
@@ -1106,8 +1241,11 @@ function App() {
             >
               {ledger.privacyMode ? <EyeOff size={19} /> : <Eye size={19} />}
             </button>
-            <button className="iconButton" type="button" onClick={() => setToast("Already saved locally")} aria-label="Sync local data">
+            <button className="iconButton" type="button" onClick={() => setToast("Already synced to Supabase")} aria-label="Sync cloud data">
               <RotateCcw size={18} />
+            </button>
+            <button className="iconButton" type="button" onClick={handleSignOut} aria-label="Sign out" title="Sign out" disabled={authWorking}>
+              <LogOut size={18} />
             </button>
             <button className="iconButton" type="button" onClick={() => setActiveView("settings")} aria-label="Help">
               <CircleHelp size={18} />
@@ -1671,19 +1809,19 @@ function App() {
               <div className="pageHeader settingsHeader">
                 <div>
                   <h2>Management Hub</h2>
-                  <p>Configure your local vault and interface preferences.</p>
+                  <p>Configure your cloud vault, exports, and interface preferences.</p>
                 </div>
                 <span className="privacyBadge">
                   <ShieldCheck size={15} />
-                  All data stays on your machine
+                  Protected by Supabase RLS
                 </span>
               </div>
 
               <article className="architectureNote">
-                <Info size={21} />
+                <Cloud size={21} />
                 <div>
-                  <h3>Local-first architecture</h3>
-                  <p>All your data is stored locally in this browser with IndexedDB. JSON and CSV exports are available for your own backups.</p>
+                  <h3>Cloud vault architecture</h3>
+                  <p>Your ledger syncs to a private Supabase row tied to your Google account. This browser keeps an IndexedDB cache for resilience.</p>
                 </div>
               </article>
 
@@ -1854,7 +1992,62 @@ function App() {
   );
 }
 
-function StatusPill({ state, toast }: { state: "loading" | "saved" | "saving" | "offline"; toast: string }) {
+function AuthGate({
+  mode,
+  onSignIn,
+  working,
+  configured,
+}: {
+  mode: "loading" | "signin" | "opening";
+  onSignIn: () => void;
+  working: boolean;
+  configured: boolean;
+}) {
+  const title = mode === "signin" ? "Sign in to FinanceTracker" : mode === "opening" ? "Opening your vault" : "Preparing secure access";
+  const detail =
+    mode === "signin"
+      ? "Use your Google account to unlock a private Supabase-backed ledger. Your data is isolated with row-level security."
+      : mode === "opening"
+        ? "Checking your account and restoring the latest ledger snapshot."
+        : "Loading the local cache and checking the Supabase session.";
+
+  return (
+    <main className="authShell" aria-label="Authentication">
+      <section className="authPanel">
+        <div className="authBrand">
+          <div className="logoTile" aria-hidden="true">
+            <WalletCards size={22} />
+          </div>
+          <div>
+            <h1>FinanceTracker</h1>
+            <p>Supabase Vault</p>
+          </div>
+        </div>
+        <div className="authCopy">
+          <span className="privacyBadge">
+            <ShieldCheck size={15} />
+            Google sign-in only
+          </span>
+          <h2>{title}</h2>
+          <p>{detail}</p>
+        </div>
+        {configured ? (
+          <button className="googleButton" type="button" onClick={onSignIn} disabled={working || mode !== "signin"}>
+            <span aria-hidden="true">G</span>
+            {working || mode !== "signin" ? "Please wait" : "Continue with Google"}
+          </button>
+        ) : (
+          <div className="authWarning" role="alert">
+            <AlertCircle size={18} />
+            Add `VITE_SUPABASE_PUBLISHABLE_KEY` to enable Google sign-in.
+          </div>
+        )}
+      </section>
+    </main>
+  );
+}
+
+function StatusPill({ state, toast }: { state: SaveState; toast: string }) {
   return (
     <div className={`statusPill ${state}`}>
       <span />

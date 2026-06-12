@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Supabase CLI temp files
+supabase/.temp/
+
+# Claude Code internal
+.agents/
+skills-lock.json
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
