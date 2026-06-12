@@ -8,11 +8,28 @@ async function addExpense(page: Page, name: string, amount: number) {
   await page.locator(".panel.expense .addRow input[placeholder='Expense name']").fill(name);
   await page.locator(".panel.expense .addRow .moneyInput input").fill(String(amount));
   await page.locator(".panel.expense .addRow .moneyInput input").press("Enter");
+  await expect.poll(() => inputValues(page, "input[aria-label='Expense name']")).toContain(name);
+}
+
+async function uploadCsv(page: Page, csv: string) {
+  await page.locator('input[accept="text/csv,.csv"]').setInputFiles({
+    name: "bank.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(csv),
+  });
 }
 
 test.describe("FinanceTracker", () => {
   test("starts empty in GBP, changes currency, groups expenses by drag-drop, masks amounts, and persists after reload", async ({ page }, testInfo) => {
     await page.goto("/");
+    const monthLabels = await page.evaluate(() => {
+      const date = new Date();
+      const formatter = new Intl.DateTimeFormat("en", { month: "long", year: "numeric" });
+      return {
+        current: formatter.format(new Date(date.getFullYear(), date.getMonth(), 1)),
+        next: formatter.format(new Date(date.getFullYear(), date.getMonth() + 1, 1)),
+      };
+    });
 
     await expect(page).toHaveTitle("FinanceTracker Local Ledger");
     await expect(page.getByRole("heading", { name: "FinanceTracker" })).toBeVisible();
@@ -38,9 +55,9 @@ test.describe("FinanceTracker", () => {
     await expect(page.locator(".panel.income .addRow input[placeholder='Add income source']")).toBeFocused();
     await page.locator(".pageHeader").click();
     await page.keyboard.press("Alt+ArrowRight");
-    await expect(page.getByText("June 2026")).toBeVisible();
+    await expect(page.getByText(monthLabels.next)).toBeVisible();
     await page.keyboard.press("Alt+ArrowLeft");
-    await expect(page.getByText("May 2026")).toBeVisible();
+    await expect(page.getByText(monthLabels.current)).toBeVisible();
 
     await page.locator(".panel.income .addRow input[placeholder='Add income source']").fill("QA bonus");
     await page.locator(".panel.income .addRow .moneyInput input").fill("250");
@@ -250,5 +267,119 @@ test.describe("FinanceTracker", () => {
     await page.mouse.wheel(0, 500);
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
     await expect.poll(() => expenseList.evaluate((element) => element.scrollTop)).toBe(listScrollTop);
+  });
+
+  test("reviews CSV transactions, imports selected rows, and undoes the import", async ({ page }) => {
+    await page.goto("/");
+    const csvYearMonth = await page.evaluate(() => ({
+      year: new Date().getFullYear(),
+      month: String(new Date().getMonth() + 1).padStart(2, "0"),
+    }));
+    await page.getByRole("button", { name: "Settings" }).click();
+
+    await uploadCsv(
+      page,
+      [
+        "Date,Description,Debit,Credit",
+        `21/${csvYearMonth.month}/${csvYearMonth.year},Tesco Express,23.50,`,
+        `22/${csvYearMonth.month}/${csvYearMonth.year},Pret A Manger,8.40,`,
+        `23/${csvYearMonth.month}/${csvYearMonth.year},ACME Payroll,,2500.00`,
+        `24/${csvYearMonth.month}/${csvYearMonth.year},Transfer to savings,200.00,`,
+      ].join("\n"),
+    );
+
+    await expect(page.getByRole("dialog", { name: "bank.csv" })).toBeVisible();
+    await expect(page.getByLabel("Import Tesco Express")).toBeChecked();
+    await expect(page.getByLabel("Import Transfer to savings")).not.toBeChecked();
+    await page.getByLabel("Category for Pret A Manger").fill("Work lunch");
+    await page.getByRole("button", { name: "Import selected" }).click();
+
+    await expect(page.getByRole("dialog", { name: "bank.csv" })).toHaveCount(0);
+    await expect.poll(() => inputValues(page, "input[aria-label='Income source']")).toContain("ACME Payroll");
+    await expect.poll(() => inputValues(page, "input[aria-label='Expense name']")).toEqual(
+      expect.arrayContaining(["Tesco Express", "Pret A Manger"]),
+    );
+    await expect.poll(() => inputValues(page, "input[aria-label='Category name']")).toEqual(expect.arrayContaining(["Food", "Work lunch"]));
+
+    await page.getByRole("button", { name: "Undo import" }).click();
+    await expect.poll(() => inputValues(page, "input[aria-label='Income source']")).not.toContain("ACME Payroll");
+    await expect.poll(() => inputValues(page, "input[aria-label='Expense name']")).not.toContain("Tesco Express");
+  });
+
+  test("adds a credit card account without changing monthly income tracking", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: "Accounts" }).click();
+
+    await page.getByLabel("Debt account name").fill("Visa Classic");
+    await page.getByLabel("Debt balance").fill("1200");
+    await page.getByLabel("Credit limit").fill("3000");
+    await page.getByLabel("Debt APR").fill("19.9");
+    await page.getByLabel("Interest-free months").fill("12");
+    await page.getByLabel("Monthly payment").fill("75");
+    await page.getByLabel("Payment due day").fill("12");
+    await page.getByRole("button", { name: "Add account" }).click();
+
+    await expect(page.getByLabel("Balance for Visa Classic")).toHaveValue("1200");
+    await expect(page.getByLabel("Interest-free months for Visa Classic")).toHaveValue("12");
+    await expect(page.getByLabel("Monthly payment for Visa Classic")).toHaveValue("75");
+    await expect(page.getByText("40% used")).toBeVisible();
+    await expect(page.locator(".accountsGrid").getByRole("heading", { name: "Net worth outlook" })).toHaveCount(0);
+    await expect(page.locator(".panel.income .panelHeader")).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Ledger" }).click();
+    await expect(page.getByRole("heading", { name: "Income" })).toBeVisible();
+    await expect(page.getByText("Start with income")).toBeVisible();
+
+    await page.getByRole("button", { name: "Dashboard" }).click();
+    await expect(page.locator(".flowPanel").getByRole("heading", { name: "Net worth outlook" })).toBeVisible();
+    await page.locator(".flowPanel").getByRole("button", { name: "5 years" }).click();
+    await expect(page.locator(".flowPanel").getByRole("button", { name: "5 years" })).toHaveClass(/selected/);
+    await page.locator(".flowPanel").getByRole("button", { name: "2 years" }).click();
+    await expect(page.locator(".flowPanel").getByRole("button", { name: "2 years" })).toHaveClass(/selected/);
+    await expect(page.getByRole("heading", { name: "Accounts and imports" })).toBeVisible();
+    await expect(page.getByText("£1,200")).toBeVisible();
+  });
+
+  test("explains health score, flags financial anomalies, and switches insight charts", async ({ page }) => {
+    await page.goto("/");
+
+    await page.locator(".panel.income .addRow input[placeholder='Add income source']").fill("Salary");
+    await page.locator(".panel.income .addRow .moneyInput input").fill("2000");
+    await page.locator(".panel.income .addRow .moneyInput input").press("Enter");
+    await addExpense(page, "Rent", 1700);
+    await addExpense(page, "Food", 600);
+
+    await page.getByRole("button", { name: "Accounts" }).click();
+    await page.getByLabel("Debt account name").fill("Everyday Visa");
+    await page.getByLabel("Debt balance").fill("2850");
+    await page.getByLabel("Credit limit").fill("3000");
+    await page.getByLabel("Debt APR").fill("24.9");
+    await page.getByLabel("Interest-free months").fill("0");
+    await page.getByLabel("Monthly payment").fill("50");
+    await page.getByLabel("Payment due day").fill("18");
+    await page.getByRole("button", { name: "Add account" }).click();
+
+    await page.getByRole("button", { name: "Insights" }).click();
+    await expect(page.getByRole("heading", { name: "Health score" })).toBeVisible();
+    await expect(page.getByText("Estimated credit score")).toBeVisible();
+    await page.getByLabel("How health score is calculated").hover();
+    await expect(page.getByText("Calculated from income cover")).toBeVisible();
+
+    await expect(page.getByRole("heading", { name: "Inflows vs outflows" })).toBeVisible();
+    await page.getByRole("button", { name: "Cash flow volatility" }).click();
+    await expect(page.getByRole("heading", { name: "Cash flow volatility" })).toBeVisible();
+    await page.getByRole("button", { name: "Net worth outlook" }).click();
+    await expect(page.getByRole("heading", { name: "Net worth outlook" })).toBeVisible();
+    await page.locator(".chartPanel").getByRole("button", { name: "5 years" }).click();
+    await expect(page.locator(".chartPanel").getByRole("button", { name: "5 years" })).toHaveClass(/selected/);
+    await page.getByRole("button", { name: "Inflows vs outflows" }).click();
+    await expect(page.getByRole("heading", { name: "Inflows vs outflows" })).toBeVisible();
+
+    await expect(page.getByText("Outflow is higher than income")).toBeVisible();
+    await expect(page.getByText("Card utilisation over 90%")).toBeVisible();
+    await expect(page.getByText("Overall credit utilisation over 80%")).toBeVisible();
+    await expect(page.getByText("Grouping coverage")).toHaveCount(0);
+    await page.getByLabel("Card utilisation over 90% context").hover();
+    await expect(page.getByText("Very high utilisation can drag down")).toBeVisible();
   });
 });

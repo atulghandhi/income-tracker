@@ -1408,6 +1408,16 @@ textarea:focus,
   color: var(--ink);
 }
 
+.compactTabs {
+  flex: 0 0 auto;
+}
+
+.compactTabs button {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 11px;
+}
+
 .annualGrid {
   display: grid;
   grid-template-columns: 1fr 0.9fr 1.6fr;
@@ -1415,6 +1425,7 @@ textarea:focus,
 }
 
 .dashboardGrid,
+.accountsGrid,
 .insightsGrid,
 .settingsGrid {
   display: grid;
@@ -1423,6 +1434,11 @@ textarea:focus,
 
 .dashboardGrid {
   grid-template-columns: 1fr 1fr;
+}
+
+.accountsGrid {
+  grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.8fr);
+  align-items: start;
 }
 
 .insightsGrid {
@@ -1442,10 +1458,334 @@ textarea:focus,
 
 .flowPanel,
 .ledgerPreview,
+.debtPanel,
+.accountsPanel,
+.accountEditorPanel,
 .chartPanel,
 .categoryPanel,
 .anomalyPanel {
   min-height: 340px;
+}
+
+.debtPanel {
+  grid-column: 1 / -1;
+}
+
+.flowPanel {
+  grid-column: 1 / -1;
+  min-height: 500px;
+}
+
+.panelSubcopy {
+  max-width: 760px;
+  margin: 12px 0 0;
+  color: rgba(212, 228, 250, 0.72);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.debtMiniGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.debtMiniGrid div {
+  min-height: 82px;
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(18, 33, 49, 0.54);
+}
+
+.debtMiniGrid span {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.debtMiniGrid strong {
+  font-family: var(--mono);
+  font-size: 18px;
+}
+
+.dashboardActions {
+  margin-top: 18px;
+}
+
+.debtAccountList {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.debtAccountRow {
+  display: grid;
+  grid-template-areas:
+    "swatch main balance minimum remove"
+    "swatch meta limit apr due"
+    "swatch meta interest interest due";
+  grid-template-columns: 28px minmax(180px, 1.2fr) minmax(120px, 0.8fr) minmax(120px, 0.8fr) 76px;
+  gap: 10px;
+  align-items: center;
+  min-height: 112px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(18, 33, 49, 0.62);
+  box-shadow: inset 3px 0 0 var(--account-color, var(--mint));
+}
+
+.debtAccountRow .swatchButton {
+  grid-area: swatch;
+}
+
+.debtAccountMain {
+  grid-area: main;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  gap: 8px;
+}
+
+.balanceField {
+  grid-area: balance;
+}
+
+.limitField {
+  grid-area: limit;
+}
+
+.minimumField {
+  grid-area: minimum;
+}
+
+.aprField {
+  grid-area: apr;
+}
+
+.interestFreeField {
+  grid-area: interest;
+}
+
+.dueField {
+  grid-area: due;
+}
+
+.debtAccountRow .rowAction {
+  grid-area: remove;
+  justify-self: end;
+}
+
+.debtAccountMain input,
+.debtAccountMain select,
+.debtDraftGrid input,
+.debtDraftGrid select,
+.numberField input {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(5, 20, 36, 0.74);
+  color: var(--ink);
+}
+
+.debtAccountMain input,
+.debtDraftGrid input,
+.numberField input {
+  min-width: 0;
+  padding: 0 10px;
+}
+
+.debtAccountMain select,
+.debtDraftGrid select {
+  padding: 0 8px;
+}
+
+.numberField {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.numberField.compact {
+  grid-template-columns: 34px minmax(0, 1fr);
+}
+
+.numberField.hintField,
+.numberField.compact.hintField {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.numberField > span:not(.infoHint) {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 720;
+}
+
+.numberField .infoHint {
+  width: 24px;
+  height: 24px;
+  color: var(--muted);
+}
+
+.debtField {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.debtField > span {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 720;
+}
+
+.debtField .moneyInput {
+  min-width: 0;
+}
+
+.debtAccountMeta {
+  grid-area: meta;
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.debtAccountMeta span,
+.debtAccountMeta em {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.debtAccountMeta strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.debtDraftGrid {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.netWorthPanel {
+  min-height: 420px;
+}
+
+.compactSectionHeading {
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.compactSectionHeading h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.netWorthChart {
+  display: grid;
+  gap: 18px;
+}
+
+.netWorthChart.compact {
+  gap: 14px;
+}
+
+.netWorthStats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.netWorthStats div {
+  display: grid;
+  gap: 8px;
+  min-height: 76px;
+  align-content: center;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(18, 33, 49, 0.54);
+}
+
+.netWorthStats span,
+.netWorthLabels span {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.netWorthStats strong {
+  font-family: var(--mono);
+  font-size: 20px;
+}
+
+.netWorthChart.compact .netWorthStats div {
+  min-height: 62px;
+  padding: 12px;
+}
+
+.netWorthChart.compact .netWorthStats strong {
+  font-size: 16px;
+}
+
+.netWorthSvgWrap {
+  min-height: 260px;
+  overflow: hidden;
+}
+
+.netWorthSvgWrap svg {
+  width: 100%;
+  height: min(280px, 34vw);
+  min-height: 220px;
+  color: var(--mint);
+}
+
+.netWorthChart.compact .netWorthSvgWrap {
+  min-height: 210px;
+}
+
+.netWorthChart.compact .netWorthSvgWrap svg {
+  height: min(220px, 28vw);
+  min-height: 190px;
+}
+
+.netWorthAxis {
+  stroke: rgba(198, 198, 203, 0.18);
+  stroke-width: 2;
+}
+
+.netWorthLine {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.netWorthDot {
+  fill: var(--bg-deep);
+  stroke: var(--mint);
+  stroke-width: 3;
+}
+
+.netWorthLabels {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: -8px;
 }
 
 .healthPanel {
@@ -1469,6 +1809,14 @@ textarea:focus,
   color: var(--mint);
 }
 
+.panelTitleActions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
+}
+
 .panelTitle h3 {
   margin: 0;
   color: var(--ink);
@@ -1478,6 +1826,59 @@ textarea:focus,
 
 .healthPanel .panelTitle h3 {
   color: rgba(26, 28, 32, 0.72);
+}
+
+.infoHint {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  color: var(--mint);
+  cursor: help;
+  outline: 0;
+}
+
+.infoHint > span {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  z-index: 20;
+  width: min(320px, calc(100vw - 36px));
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: rgba(5, 20, 36, 0.98);
+  color: rgba(212, 228, 250, 0.9);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.35);
+  font-family: var(--body);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease;
+}
+
+.infoHint:hover > span,
+.infoHint:focus-visible > span {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.healthPanel .infoHint {
+  color: rgba(26, 28, 32, 0.62);
+}
+
+.healthPanel .infoHint > span {
+  border-color: rgba(26, 28, 32, 0.16);
+  background: rgba(235, 243, 255, 0.98);
+  color: rgba(26, 28, 32, 0.82);
 }
 
 .factList {
@@ -1848,7 +2249,7 @@ hr {
 }
 
 .scoreNumber {
-  margin-top: 34px;
+  margin-top: 26px;
   color: rgba(26, 28, 32, 0.42);
   font-size: 68px;
   line-height: 1;
@@ -1858,10 +2259,31 @@ hr {
   margin-left: 4px;
 }
 
+.creditEstimate {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 22px;
+  padding: 12px 14px;
+  border: 1px solid rgba(1, 15, 31, 0.12);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.18);
+  color: rgba(26, 28, 32, 0.62);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.creditEstimate strong {
+  color: rgba(26, 28, 32, 0.78);
+  font-size: 18px;
+}
+
 .ruleList {
   display: grid;
-  gap: 18px;
-  margin-top: 54px;
+  gap: 12px;
+  margin-top: 20px;
 }
 
 .progressRule {
@@ -1929,17 +2351,149 @@ hr {
   gap: 18px;
 }
 
+.iconToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(1, 15, 31, 0.22);
+}
+
+.iconToggle button {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+}
+
+.iconToggle button.selected {
+  background: rgba(0, 223, 193, 0.12);
+  color: var(--mint);
+}
+
+.chartUtilityRow {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.flowComparisonChart {
+  display: grid;
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.flowComparisonChart svg {
+  width: 100%;
+  height: 270px;
+}
+
+.flowMonth text {
+  fill: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.flowMonth:not(.active) {
+  opacity: 0.28;
+}
+
+.flowBar {
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease;
+}
+
+.flowBar.income {
+  fill: var(--mint);
+}
+
+.flowBar.expense {
+  fill: #ffa8a0;
+}
+
+.flowMonth:hover .flowBar {
+  opacity: 0.82;
+}
+
+.flowLegend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.flowLegend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.flowLegend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.flowLegend i.income {
+  background: var(--mint);
+}
+
+.flowLegend i.expense {
+  background: #ffa8a0;
+}
+
 .anomalyList {
   display: grid;
   gap: 16px;
   margin-top: 22px;
 }
 
-.anomalyList > div {
+.signalCard {
+  position: relative;
+  z-index: 0;
   padding: 16px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: rgba(1, 15, 31, 0.2);
+  box-shadow: inset 3px 0 0 rgba(167, 200, 255, 0.42);
+}
+
+.signalCard:hover,
+.signalCard:focus-within {
+  z-index: 5;
+}
+
+.signalCard.danger {
+  border-color: rgba(255, 168, 160, 0.32);
+  box-shadow: inset 3px 0 0 var(--red);
+}
+
+.signalCard.warning {
+  border-color: rgba(244, 195, 106, 0.28);
+  box-shadow: inset 3px 0 0 var(--amber);
+}
+
+.signalCard.good {
+  border-color: rgba(0, 223, 193, 0.24);
+  box-shadow: inset 3px 0 0 var(--mint);
+}
+
+.signalTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .anomalyList strong,
@@ -1948,9 +2502,23 @@ hr {
 }
 
 .anomalyList span {
-  margin-top: 8px;
+  margin-top: 10px;
   color: rgba(212, 228, 250, 0.78);
   line-height: 1.5;
+}
+
+.signalCard .infoHint {
+  width: 24px;
+  height: 24px;
+}
+
+.signalCard .infoHint > span {
+  top: calc(100% + 8px);
+  right: -4px;
+  bottom: auto;
+  border-color: rgba(0, 223, 193, 0.35);
+  background: rgba(5, 20, 36, 0.99);
+  color: rgba(236, 246, 255, 0.96);
 }
 
 .settingsHeader {
@@ -2036,6 +2604,321 @@ hr {
   gap: 10px;
   margin-top: auto;
   flex-wrap: wrap;
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background: rgba(1, 15, 31, 0.72);
+  backdrop-filter: blur(14px);
+}
+
+.importModal {
+  width: min(1180px, 100%);
+  max-height: min(900px, calc(100vh - 56px));
+  display: grid;
+  grid-template-rows: auto auto auto 1fr auto;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: rgba(13, 28, 45, 0.98);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
+}
+
+.importModalHeader,
+.importModalFooter,
+.importToolbar,
+.importStats,
+.bulkCategoryField,
+.checkCell {
+  display: flex;
+  align-items: center;
+}
+
+.importModalHeader {
+  justify-content: space-between;
+  gap: 18px;
+  padding: 20px 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.importModalHeader h2 {
+  margin: 4px 0 0;
+  font-size: 24px;
+  letter-spacing: 0;
+}
+
+.eyebrow {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.importStats {
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.importStats span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(18, 33, 49, 0.64);
+  color: rgba(212, 228, 250, 0.78);
+  font-size: 13px;
+}
+
+.importStats b {
+  color: var(--ink);
+}
+
+.importToolbar {
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.bulkCategoryField {
+  gap: 8px;
+  margin-left: auto;
+}
+
+.bulkCategoryField span {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.bulkCategoryField input,
+.importTable input,
+.importTable select {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(5, 20, 36, 0.74);
+  color: var(--ink);
+}
+
+.bulkCategoryField input {
+  width: 180px;
+  padding: 0 10px;
+}
+
+.importTableShell {
+  min-height: 260px;
+  overflow: auto;
+}
+
+.importTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.importTable th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(13, 28, 45, 0.98);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.importTable td {
+  padding: 11px 12px;
+  border-bottom: 1px solid rgba(198, 198, 203, 0.08);
+  vertical-align: middle;
+}
+
+.importTable tr.selected {
+  background: rgba(0, 223, 193, 0.05);
+}
+
+.importTable tr.duplicate {
+  background: rgba(244, 195, 106, 0.06);
+}
+
+.importTable td:nth-child(1) {
+  width: 72px;
+}
+
+.importTable td:nth-child(3) {
+  min-width: 250px;
+}
+
+.importTable td:nth-child(3) strong,
+.importTable td:nth-child(3) span,
+.importTable td:nth-child(7) em {
+  display: block;
+}
+
+.importTable td:nth-child(3) span,
+.importTable td:nth-child(7) em {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.importTable input:not([type="checkbox"]) {
+  width: min(180px, 100%);
+  padding: 0 9px;
+}
+
+.importTable select {
+  width: 140px;
+  padding: 0 8px;
+}
+
+.checkCell {
+  justify-content: center;
+}
+
+.checkCell input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--mint);
+}
+
+.importSignal {
+  display: inline-flex;
+  min-width: 74px;
+  justify-content: center;
+  padding: 4px 8px;
+  border: 1px solid rgba(0, 223, 193, 0.24);
+  border-radius: 999px;
+  background: var(--mint-soft);
+  color: var(--mint);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.importSignal.low {
+  border-color: rgba(244, 195, 106, 0.26);
+  background: rgba(244, 195, 106, 0.1);
+  color: var(--amber);
+}
+
+.importSignal.duplicate {
+  border-color: rgba(244, 195, 106, 0.32);
+  background: rgba(244, 195, 106, 0.12);
+  color: var(--amber);
+}
+
+.importErrorList {
+  margin: 18px 22px;
+  padding: 16px;
+  border: 1px solid rgba(255, 180, 171, 0.34);
+  border-radius: var(--radius);
+  background: rgba(255, 180, 171, 0.1);
+  color: var(--red);
+}
+
+.importModalFooter {
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 22px;
+  border-top: 1px solid var(--line);
+}
+
+.inlineCta {
+  min-width: 150px;
+  min-height: 40px;
+  margin: 0;
+}
+
+.inlineCta:disabled,
+.commandButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+  transform: none;
+}
+
+.importHistory {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.historyHead.compact,
+.importHistoryRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px 110px auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.historyHead.compact {
+  min-height: auto;
+  padding: 0 8px 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.importHistoryRow {
+  min-height: 48px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(18, 33, 49, 0.54);
+  font-size: 13px;
+}
+
+.importHistoryRow strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.importHistoryRow span {
+  color: rgba(212, 228, 250, 0.76);
+}
+
+.undoImportToast {
+  position: fixed;
+  right: 22px;
+  bottom: 82px;
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: rgba(13, 28, 45, 0.96);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.32);
+}
+
+.undoImportToast span {
+  color: rgba(212, 228, 250, 0.82);
+  font-size: 13px;
+}
+
+.undoImportToast b {
+  color: var(--ink);
 }
 
 .settingsSide {
@@ -2255,6 +3138,7 @@ hr {
 
   .monthlyGrid,
   .dashboardGrid,
+  .accountsGrid,
   .insightsGrid,
   .settingsGrid {
     grid-template-columns: 1fr;
@@ -2282,7 +3166,7 @@ hr {
   }
 
   .navStack {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 
   .navItem {
@@ -2372,9 +3256,84 @@ hr {
   .summaryStrip,
   .annualGrid,
   .dataActionGrid,
+  .debtMiniGrid,
   .goalAmounts,
   .notesBand .goalPanel {
     grid-template-columns: 1fr;
+  }
+
+  .modalBackdrop {
+    padding: 10px;
+    align-items: stretch;
+  }
+
+  .importModal {
+    max-height: calc(100vh - 20px);
+  }
+
+  .importModalHeader,
+  .importToolbar,
+  .importModalFooter {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .importToolbar .buttonRow,
+  .bulkCategoryField,
+  .bulkCategoryField input,
+  .importModalFooter .commandButton,
+  .importModalFooter .inlineCta {
+    width: 100%;
+  }
+
+  .importToolbar .buttonRow .commandButton {
+    flex: 1 1 120px;
+  }
+
+  .debtMiniGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .netWorthStats {
+    grid-template-columns: 1fr;
+  }
+
+  .compactSectionHeading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .debtAccountRow {
+    grid-template-areas:
+      "swatch main remove"
+      "meta meta meta"
+      "balance balance balance"
+      "limit limit limit"
+      "minimum minimum minimum"
+      "apr interest interest"
+      "due due due";
+    grid-template-columns: 28px minmax(0, 1fr) 38px;
+  }
+
+  .debtAccountMain {
+    grid-template-columns: 1fr;
+  }
+
+  .historyHead.compact {
+    display: none;
+  }
+
+  .importHistoryRow {
+    grid-template-columns: 1fr;
+  }
+
+  .undoImportToast {
+    right: 10px;
+    bottom: 10px;
+    left: 10px;
+    max-width: none;
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .notesBand .panelTitle,

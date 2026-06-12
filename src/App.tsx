@@ -10,10 +10,12 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleHelp,
+  CreditCard,
   Database,
   Download,
   Eye,
   EyeOff,
+  FileSpreadsheet,
   FileJson,
   FolderPlus,
   Gauge,
@@ -29,13 +31,21 @@ import {
   ShieldCheck,
   Target,
   Trash2,
+  X,
   Upload,
   WalletCards,
 } from "lucide-react";
 import {
   buildCsvExport,
+  buildFinancialSignals,
+  buildMonthlyFlowPoints,
+  buildNetWorthOutlook,
+  calculateHealthScore,
+  calculateDebtSummary,
   calculateProjection,
+  clampDueDay,
   clampPercent,
+  clampWholeNumber,
   colors,
   createId,
   createInitialState,
@@ -47,11 +57,31 @@ import {
   seedMonthFromPrevious,
   shiftMonth,
 } from "./finance";
+import { buildRulePattern, parseBankCsv, sortImportRows, type CsvImportRow } from "./importer";
 import { loadLedgerState, saveLedgerState } from "./storage";
-import type { CurrencyCode, ExpenseEntry, IncomeEntry, LedgerState, MonthBudget, Projection } from "./types";
+import type {
+  CategoryRule,
+  CurrencyCode,
+  DebtAccount,
+  DebtAccountType,
+  ExpenseEntry,
+  FinancialSignal,
+  HealthScoreBreakdown,
+  ImportBatch,
+  ImportedTransactionRef,
+  IncomeEntry,
+  LedgerState,
+  MonthBudget,
+  MonthlyFlowPoint,
+  NetWorthPoint,
+  Projection,
+  TransactionKind,
+} from "./types";
 
 type ProjectionView = "overview" | "category" | "month";
-type AppView = "dashboard" | "ledger" | "insights" | "settings";
+type AppView = "dashboard" | "ledger" | "accounts" | "insights" | "settings";
+type NetWorthHorizon = 12 | 24 | 60;
+type InsightChartView = "inflow-outflow" | "cash-flow" | "net-worth";
 type ExpenseDropPreview =
   | { type: "reorder"; targetId: string; edge: "before" | "after" }
   | { type: "category"; category: string }
@@ -60,6 +90,17 @@ type ExpenseDropPreview =
 type ExpenseDropState = "before" | "after" | "combine";
 type CategoryMenuState = { expenseId: string; x: number; y: number };
 type CategoryOption = { name: string; color: string; count: number; total: number };
+type ImportReviewState = {
+  fileName: string;
+  rows: CsvImportRow[];
+  errors: string[];
+  totalRows: number;
+};
+type LastImportAction = {
+  batchId: string;
+  fileName: string;
+  importedRows: number;
+};
 
 type IncomeDraft = {
   source: string;
@@ -69,6 +110,17 @@ type IncomeDraft = {
 type ExpenseDraft = {
   name: string;
   amount: string;
+};
+
+type DebtDraft = {
+  name: string;
+  type: DebtAccountType;
+  balance: string;
+  creditLimit: string;
+  apr: string;
+  interestFreeMonths: string;
+  minimumPayment: string;
+  dueDay: string;
 };
 
 const initialIncomeDraft: IncomeDraft = {
@@ -81,13 +133,27 @@ const initialExpenseDraft: ExpenseDraft = {
   amount: "",
 };
 
+const initialDebtDraft: DebtDraft = {
+  name: "",
+  type: "credit-card",
+  balance: "",
+  creditLimit: "",
+  apr: "",
+  interestFreeMonths: "",
+  minimumPayment: "",
+  dueDay: "",
+};
+
 function App() {
   const [ledger, setLedger] = useState<LedgerState>(() => createInitialState());
   const [hydrated, setHydrated] = useState(false);
   const [saveState, setSaveState] = useState<"loading" | "saved" | "saving" | "offline">("loading");
   const [incomeDraft, setIncomeDraft] = useState<IncomeDraft>(initialIncomeDraft);
   const [expenseDraft, setExpenseDraft] = useState<ExpenseDraft>(initialExpenseDraft);
+  const [debtDraft, setDebtDraft] = useState<DebtDraft>(initialDebtDraft);
   const [projectionView, setProjectionView] = useState<ProjectionView>("overview");
+  const [insightChartView, setInsightChartView] = useState<InsightChartView>("inflow-outflow");
+  const [netWorthHorizon, setNetWorthHorizon] = useState<NetWorthHorizon>(24);
   const [activeView, setActiveView] = useState<AppView>("ledger");
   const [animationsEnabled, setAnimationsEnabled] = useState(true);
   const [query, setQuery] = useState("");
@@ -96,6 +162,8 @@ function App() {
   const [groupingSourceId, setGroupingSourceId] = useState<string | null>(null);
   const [dropPreview, setDropPreview] = useState<ExpenseDropPreview>(null);
   const [categoryMenu, setCategoryMenu] = useState<CategoryMenuState | null>(null);
+  const [importReview, setImportReview] = useState<ImportReviewState | null>(null);
+  const [lastImportAction, setLastImportAction] = useState<LastImportAction | null>(null);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(() => new Set());
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const incomeSourceInputRef = useRef<HTMLInputElement | null>(null);
@@ -103,11 +171,23 @@ function App() {
   const expenseNameInputRef = useRef<HTMLInputElement | null>(null);
   const expenseAmountInputRef = useRef<HTMLInputElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const csvInputRef = useRef<HTMLInputElement | null>(null);
 
   const currentMonth = ledger.months[ledger.selectedMonth] ?? seedMonthFromPrevious();
   const moneyFormatter = useMemo(() => getCurrencyFormatter(ledger.currency), [ledger.currency]);
   const currencySymbol = useMemo(() => getCurrencySymbol(ledger.currency), [ledger.currency]);
   const projection = useMemo(() => calculateProjection(currentMonth), [currentMonth]);
+  const debtSummary = useMemo(() => calculateDebtSummary(ledger.debts), [ledger.debts]);
+  const netWorthOutlook = useMemo(
+    () =>
+      buildNetWorthOutlook({
+        debts: ledger.debts,
+        projection,
+        startingCash: ledger.goal.saved,
+        months: netWorthHorizon,
+      }),
+    [ledger.debts, ledger.goal.saved, netWorthHorizon, projection],
+  );
   const categoryRows = useMemo(() => buildCategoryRows(currentMonth, projection), [currentMonth, projection]);
   const expenseGroups = useMemo(() => buildExpenseGroups(currentMonth.expenses), [currentMonth.expenses]);
   const categoryOptions: CategoryOption[] = useMemo(
@@ -117,6 +197,26 @@ function App() {
         .map((group) => ({ name: group.category, color: group.color, count: group.items.length, total: group.total })),
     [expenseGroups],
   );
+  const importCategoryOptions = useMemo(() => {
+    const names = new Set([
+      "Unsorted",
+      "Income",
+      "Home",
+      "Food",
+      "Bills",
+      "Travel",
+      "Subscriptions",
+      "Health",
+      "Tax",
+      "Debt payments",
+      "Transfers",
+    ]);
+    categoryOptions.forEach((option) => names.add(option.name));
+    importReview?.rows.forEach((row) => {
+      if (row.category) names.add(row.category);
+    });
+    return Array.from(names).sort((a, b) => a.localeCompare(b));
+  }, [categoryOptions, importReview?.rows]);
   const normalizedQuery = query.trim().toLowerCase();
   const visibleIncomes = useMemo(() => {
     if (!normalizedQuery) return currentMonth.incomes;
@@ -133,6 +233,15 @@ function App() {
     );
   }, [currentMonth.expenses, expenseGroups, normalizedQuery]);
   const monthlyBars = useMemo(() => buildMonthlyBars(ledger, currentMonth), [ledger, currentMonth]);
+  const monthlyFlowPoints = useMemo(() => buildMonthlyFlowPoints(ledger), [ledger]);
+  const healthScore = useMemo(
+    () => calculateHealthScore({ projection, debtSummary, debts: ledger.debts, savingsTarget: ledger.savingsTarget }),
+    [debtSummary, ledger.debts, ledger.savingsTarget, projection],
+  );
+  const financialSignals = useMemo(
+    () => buildFinancialSignals({ projection, debtSummary, debts: ledger.debts, month: currentMonth, savingsTarget: ledger.savingsTarget }),
+    [currentMonth, debtSummary, ledger.debts, ledger.savingsTarget, projection],
+  );
   const goalPercent = clampPercent((ledger.goal.saved / Math.max(ledger.goal.target, 1)) * 100);
   const selectedYear = ledger.selectedMonth.split("-")[0];
   const menuExpense = categoryMenu ? currentMonth.expenses.find((expense) => expense.id === categoryMenu.expenseId) : undefined;
@@ -331,6 +440,52 @@ function App() {
       expenses: month.expenses.filter((expense) => expense.id !== id),
     }));
     setToast("Expense removed");
+  }
+
+  function addDebtAccount() {
+    const name = debtDraft.name.trim();
+    if (!name) {
+      setToast("Add an account name");
+      return;
+    }
+
+    updateLedger((current) => ({
+      ...current,
+      debts: [
+        ...current.debts,
+        {
+          id: createId("debt"),
+          name,
+          type: debtDraft.type,
+          balance: Math.max(0, Number(debtDraft.balance) || 0),
+          creditLimit: Math.max(0, Number(debtDraft.creditLimit) || 0),
+          apr: Math.max(0, Number(debtDraft.apr) || 0),
+          interestFreeMonths: clampWholeNumber(Number(debtDraft.interestFreeMonths) || 0, 120),
+          minimumPayment: Math.max(0, Number(debtDraft.minimumPayment) || 0),
+          dueDay: clampDueDay(Number(debtDraft.dueDay) || 1),
+          includeInNetWorth: true,
+          color: colors[current.debts.length % colors.length],
+          note: "",
+        },
+      ],
+    }));
+    setDebtDraft(initialDebtDraft);
+    setToast("Account added");
+  }
+
+  function updateDebtAccount(id: string, patch: Partial<DebtAccount>) {
+    updateLedger((current) => ({
+      ...current,
+      debts: current.debts.map((debt) => (debt.id === id ? { ...debt, ...patch } : debt)),
+    }));
+  }
+
+  function removeDebtAccount(id: string) {
+    updateLedger((current) => ({
+      ...current,
+      debts: current.debts.filter((debt) => debt.id !== id),
+    }));
+    setToast("Account removed");
   }
 
   function changeCurrency(currency: CurrencyCode) {
@@ -575,6 +730,175 @@ function App() {
     }
   }
 
+  async function importCsv(file: File) {
+    try {
+      const text = await file.text();
+      const result = parseBankCsv({ text, fileName: file.name, state: ledger, fallbackMonthKey: ledger.selectedMonth });
+      setImportReview({
+        fileName: file.name,
+        rows: result.rows,
+        errors: result.errors,
+        totalRows: result.totalRows,
+      });
+      setToast(result.rows.length ? "CSV ready for review" : "CSV needs review");
+    } catch {
+      setToast("CSV import failed");
+    } finally {
+      if (csvInputRef.current) {
+        csvInputRef.current.value = "";
+      }
+    }
+  }
+
+  function updateImportReviewRow(id: string, patch: Partial<CsvImportRow>) {
+    setImportReview((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        rows: current.rows.map((row, index) =>
+          row.id === id
+            ? {
+                ...row,
+                ...patch,
+                color: patch.category ? categoryColor(patch.category, index) : row.color,
+              }
+            : row,
+        ),
+      };
+    });
+  }
+
+  function setAllImportRowsIncluded(include: boolean) {
+    setImportReview((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        rows: current.rows.map((row) => ({ ...row, include })),
+      };
+    });
+  }
+
+  function skipDuplicateImportRows() {
+    setImportReview((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        rows: current.rows.map((row) => (row.duplicate ? { ...row, include: false } : row)),
+      };
+    });
+  }
+
+  function applyImportCategoryToIncluded(category: string) {
+    const trimmed = category.trim();
+    if (!trimmed) return;
+    setImportReview((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        rows: sortImportRows(
+          current.rows.map((row, index) =>
+            row.include
+              ? {
+                  ...row,
+                  category: trimmed,
+                  color: categoryColor(trimmed, index),
+                }
+              : row,
+          ),
+        ),
+      };
+    });
+  }
+
+  function confirmCsvImport() {
+    if (!importReview) return;
+    const rowsToImport = importReview.rows.filter((row) => row.include && row.kind !== "transfer");
+    if (!rowsToImport.length) {
+      setToast("No transactions selected");
+      return;
+    }
+
+    const batchId = createId("batch");
+    const importedAt = new Date().toISOString();
+    const transactionRefs: ImportedTransactionRef[] = [];
+
+    updateLedger((current) => {
+      const months = { ...current.months };
+
+      rowsToImport.forEach((row, index) => {
+        const month = months[row.monthKey] ?? seedMonthFromPrevious();
+        const imported = {
+          batchId,
+          fileName: importReview.fileName,
+          rowNumber: row.rowNumber,
+          hash: row.hash,
+          originalDescription: row.description,
+          importedAt,
+        };
+
+        if (row.kind === "income") {
+          const entry: IncomeEntry = {
+            id: createId("income"),
+            source: row.description,
+            amount: Math.abs(row.amount),
+            color: row.color || colors[index % colors.length],
+            date: row.date,
+            imported,
+          };
+          months[row.monthKey] = {
+            ...month,
+            incomes: [...month.incomes, entry],
+          };
+          transactionRefs.push({ monthKey: row.monthKey, entryId: entry.id, kind: "income" });
+          return;
+        }
+
+        const entry: ExpenseEntry = {
+          id: createId("expense"),
+          name: row.description,
+          amount: Math.abs(row.amount),
+          category: row.category.trim() || (row.kind === "debt-payment" ? "Debt payments" : "Unsorted"),
+          color: row.color || colors[(index + 2) % colors.length],
+          date: row.date,
+          imported,
+        };
+        months[row.monthKey] = {
+          ...month,
+          expenses: [...month.expenses, entry],
+        };
+        transactionRefs.push({ monthKey: row.monthKey, entryId: entry.id, kind: "expense" });
+      });
+
+      const batch: ImportBatch = {
+        id: batchId,
+        fileName: importReview.fileName,
+        importedAt,
+        totalRows: importReview.totalRows,
+        importedRows: transactionRefs.length,
+        skippedRows: Math.max(0, importReview.totalRows - transactionRefs.length),
+        transactionRefs,
+      };
+
+      return {
+        ...current,
+        months,
+        categoryRules: mergeCategoryRules(current.categoryRules, rowsToImport, importedAt),
+        importBatches: [batch, ...current.importBatches].slice(0, 25),
+      };
+    });
+
+    setImportReview(null);
+    setLastImportAction({ batchId, fileName: importReview.fileName, importedRows: rowsToImport.length });
+    setActiveView("ledger");
+    setToast(`Imported ${rowsToImport.length} transactions`);
+  }
+
+  function undoImportBatch(batchId: string) {
+    updateLedger((current) => removeImportBatchFromState(current, batchId));
+    setLastImportAction((current) => (current?.batchId === batchId ? null : current));
+    setToast("Import removed");
+  }
+
   function resetMonth() {
     updateCurrentMonth(() => ({ incomes: [], expenses: [], note: "" }));
     setToast("Month cleared");
@@ -642,6 +966,7 @@ function App() {
   const navItems: Array<{ id: AppView; label: string; icon: ReactNode }> = [
     { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard size={20} /> },
     { id: "ledger", label: "Ledger", icon: <ReceiptText size={20} /> },
+    { id: "accounts", label: "Accounts", icon: <CreditCard size={20} /> },
     { id: "insights", label: "Insights", icon: <LineChart size={20} /> },
     { id: "settings", label: "Settings", icon: <SettingsIcon size={20} /> },
   ];
@@ -650,9 +975,17 @@ function App() {
       ? "Dashboard"
       : activeView === "ledger"
         ? "Ledger"
-        : activeView === "insights"
-          ? "Spending Intelligence"
-          : "Management Hub";
+        : activeView === "accounts"
+          ? "Accounts"
+          : activeView === "insights"
+            ? "Spending Intelligence"
+            : "Management Hub";
+  const insightChartTitle =
+    insightChartView === "cash-flow"
+      ? "Cash flow volatility"
+      : insightChartView === "net-worth"
+        ? "Net worth outlook"
+        : "Inflows vs outflows";
 
   return (
     <div className={`appShell ${ledger.privacyMode ? "privacy-on" : ""} ${animationsEnabled ? "motion-on" : "motion-off"}`}>
@@ -664,6 +997,16 @@ function App() {
         onChange={(event) => {
           const file = event.currentTarget.files?.[0];
           if (file) void importJson(file);
+        }}
+      />
+      <input
+        ref={csvInputRef}
+        className="hiddenFile"
+        type="file"
+        accept="text/csv,.csv"
+        onChange={(event) => {
+          const file = event.currentTarget.files?.[0];
+          if (file) void importCsv(file);
         }}
       />
 
@@ -797,12 +1140,48 @@ function App() {
 
               <section className="dashboardGrid">
                 <article className="miniPanel flowPanel">
-                  <PanelTitle title="Cash flow volatility" icon={<BarChart3 size={16} />} />
-                  <BarChart bars={monthlyBars} privacy={ledger.privacyMode} formatter={moneyFormatter} />
+                  <PanelTitle
+                    title="Net worth outlook"
+                    icon={<LineChart size={16} />}
+                    action={<NetWorthHorizonTabs horizon={netWorthHorizon} onChange={setNetWorthHorizon} compact />}
+                  />
+                  <p className="panelSubcopy">Projects monthly cash flow, debt payments, and interest after any 0% period ends.</p>
+                  <NetWorthChart points={netWorthOutlook} formatter={moneyFormatter} privacy={ledger.privacyMode} compact />
                 </article>
                 <article className="miniPanel ledgerPreview">
                   <PanelTitle title="Master ledger" icon={<ReceiptText size={16} />} />
                   <TransactionHistory month={currentMonth} privacy={ledger.privacyMode} formatter={moneyFormatter} />
+                </article>
+                <article className="miniPanel debtPanel">
+                  <PanelTitle title="Accounts and imports" icon={<CreditCard size={16} />} />
+                  <div className="debtMiniGrid">
+                    <div>
+                      <span>Total debt</span>
+                      <strong className={ledger.privacyMode ? "masked" : ""}>{moneyFormatter.format(debtSummary.totalDebt)}</strong>
+                    </div>
+                    <div>
+                      <span>Monthly payments</span>
+                      <strong className={ledger.privacyMode ? "masked" : ""}>{moneyFormatter.format(debtSummary.monthlyMinimums)}</strong>
+                    </div>
+                    <div>
+                      <span>Utilization</span>
+                      <strong>{formatDecimal(debtSummary.utilization)}%</strong>
+                    </div>
+                    <div>
+                      <span>Last import</span>
+                      <strong>{ledger.importBatches[0]?.importedRows ?? 0} rows</strong>
+                    </div>
+                  </div>
+                  <div className="buttonRow dashboardActions">
+                    <button className="commandButton" type="button" onClick={() => setActiveView("accounts")}>
+                      <CreditCard size={16} />
+                      Manage accounts
+                    </button>
+                    <button className="commandButton" type="button" onClick={() => csvInputRef.current?.click()}>
+                      <FileSpreadsheet size={16} />
+                      Import CSV
+                    </button>
+                  </div>
                 </article>
               </section>
             </section>
@@ -1071,6 +1450,141 @@ function App() {
             </section>
           )}
 
+          {activeView === "accounts" && (
+            <section className="viewStack" aria-label="Accounts">
+              <div className="pageHeader compactHeader">
+                <div>
+                  <h2>Accounts</h2>
+                  <p>Debt, credit limits, monthly payments, interest-free periods, and due dates alongside the monthly ledger.</p>
+                </div>
+                <div className="netBlock">
+                  <span>Total Debt</span>
+                  <strong className={ledger.privacyMode ? "negativeText masked" : "negativeText"}>
+                    <AnimatedCurrency value={debtSummary.totalDebt} formatter={moneyFormatter} />
+                  </strong>
+                </div>
+              </div>
+
+              <section className="summaryStrip" aria-label="Debt snapshot">
+                <MetricCard label="Debt balance" value={debtSummary.totalDebt} tone="red" privacy={ledger.privacyMode} formatter={moneyFormatter} />
+                <MetricCard label="Available credit" value={debtSummary.availableCredit} tone="green" privacy={ledger.privacyMode} formatter={moneyFormatter} />
+                <MetricCard label="Monthly payments" value={debtSummary.monthlyMinimums} tone="amber" privacy={ledger.privacyMode} formatter={moneyFormatter} />
+                <MetricCard label="Utilization" value={debtSummary.utilization} suffix="%" tone={debtSummary.utilization < 30 ? "green" : "amber"} />
+              </section>
+
+              <section className="accountsGrid">
+                <article className="miniPanel accountsPanel">
+                  <PanelTitle title="Debt accounts" icon={<CreditCard size={16} />} />
+                  <div className="debtAccountList">
+                    {ledger.debts.length ? (
+                      ledger.debts.map((debt) => (
+                        <DebtAccountRow
+                          key={debt.id}
+                          debt={debt}
+                          symbol={currencySymbol}
+                          formatter={moneyFormatter}
+                          privacy={ledger.privacyMode}
+                          onChange={(patch) => updateDebtAccount(debt.id, patch)}
+                          onRemove={() => removeDebtAccount(debt.id)}
+                        />
+                      ))
+                    ) : (
+                      <EmptyState icon={<CreditCard size={18} />} title="No debt accounts" text="Add a credit card, loan, overdraft, or other balance to track it here." />
+                    )}
+                  </div>
+                </article>
+
+                <article className="miniPanel accountEditorPanel">
+                  <PanelTitle title="Add account" icon={<Plus size={16} />} />
+                  <div className="debtDraftGrid">
+                    <input
+                      value={debtDraft.name}
+                      placeholder="Account name"
+                      onChange={(event) => setDebtDraft((draft) => ({ ...draft, name: event.target.value }))}
+                      onKeyDown={(event) => handleDraftEnter(event, addDebtAccount)}
+                      aria-label="Debt account name"
+                    />
+                    <select
+                      value={debtDraft.type}
+                      onChange={(event) => setDebtDraft((draft) => ({ ...draft, type: event.target.value as DebtAccountType }))}
+                      aria-label="Debt account type"
+                    >
+                      <option value="credit-card">Credit card</option>
+                      <option value="loan">Loan</option>
+                      <option value="overdraft">Overdraft</option>
+                      <option value="other">Other</option>
+                    </select>
+                    <MoneyInput
+                      ariaLabel="Debt balance"
+                      value={debtDraft.balance}
+                      symbol={currencySymbol}
+                      placeholder="Current balance"
+                      onChange={(value) => setDebtDraft((draft) => ({ ...draft, balance: value }))}
+                    />
+                    <MoneyInput
+                      ariaLabel="Credit limit"
+                      value={debtDraft.creditLimit}
+                      symbol={currencySymbol}
+                      placeholder="Credit limit"
+                      onChange={(value) => setDebtDraft((draft) => ({ ...draft, creditLimit: value }))}
+                    />
+                    <label className="numberField hintField">
+                      <input
+                        value={debtDraft.apr}
+                        inputMode="decimal"
+                        placeholder="Interest rate %"
+                        onChange={(event) => setDebtDraft((draft) => ({ ...draft, apr: event.target.value }))}
+                        aria-label="Debt APR"
+                      />
+                      <InfoHint
+                        label="Interest rate help"
+                        text="Enter the annual percentage rate charged after any interest-free period ends. Use 0 if the account has no interest."
+                      />
+                    </label>
+                    <label className="numberField hintField">
+                      <input
+                        value={debtDraft.interestFreeMonths}
+                        inputMode="numeric"
+                        placeholder="Interest-free months left"
+                        onChange={(event) => setDebtDraft((draft) => ({ ...draft, interestFreeMonths: event.target.value }))}
+                        aria-label="Interest-free months"
+                      />
+                      <InfoHint
+                        label="Promotional period help"
+                        text="Enter how many months remain before APR starts applying. The net-worth forecast delays interest until this period ends."
+                      />
+                    </label>
+                    <MoneyInput
+                      ariaLabel="Monthly payment"
+                      value={debtDraft.minimumPayment}
+                      symbol={currencySymbol}
+                      placeholder="Monthly payment"
+                      onChange={(value) => setDebtDraft((draft) => ({ ...draft, minimumPayment: value }))}
+                    />
+                    <label className="numberField hintField">
+                      <input
+                        value={debtDraft.dueDay}
+                        inputMode="numeric"
+                        placeholder="Payment due day (1-31)"
+                        onChange={(event) => setDebtDraft((draft) => ({ ...draft, dueDay: event.target.value }))}
+                        onKeyDown={(event) => handleDraftEnter(event, addDebtAccount)}
+                        aria-label="Payment due day"
+                      />
+                      <InfoHint
+                        label="Payment date help"
+                        text="Enter the day of the month the payment is due. This keeps upcoming payment reminders and account context clear."
+                      />
+                    </label>
+                    <button className="navCta inlineCta" type="button" onClick={addDebtAccount}>
+                      Add account
+                    </button>
+                  </div>
+                </article>
+              </section>
+
+            </section>
+          )}
+
           {activeView === "insights" && (
             <section className="viewStack" aria-label="Insights">
               <div className="pageHeader compactHeader">
@@ -1082,17 +1596,43 @@ function App() {
 
               <section className="insightsGrid">
                 <article className="miniPanel healthPanel">
-                  <PanelTitle title="Health score" icon={<Gauge size={16} />} />
-                  <div className="scoreNumber">{formatDecimal(Math.max(0, Math.min(10, projection.savingsRate / 5 + 5)))}</div>
-                  <span className="scoreCaption">/10</span>
+                  <PanelTitle
+                    title="Health score"
+                    icon={<Gauge size={16} />}
+                    action={<InfoHint label="How health score is calculated" text={healthScore.detail} />}
+                  />
+                  <div className="scoreNumber">{formatDecimal(healthScore.score)}</div>
+                  <span className="scoreCaption">/10 · {healthScore.summary}</span>
+                  <div className="creditEstimate">
+                    <span>Estimated credit score</span>
+                    <strong>{healthScore.estimatedCreditScore}</strong>
+                  </div>
                   <div className="ruleList">
-                    <ProgressRule label="Needs" value={projection.monthlyIncome ? (projection.monthlyExpenses / projection.monthlyIncome) * 100 : 0} target={50} tone="neutral" />
-                    <ProgressRule label="Savings" value={projection.savingsRate} target={ledger.savingsTarget} tone="good" />
+                    <ProgressRule label="Cash flow" value={healthScore.cashFlowScore} target={75} tone="good" />
+                    <ProgressRule label="Debt load" value={healthScore.debtLoadScore} target={75} tone="neutral" />
+                    <ProgressRule label="Payments" value={healthScore.paymentPressureScore} target={75} tone="neutral" />
+                    <ProgressRule label="Card headroom" value={healthScore.utilizationScore} target={75} tone="neutral" />
+                    <ProgressRule label="Savings" value={healthScore.savingsScore} target={75} tone="good" />
                   </div>
                 </article>
                 <article className="miniPanel chartPanel">
-                  <PanelTitle title="Inflows vs outflows" icon={<LineChart size={16} />} />
-                  <LineGraph projection={projection} />
+                  <PanelTitle
+                    title={insightChartTitle}
+                    icon={insightChartView === "cash-flow" ? <BarChart3 size={16} /> : <LineChart size={16} />}
+                    action={<InsightChartToggle value={insightChartView} onChange={setInsightChartView} />}
+                  />
+                  {insightChartView === "inflow-outflow" && (
+                    <InflowOutflowChart points={monthlyFlowPoints} privacy={ledger.privacyMode} formatter={moneyFormatter} />
+                  )}
+                  {insightChartView === "cash-flow" && <BarChart bars={monthlyBars} privacy={ledger.privacyMode} formatter={moneyFormatter} />}
+                  {insightChartView === "net-worth" && (
+                    <>
+                      <div className="chartUtilityRow">
+                        <NetWorthHorizonTabs horizon={netWorthHorizon} onChange={setNetWorthHorizon} compact />
+                      </div>
+                      <NetWorthChart points={netWorthOutlook} formatter={moneyFormatter} privacy={ledger.privacyMode} compact />
+                    </>
+                  )}
                 </article>
                 <article className="miniPanel categoryPanel">
                   <PanelTitle title="Top categories" icon={<Database size={16} />} />
@@ -1112,20 +1652,14 @@ function App() {
                   </div>
                 </article>
                 <article className="miniPanel anomalyPanel">
-                  <PanelTitle title="Detected anomalies" icon={<Info size={16} />} />
+                  <PanelTitle
+                    title="Detected anomalies"
+                    icon={<InfoHint label="About detected anomalies" text="Flags are generated only from local income, outflow, debt, card limit, APR, payment, and categorisation data. They are not financial advice, but they point to pressure worth checking." />}
+                  />
                   <div className="anomalyList">
-                    <div>
-                      <strong>{projection.monthlyExpenses > projection.monthlyIncome ? "Output pressure" : "No major anomaly"}</strong>
-                      <span>
-                        {projection.monthlyExpenses > projection.monthlyIncome
-                          ? "Expenses are above income for the selected month."
-                          : "Current entries sit inside a stable monthly flow."}
-                      </span>
-                    </div>
-                    <div>
-                      <strong>Grouping coverage</strong>
-                      <span>{formatDecimal((projection.paidTotal / Math.max(projection.monthlyExpenses, 1)) * 100)}% of expenses are categorized.</span>
-                    </div>
+                    {financialSignals.map((signal) => (
+                      <FinancialSignalCard key={signal.id} signal={signal} />
+                    ))}
                   </div>
                 </article>
               </section>
@@ -1174,14 +1708,40 @@ function App() {
                     </div>
                     <div className="dataAction">
                       <Upload size={20} />
-                      <h3>Import archive</h3>
-                      <p>Restore from a previous JSON backup stored on your machine.</p>
-                      <button className="commandButton" type="button" onClick={() => fileInputRef.current?.click()}>
-                        <Upload size={16} />
-                        Import JSON
-                      </button>
+                      <h3>Import data</h3>
+                      <p>Review bank transactions or restore a previous JSON backup.</p>
+                      <div className="buttonRow">
+                        <button className="commandButton" type="button" onClick={() => csvInputRef.current?.click()}>
+                          <FileSpreadsheet size={16} />
+                          Import CSV
+                        </button>
+                        <button className="commandButton" type="button" onClick={() => fileInputRef.current?.click()}>
+                          <Upload size={16} />
+                          Import JSON
+                        </button>
+                      </div>
                     </div>
                   </div>
+                  {ledger.importBatches.length > 0 && (
+                    <div className="importHistory">
+                      <div className="historyHead compact">
+                        <span>Recent imports</span>
+                        <span>Rows</span>
+                        <span>Date</span>
+                        <span />
+                      </div>
+                      {ledger.importBatches.slice(0, 5).map((batch) => (
+                        <div className="importHistoryRow" key={batch.id}>
+                          <strong>{batch.fileName}</strong>
+                          <span>{batch.importedRows}</span>
+                          <span>{new Intl.DateTimeFormat("en", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(batch.importedAt))}</span>
+                          <button className="commandButton" type="button" onClick={() => undoImportBatch(batch.id)}>
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </article>
 
                 <aside className="settingsSide">
@@ -1252,6 +1812,31 @@ function App() {
           </span>
         </footer>
 
+        {lastImportAction && (
+          <div className="undoImportToast" role="status">
+            <span>
+              <b>{lastImportAction.importedRows}</b> imported from {lastImportAction.fileName}
+            </span>
+            <button className="commandButton" type="button" onClick={() => undoImportBatch(lastImportAction.batchId)}>
+              Undo import
+            </button>
+          </div>
+        )}
+
+        {importReview && (
+          <ImportReviewModal
+            review={importReview}
+            categoryOptions={importCategoryOptions}
+            formatter={moneyFormatter}
+            onClose={() => setImportReview(null)}
+            onRowChange={updateImportReviewRow}
+            onToggleAll={setAllImportRowsIncluded}
+            onSkipDuplicates={skipDuplicateImportRows}
+            onBulkCategory={applyImportCategoryToIncluded}
+            onConfirm={confirmCsvImport}
+          />
+        )}
+
         {categoryMenu && menuExpense && (
           <CategoryContextMenu
             expense={menuExpense}
@@ -1279,6 +1864,249 @@ function StatusPill({ state, toast }: { state: "loading" | "saved" | "saving" | 
       </div>
     </div>
   );
+}
+
+function ImportReviewModal({
+  review,
+  categoryOptions,
+  formatter,
+  onClose,
+  onRowChange,
+  onToggleAll,
+  onSkipDuplicates,
+  onBulkCategory,
+  onConfirm,
+}: {
+  review: ImportReviewState;
+  categoryOptions: string[];
+  formatter: Intl.NumberFormat;
+  onClose: () => void;
+  onRowChange: (id: string, patch: Partial<CsvImportRow>) => void;
+  onToggleAll: (include: boolean) => void;
+  onSkipDuplicates: () => void;
+  onBulkCategory: (category: string) => void;
+  onConfirm: () => void;
+}) {
+  const [bulkCategory, setBulkCategory] = useState("");
+  const selectedCount = review.rows.filter((row) => row.include).length;
+  const duplicateCount = review.rows.filter((row) => row.duplicate).length;
+  const totalAmount = review.rows.filter((row) => row.include).reduce((sum, row) => sum + row.amount, 0);
+  const hasErrors = review.errors.length > 0 && review.rows.length === 0;
+
+  function applyBulkCategory() {
+    onBulkCategory(bulkCategory);
+    setBulkCategory("");
+  }
+
+  return (
+    <div className="modalBackdrop">
+      <section className="importModal" role="dialog" aria-modal="true" aria-labelledby="import-review-title">
+        <header className="importModalHeader">
+          <div>
+            <span className="eyebrow">CSV Review</span>
+            <h2 id="import-review-title">{review.fileName}</h2>
+          </div>
+          <button className="iconButton" type="button" onClick={onClose} aria-label="Close CSV review">
+            <X size={18} />
+          </button>
+        </header>
+
+        <div className="importStats" aria-label="Import summary">
+          <span>
+            Rows <b>{review.totalRows}</b>
+          </span>
+          <span>
+            Selected <b>{selectedCount}</b>
+          </span>
+          <span>
+            Duplicates <b>{duplicateCount}</b>
+          </span>
+          <span>
+            Net <b className={totalAmount >= 0 ? "positiveText" : "negativeText"}>{formatter.format(totalAmount)}</b>
+          </span>
+        </div>
+
+        {hasErrors ? (
+          <div className="importErrorList" role="alert">
+            {review.errors.map((error) => (
+              <p key={error}>{error}</p>
+            ))}
+          </div>
+        ) : (
+          <>
+            <div className="importToolbar">
+              <div className="buttonRow">
+                <button className="commandButton" type="button" onClick={() => onToggleAll(true)}>
+                  Select all
+                </button>
+                <button className="commandButton" type="button" onClick={() => onToggleAll(false)}>
+                  Clear all
+                </button>
+                <button className="commandButton" type="button" onClick={onSkipDuplicates}>
+                  Skip duplicates
+                </button>
+              </div>
+              <label className="bulkCategoryField">
+                <span>Bulk category</span>
+                <input
+                  value={bulkCategory}
+                  list="import-category-options"
+                  placeholder="Category"
+                  onChange={(event) => setBulkCategory(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") applyBulkCategory();
+                  }}
+                />
+                <button className="commandButton" type="button" onClick={applyBulkCategory}>
+                  Apply
+                </button>
+              </label>
+            </div>
+
+            <datalist id="import-category-options">
+              {categoryOptions.map((option) => (
+                <option value={option} key={option} />
+              ))}
+            </datalist>
+
+            <div className="importTableShell">
+              <table className="importTable">
+                <thead>
+                  <tr>
+                    <th>Import</th>
+                    <th>Date</th>
+                    <th>Transaction</th>
+                    <th>Amount</th>
+                    <th>Type</th>
+                    <th>Category</th>
+                    <th>Signal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {review.rows.map((row) => (
+                    <ImportReviewTableRow
+                      key={row.id}
+                      row={row}
+                      formatter={formatter}
+                      categoryOptions={categoryOptions}
+                      onChange={(patch) => onRowChange(row.id, patch)}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        <footer className="importModalFooter">
+          <button className="commandButton" type="button" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="navCta inlineCta" type="button" disabled={selectedCount === 0 || hasErrors} onClick={onConfirm}>
+            Import selected
+          </button>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
+function ImportReviewTableRow({
+  row,
+  formatter,
+  categoryOptions,
+  onChange,
+}: {
+  row: CsvImportRow;
+  formatter: Intl.NumberFormat;
+  categoryOptions: string[];
+  onChange: (patch: Partial<CsvImportRow>) => void;
+}) {
+  return (
+    <tr className={`${row.include ? "selected" : ""} ${row.duplicate ? "duplicate" : ""}`}>
+      <td>
+        <label className="checkCell">
+          <input type="checkbox" checked={row.include} onChange={(event) => onChange({ include: event.target.checked })} aria-label={`Import ${row.description}`} />
+        </label>
+      </td>
+      <td>{formatShortDate(row.date)}</td>
+      <td>
+        <strong>{row.description}</strong>
+        <span>Row {row.rowNumber}</span>
+      </td>
+      <td className={row.amount >= 0 ? "positiveText" : "negativeText"}>{formatter.format(row.amount)}</td>
+      <td>
+        <select
+          value={row.kind}
+          aria-label={`Type for ${row.description}`}
+          onChange={(event) => onChange(importKindPatch(event.target.value as TransactionKind, row))}
+        >
+          <option value="expense">Expense</option>
+          <option value="income">Income</option>
+          <option value="debt-payment">Debt payment</option>
+          <option value="transfer">Transfer</option>
+        </select>
+      </td>
+      <td>
+        <input
+          value={row.category}
+          list="import-category-options"
+          aria-label={`Category for ${row.description}`}
+          onChange={(event) => onChange({ category: event.target.value, note: row.suggestedCategory === event.target.value ? row.note : "Edited" })}
+        />
+      </td>
+      <td>
+        <span className={row.duplicate ? "importSignal duplicate" : row.confidence < 0.5 ? "importSignal low" : "importSignal"}>
+          {row.duplicate ? "Duplicate" : `${Math.round(row.confidence * 100)}%`}
+        </span>
+        <em>{row.note}</em>
+      </td>
+    </tr>
+  );
+}
+
+function importKindPatch(kind: TransactionKind, row: CsvImportRow): Partial<CsvImportRow> {
+  if (kind === "income") {
+    return {
+      kind,
+      amount: Math.abs(row.amount),
+      category: row.category === "Unsorted" || row.category === "Transfers" || row.category === "Debt payments" ? "Income" : row.category,
+      include: true,
+      note: row.suggestedKind === kind ? row.note : "Edited",
+    };
+  }
+
+  if (kind === "transfer") {
+    return {
+      kind,
+      category: "Transfers",
+      include: false,
+      note: row.suggestedKind === kind ? row.note : "Edited",
+    };
+  }
+
+  if (kind === "debt-payment") {
+    return {
+      kind,
+      amount: -Math.abs(row.amount),
+      category: "Debt payments",
+      include: true,
+      note: row.suggestedKind === kind ? row.note : "Edited",
+    };
+  }
+
+  return {
+    kind,
+    amount: -Math.abs(row.amount),
+    category: row.category === "Income" || row.category === "Transfers" ? "Unsorted" : row.category,
+    include: true,
+    note: row.suggestedKind === kind ? row.note : "Edited",
+  };
+}
+
+function formatShortDate(date: string): string {
+  const [year, month, day] = date.split("-").map(Number);
+  return new Intl.DateTimeFormat("en", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(year, month - 1, day));
 }
 
 function MetricCard({
@@ -1559,11 +2387,117 @@ function ExpenseRow({
   );
 }
 
+function DebtAccountRow({
+  debt,
+  symbol,
+  formatter,
+  privacy,
+  onChange,
+  onRemove,
+}: {
+  debt: DebtAccount;
+  symbol: string;
+  formatter: Intl.NumberFormat;
+  privacy: boolean;
+  onChange: (patch: Partial<DebtAccount>) => void;
+  onRemove: () => void;
+}) {
+  const utilization = debt.creditLimit > 0 ? clampPercent((debt.balance / debt.creditLimit) * 100) : 0;
+
+  return (
+    <div className="debtAccountRow" style={{ "--account-color": debt.color } as CSSProperties}>
+      <button
+        className="swatchButton"
+        type="button"
+        style={{ background: debt.color }}
+        onClick={() => onChange({ color: nextColor(debt.color) })}
+        aria-label="Cycle debt account color"
+      />
+      <div className="debtAccountMain">
+        <input value={debt.name} onChange={(event) => onChange({ name: event.target.value })} aria-label="Debt account name" />
+        <select value={debt.type} onChange={(event) => onChange({ type: event.target.value as DebtAccountType })} aria-label={`Type for ${debt.name}`}>
+          <option value="credit-card">Credit card</option>
+          <option value="loan">Loan</option>
+          <option value="overdraft">Overdraft</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div className="debtField balanceField">
+        <span>Balance</span>
+        <MoneyInput
+          ariaLabel={`Balance for ${debt.name}`}
+          value={String(debt.balance)}
+          symbol={symbol}
+          privacy={privacy}
+          placeholder="Current balance"
+          onChange={(value) => onChange({ balance: Math.max(0, Number(value) || 0) })}
+        />
+      </div>
+      <div className="debtField limitField">
+        <span>Limit</span>
+        <MoneyInput
+          ariaLabel={`Credit limit for ${debt.name}`}
+          value={String(debt.creditLimit)}
+          symbol={symbol}
+          privacy={privacy}
+          placeholder="Credit limit"
+          onChange={(value) => onChange({ creditLimit: Math.max(0, Number(value) || 0) })}
+        />
+      </div>
+      <label className="numberField compact hintField aprField">
+        <input value={String(debt.apr)} inputMode="decimal" placeholder="Interest rate %" onChange={(event) => onChange({ apr: Math.max(0, Number(event.target.value) || 0) })} aria-label={`APR for ${debt.name}`} />
+        <InfoHint label={`Interest rate help for ${debt.name}`} text="Annual percentage rate charged after any interest-free period ends." />
+      </label>
+      <label className="numberField compact hintField interestFreeField">
+        <input
+          value={String(debt.interestFreeMonths)}
+          inputMode="numeric"
+          placeholder="Interest-free months left"
+          onChange={(event) => onChange({ interestFreeMonths: clampWholeNumber(Number(event.target.value) || 0, 120) })}
+          aria-label={`Interest-free months for ${debt.name}`}
+        />
+        <InfoHint label={`Promotional period help for ${debt.name}`} text="Months left before APR starts applying in the net-worth forecast." />
+      </label>
+      <div className="debtField minimumField">
+        <span>Monthly</span>
+        <MoneyInput
+          ariaLabel={`Monthly payment for ${debt.name}`}
+          value={String(debt.minimumPayment)}
+          symbol={symbol}
+          privacy={privacy}
+          placeholder="Monthly payment"
+          onChange={(value) => onChange({ minimumPayment: Math.max(0, Number(value) || 0) })}
+        />
+      </div>
+      <label className="numberField compact hintField dueField">
+        <input value={String(debt.dueDay)} inputMode="numeric" placeholder="Payment due day (1-31)" onChange={(event) => onChange({ dueDay: clampDueDay(Number(event.target.value) || 1) })} aria-label={`Due day for ${debt.name}`} />
+        <InfoHint label={`Payment date help for ${debt.name}`} text="Day of the month this account payment is due." />
+      </label>
+      <div className="debtAccountMeta">
+        <span>{debtTypeLabel(debt.type)}</span>
+        <strong className={privacy ? "masked" : ""}>{formatter.format(debt.balance)}</strong>
+        <em>{formatDecimal(utilization)}% used · {debt.interestFreeMonths > 0 ? `${debt.interestFreeMonths} mo 0%` : "APR active"}</em>
+      </div>
+      <button className="iconButton rowAction" type="button" onClick={onRemove} aria-label={`Remove ${debt.name}`}>
+        <Trash2 size={17} />
+      </button>
+    </div>
+  );
+}
+
+function debtTypeLabel(type: DebtAccountType): string {
+  if (type === "credit-card") return "Credit card";
+  if (type === "loan") return "Loan";
+  if (type === "overdraft") return "Overdraft";
+  return "Other";
+}
+
 function MoneyInput({
   ariaLabel,
   inputRef,
   value,
   symbol,
+  placeholder,
   privacy,
   onEnter,
   onChange,
@@ -1572,6 +2506,7 @@ function MoneyInput({
   inputRef?: Ref<HTMLInputElement>;
   value: string;
   symbol: string;
+  placeholder?: string;
   privacy?: boolean;
   onEnter?: (event: KeyboardEvent<HTMLInputElement>) => void;
   onChange: (value: string) => void;
@@ -1584,6 +2519,7 @@ function MoneyInput({
         type="text"
         inputMode="decimal"
         value={value}
+        placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === "Enter") {
@@ -1789,11 +2725,85 @@ function GoalsPanel({
   );
 }
 
-function PanelTitle({ title, icon }: { title: string; icon?: ReactNode }) {
+function PanelTitle({ title, icon, action }: { title: string; icon?: ReactNode; action?: ReactNode }) {
   return (
     <div className="panelTitle">
       <h3>{title}</h3>
-      {icon ?? <Info size={16} />}
+      <div className="panelTitleActions">
+        {action}
+        {icon ?? <Info size={16} />}
+      </div>
+    </div>
+  );
+}
+
+function InfoHint({ text, label = "More information" }: { text: string; label?: string }) {
+  return (
+    <span className="infoHint" tabIndex={0} role="button" aria-label={label} title={text}>
+      <Info size={15} aria-hidden="true" />
+      <span role="tooltip">{text}</span>
+    </span>
+  );
+}
+
+function NetWorthHorizonTabs({
+  horizon,
+  onChange,
+  compact,
+}: {
+  horizon: NetWorthHorizon;
+  onChange: (horizon: NetWorthHorizon) => void;
+  compact?: boolean;
+}) {
+  return (
+    <div className={compact ? "tabs compactTabs" : "tabs"} role="tablist" aria-label="Net worth horizon">
+      <button className={horizon === 12 ? "selected" : ""} type="button" onClick={() => onChange(12)}>
+        1 year
+      </button>
+      <button className={horizon === 24 ? "selected" : ""} type="button" onClick={() => onChange(24)}>
+        2 years
+      </button>
+      <button className={horizon === 60 ? "selected" : ""} type="button" onClick={() => onChange(60)}>
+        5 years
+      </button>
+    </div>
+  );
+}
+
+function InsightChartToggle({ value, onChange }: { value: InsightChartView; onChange: (value: InsightChartView) => void }) {
+  const options: Array<{ value: InsightChartView; label: string; icon: ReactNode }> = [
+    { value: "inflow-outflow", label: "Inflows vs outflows", icon: <LineChart size={15} /> },
+    { value: "cash-flow", label: "Cash flow volatility", icon: <BarChart3 size={15} /> },
+    { value: "net-worth", label: "Net worth outlook", icon: <Gauge size={15} /> },
+  ];
+
+  return (
+    <div className="iconToggle" role="group" aria-label="Insight chart">
+      {options.map((option) => (
+        <button
+          key={option.value}
+          className={value === option.value ? "selected" : ""}
+          type="button"
+          onClick={() => onChange(option.value)}
+          aria-label={option.label}
+          aria-pressed={value === option.value}
+          title={option.label}
+        >
+          {option.icon}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function FinancialSignalCard({ signal }: { signal: FinancialSignal }) {
+  return (
+    <div className={`signalCard ${signal.tone}`}>
+      <div className="signalTitle">
+        <strong>{signal.title}</strong>
+        <InfoHint label={`${signal.title} context`} text={signal.detail} />
+      </div>
+      <span>{signal.summary}</span>
     </div>
   );
 }
@@ -1831,6 +2841,158 @@ function BarChart({ bars, privacy, formatter }: { bars: ReturnType<typeof buildM
           <em className={privacy ? "masked tinyMask" : ""}>{bar.value >= 0 ? "+" : ""}{formatter.format(bar.value)}</em>
         </div>
       ))}
+    </div>
+  );
+}
+
+function InflowOutflowChart({
+  points,
+  privacy,
+  formatter,
+}: {
+  points: MonthlyFlowPoint[];
+  privacy: boolean;
+  formatter: Intl.NumberFormat;
+}) {
+  const width = 720;
+  const height = 260;
+  const padding = 28;
+  const plotHeight = height - padding * 2;
+  const maxValue = Math.max(...points.map((point) => Math.max(point.income, point.expenses)), 1);
+  const slot = (width - padding * 2) / Math.max(points.length, 1);
+  const barWidth = Math.max(10, Math.min(20, slot * 0.24));
+  const activePoints = points.filter((point) => point.hasData);
+
+  if (!activePoints.length) {
+    return <EmptyState icon={<LineChart size={18} />} title="No monthly flow yet" text="Add income and outflows or import a CSV to build this chart." />;
+  }
+
+  return (
+    <div className="flowComparisonChart" aria-label="Monthly inflows and outflows chart">
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Actual monthly inflows compared with outflows">
+        <line className="netWorthAxis" x1={padding} x2={width - padding} y1={height - padding} y2={height - padding} />
+        {points.map((point, index) => {
+          const x = padding + index * slot + slot / 2;
+          const incomeHeight = (point.income / maxValue) * plotHeight;
+          const expenseHeight = (point.expenses / maxValue) * plotHeight;
+          const incomeY = height - padding - incomeHeight;
+          const expenseY = height - padding - expenseHeight;
+
+          return (
+            <g key={point.monthKey} className={point.hasData ? "flowMonth active" : "flowMonth"}>
+              <rect
+                className="flowBar income"
+                x={x - barWidth - 2}
+                y={incomeY}
+                width={barWidth}
+                height={Math.max(point.income > 0 ? 3 : 0, incomeHeight)}
+                rx="3"
+              />
+              <rect
+                className="flowBar expense"
+                x={x + 2}
+                y={expenseY}
+                width={barWidth}
+                height={Math.max(point.expenses > 0 ? 3 : 0, expenseHeight)}
+                rx="3"
+              />
+              <text x={x} y={height - 8} textAnchor="middle">
+                {point.label}
+              </text>
+              {point.hasData && (
+                <title>
+                  {point.label}: income {formatter.format(point.income)}, outflow {formatter.format(point.expenses)}, net{" "}
+                  {formatter.format(point.surplus)}
+                </title>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+      <div className="flowLegend">
+        <span>
+          <i className="income" /> Inflow
+        </span>
+        <span>
+          <i className="expense" /> Outflow
+        </span>
+        <strong className={privacy ? "masked" : ""}>
+          Latest net {formatter.format(activePoints[activePoints.length - 1]?.surplus ?? 0)}
+        </strong>
+      </div>
+    </div>
+  );
+}
+
+function NetWorthChart({
+  points,
+  formatter,
+  privacy,
+  compact = false,
+}: {
+  points: NetWorthPoint[];
+  formatter: Intl.NumberFormat;
+  privacy: boolean;
+  compact?: boolean;
+}) {
+  const width = 720;
+  const height = 260;
+  const padding = 28;
+  const values = points.map((point) => point.netWorth);
+  const minValue = Math.min(...values, 0);
+  const maxValue = Math.max(...values, 1);
+  const range = Math.max(1, maxValue - minValue);
+  const lastPoint = points[points.length - 1] ?? points[0];
+  const totalInterest = points.reduce((sum, point) => sum + point.interestCharged, 0);
+  const path = points
+    .map((point, index) => {
+      const x = padding + (index / Math.max(points.length - 1, 1)) * (width - padding * 2);
+      const y = padding + ((maxValue - point.netWorth) / range) * (height - padding * 2);
+      return `${index === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    })
+    .join(" ");
+  const areaPath = `${path} L ${width - padding} ${height - padding} L ${padding} ${height - padding} Z`;
+  const markerPoints = points.filter((point) => point.monthIndex % 12 === 0 || point.monthIndex === points.length - 1);
+
+  return (
+    <div className={compact ? "netWorthChart compact" : "netWorthChart"}>
+      <div className="netWorthStats">
+        <div>
+          <span>Ending net worth</span>
+          <strong className={privacy ? "masked" : ""}>{formatter.format(lastPoint?.netWorth ?? 0)}</strong>
+        </div>
+        <div>
+          <span>Remaining debt</span>
+          <strong className={privacy ? "masked" : ""}>{formatter.format(lastPoint?.debtBalance ?? 0)}</strong>
+        </div>
+        <div>
+          <span>Interest in period</span>
+          <strong className={privacy ? "masked" : ""}>{formatter.format(totalInterest)}</strong>
+        </div>
+      </div>
+      <div className="netWorthSvgWrap">
+        <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Projected net worth over selected horizon">
+          <defs>
+            <linearGradient id="netWorthFill" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="rgba(0, 223, 193, 0.24)" />
+              <stop offset="100%" stopColor="rgba(0, 223, 193, 0.02)" />
+            </linearGradient>
+          </defs>
+          <line className="netWorthAxis" x1={padding} x2={width - padding} y1={height - padding} y2={height - padding} />
+          <path d={areaPath} fill="url(#netWorthFill)" />
+          <path className="netWorthLine" d={path} />
+          {markerPoints.map((point) => {
+            const x = padding + (point.monthIndex / Math.max(points.length - 1, 1)) * (width - padding * 2);
+            const y = padding + ((maxValue - point.netWorth) / range) * (height - padding * 2);
+            return <circle key={point.monthIndex} className="netWorthDot" cx={x} cy={y} r="4" />;
+          })}
+        </svg>
+        <div className="netWorthLabels">
+          {markerPoints.map((point) => (
+            <span key={point.monthIndex}>{point.label}</span>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1984,23 +3146,168 @@ function useAnimatedNumber(value: number) {
   return display;
 }
 
-function normalizeState(state: LedgerState): LedgerState {
+function normalizeState(state: Partial<LedgerState>): LedgerState {
   const fallback = createInitialState();
-  if (state.schemaVersion !== CURRENT_SCHEMA_VERSION) {
-    return fallback;
-  }
-  const selectedMonth = state.selectedMonth || fallback.selectedMonth;
+  const selectedMonth = typeof state.selectedMonth === "string" && state.selectedMonth ? state.selectedMonth : fallback.selectedMonth;
+  const months = normalizeMonths(state.months, fallback.months);
+  const normalizedMonths = months[selectedMonth]
+    ? months
+    : {
+        ...months,
+        [selectedMonth]: seedMonthFromPrevious(),
+      };
 
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
-    currency: state.currency ?? fallback.currency,
+    currency: currencyOptions.some((option) => option.code === state.currency) ? state.currency! : fallback.currency,
     selectedMonth,
-    months: Object.keys(state.months ?? {}).length ? state.months : fallback.months,
-    goal: state.goal ?? fallback.goal,
+    months: normalizedMonths,
+    goal: {
+      id: state.goal?.id || fallback.goal.id,
+      name: state.goal?.name ?? fallback.goal.name,
+      saved: finiteNumber(state.goal?.saved, fallback.goal.saved),
+      target: finiteNumber(state.goal?.target, fallback.goal.target),
+    },
     savingsTarget: Number.isFinite(state.savingsTarget) ? state.savingsTarget : fallback.savingsTarget,
+    debts: normalizeDebts(state.debts),
+    categoryRules: normalizeCategoryRules(state.categoryRules),
+    importBatches: normalizeImportBatches(state.importBatches),
     privacyMode: Boolean(state.privacyMode),
     lastSavedAt: state.lastSavedAt ?? new Date().toISOString(),
   };
+}
+
+function normalizeMonths(months: LedgerState["months"] | undefined, fallback: LedgerState["months"]): LedgerState["months"] {
+  if (!months || !Object.keys(months).length) return fallback;
+
+  return Object.fromEntries(
+    Object.entries(months).map(([monthKey, month]) => [
+      monthKey,
+      {
+        incomes: Array.isArray(month?.incomes)
+          ? month.incomes.map((income, index) => ({
+              ...income,
+              id: income.id || createId("income"),
+              source: income.source ?? "Imported income",
+              amount: finiteNumber(income.amount, 0),
+              color: income.color || colors[index % colors.length],
+            }))
+          : [],
+        expenses: Array.isArray(month?.expenses)
+          ? month.expenses.map((expense, index) => ({
+              ...expense,
+              id: expense.id || createId("expense"),
+              name: expense.name ?? "Imported expense",
+              category: expense.category ?? "",
+              amount: finiteNumber(expense.amount, 0),
+              color: expense.color || colors[(index + 2) % colors.length],
+            }))
+          : [],
+        note: month?.note ?? "",
+      },
+    ]),
+  );
+}
+
+function normalizeDebts(debts: DebtAccount[] | undefined): DebtAccount[] {
+  if (!Array.isArray(debts)) return [];
+
+  return debts.map((debt, index) => ({
+    id: debt.id || createId("debt"),
+    name: debt.name || "Debt account",
+    type: debt.type ?? "other",
+    balance: finiteNumber(debt.balance, 0),
+    creditLimit: finiteNumber(debt.creditLimit, 0),
+    apr: finiteNumber(debt.apr, 0),
+    interestFreeMonths: clampWholeNumber(finiteNumber(debt.interestFreeMonths, 0), 120),
+    minimumPayment: finiteNumber(debt.minimumPayment, 0),
+    dueDay: clampDueDay(debt.dueDay),
+    includeInNetWorth: debt.includeInNetWorth !== false,
+    color: debt.color || colors[(index + 3) % colors.length],
+    note: debt.note ?? "",
+  }));
+}
+
+function normalizeCategoryRules(rules: CategoryRule[] | undefined): CategoryRule[] {
+  if (!Array.isArray(rules)) return [];
+
+  return rules
+    .filter((rule) => rule.pattern?.trim() && rule.category?.trim())
+    .map((rule) => ({
+      id: rule.id || createId("rule"),
+      pattern: rule.pattern.trim().toLowerCase(),
+      category: rule.category.trim(),
+      kind: rule.kind ?? "expense",
+      createdAt: rule.createdAt ?? new Date().toISOString(),
+      updatedAt: rule.updatedAt ?? new Date().toISOString(),
+    }));
+}
+
+function normalizeImportBatches(batches: ImportBatch[] | undefined): ImportBatch[] {
+  if (!Array.isArray(batches)) return [];
+
+  return batches.map((batch) => ({
+    id: batch.id || createId("batch"),
+    fileName: batch.fileName || "Imported CSV",
+    importedAt: batch.importedAt ?? new Date().toISOString(),
+    totalRows: finiteNumber(batch.totalRows, 0),
+    importedRows: finiteNumber(batch.importedRows, 0),
+    skippedRows: finiteNumber(batch.skippedRows, 0),
+    transactionRefs: Array.isArray(batch.transactionRefs) ? batch.transactionRefs : [],
+  }));
+}
+
+function mergeCategoryRules(existingRules: CategoryRule[], importedRows: CsvImportRow[], timestamp: string): CategoryRule[] {
+  const rules = new Map(existingRules.map((rule) => [rule.pattern, rule]));
+
+  importedRows.forEach((row) => {
+    const pattern = buildRulePattern(row.description);
+    const category = row.category.trim();
+    if (!pattern || !category || category === "Unsorted") return;
+
+    const existing = rules.get(pattern);
+    rules.set(pattern, {
+      id: existing?.id ?? createId("rule"),
+      pattern,
+      category,
+      kind: row.kind,
+      createdAt: existing?.createdAt ?? timestamp,
+      updatedAt: timestamp,
+    });
+  });
+
+  return Array.from(rules.values()).slice(-120);
+}
+
+function removeImportBatchFromState(state: LedgerState, batchId: string): LedgerState {
+  const batch = state.importBatches.find((item) => item.id === batchId);
+  if (!batch) return state;
+
+  const refKeys = new Set(batch.transactionRefs.map((ref) => `${ref.monthKey}:${ref.entryId}:${ref.kind}`));
+  const months = Object.fromEntries(
+    Object.entries(state.months).map(([monthKey, month]) => [
+      monthKey,
+      {
+        ...month,
+        incomes: month.incomes.filter(
+          (income) => income.imported?.batchId !== batchId && !refKeys.has(`${monthKey}:${income.id}:income`),
+        ),
+        expenses: month.expenses.filter(
+          (expense) => expense.imported?.batchId !== batchId && !refKeys.has(`${monthKey}:${expense.id}:expense`),
+        ),
+      },
+    ]),
+  );
+
+  return {
+    ...state,
+    months,
+    importBatches: state.importBatches.filter((item) => item.id !== batchId),
+  };
+}
+
+function finiteNumber(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
 function buildCategoryRows(month: MonthBudget, projection: Projection) {
@@ -2063,11 +3370,11 @@ function buildExpenseGroups(expenses: ExpenseEntry[]) {
   return [...categoryGroups, ...ungrouped].map(({ order, ...group }) => group);
 }
 
-function buildMonthlyBars(ledger: LedgerState, fallbackMonth: MonthBudget) {
+function buildMonthlyBars(ledger: LedgerState, _fallbackMonth: MonthBudget) {
   const [year] = ledger.selectedMonth.split("-").map(Number);
   const values = Array.from({ length: 12 }, (_, index) => {
     const key = `${year}-${String(index + 1).padStart(2, "0")}`;
-    const month = ledger.months[key] ?? fallbackMonth;
+    const month = ledger.months[key] ?? { incomes: [], expenses: [], note: "" };
     const projection = calculateProjection(month);
     return {
       label: new Date(year, index, 1).toLocaleString("en", { month: "short" }),
