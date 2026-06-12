@@ -24,6 +24,7 @@ import {
   Info,
   LayoutDashboard,
   LineChart,
+  LogIn,
   LogOut,
   Pencil,
   Plus,
@@ -95,6 +96,7 @@ import type {
 type ProjectionView = "overview" | "category" | "month";
 type AppView = "dashboard" | "ledger" | "accounts" | "insights" | "settings";
 type SaveState = "loading" | "saved" | "saving" | "offline";
+type SyncConflict = { local: LedgerState; cloud: LedgerState };
 type NetWorthHorizon = 12 | 24 | 60;
 type InsightChartView = "inflow-outflow" | "cash-flow" | "net-worth";
 type ExpenseDropPreview =
@@ -167,6 +169,10 @@ function App() {
   const [authWorking, setAuthWorking] = useState(false);
   const [cloudHydrated, setCloudHydrated] = useState(false);
   const authUserIdRef = useRef<string | null>(null);
+  const [showSignInModal, setShowSignInModal] = useState(false);
+  const [showSyncNudge, setShowSyncNudge] = useState(false);
+  const [syncConflict, setSyncConflict] = useState<SyncConflict | null>(null);
+  const nudgeDismissedRef = useRef(false);
   const [saveState, setSaveState] = useState<SaveState>("loading");
   const [incomeDraft, setIncomeDraft] = useState<IncomeDraft>(initialIncomeDraft);
   const [expenseDraft, setExpenseDraft] = useState<ExpenseDraft>(initialExpenseDraft);
@@ -343,20 +349,23 @@ function App() {
 
     async function hydrateCloudLedger() {
       setSaveState("loading");
-      setToast("Opening cloud vault");
-
       try {
         await upsertUserProfile(user);
         const cloudState = await loadCloudLedgerState();
         if (!alive) return;
 
         if (cloudState) {
+          if (hasLocalData(ledger)) {
+            // Both sides have data — let the user choose
+            setSyncConflict({ local: ledger, cloud: normalizeState(cloudState) });
+            return;
+          }
           setLedger(normalizeState(cloudState));
-          setToast("Cloud vault restored");
+          setToast("Cloud data restored");
         } else {
           await saveCloudLedgerState(user.id, ledger);
           if (!alive) return;
-          setToast("Local ledger secured in cloud");
+          setToast("Data backed up to cloud");
         }
 
         setCloudHydrated(true);
@@ -365,7 +374,7 @@ function App() {
         if (!alive) return;
         setCloudHydrated(true);
         setSaveState("offline");
-        setToast("Cloud unavailable; local cache active");
+        setToast("Cloud unavailable — working offline");
       }
     }
 
@@ -375,6 +384,15 @@ function App() {
       alive = false;
     };
   }, [hydrated, user?.id]);
+
+  // Nudge unsigned-in users after 60 s
+  useEffect(() => {
+    if (user || !hydrated) return;
+    const timer = window.setTimeout(() => {
+      if (!nudgeDismissedRef.current) setShowSyncNudge(true);
+    }, 60_000);
+    return () => clearTimeout(timer);
+  }, [user, hydrated]);
 
   useEffect(() => {
     if (!hydrated || authLoading || (user && !cloudHydrated)) return;
@@ -1027,12 +1045,43 @@ function App() {
     setAuthWorking(true);
     try {
       await signOut();
-      setToast("Signed out");
+      const fresh = createInitialState();
+      await saveLedgerState(fresh);
+      setLedger(fresh);
+      setSyncConflict(null);
+      setToast("Signed out — local data cleared");
     } catch {
       setToast("Sign out failed");
     } finally {
       setAuthWorking(false);
     }
+  }
+
+  async function handleKeepLocal() {
+    if (!syncConflict || !user) return;
+    const local = syncConflict.local;
+    setSyncConflict(null);
+    try {
+      await saveCloudLedgerState(user.id, local);
+      setLedger(local);
+      setCloudHydrated(true);
+      setSaveState("saved");
+      setToast("Local data saved to cloud");
+    } catch {
+      setCloudHydrated(true);
+      setSaveState("offline");
+      setToast("Sync failed — using local data");
+    }
+  }
+
+  function handleUseCloud() {
+    if (!syncConflict) return;
+    const cloud = syncConflict.cloud;
+    setSyncConflict(null);
+    setLedger(cloud);
+    setCloudHydrated(true);
+    setSaveState("saved");
+    setToast("Cloud data loaded");
   }
 
   function focusSearch() {
@@ -1122,14 +1171,6 @@ function App() {
     return <AuthGate mode="loading" onSignIn={handleSignIn} working={authWorking} configured={isSupabaseConfigured()} />;
   }
 
-  if (!user) {
-    return <AuthGate mode="signin" onSignIn={handleSignIn} working={authWorking} configured={isSupabaseConfigured()} />;
-  }
-
-  if (!cloudHydrated) {
-    return <AuthGate mode="opening" onSignIn={handleSignIn} working configured={isSupabaseConfigured()} />;
-  }
-
   return (
     <div className={`appShell ${ledger.privacyMode ? "privacy-on" : ""} ${animationsEnabled ? "motion-on" : "motion-off"}`}>
       <input
@@ -1181,17 +1222,29 @@ function App() {
           ))}
         </nav>
 
-        <div className="localIdentity">
-          {userAvatar ? <img className="identityAvatar" src={userAvatar} alt="" referrerPolicy="no-referrer" /> : (
-            <div className="identityMark">
-              <ShieldCheck size={17} />
+        {user ? (
+          <div className="localIdentity">
+            {userAvatar ? (
+              <img className="identityAvatar" src={userAvatar} alt="" referrerPolicy="no-referrer" />
+            ) : (
+              <div className="identityMark">
+                <ShieldCheck size={17} />
+              </div>
+            )}
+            <div>
+              <strong>{userName}</strong>
+              <span>{user.email}</span>
             </div>
-          )}
-          <div>
-            <strong>{userName}</strong>
-            <span>{user.email}</span>
           </div>
-        </div>
+        ) : (
+          <button className="sideSignInBtn" type="button" onClick={() => setShowSignInModal(true)}>
+            <LogIn size={16} />
+            <div>
+              <span>Sign in to sync</span>
+              <small>Save your data to the cloud</small>
+            </div>
+          </button>
+        )}
       </aside>
 
       <div className="workspace">
@@ -1248,12 +1301,15 @@ function App() {
             >
               {ledger.privacyMode ? <EyeOff size={19} /> : <Eye size={19} />}
             </button>
-            <button className="iconButton" type="button" onClick={() => setToast("Already synced to Supabase")} aria-label="Sync cloud data">
-              <RotateCcw size={18} />
-            </button>
-            <button className="iconButton" type="button" onClick={handleSignOut} aria-label="Sign out" title="Sign out" disabled={authWorking}>
-              <LogOut size={18} />
-            </button>
+            {user ? (
+              <button className="iconButton" type="button" onClick={handleSignOut} aria-label="Sign out" title="Sign out" disabled={authWorking}>
+                <LogOut size={18} />
+              </button>
+            ) : (
+              <button className="iconButton" type="button" onClick={() => setShowSignInModal(true)} aria-label="Sign in" title="Sign in to sync">
+                <LogIn size={18} />
+              </button>
+            )}
             <button className="iconButton" type="button" onClick={() => setActiveView("settings")} aria-label="Help">
               <CircleHelp size={18} />
             </button>
@@ -2001,6 +2057,32 @@ function App() {
           />
         )}
       </div>
+
+      {user && !cloudHydrated && !syncConflict && <VaultOverlay />}
+
+      {showSyncNudge && !user && (
+        <SyncNudge
+          onSignIn={() => { setShowSyncNudge(false); setShowSignInModal(true); }}
+          onDismiss={() => { nudgeDismissedRef.current = true; setShowSyncNudge(false); }}
+        />
+      )}
+
+      {(showSignInModal || authWorking) && !user && (
+        <SignInModal
+          onSignIn={handleSignIn}
+          onDismiss={() => setShowSignInModal(false)}
+          working={authWorking}
+          configured={isSupabaseConfigured()}
+        />
+      )}
+
+      {syncConflict && (
+        <MergeConflictModal
+          conflict={syncConflict}
+          onKeepLocal={() => { void handleKeepLocal(); }}
+          onUseCloud={handleUseCloud}
+        />
+      )}
     </div>
   );
 }
@@ -2016,16 +2098,13 @@ function AuthGate({
   working: boolean;
   configured: boolean;
 }) {
-  const title = mode === "signin" ? "Sign in to FinanceTracker" : mode === "opening" ? "Opening your vault" : "Preparing secure access";
-  const detail =
-    mode === "signin"
-      ? "Use your Google account to unlock a private Supabase-backed ledger. Your data is isolated with row-level security."
-      : mode === "opening"
-        ? "Checking your account and restoring the latest ledger snapshot."
-        : "Loading the local cache and checking the Supabase session.";
+  void onSignIn; void working; void configured;
+  const detail = mode === "opening"
+    ? "Checking your account and restoring the latest ledger snapshot."
+    : "Loading your data…";
 
   return (
-    <main className="authShell" aria-label="Authentication">
+    <main className="authShell" aria-label="Loading">
       <section className="authPanel">
         <div className="authBrand">
           <img src="/icon.svg" alt="" width="36" height="36" style={{borderRadius: '10px', flexShrink: 0}} aria-hidden="true" />
@@ -2034,27 +2113,160 @@ function AuthGate({
           </div>
         </div>
         <div className="authCopy">
-          <span className="privacyBadge">
-            <ShieldCheck size={15} />
-            Google sign-in only
-          </span>
-          <h2>{title}</h2>
           <p>{detail}</p>
         </div>
+        <div className="authLoadingRow">
+          <div className="vaultSpinner" aria-hidden="true" />
+          <span>Please wait…</span>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function SignInModal({
+  onSignIn,
+  onDismiss,
+  working,
+  configured,
+}: {
+  onSignIn: () => void;
+  onDismiss: () => void;
+  working: boolean;
+  configured: boolean;
+}) {
+  return (
+    <div
+      className="modalBackdrop signInBackdrop"
+      role="presentation"
+      onClick={(e) => { if (e.target === e.currentTarget) onDismiss(); }}
+    >
+      <div className="signInModal" role="dialog" aria-modal="true" aria-labelledby="signin-title">
+        <button className="iconButton signInClose" type="button" onClick={onDismiss} aria-label="Close">
+          <X size={18} />
+        </button>
+        <div className="signInModalBrand">
+          <img src="/icon.svg" alt="" width="40" height="40" style={{ borderRadius: 10, flexShrink: 0 }} aria-hidden="true" />
+          <div>
+            <h2 id="signin-title">Sync your data</h2>
+            <p>Back it up and use it anywhere</p>
+          </div>
+        </div>
+        <ul className="signInBenefits">
+          <li><ShieldCheck size={14} /> Data isolated with row-level security</li>
+          <li><Cloud size={14} /> Automatic sync on every save</li>
+          <li><RotateCcw size={14} /> Restore instantly on any device</li>
+        </ul>
         {configured ? (
-          <button className="googleButton" type="button" onClick={onSignIn} disabled={working || mode !== "signin"}>
+          <button className="googleButton" type="button" onClick={onSignIn} disabled={working}>
             <span aria-hidden="true">G</span>
-            {working || mode !== "signin" ? "Please wait" : "Continue with Google"}
+            {working ? "Redirecting…" : "Continue with Google"}
           </button>
         ) : (
           <div className="authWarning" role="alert">
             <AlertCircle size={18} />
-            Add `VITE_SUPABASE_PUBLISHABLE_KEY` to enable Google sign-in.
+            Add `VITE_SUPABASE_PUBLISHABLE_KEY` to enable sign-in.
           </div>
         )}
-      </section>
-    </main>
+        <button className="signInSkip" type="button" onClick={onDismiss}>
+          Continue without signing in
+        </button>
+      </div>
+    </div>
   );
+}
+
+function MergeConflictModal({
+  conflict,
+  onKeepLocal,
+  onUseCloud,
+}: {
+  conflict: SyncConflict;
+  onKeepLocal: () => void;
+  onUseCloud: () => void;
+}) {
+  const local = ledgerSummary(conflict.local);
+  const cloud = ledgerSummary(conflict.cloud);
+  return (
+    <div className="modalBackdrop mergeBackdrop">
+      <div className="mergeModal" role="dialog" aria-modal="true" aria-labelledby="merge-title">
+        <div className="mergeModalIcon">
+          <Cloud size={24} />
+        </div>
+        <h2 id="merge-title">Your account already has data</h2>
+        <p>Both this device and your cloud have separate data. Choose which to keep — the other will be overwritten.</p>
+        <div className="mergeOptions">
+          <button className="mergeOption" type="button" onClick={onKeepLocal}>
+            <strong>Keep this device's data</strong>
+            <span>{local.transactions} transaction{local.transactions !== 1 ? "s" : ""} · {local.months} month{local.months !== 1 ? "s" : ""}</span>
+            <small>Cloud data will be replaced.</small>
+          </button>
+          <button className="mergeOption" type="button" onClick={onUseCloud}>
+            <strong>Use cloud data</strong>
+            <span>{cloud.transactions} transaction{cloud.transactions !== 1 ? "s" : ""} · {cloud.months} month{cloud.months !== 1 ? "s" : ""}</span>
+            <small>Local data will be cleared.</small>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SyncNudge({
+  onSignIn,
+  onDismiss,
+}: {
+  onSignIn: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <div className="syncNudge" role="status">
+      <div className="syncNudgeInner">
+        <Cloud size={18} />
+        <div className="syncNudgeText">
+          <strong>Back up your data</strong>
+          <span>Sign in to sync across devices</span>
+        </div>
+        <button className="googleButton syncNudgeSignIn" type="button" onClick={onSignIn}>
+          <span aria-hidden="true">G</span>
+          Sign in
+        </button>
+        <button className="iconButton" type="button" onClick={onDismiss} aria-label="Dismiss nudge">
+          <X size={15} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function VaultOverlay() {
+  return (
+    <div className="vaultOverlay" aria-live="polite" aria-label="Opening vault">
+      <div className="vaultCard">
+        <div className="vaultSpinner" aria-hidden="true" />
+        <span>Opening your vault…</span>
+      </div>
+    </div>
+  );
+}
+
+function hasLocalData(state: LedgerState): boolean {
+  return (
+    Object.values(state.months).some((m) => m.incomes.length > 0 || m.expenses.length > 0) ||
+    state.debts.length > 0
+  );
+}
+
+function ledgerSummary(state: LedgerState): { months: number; transactions: number } {
+  let transactions = 0;
+  let months = 0;
+  for (const month of Object.values(state.months)) {
+    if (month.incomes.length > 0 || month.expenses.length > 0) {
+      months++;
+      transactions += month.incomes.length + month.expenses.length;
+    }
+  }
+  return { months, transactions };
 }
 
 function StatusPill({ state, toast }: { state: SaveState; toast: string }) {

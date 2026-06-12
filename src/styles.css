@@ -3568,3 +3568,341 @@ hr {
     text-align: left;
   }
 }
+
+/* ─── Sign-in modal ─────────────────────────────────── */
+.signInBackdrop {
+  z-index: 200;
+  animation: fadeIn 180ms ease both;
+}
+
+.mergeBackdrop {
+  z-index: 200;
+  animation: fadeIn 180ms ease both;
+}
+
+.signInModal {
+  position: relative;
+  width: min(440px, 100%);
+  display: grid;
+  gap: 22px;
+  padding: 32px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.5);
+  animation: cardIn 220ms ease both;
+}
+
+.signInClose {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+}
+
+.signInModalBrand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.signInModalBrand h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 640;
+  color: var(--ink);
+  letter-spacing: 0;
+}
+
+.signInModalBrand p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.signInBenefits {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+
+.signInBenefits li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.signInBenefits li svg {
+  color: var(--mint);
+  flex-shrink: 0;
+}
+
+.signInSkip {
+  background: none;
+  border: none;
+  color: var(--faint);
+  font-size: 13px;
+  padding: 0;
+  cursor: pointer;
+  text-align: center;
+  transition: color 150ms ease;
+}
+
+.signInSkip:hover {
+  color: var(--muted);
+}
+
+/* ─── Merge conflict modal ──────────────────────────── */
+.mergeModal {
+  width: min(480px, 100%);
+  display: grid;
+  gap: 18px;
+  padding: 32px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.5);
+  animation: cardIn 220ms ease both;
+  text-align: center;
+}
+
+.mergeModal h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 640;
+  color: var(--ink);
+  letter-spacing: 0;
+}
+
+.mergeModal > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.mergeModalIcon {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  margin: 0 auto;
+  border-radius: 50%;
+  background: var(--mint-soft);
+  color: var(--mint);
+}
+
+.mergeOptions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.mergeOption {
+  display: grid;
+  gap: 6px;
+  padding: 18px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-high);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.mergeOption:hover {
+  border-color: var(--mint);
+  background: var(--mint-soft);
+}
+
+.mergeOption:active {
+  transform: scale(0.98);
+}
+
+.mergeOption strong {
+  font-size: 14px;
+  color: var(--ink);
+  font-weight: 620;
+}
+
+.mergeOption span {
+  font-size: 12px;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+
+.mergeOption small {
+  font-size: 11px;
+  color: var(--faint);
+}
+
+/* ─── Sync nudge ────────────────────────────────────── */
+.syncNudge {
+  position: fixed;
+  bottom: 28px;
+  left: calc(var(--nav-width) + 24px);
+  z-index: 150;
+  animation: nudgeIn 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.syncNudgeInner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-high);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.32);
+  color: var(--mint);
+}
+
+.syncNudgeText {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.syncNudgeText strong {
+  display: block;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.syncNudgeText span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.syncNudgeSignIn {
+  min-height: 34px;
+  padding: 0 14px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* ─── Vault opening overlay ─────────────────────────── */
+.vaultOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 180;
+  display: grid;
+  place-items: center;
+  background: rgba(1, 15, 31, 0.65);
+  backdrop-filter: blur(8px);
+  animation: fadeIn 200ms ease both;
+}
+
+.vaultCard {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 22px 30px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+  font-size: 15px;
+  color: var(--ink);
+  animation: cardIn 200ms ease both;
+}
+
+.vaultSpinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--line-strong);
+  border-top-color: var(--mint);
+  border-radius: 50%;
+  animation: spin 700ms linear infinite;
+  flex-shrink: 0;
+}
+
+/* ─── Auth loading row ──────────────────────────────── */
+.authLoadingRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* ─── Sidebar sign-in button ────────────────────────── */
+.sideSignInBtn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+  padding: 10px 10px;
+  border: 1px dashed rgba(0, 223, 193, 0.28);
+  border-radius: var(--radius-lg);
+  background: none;
+  color: var(--muted);
+  text-align: left;
+  transition: border-color 150ms ease, color 150ms ease, background 150ms ease;
+}
+
+.sideSignInBtn:hover {
+  border-color: var(--mint);
+  color: var(--ink);
+  background: var(--mint-soft);
+}
+
+.sideSignInBtn > svg {
+  flex-shrink: 0;
+  color: var(--mint);
+}
+
+.sideSignInBtn span {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: inherit;
+}
+
+.sideSignInBtn small {
+  display: block;
+  font-size: 11px;
+  color: var(--faint);
+  margin-top: 1px;
+}
+
+/* ─── New keyframes ─────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes nudgeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Responsive tweaks ─────────────────────────────── */
+@media (max-width: 900px) {
+  .syncNudge {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+  }
+
+  .syncNudgeInner {
+    flex-wrap: wrap;
+  }
+
+  .mergeOptions {
+    grid-template-columns: 1fr;
+  }
+}
