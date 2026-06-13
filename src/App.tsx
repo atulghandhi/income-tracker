@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import LandingPage from "./LandingPage";
 import type { CSSProperties, Dispatch, DragEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode, Ref, SetStateAction } from "react";
 import {
   AlertCircle,
@@ -206,6 +207,7 @@ const initialAccountDraft: AccountDraft = {
 };
 
 function App() {
+  const [showLanding, setShowLanding] = useState(() => !localStorage.getItem("hasSeenLanding"));
   const [ledger, setLedger] = useState<LedgerState>(() => createInitialState());
   const [hydrated, setHydrated] = useState(false);
   const [session, setSession] = useState<AuthSession | null>(null);
@@ -1245,6 +1247,10 @@ function App() {
     user?.email?.split("@")[0] ||
     "Secure user";
   const userAvatar = typeof user?.user_metadata.avatar_url === "string" ? user.user_metadata.avatar_url : "";
+
+  if (showLanding) {
+    return <LandingPage onEnter={() => setShowLanding(false)} />;
+  }
 
   if (authLoading || !hydrated) {
     return <AuthGate mode="loading" onSignIn={handleSignIn} working={authWorking} configured={isSupabaseConfigured()} />;
