@@ -1321,6 +1321,13 @@ function App() {
             </div>
           </button>
         )}
+        <button
+          className="viewHomepageBtn"
+          type="button"
+          onClick={() => { localStorage.removeItem("hasSeenLanding"); setShowLanding(true); }}
+        >
+          View homepage
+        </button>
       </aside>
 
       <div className="workspace">
