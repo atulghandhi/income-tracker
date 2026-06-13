@@ -1,4 +1,7 @@
 import type {
+  Account,
+  AccountClass,
+  AssetSummary,
   CurrencyCode,
   DebtAccount,
   DebtSummary,
@@ -10,10 +13,31 @@ import type {
   MonthBudget,
   MonthlyFlowPoint,
   NetWorthPoint,
+  NetWorthSummary,
   Projection,
 } from "./types";
 
-export const CURRENT_SCHEMA_VERSION = 4;
+export const CURRENT_SCHEMA_VERSION = 5;
+
+export const DEFAULT_INVESTMENT_RETURN = 6;
+
+export const ASSET_CLASSES: AccountClass[] = ["cash", "savings", "investment"];
+
+export function isDebtClass(account: Account): boolean {
+  return account.accountClass === "debt";
+}
+
+// Geometric monthly rate from an annual percentage — more accurate than a flat /12.
+export function monthlyRateFromAnnual(annualPercent: number): number {
+  const r = Math.max(-99.9, Number(annualPercent) || 0) / 100;
+  return Math.pow(1 + r, 1 / 12) - 1;
+}
+
+// The rate in effect at a given simulated month: promo rate during the intro window, then standard.
+export function effectiveAnnualRate(account: { rate: number; promoRate: number; promoMonths: number }, monthIndex: number): number {
+  const promoMonths = Math.max(0, Math.round(Number(account.promoMonths) || 0));
+  return monthIndex <= promoMonths ? Number(account.promoRate) || 0 : Number(account.rate) || 0;
+}
 
 export const colors = ["#12b886", "#6c5ce7", "#ff6b6b", "#f59f00", "#15aabf", "#845ef7", "#51cf66", "#ff922b"];
 
@@ -82,7 +106,8 @@ export function createInitialState(): LedgerState {
       target: 0,
     },
     savingsTarget: 20,
-    debts: [],
+    accounts: [],
+    assumedInvestmentReturn: DEFAULT_INVESTMENT_RETURN,
     categoryRules: [],
     importBatches: [],
     privacyMode: false,
@@ -132,7 +157,16 @@ export function calculateProjection(month: MonthBudget): Projection {
   };
 }
 
-export function calculateDebtSummary(debts: DebtAccount[]): DebtSummary {
+export function getDebtAccounts(accounts: Account[]): Account[] {
+  return accounts.filter((account) => account.accountClass === "debt");
+}
+
+export function getAssetAccounts(accounts: Account[]): Account[] {
+  return accounts.filter((account) => account.accountClass !== "debt");
+}
+
+export function calculateDebtSummary(accounts: DebtAccount[]): DebtSummary {
+  const debts = getDebtAccounts(accounts);
   const activeDebts = debts.filter((debt) => debt.balance > 0);
   const totalDebt = activeDebts.reduce((sum, debt) => sum + Number(debt.balance || 0), 0);
   const totalCreditLimit = debts.reduce((sum, debt) => sum + Math.max(0, Number(debt.creditLimit || 0)), 0);
@@ -140,7 +174,7 @@ export function calculateDebtSummary(debts: DebtAccount[]): DebtSummary {
   const utilization = totalCreditLimit > 0 ? (totalDebt / totalCreditLimit) * 100 : 0;
   const monthlyMinimums = activeDebts.reduce((sum, debt) => sum + Math.max(0, Number(debt.minimumPayment || 0)), 0);
   const weightedApr =
-    totalDebt > 0 ? activeDebts.reduce((sum, debt) => sum + Math.max(0, Number(debt.apr || 0)) * debt.balance, 0) / totalDebt : 0;
+    totalDebt > 0 ? activeDebts.reduce((sum, debt) => sum + Math.max(0, Number(debt.rate || 0)) * debt.balance, 0) / totalDebt : 0;
   const nextDueDay = activeDebts
     .map((debt) => clampDueDay(debt.dueDay))
     .sort((a, b) => a - b)[0] ?? null;
@@ -156,54 +190,130 @@ export function calculateDebtSummary(debts: DebtAccount[]): DebtSummary {
   };
 }
 
+export function calculateAssetSummary(accounts: Account[]): AssetSummary {
+  const assets = getAssetAccounts(accounts);
+  const byClass = (cls: AccountClass) =>
+    assets.filter((a) => a.accountClass === cls).reduce((sum, a) => sum + Math.max(0, Number(a.balance || 0)), 0);
+
+  const totalCash = byClass("cash");
+  const totalSavings = byClass("savings");
+  const totalInvestments = byClass("investment");
+  const totalAssets = totalCash + totalSavings + totalInvestments;
+  const monthlyContributions = assets.reduce((sum, a) => sum + Math.max(0, Number(a.monthlyContribution || 0)), 0);
+  const weightedAssetRate =
+    totalAssets > 0
+      ? assets.reduce((sum, a) => sum + Math.max(0, Number(a.rate || 0)) * Math.max(0, Number(a.balance || 0)), 0) / totalAssets
+      : 0;
+
+  return { totalAssets, totalCash, totalSavings, totalInvestments, monthlyContributions, weightedAssetRate };
+}
+
+export function calculateNetWorthSummary(accounts: Account[]): NetWorthSummary {
+  const totalAssets = getAssetAccounts(accounts)
+    .filter((a) => a.includeInNetWorth !== false)
+    .reduce((sum, a) => sum + Math.max(0, Number(a.balance || 0)), 0);
+  const totalDebt = getDebtAccounts(accounts)
+    .filter((a) => a.includeInNetWorth !== false)
+    .reduce((sum, a) => sum + Math.max(0, Number(a.balance || 0)), 0);
+  return { netWorth: totalAssets - totalDebt, totalAssets, totalDebt };
+}
+
+// Projects net worth forward by routing each month's surplus into the user's accounts,
+// then growing/shrinking every balance at its own (promo-aware, compounding) rate.
+//
+// The guiding rule: moving money between a person's own accounts does not change net worth.
+// Only three things move it month to month — fresh surplus in, asset growth, and debt interest.
+// So contributions and debt payments are modelled as transfers out of a "cash" bucket, never as
+// extra inflows/outflows. Leftover surplus collects in that cash bucket (which may go negative,
+// representing drawing down reserves).
 export function buildNetWorthOutlook({
-  debts,
+  accounts,
   projection,
-  startingCash,
   months,
   startDate = new Date(),
 }: {
-  debts: DebtAccount[];
+  accounts: Account[];
   projection: Projection;
-  startingCash: number;
   months: number;
   startDate?: Date;
 }): NetWorthPoint[] {
-  const debtBalances = debts.map((debt) => ({
-    balance: Math.max(0, Number(debt.balance || 0)),
-    monthlyPayment: Math.max(0, Number(debt.minimumPayment || 0)),
-    apr: Math.max(0, Number(debt.apr || 0)),
-    interestFreeMonths: Math.max(0, Math.round(Number(debt.interestFreeMonths || 0))),
-    includeInNetWorth: debt.includeInNetWorth !== false,
+  const working = accounts.map((account) => ({
+    accountClass: account.accountClass,
+    balance: Math.max(0, Number(account.balance || 0)),
+    rate: Number(account.rate || 0),
+    promoRate: Number(account.promoRate || 0),
+    promoMonths: Math.max(0, Math.round(Number(account.promoMonths || 0))),
+    contribution: Math.max(0, Number(account.monthlyContribution || 0)),
+    payment: Math.max(0, Number(account.minimumPayment || 0)),
+    includeInNetWorth: account.includeInNetWorth !== false,
   }));
-  let projectedCash = startingCash;
+
+  // Surplus that has not been explicitly routed to a named account lands here. Always counted in
+  // net worth (it is real money); allowed to go negative when contributions/payments outrun surplus.
+  let unallocatedCash = 0;
 
   return Array.from({ length: months + 1 }, (_, monthIndex) => {
     let interestCharged = 0;
+    let growthEarned = 0;
 
     if (monthIndex > 0) {
-      projectedCash += projection.monthlySurplus;
-      debtBalances.forEach((debt) => {
-        if (debt.balance <= 0) return;
-        const interestApplies = monthIndex > debt.interestFreeMonths;
-        const monthlyInterest = interestApplies ? debt.balance * (debt.apr / 100 / 12) : 0;
+      // 1. Fresh surplus arrives.
+      unallocatedCash += projection.monthlySurplus;
+
+      // 2. Route contributions into asset accounts (transfer out of cash — net worth unchanged).
+      working.forEach((account) => {
+        if (account.accountClass === "debt" || account.contribution <= 0) return;
+        account.balance += account.contribution;
+        unallocatedCash -= account.contribution;
+      });
+
+      // 3. Pay debts (transfer out of cash) and apply debt interest.
+      working.forEach((account) => {
+        if (account.accountClass !== "debt" || account.balance <= 0) return;
+        const monthlyInterest = account.balance * monthlyRateFromAnnual(effectiveAnnualRate(account, monthIndex));
         interestCharged += monthlyInterest;
-        debt.balance = Math.max(0, debt.balance + monthlyInterest - debt.monthlyPayment);
+        const owed = account.balance + monthlyInterest;
+        const actualPayment = Math.min(account.payment, owed);
+        account.balance = Math.max(0, owed - actualPayment);
+        unallocatedCash -= actualPayment;
+      });
+
+      // 4. Grow asset balances at their effective compounding rate.
+      working.forEach((account) => {
+        if (account.accountClass === "debt") return;
+        const growth = account.balance * monthlyRateFromAnnual(effectiveAnnualRate(account, monthIndex));
+        growthEarned += growth;
+        account.balance += growth;
       });
     }
 
-    const debtBalance = debtBalances
-      .filter((debt) => debt.includeInNetWorth)
-      .reduce((sum, debt) => sum + debt.balance, 0);
+    let cashBalance = unallocatedCash;
+    let savingsBalance = 0;
+    let investmentBalance = 0;
+    let debtBalance = 0;
+
+    working.forEach((account) => {
+      if (!account.includeInNetWorth) return;
+      if (account.accountClass === "debt") debtBalance += account.balance;
+      else if (account.accountClass === "savings") savingsBalance += account.balance;
+      else if (account.accountClass === "investment") investmentBalance += account.balance;
+      else cashBalance += account.balance;
+    });
+
+    const assetBalance = cashBalance + savingsBalance + investmentBalance;
     const date = new Date(startDate.getFullYear(), startDate.getMonth() + monthIndex, 1);
 
     return {
       monthIndex,
       label: new Intl.DateTimeFormat("en", { month: "short", year: monthIndex % 12 === 0 ? "2-digit" : undefined }).format(date),
-      netWorth: projectedCash - debtBalance,
+      netWorth: assetBalance - debtBalance,
+      assetBalance,
+      cashBalance,
+      savingsBalance,
+      investmentBalance,
       debtBalance,
-      projectedCash,
       interestCharged,
+      growthEarned,
     };
   });
 }
@@ -230,22 +340,23 @@ export function buildMonthlyFlowPoints(ledger: LedgerState): MonthlyFlowPoint[] 
 export function calculateHealthScore({
   projection,
   debtSummary,
-  debts,
+  accounts,
   savingsTarget,
 }: {
   projection: Projection;
   debtSummary: DebtSummary;
-  debts: DebtAccount[];
+  accounts: Account[];
   savingsTarget: number;
 }): HealthScoreBreakdown {
+  const debts = getDebtAccounts(accounts);
   const income = projection.monthlyIncome;
   const expenseRatio = income > 0 ? projection.monthlyExpenses / income : projection.monthlyExpenses > 0 ? 2 : 0;
   const paymentPressure = income > 0 ? debtSummary.monthlyMinimums / income : debtSummary.monthlyMinimums > 0 ? 1 : 0;
   const cardStats = calculateCreditCardStats(debts);
-  const activeHighAprDebt = debts.some((debt) => debt.balance > 0 && debt.apr >= 20 && debt.interestFreeMonths <= 0);
+  const activeHighAprDebt = debts.some((debt) => debt.balance > 0 && debt.rate >= 20 && debt.promoMonths <= 0);
   const paymentNotReducingDebt = debts.some((debt) => {
-    if (debt.balance <= 0 || debt.apr <= 0 || debt.interestFreeMonths > 0) return false;
-    return debt.minimumPayment <= debt.balance * (debt.apr / 100 / 12);
+    if (debt.balance <= 0 || debt.rate <= 0 || debt.promoMonths > 0) return false;
+    return debt.minimumPayment <= debt.balance * (debt.rate / 100 / 12);
   });
 
   const cashFlowScore = clampPercent(
@@ -295,17 +406,20 @@ export function calculateHealthScore({
 export function buildFinancialSignals({
   projection,
   debtSummary,
-  debts,
+  accounts,
+  assetSummary,
   month,
   savingsTarget,
 }: {
   projection: Projection;
   debtSummary: DebtSummary;
-  debts: DebtAccount[];
+  accounts: Account[];
+  assetSummary: AssetSummary;
   month: MonthBudget;
   savingsTarget: number;
 }): FinancialSignal[] {
   const signals: FinancialSignal[] = [];
+  const debts = getDebtAccounts(accounts);
   const income = projection.monthlyIncome;
   const expenseRatio = income > 0 ? (projection.monthlyExpenses / income) * 100 : projection.monthlyExpenses > 0 ? 100 : 0;
   const paymentPressure = income > 0 ? (debtSummary.monthlyMinimums / income) * 100 : debtSummary.monthlyMinimums > 0 ? 100 : 0;
@@ -371,26 +485,26 @@ export function buildFinancialSignals({
   }
 
   debts
-    .filter((debt) => debt.balance > 0 && debt.apr >= 20 && debt.interestFreeMonths <= 0)
+    .filter((debt) => debt.balance > 0 && debt.rate >= 20 && debt.promoMonths <= 0)
     .slice(0, 2)
     .forEach((debt) => {
       signals.push({
         id: `high-apr-${debt.id}`,
         title: "High interest is active",
-        summary: `${debt.name} has ${formatRatio(debt.apr)} APR applying now.`,
+        summary: `${debt.name} has ${formatRatio(debt.rate)} APR applying now.`,
         detail: "High APR compounds the balance quickly, so paying above the monthly minimum has an outsized effect on future net worth.",
         tone: "warning",
       });
     });
 
   debts
-    .filter((debt) => debt.balance > 0 && debt.apr > 0 && debt.interestFreeMonths > 0 && debt.interestFreeMonths <= 3)
+    .filter((debt) => debt.balance > 0 && debt.rate > 0 && debt.promoMonths > 0 && debt.promoMonths <= 3)
     .slice(0, 2)
     .forEach((debt) => {
       signals.push({
         id: `promo-ending-${debt.id}`,
         title: "Interest-free period ending soon",
-        summary: `${debt.name} has ${debt.interestFreeMonths} 0% ${debt.interestFreeMonths === 1 ? "month" : "months"} left.`,
+        summary: `${debt.name} has ${debt.promoMonths} 0% ${debt.promoMonths === 1 ? "month" : "months"} left.`,
         detail: "The net-worth forecast starts applying APR after the 0% period. Plan payments before that date if the balance is still material.",
         tone: "warning",
       });
@@ -398,8 +512,8 @@ export function buildFinancialSignals({
 
   debts
     .filter((debt) => {
-      if (debt.balance <= 0 || debt.apr <= 0 || debt.interestFreeMonths > 0) return false;
-      return debt.minimumPayment <= debt.balance * (debt.apr / 100 / 12);
+      if (debt.balance <= 0 || debt.rate <= 0 || debt.promoMonths > 0) return false;
+      return debt.minimumPayment <= debt.balance * (debt.rate / 100 / 12);
     })
     .slice(0, 2)
     .forEach((debt) => {
@@ -428,6 +542,47 @@ export function buildFinancialSignals({
       detail: "Missing the savings target is not always urgent, but repeated misses weaken the net-worth forecast.",
       tone: "info",
     });
+  }
+
+  // Emergency fund: liquid cash + savings against monthly outflow.
+  const liquidReserve = assetSummary.totalCash + assetSummary.totalSavings;
+  const monthlyOutflow = projection.monthlyExpenses + debtSummary.monthlyMinimums;
+  if (monthlyOutflow > 0 && (assetSummary.totalCash > 0 || assetSummary.totalSavings > 0)) {
+    const monthsCovered = liquidReserve / monthlyOutflow;
+    if (monthsCovered < 3) {
+      signals.push({
+        id: "emergency-fund-low",
+        title: "Emergency fund under 3 months",
+        summary: `Liquid savings cover about ${roundTo(monthsCovered, 1)} ${monthsCovered === 1 ? "month" : "months"} of outflow.`,
+        detail: "A common guideline is 3–6 months of essential outflow in easy-access cash or savings before locking money into investments.",
+        tone: monthsCovered < 1 ? "warning" : "info",
+      });
+    }
+  }
+
+  // Over-allocation: routing more into accounts each month than the surplus can fund.
+  if (assetSummary.monthlyContributions > 0 && projection.monthlySurplus >= 0 && assetSummary.monthlyContributions > projection.monthlySurplus + 1) {
+    signals.push({
+      id: "contribution-over-allocation",
+      title: "Contributions exceed surplus",
+      summary: "Monthly contributions are more than this month's surplus.",
+      detail: "Routing more into savings and investments than your surplus covers will draw down cash over time. The forecast lets cash go negative to show this — adjust contributions or income to stay sustainable.",
+      tone: "warning",
+    });
+  }
+
+  // Cash drag: a large idle cash pile earning nothing while reserves are already healthy.
+  if (assetSummary.totalCash > 0 && monthlyOutflow > 0) {
+    const cashMonths = assetSummary.totalCash / monthlyOutflow;
+    if (cashMonths >= 9 && assetSummary.totalCash >= 5000) {
+      signals.push({
+        id: "cash-drag",
+        title: "Large cash balance is idle",
+        summary: `Cash covers about ${Math.round(cashMonths)} months of outflow.`,
+        detail: "Beyond a healthy emergency fund, cash held at 0% loses value to inflation. Some of this could move to interest-bearing savings or longer-term investments, depending on your plans.",
+        tone: "info",
+      });
+    }
   }
 
   const uncategorizedShare = projection.monthlyExpenses > 0 ? (projection.unpaidTotal / projection.monthlyExpenses) * 100 : 0;

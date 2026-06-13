@@ -1591,7 +1591,7 @@ textarea:focus,
 }
 
 .accountsGrid {
-  grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.8fr);
+  grid-template-columns: 1fr 1fr;
   align-items: start;
 }
 
@@ -1730,6 +1730,20 @@ textarea:focus,
   grid-area: due;
 }
 
+/* Asset rows reuse the debt grid; the promo-rate input sits where a debt's due-day would. */
+.introRateField {
+  grid-area: due;
+}
+
+/* Tint the whole row by class so assets and debts read apart at a glance. */
+.debtAccountRow.isAsset {
+  box-shadow: inset 3px 0 0 var(--account-color, var(--mint));
+}
+
+.debtAccountRow.isDebt {
+  box-shadow: inset 3px 0 0 var(--account-color, var(--red));
+}
+
 .debtAccountRow .rowAction {
   grid-area: remove;
   justify-self: end;
@@ -1833,6 +1847,29 @@ textarea:focus,
   margin-top: 18px;
 }
 
+.accountClassSelect {
+  font-weight: 720;
+  color: var(--ink);
+  box-shadow: inset 3px 0 0 var(--mint);
+}
+
+.investmentSettingPanel {
+  min-height: auto;
+}
+
+.assumedReturnField {
+  max-width: 220px;
+  margin-top: 18px;
+}
+
+.assumedReturnField .fieldSuffix {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 720;
+  white-space: nowrap;
+}
+
 .netWorthPanel {
   min-height: 420px;
 }
@@ -1858,7 +1895,7 @@ textarea:focus,
 
 .netWorthStats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
 

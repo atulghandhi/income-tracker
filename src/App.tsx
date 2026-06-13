@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, DragEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode, Ref } from "react";
+import type { CSSProperties, Dispatch, DragEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode, Ref, SetStateAction } from "react";
 import {
   AlertCircle,
   ArrowDown,
@@ -27,8 +27,10 @@ import {
   LogIn,
   LogOut,
   Pencil,
+  PiggyBank,
   Plus,
   ReceiptText,
+  TrendingUp,
   RotateCcw,
   Search,
   Settings as SettingsIcon,
@@ -44,8 +46,10 @@ import {
   buildFinancialSignals,
   buildMonthlyFlowPoints,
   buildNetWorthOutlook,
+  calculateAssetSummary,
   calculateHealthScore,
   calculateDebtSummary,
+  calculateNetWorthSummary,
   calculateProjection,
   clampDueDay,
   clampPercent,
@@ -55,6 +59,7 @@ import {
   createInitialState,
   CURRENT_SCHEMA_VERSION,
   currencyOptions,
+  DEFAULT_INVESTMENT_RETURN,
   formatMonth,
   getCurrencyFormatter,
   getCurrencySymbol,
@@ -75,10 +80,11 @@ import {
   type AuthSession,
 } from "./supabase";
 import type {
+  Account,
+  AccountClass,
+  AccountType,
   CategoryRule,
   CurrencyCode,
-  DebtAccount,
-  DebtAccountType,
   ExpenseEntry,
   FinancialSignal,
   HealthScoreBreakdown,
@@ -129,15 +135,50 @@ type ExpenseDraft = {
   amount: string;
 };
 
-type DebtDraft = {
+type AccountDraft = {
   name: string;
-  type: DebtAccountType;
+  accountClass: AccountClass;
+  type: AccountType;
   balance: string;
+  rate: string;
+  promoRate: string;
+  promoMonths: string;
+  monthlyContribution: string;
   creditLimit: string;
-  apr: string;
-  interestFreeMonths: string;
   minimumPayment: string;
   dueDay: string;
+};
+
+// Default sub-type for each account class, so switching the class picks a sensible type.
+const DEFAULT_TYPE_BY_CLASS: Record<AccountClass, AccountType> = {
+  debt: "credit-card",
+  cash: "current",
+  savings: "savings",
+  investment: "investment",
+};
+
+const ACCOUNT_TYPE_OPTIONS: Record<AccountClass, Array<{ value: AccountType; label: string }>> = {
+  debt: [
+    { value: "credit-card", label: "Credit card" },
+    { value: "loan", label: "Loan" },
+    { value: "overdraft", label: "Overdraft" },
+    { value: "other", label: "Other" },
+  ],
+  cash: [
+    { value: "current", label: "Current / debit" },
+    { value: "other-asset", label: "Other cash" },
+  ],
+  savings: [
+    { value: "savings", label: "Savings" },
+    { value: "isa", label: "Cash ISA" },
+    { value: "other-asset", label: "Other" },
+  ],
+  investment: [
+    { value: "investment", label: "Investment / stocks" },
+    { value: "isa", label: "Stocks & shares ISA" },
+    { value: "pension", label: "Pension" },
+    { value: "other-asset", label: "Other" },
+  ],
 };
 
 const initialIncomeDraft: IncomeDraft = {
@@ -150,13 +191,16 @@ const initialExpenseDraft: ExpenseDraft = {
   amount: "",
 };
 
-const initialDebtDraft: DebtDraft = {
+const initialAccountDraft: AccountDraft = {
   name: "",
+  accountClass: "debt",
   type: "credit-card",
   balance: "",
+  rate: "",
+  promoRate: "",
+  promoMonths: "",
+  monthlyContribution: "",
   creditLimit: "",
-  apr: "",
-  interestFreeMonths: "",
   minimumPayment: "",
   dueDay: "",
 };
@@ -176,7 +220,7 @@ function App() {
   const [saveState, setSaveState] = useState<SaveState>("loading");
   const [incomeDraft, setIncomeDraft] = useState<IncomeDraft>(initialIncomeDraft);
   const [expenseDraft, setExpenseDraft] = useState<ExpenseDraft>(initialExpenseDraft);
-  const [debtDraft, setDebtDraft] = useState<DebtDraft>(initialDebtDraft);
+  const [accountDraft, setAccountDraft] = useState<AccountDraft>(initialAccountDraft);
   const [projectionView, setProjectionView] = useState<ProjectionView>("overview");
   const [insightChartView, setInsightChartView] = useState<InsightChartView>("inflow-outflow");
   const [netWorthHorizon, setNetWorthHorizon] = useState<NetWorthHorizon>(24);
@@ -204,16 +248,17 @@ function App() {
   const moneyFormatter = useMemo(() => getCurrencyFormatter(ledger.currency), [ledger.currency]);
   const currencySymbol = useMemo(() => getCurrencySymbol(ledger.currency), [ledger.currency]);
   const projection = useMemo(() => calculateProjection(currentMonth), [currentMonth]);
-  const debtSummary = useMemo(() => calculateDebtSummary(ledger.debts), [ledger.debts]);
+  const debtSummary = useMemo(() => calculateDebtSummary(ledger.accounts), [ledger.accounts]);
+  const assetSummary = useMemo(() => calculateAssetSummary(ledger.accounts), [ledger.accounts]);
+  const netWorthSummary = useMemo(() => calculateNetWorthSummary(ledger.accounts), [ledger.accounts]);
   const netWorthOutlook = useMemo(
     () =>
       buildNetWorthOutlook({
-        debts: ledger.debts,
+        accounts: ledger.accounts,
         projection,
-        startingCash: ledger.goal.saved,
         months: netWorthHorizon,
       }),
-    [ledger.debts, ledger.goal.saved, netWorthHorizon, projection],
+    [ledger.accounts, netWorthHorizon, projection],
   );
   const categoryRows = useMemo(() => buildCategoryRows(currentMonth, projection), [currentMonth, projection]);
   const expenseGroups = useMemo(() => buildExpenseGroups(currentMonth.expenses), [currentMonth.expenses]);
@@ -262,12 +307,12 @@ function App() {
   const monthlyBars = useMemo(() => buildMonthlyBars(ledger, currentMonth), [ledger, currentMonth]);
   const monthlyFlowPoints = useMemo(() => buildMonthlyFlowPoints(ledger), [ledger]);
   const healthScore = useMemo(
-    () => calculateHealthScore({ projection, debtSummary, debts: ledger.debts, savingsTarget: ledger.savingsTarget }),
-    [debtSummary, ledger.debts, ledger.savingsTarget, projection],
+    () => calculateHealthScore({ projection, debtSummary, accounts: ledger.accounts, savingsTarget: ledger.savingsTarget }),
+    [debtSummary, ledger.accounts, ledger.savingsTarget, projection],
   );
   const financialSignals = useMemo(
-    () => buildFinancialSignals({ projection, debtSummary, debts: ledger.debts, month: currentMonth, savingsTarget: ledger.savingsTarget }),
-    [currentMonth, debtSummary, ledger.debts, ledger.savingsTarget, projection],
+    () => buildFinancialSignals({ projection, debtSummary, accounts: ledger.accounts, assetSummary, month: currentMonth, savingsTarget: ledger.savingsTarget }),
+    [currentMonth, debtSummary, assetSummary, ledger.accounts, ledger.savingsTarget, projection],
   );
   const goalPercent = clampPercent((ledger.goal.saved / Math.max(ledger.goal.target, 1)) * 100);
   const selectedYear = ledger.selectedMonth.split("-")[0];
@@ -563,48 +608,57 @@ function App() {
     setToast("Expense removed");
   }
 
-  function addDebtAccount() {
-    const name = debtDraft.name.trim();
+  function addAccount() {
+    const name = accountDraft.name.trim();
     if (!name) {
       setToast("Add an account name");
       return;
     }
 
+    const cls = accountDraft.accountClass;
+    const isDebt = cls === "debt";
+    // Investment accounts default their rate to the global assumed return when left blank.
+    const fallbackRate = cls === "investment" ? ledger.assumedInvestmentReturn : 0;
+    const rate = accountDraft.rate.trim() === "" ? fallbackRate : Math.max(-50, Number(accountDraft.rate) || 0);
+
     updateLedger((current) => ({
       ...current,
-      debts: [
-        ...current.debts,
+      accounts: [
+        ...current.accounts,
         {
-          id: createId("debt"),
+          id: createId("account"),
           name,
-          type: debtDraft.type,
-          balance: Math.max(0, Number(debtDraft.balance) || 0),
-          creditLimit: Math.max(0, Number(debtDraft.creditLimit) || 0),
-          apr: Math.max(0, Number(debtDraft.apr) || 0),
-          interestFreeMonths: clampWholeNumber(Number(debtDraft.interestFreeMonths) || 0, 120),
-          minimumPayment: Math.max(0, Number(debtDraft.minimumPayment) || 0),
-          dueDay: clampDueDay(Number(debtDraft.dueDay) || 1),
+          accountClass: cls,
+          type: accountDraft.type,
+          balance: Math.max(0, Number(accountDraft.balance) || 0),
+          rate,
+          promoRate: Math.max(0, Number(accountDraft.promoRate) || 0),
+          promoMonths: clampWholeNumber(Number(accountDraft.promoMonths) || 0, 120),
+          monthlyContribution: isDebt ? 0 : Math.max(0, Number(accountDraft.monthlyContribution) || 0),
+          creditLimit: isDebt ? Math.max(0, Number(accountDraft.creditLimit) || 0) : 0,
+          minimumPayment: isDebt ? Math.max(0, Number(accountDraft.minimumPayment) || 0) : 0,
+          dueDay: isDebt ? clampDueDay(Number(accountDraft.dueDay) || 1) : 1,
           includeInNetWorth: true,
-          color: colors[current.debts.length % colors.length],
+          color: colors[current.accounts.length % colors.length],
           note: "",
         },
       ],
     }));
-    setDebtDraft(initialDebtDraft);
-    setToast("Account added");
+    setAccountDraft({ ...initialAccountDraft, accountClass: cls, type: accountDraft.type });
+    setToast(isDebt ? "Debt account added" : "Account added");
   }
 
-  function updateDebtAccount(id: string, patch: Partial<DebtAccount>) {
+  function updateAccount(id: string, patch: Partial<Account>) {
     updateLedger((current) => ({
       ...current,
-      debts: current.debts.map((debt) => (debt.id === id ? { ...debt, ...patch } : debt)),
+      accounts: current.accounts.map((account) => (account.id === id ? { ...account, ...patch } : account)),
     }));
   }
 
-  function removeDebtAccount(id: string) {
+  function removeAccount(id: string) {
     updateLedger((current) => ({
       ...current,
-      debts: current.debts.filter((debt) => debt.id !== id),
+      accounts: current.accounts.filter((account) => account.id !== id),
     }));
     setToast("Account removed");
   }
@@ -1636,131 +1690,95 @@ function App() {
             <section className="viewStack" aria-label="Accounts">
               <div className="pageHeader compactHeader">
                 <div>
-                  <h2>Accounts</h2>
-                  <p>Debt, credit limits, monthly payments, interest-free periods, and due dates alongside the monthly ledger.</p>
+                  <h2>Net Worth</h2>
+                  <p>Track savings, current accounts, and investments alongside debt to see your whole financial picture.</p>
                 </div>
                 <div className="netBlock">
-                  <span>Total Debt</span>
-                  <strong className={ledger.privacyMode ? "negativeText masked" : "negativeText"}>
-                    <AnimatedCurrency value={debtSummary.totalDebt} formatter={moneyFormatter} />
+                  <span>Net Worth</span>
+                  <strong className={`${netWorthSummary.netWorth >= 0 ? "positiveText" : "negativeText"} ${ledger.privacyMode ? "masked" : ""}`}>
+                    <AnimatedCurrency value={netWorthSummary.netWorth} formatter={moneyFormatter} />
                   </strong>
                 </div>
               </div>
 
-              <section className="summaryStrip" aria-label="Debt snapshot">
-                <MetricCard label="Debt balance" value={debtSummary.totalDebt} tone="red" privacy={ledger.privacyMode} formatter={moneyFormatter} />
-                <MetricCard label="Available credit" value={debtSummary.availableCredit} tone="green" privacy={ledger.privacyMode} formatter={moneyFormatter} />
-                <MetricCard label="Monthly payments" value={debtSummary.monthlyMinimums} tone="amber" privacy={ledger.privacyMode} formatter={moneyFormatter} />
-                <MetricCard label="Utilization" value={debtSummary.utilization} suffix="%" tone={debtSummary.utilization < 30 ? "green" : "amber"} />
+              <section className="summaryStrip" aria-label="Net worth snapshot">
+                <MetricCard label="Total assets" value={netWorthSummary.totalAssets} tone="green" privacy={ledger.privacyMode} formatter={moneyFormatter} />
+                <MetricCard label="Total debt" value={debtSummary.totalDebt} tone="red" privacy={ledger.privacyMode} formatter={moneyFormatter} />
+                <MetricCard label="Monthly into accounts" value={assetSummary.monthlyContributions} tone="amber" privacy={ledger.privacyMode} formatter={moneyFormatter} />
+                <MetricCard label="Card utilization" value={debtSummary.utilization} suffix="%" tone={debtSummary.utilization < 30 ? "green" : "amber"} />
               </section>
 
               <section className="accountsGrid">
                 <article className="miniPanel accountsPanel">
+                  <PanelTitle title="Savings, cash & investments" icon={<PiggyBank size={16} />} />
+                  <div className="debtAccountList">
+                    {ledger.accounts.filter((a) => a.accountClass !== "debt").length ? (
+                      ledger.accounts
+                        .filter((a) => a.accountClass !== "debt")
+                        .map((account) => (
+                          <AccountRow
+                            key={account.id}
+                            account={account}
+                            symbol={currencySymbol}
+                            formatter={moneyFormatter}
+                            privacy={ledger.privacyMode}
+                            onChange={(patch) => updateAccount(account.id, patch)}
+                            onRemove={() => removeAccount(account.id)}
+                          />
+                        ))
+                    ) : (
+                      <EmptyState icon={<PiggyBank size={18} />} title="No asset accounts" text="Add a savings, current, or investment account below to start tracking net worth." />
+                    )}
+                  </div>
+                </article>
+
+                <article className="miniPanel accountsPanel">
                   <PanelTitle title="Debt accounts" icon={<CreditCard size={16} />} />
                   <div className="debtAccountList">
-                    {ledger.debts.length ? (
-                      ledger.debts.map((debt) => (
-                        <DebtAccountRow
-                          key={debt.id}
-                          debt={debt}
-                          symbol={currencySymbol}
-                          formatter={moneyFormatter}
-                          privacy={ledger.privacyMode}
-                          onChange={(patch) => updateDebtAccount(debt.id, patch)}
-                          onRemove={() => removeDebtAccount(debt.id)}
-                        />
-                      ))
+                    {ledger.accounts.filter((a) => a.accountClass === "debt").length ? (
+                      ledger.accounts
+                        .filter((a) => a.accountClass === "debt")
+                        .map((account) => (
+                          <AccountRow
+                            key={account.id}
+                            account={account}
+                            symbol={currencySymbol}
+                            formatter={moneyFormatter}
+                            privacy={ledger.privacyMode}
+                            onChange={(patch) => updateAccount(account.id, patch)}
+                            onRemove={() => removeAccount(account.id)}
+                          />
+                        ))
                     ) : (
                       <EmptyState icon={<CreditCard size={18} />} title="No debt accounts" text="Add a credit card, loan, overdraft, or other balance to track it here." />
                     )}
                   </div>
                 </article>
 
-                <article className="miniPanel accountEditorPanel">
-                  <PanelTitle title="Add account" icon={<Plus size={16} />} />
-                  <div className="debtDraftGrid">
+                <AccountEditor
+                  draft={accountDraft}
+                  setDraft={setAccountDraft}
+                  symbol={currencySymbol}
+                  assumedReturn={ledger.assumedInvestmentReturn}
+                  onAdd={addAccount}
+                />
+
+                <article className="miniPanel investmentSettingPanel">
+                  <PanelTitle title="Investment assumption" icon={<TrendingUp size={16} />} />
+                  <p className="panelSubcopy">
+                    New investment accounts default to this assumed annual return. Returns are an estimate, not a guarantee — markets can fall as well as rise.
+                  </p>
+                  <label className="numberField hintField assumedReturnField">
                     <input
-                      value={debtDraft.name}
-                      placeholder="Account name"
-                      onChange={(event) => setDebtDraft((draft) => ({ ...draft, name: event.target.value }))}
-                      onKeyDown={(event) => handleDraftEnter(event, addDebtAccount)}
-                      aria-label="Debt account name"
+                      value={String(ledger.assumedInvestmentReturn)}
+                      inputMode="decimal"
+                      aria-label="Assumed annual investment return"
+                      onChange={(event) =>
+                        updateLedger((current) => ({ ...current, assumedInvestmentReturn: Math.max(-50, Math.min(50, Number(event.target.value) || 0)) }))
+                      }
                     />
-                    <select
-                      value={debtDraft.type}
-                      onChange={(event) => setDebtDraft((draft) => ({ ...draft, type: event.target.value as DebtAccountType }))}
-                      aria-label="Debt account type"
-                    >
-                      <option value="credit-card">Credit card</option>
-                      <option value="loan">Loan</option>
-                      <option value="overdraft">Overdraft</option>
-                      <option value="other">Other</option>
-                    </select>
-                    <MoneyInput
-                      ariaLabel="Debt balance"
-                      value={debtDraft.balance}
-                      symbol={currencySymbol}
-                      placeholder="Current balance"
-                      onChange={(value) => setDebtDraft((draft) => ({ ...draft, balance: value }))}
-                    />
-                    <MoneyInput
-                      ariaLabel="Credit limit"
-                      value={debtDraft.creditLimit}
-                      symbol={currencySymbol}
-                      placeholder="Credit limit"
-                      onChange={(value) => setDebtDraft((draft) => ({ ...draft, creditLimit: value }))}
-                    />
-                    <label className="numberField hintField">
-                      <input
-                        value={debtDraft.apr}
-                        inputMode="decimal"
-                        placeholder="Interest rate %"
-                        onChange={(event) => setDebtDraft((draft) => ({ ...draft, apr: event.target.value }))}
-                        aria-label="Debt APR"
-                      />
-                      <InfoHint
-                        label="Interest rate help"
-                        text="Enter the annual percentage rate charged after any interest-free period ends. Use 0 if the account has no interest."
-                      />
-                    </label>
-                    <label className="numberField hintField">
-                      <input
-                        value={debtDraft.interestFreeMonths}
-                        inputMode="numeric"
-                        placeholder="Interest-free months left"
-                        onChange={(event) => setDebtDraft((draft) => ({ ...draft, interestFreeMonths: event.target.value }))}
-                        aria-label="Interest-free months"
-                      />
-                      <InfoHint
-                        label="Promotional period help"
-                        text="Enter how many months remain before APR starts applying. The net-worth forecast delays interest until this period ends."
-                      />
-                    </label>
-                    <MoneyInput
-                      ariaLabel="Monthly payment"
-                      value={debtDraft.minimumPayment}
-                      symbol={currencySymbol}
-                      placeholder="Monthly payment"
-                      onChange={(value) => setDebtDraft((draft) => ({ ...draft, minimumPayment: value }))}
-                    />
-                    <label className="numberField hintField">
-                      <input
-                        value={debtDraft.dueDay}
-                        inputMode="numeric"
-                        placeholder="Payment due day (1-31)"
-                        onChange={(event) => setDebtDraft((draft) => ({ ...draft, dueDay: event.target.value }))}
-                        onKeyDown={(event) => handleDraftEnter(event, addDebtAccount)}
-                        aria-label="Payment due day"
-                      />
-                      <InfoHint
-                        label="Payment date help"
-                        text="Enter the day of the month the payment is due. This keeps upcoming payment reminders and account context clear."
-                      />
-                    </label>
-                    <button className="navCta inlineCta" type="button" onClick={addDebtAccount}>
-                      Add account
-                    </button>
-                  </div>
+                    <span className="fieldSuffix">% / year</span>
+                  </label>
                 </article>
               </section>
 
@@ -2253,7 +2271,7 @@ function VaultOverlay() {
 function hasLocalData(state: LedgerState): boolean {
   return (
     Object.values(state.months).some((m) => m.incomes.length > 0 || m.expenses.length > 0) ||
-    state.debts.length > 0
+    state.accounts.length > 0
   );
 }
 
@@ -2802,109 +2820,332 @@ function ExpenseRow({
   );
 }
 
-function DebtAccountRow({
-  debt,
+function AccountRow({
+  account,
   symbol,
   formatter,
   privacy,
   onChange,
   onRemove,
 }: {
-  debt: DebtAccount;
+  account: Account;
   symbol: string;
   formatter: Intl.NumberFormat;
   privacy: boolean;
-  onChange: (patch: Partial<DebtAccount>) => void;
+  onChange: (patch: Partial<Account>) => void;
   onRemove: () => void;
 }) {
-  const utilization = debt.creditLimit > 0 ? clampPercent((debt.balance / debt.creditLimit) * 100) : 0;
+  const isDebt = account.accountClass === "debt";
+  const utilization = isDebt && account.creditLimit > 0 ? clampPercent((account.balance / account.creditLimit) * 100) : 0;
+  const typeOptions = ACCOUNT_TYPE_OPTIONS[account.accountClass];
 
   return (
-    <div className="debtAccountRow" style={{ "--account-color": debt.color } as CSSProperties}>
+    <div className={`debtAccountRow ${isDebt ? "isDebt" : "isAsset"}`} style={{ "--account-color": account.color } as CSSProperties}>
       <button
         className="swatchButton"
         type="button"
-        style={{ background: debt.color }}
-        onClick={() => onChange({ color: nextColor(debt.color) })}
-        aria-label="Cycle debt account color"
+        style={{ background: account.color }}
+        onClick={() => onChange({ color: nextColor(account.color) })}
+        aria-label="Cycle account color"
       />
       <div className="debtAccountMain">
-        <input value={debt.name} onChange={(event) => onChange({ name: event.target.value })} aria-label="Debt account name" />
-        <select value={debt.type} onChange={(event) => onChange({ type: event.target.value as DebtAccountType })} aria-label={`Type for ${debt.name}`}>
-          <option value="credit-card">Credit card</option>
-          <option value="loan">Loan</option>
-          <option value="overdraft">Overdraft</option>
-          <option value="other">Other</option>
+        <input value={account.name} onChange={(event) => onChange({ name: event.target.value })} aria-label="Account name" />
+        <select
+          value={account.type}
+          onChange={(event) => onChange({ type: event.target.value as AccountType })}
+          aria-label={`Type for ${account.name}`}
+        >
+          {typeOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
         </select>
       </div>
       <div className="debtField balanceField">
         <span>Balance</span>
         <MoneyInput
-          ariaLabel={`Balance for ${debt.name}`}
-          value={String(debt.balance)}
+          ariaLabel={`Balance for ${account.name}`}
+          value={String(account.balance)}
           symbol={symbol}
           privacy={privacy}
           placeholder="Current balance"
           onChange={(value) => onChange({ balance: Math.max(0, Number(value) || 0) })}
         />
       </div>
-      <div className="debtField limitField">
-        <span>Limit</span>
-        <MoneyInput
-          ariaLabel={`Credit limit for ${debt.name}`}
-          value={String(debt.creditLimit)}
-          symbol={symbol}
-          privacy={privacy}
-          placeholder="Credit limit"
-          onChange={(value) => onChange({ creditLimit: Math.max(0, Number(value) || 0) })}
-        />
-      </div>
+
+      {isDebt ? (
+        <div className="debtField limitField">
+          <span>Limit</span>
+          <MoneyInput
+            ariaLabel={`Credit limit for ${account.name}`}
+            value={String(account.creditLimit)}
+            symbol={symbol}
+            privacy={privacy}
+            placeholder="Credit limit"
+            onChange={(value) => onChange({ creditLimit: Math.max(0, Number(value) || 0) })}
+          />
+        </div>
+      ) : (
+        <div className="debtField limitField">
+          <span>Monthly in</span>
+          <MoneyInput
+            ariaLabel={`Monthly contribution for ${account.name}`}
+            value={String(account.monthlyContribution)}
+            symbol={symbol}
+            privacy={privacy}
+            placeholder="Monthly contribution"
+            onChange={(value) => onChange({ monthlyContribution: Math.max(0, Number(value) || 0) })}
+          />
+        </div>
+      )}
+
       <label className="numberField compact hintField aprField">
-        <input value={String(debt.apr)} inputMode="decimal" placeholder="Interest rate %" onChange={(event) => onChange({ apr: Math.max(0, Number(event.target.value) || 0) })} aria-label={`APR for ${debt.name}`} />
-        <InfoHint label={`Interest rate help for ${debt.name}`} text="Annual percentage rate charged after any interest-free period ends." />
+        <input
+          value={String(account.rate)}
+          inputMode="decimal"
+          placeholder={rateLabel(account.accountClass)}
+          onChange={(event) => onChange({ rate: Math.max(-50, Number(event.target.value) || 0) })}
+          aria-label={`${rateLabel(account.accountClass)} for ${account.name}`}
+        />
+        <InfoHint label={`Rate help for ${account.name}`} text={rateHelp(account.accountClass)} />
       </label>
       <label className="numberField compact hintField interestFreeField">
         <input
-          value={String(debt.interestFreeMonths)}
+          value={String(account.promoMonths)}
           inputMode="numeric"
-          placeholder="Interest-free months left"
-          onChange={(event) => onChange({ interestFreeMonths: clampWholeNumber(Number(event.target.value) || 0, 120) })}
-          aria-label={`Interest-free months for ${debt.name}`}
+          placeholder={isDebt ? "0% months left" : "Intro months left"}
+          onChange={(event) => onChange({ promoMonths: clampWholeNumber(Number(event.target.value) || 0, 120) })}
+          aria-label={`Promo months for ${account.name}`}
         />
-        <InfoHint label={`Promotional period help for ${debt.name}`} text="Months left before APR starts applying in the net-worth forecast." />
-      </label>
-      <div className="debtField minimumField">
-        <span>Monthly</span>
-        <MoneyInput
-          ariaLabel={`Monthly payment for ${debt.name}`}
-          value={String(debt.minimumPayment)}
-          symbol={symbol}
-          privacy={privacy}
-          placeholder="Monthly payment"
-          onChange={(value) => onChange({ minimumPayment: Math.max(0, Number(value) || 0) })}
+        <InfoHint
+          label={`Promo period help for ${account.name}`}
+          text={
+            isDebt
+              ? "Months left before APR starts applying. The forecast delays interest until then."
+              : "Months an intro rate applies before the standard rate takes over. Leave blank if none."
+          }
         />
-      </div>
-      <label className="numberField compact hintField dueField">
-        <input value={String(debt.dueDay)} inputMode="numeric" placeholder="Payment due day (1-31)" onChange={(event) => onChange({ dueDay: clampDueDay(Number(event.target.value) || 1) })} aria-label={`Due day for ${debt.name}`} />
-        <InfoHint label={`Payment date help for ${debt.name}`} text="Day of the month this account payment is due." />
       </label>
+
+      {isDebt ? (
+        <>
+          <div className="debtField minimumField">
+            <span>Monthly</span>
+            <MoneyInput
+              ariaLabel={`Monthly payment for ${account.name}`}
+              value={String(account.minimumPayment)}
+              symbol={symbol}
+              privacy={privacy}
+              placeholder="Monthly payment"
+              onChange={(value) => onChange({ minimumPayment: Math.max(0, Number(value) || 0) })}
+            />
+          </div>
+          <label className="numberField compact hintField dueField">
+            <input value={String(account.dueDay)} inputMode="numeric" placeholder="Due day (1-31)" onChange={(event) => onChange({ dueDay: clampDueDay(Number(event.target.value) || 1) })} aria-label={`Due day for ${account.name}`} />
+            <InfoHint label={`Payment date help for ${account.name}`} text="Day of the month this account payment is due." />
+          </label>
+        </>
+      ) : (
+        <label className="numberField compact hintField introRateField">
+          <input
+            value={String(account.promoRate)}
+            inputMode="decimal"
+            placeholder="Intro rate %"
+            onChange={(event) => onChange({ promoRate: Math.max(0, Number(event.target.value) || 0) })}
+            aria-label={`Intro rate for ${account.name}`}
+          />
+          <InfoHint label={`Intro rate help for ${account.name}`} text="The rate that applies during the intro months above, before the standard rate takes over." />
+        </label>
+      )}
+
       <div className="debtAccountMeta">
-        <span>{debtTypeLabel(debt.type)}</span>
-        <strong className={privacy ? "masked" : ""}>{formatter.format(debt.balance)}</strong>
-        <em>{formatDecimal(utilization)}% used · {debt.interestFreeMonths > 0 ? `${debt.interestFreeMonths} mo 0%` : "APR active"}</em>
+        <span>{accountTypeLabel(account)}</span>
+        <strong className={privacy ? "masked" : ""}>{formatter.format(account.balance)}</strong>
+        <em>{accountMetaCaption(account, utilization)}</em>
       </div>
-      <button className="iconButton rowAction" type="button" onClick={onRemove} aria-label={`Remove ${debt.name}`}>
+      <button className="iconButton rowAction" type="button" onClick={onRemove} aria-label={`Remove ${account.name}`}>
         <Trash2 size={17} />
       </button>
     </div>
   );
 }
 
-function debtTypeLabel(type: DebtAccountType): string {
-  if (type === "credit-card") return "Credit card";
-  if (type === "loan") return "Loan";
-  if (type === "overdraft") return "Overdraft";
-  return "Other";
+function AccountEditor({
+  draft,
+  setDraft,
+  symbol,
+  assumedReturn,
+  onAdd,
+}: {
+  draft: AccountDraft;
+  setDraft: Dispatch<SetStateAction<AccountDraft>>;
+  symbol: string;
+  assumedReturn: number;
+  onAdd: () => void;
+}) {
+  const isDebt = draft.accountClass === "debt";
+
+  function changeClass(accountClass: AccountClass) {
+    setDraft((current) => ({ ...current, accountClass, type: DEFAULT_TYPE_BY_CLASS[accountClass] }));
+  }
+
+  return (
+    <article className="miniPanel accountEditorPanel">
+      <PanelTitle title="Add account" icon={<Plus size={16} />} />
+      <div className="debtDraftGrid">
+        <select
+          className="accountClassSelect"
+          value={draft.accountClass}
+          onChange={(event) => changeClass(event.target.value as AccountClass)}
+          aria-label="Account kind"
+        >
+          <option value="savings">Savings account</option>
+          <option value="cash">Current / debit account</option>
+          <option value="investment">Investment / stocks</option>
+          <option value="debt">Debt account</option>
+        </select>
+        <select
+          value={draft.type}
+          onChange={(event) => setDraft((current) => ({ ...current, type: event.target.value as AccountType }))}
+          aria-label="Account type"
+        >
+          {ACCOUNT_TYPE_OPTIONS[draft.accountClass].map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <input
+          value={draft.name}
+          placeholder="Account name"
+          onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+          onKeyDown={(event) => handleDraftEnter(event, onAdd)}
+          aria-label="Account name"
+        />
+        <MoneyInput
+          ariaLabel="Current balance"
+          value={draft.balance}
+          symbol={symbol}
+          placeholder={isDebt ? "Current balance owed" : "Current balance"}
+          onChange={(value) => setDraft((current) => ({ ...current, balance: value }))}
+        />
+
+        {!isDebt && (
+          <MoneyInput
+            ariaLabel="Monthly contribution"
+            value={draft.monthlyContribution}
+            symbol={symbol}
+            placeholder="Monthly contribution"
+            onChange={(value) => setDraft((current) => ({ ...current, monthlyContribution: value }))}
+          />
+        )}
+
+        <label className="numberField hintField">
+          <input
+            value={draft.rate}
+            inputMode="decimal"
+            placeholder={draft.accountClass === "investment" ? `Expected return % (default ${assumedReturn})` : rateLabel(draft.accountClass)}
+            onChange={(event) => setDraft((current) => ({ ...current, rate: event.target.value }))}
+            aria-label={rateLabel(draft.accountClass)}
+          />
+          <InfoHint label="Rate help" text={rateHelp(draft.accountClass)} />
+        </label>
+
+        <label className="numberField hintField">
+          <input
+            value={draft.promoMonths}
+            inputMode="numeric"
+            placeholder={isDebt ? "Interest-free months left" : "Intro rate months (optional)"}
+            onChange={(event) => setDraft((current) => ({ ...current, promoMonths: event.target.value }))}
+            aria-label="Promo months"
+          />
+          <InfoHint
+            label="Promo period help"
+            text={
+              isDebt
+                ? "Months before APR starts applying. The forecast delays interest until this period ends."
+                : "If this account has an intro rate, how many months it lasts before the standard rate takes over."
+            }
+          />
+        </label>
+
+        {isDebt ? (
+          <>
+            <MoneyInput
+              ariaLabel="Credit limit"
+              value={draft.creditLimit}
+              symbol={symbol}
+              placeholder="Credit limit"
+              onChange={(value) => setDraft((current) => ({ ...current, creditLimit: value }))}
+            />
+            <MoneyInput
+              ariaLabel="Monthly payment"
+              value={draft.minimumPayment}
+              symbol={symbol}
+              placeholder="Monthly payment"
+              onChange={(value) => setDraft((current) => ({ ...current, minimumPayment: value }))}
+            />
+            <label className="numberField hintField">
+              <input
+                value={draft.dueDay}
+                inputMode="numeric"
+                placeholder="Payment due day (1-31)"
+                onChange={(event) => setDraft((current) => ({ ...current, dueDay: event.target.value }))}
+                onKeyDown={(event) => handleDraftEnter(event, onAdd)}
+                aria-label="Payment due day"
+              />
+              <InfoHint label="Payment date help" text="Day of the month the payment is due." />
+            </label>
+          </>
+        ) : (
+          <label className="numberField hintField">
+            <input
+              value={draft.promoRate}
+              inputMode="decimal"
+              placeholder="Intro rate % (optional)"
+              onChange={(event) => setDraft((current) => ({ ...current, promoRate: event.target.value }))}
+              onKeyDown={(event) => handleDraftEnter(event, onAdd)}
+              aria-label="Intro rate"
+            />
+            <InfoHint label="Intro rate help" text="If the account has a promotional intro rate, enter it here. It applies for the intro months above." />
+          </label>
+        )}
+
+        <button className="navCta inlineCta" type="button" onClick={onAdd}>
+          Add account
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function rateLabel(accountClass: AccountClass): string {
+  if (accountClass === "debt") return "Interest rate (APR) %";
+  if (accountClass === "investment") return "Expected return %";
+  return "Interest rate (AER) %";
+}
+
+function rateHelp(accountClass: AccountClass): string {
+  if (accountClass === "debt") return "Annual percentage rate charged after any interest-free period ends. Use 0 if the account has no interest.";
+  if (accountClass === "investment")
+    return "Assumed average annual return — an estimate, not a guarantee. A conservative long-run figure is around 6%. Markets can fall as well as rise.";
+  return "The annual interest rate (AER) the account earns after any intro period ends.";
+}
+
+function accountTypeLabel(account: Account): string {
+  const option = ACCOUNT_TYPE_OPTIONS[account.accountClass].find((o) => o.value === account.type);
+  return option?.label ?? "Account";
+}
+
+function accountMetaCaption(account: Account, utilization: number): string {
+  if (account.accountClass === "debt") {
+    const limitNote = account.creditLimit > 0 ? `${formatDecimal(utilization)}% used · ` : "";
+    return `${limitNote}${account.promoMonths > 0 ? `${account.promoMonths} mo 0%` : "APR active"}`;
+  }
+  const rateNote = `${formatDecimal(account.rate)}% ${account.accountClass === "investment" ? "est." : "AER"}`;
+  const contributionNote = account.monthlyContribution > 0 ? ` · +${Math.round(account.monthlyContribution)}/mo` : "";
+  return `${rateNote}${contributionNote}`;
 }
 
 function MoneyInput({
@@ -3359,6 +3600,7 @@ function NetWorthChart({
   const range = Math.max(1, maxValue - minValue);
   const lastPoint = points[points.length - 1] ?? points[0];
   const totalInterest = points.reduce((sum, point) => sum + point.interestCharged, 0);
+  const totalGrowth = points.reduce((sum, point) => sum + point.growthEarned, 0);
   const path = points
     .map((point, index) => {
       const x = padding + (index / Math.max(points.length - 1, 1)) * (width - padding * 2);
@@ -3377,11 +3619,15 @@ function NetWorthChart({
           <strong className={privacy ? "masked" : ""}>{formatter.format(lastPoint?.netWorth ?? 0)}</strong>
         </div>
         <div>
-          <span>Remaining debt</span>
-          <strong className={privacy ? "masked" : ""}>{formatter.format(lastPoint?.debtBalance ?? 0)}</strong>
+          <span>Ending assets</span>
+          <strong className={privacy ? "masked" : ""}>{formatter.format(lastPoint?.assetBalance ?? 0)}</strong>
         </div>
         <div>
-          <span>Interest in period</span>
+          <span>Growth earned</span>
+          <strong className={`positiveText ${privacy ? "masked" : ""}`}>{formatter.format(totalGrowth)}</strong>
+        </div>
+        <div>
+          <span>Interest paid</span>
           <strong className={privacy ? "masked" : ""}>{formatter.format(totalInterest)}</strong>
         </div>
       </div>
@@ -3584,7 +3830,10 @@ function normalizeState(state: Partial<LedgerState>): LedgerState {
       target: finiteNumber(state.goal?.target, fallback.goal.target),
     },
     savingsTarget: Number.isFinite(state.savingsTarget) ? state.savingsTarget : fallback.savingsTarget,
-    debts: normalizeDebts(state.debts),
+    accounts: normalizeAccounts(state),
+    assumedInvestmentReturn: Number.isFinite(state.assumedInvestmentReturn)
+      ? Math.max(-50, Math.min(50, state.assumedInvestmentReturn as number))
+      : fallback.assumedInvestmentReturn,
     categoryRules: normalizeCategoryRules(state.categoryRules),
     importBatches: normalizeImportBatches(state.importBatches),
     privacyMode: Boolean(state.privacyMode),
@@ -3624,23 +3873,47 @@ function normalizeMonths(months: LedgerState["months"] | undefined, fallback: Le
   );
 }
 
-function normalizeDebts(debts: DebtAccount[] | undefined): DebtAccount[] {
-  if (!Array.isArray(debts)) return [];
+// Reads the new accounts[] array if present, otherwise migrates the legacy debts[] array
+// (schema < 5), mapping apr -> rate and interestFreeMonths -> promoMonths.
+function normalizeAccounts(state: Partial<LedgerState>): Account[] {
+  const raw = state as Record<string, unknown>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const source: any[] = Array.isArray(raw.accounts)
+    ? (raw.accounts as unknown[] as any[])
+    : Array.isArray(raw.debts)
+      ? (raw.debts as unknown[] as any[])
+      : [];
 
-  return debts.map((debt, index) => ({
-    id: debt.id || createId("debt"),
-    name: debt.name || "Debt account",
-    type: debt.type ?? "other",
-    balance: finiteNumber(debt.balance, 0),
-    creditLimit: finiteNumber(debt.creditLimit, 0),
-    apr: finiteNumber(debt.apr, 0),
-    interestFreeMonths: clampWholeNumber(finiteNumber(debt.interestFreeMonths, 0), 120),
-    minimumPayment: finiteNumber(debt.minimumPayment, 0),
-    dueDay: clampDueDay(debt.dueDay),
-    includeInNetWorth: debt.includeInNetWorth !== false,
-    color: debt.color || colors[(index + 3) % colors.length],
-    note: debt.note ?? "",
-  }));
+  return source.map((item, index) => {
+    const candidateClass = typeof item?.accountClass === "string" ? item.accountClass : "debt";
+    const accountClass: AccountClass = (["cash", "savings", "investment", "debt"] as AccountClass[]).includes(candidateClass)
+      ? candidateClass
+      : "debt";
+    const isDebt = accountClass === "debt";
+
+    const validTypes = ACCOUNT_TYPE_OPTIONS[accountClass].map((option) => option.value) as string[];
+    const type: AccountType = validTypes.includes(item?.type) ? item.type : DEFAULT_TYPE_BY_CLASS[accountClass];
+
+    return {
+      id: item?.id || createId("account"),
+      name: item?.name || (isDebt ? "Debt account" : "Account"),
+      accountClass,
+      type,
+      balance: finiteNumber(item?.balance, 0),
+      // new `rate` falls back to legacy `apr`
+      rate: finiteNumber(item?.rate, finiteNumber(item?.apr, 0)),
+      promoRate: Math.max(0, finiteNumber(item?.promoRate, 0)),
+      // new `promoMonths` falls back to legacy `interestFreeMonths`
+      promoMonths: clampWholeNumber(finiteNumber(item?.promoMonths, finiteNumber(item?.interestFreeMonths, 0)), 120),
+      monthlyContribution: isDebt ? 0 : Math.max(0, finiteNumber(item?.monthlyContribution, 0)),
+      creditLimit: isDebt ? finiteNumber(item?.creditLimit, 0) : 0,
+      minimumPayment: isDebt ? finiteNumber(item?.minimumPayment, 0) : 0,
+      dueDay: isDebt ? clampDueDay(item?.dueDay) : 1,
+      includeInNetWorth: item?.includeInNetWorth !== false,
+      color: item?.color || colors[index % colors.length],
+      note: item?.note ?? "",
+    };
+  });
 }
 
 function normalizeCategoryRules(rules: CategoryRule[] | undefined): CategoryRule[] {

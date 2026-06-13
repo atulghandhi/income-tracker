@@ -68,20 +68,43 @@ export type CategoryRule = {
 
 export type DebtAccountType = "credit-card" | "loan" | "overdraft" | "other";
 
-export type DebtAccount = {
+// Asset sub-types (for the savings/debit/investment side)
+export type AssetAccountType = "current" | "savings" | "isa" | "investment" | "pension" | "other-asset";
+
+// The high-level class decides whether the balance adds to or subtracts from net worth,
+// and which fields are meaningful.
+export type AccountClass = "cash" | "savings" | "investment" | "debt";
+
+export type AccountType = DebtAccountType | AssetAccountType;
+
+export type Account = {
   id: string;
   name: string;
-  type: DebtAccountType;
+  accountClass: AccountClass;
+  type: AccountType;
   balance: number;
+  // Growth — unified across every class.
+  // rate    = ongoing annual %: APR for debt, AER for savings, expected return for investment.
+  // promoRate / promoMonths = an intro offer that applies for the first N months, then `rate` takes over.
+  //   A 0%-for-18-months credit card is { promoRate: 0, promoMonths: 18, rate: 24.9 }.
+  //   A 5%-for-12-months intro saver is { promoRate: 5, promoMonths: 12, rate: 2 }.
+  rate: number;
+  promoRate: number;
+  promoMonths: number;
+  // Assets only: how much monthly surplus is routed into this account.
+  monthlyContribution: number;
+  // Debt only.
   creditLimit: number;
-  apr: number;
-  interestFreeMonths: number;
   minimumPayment: number;
   dueDay: number;
+  // Shared.
   includeInNetWorth: boolean;
   color: string;
   note: string;
 };
+
+// Back-compat alias for code/signatures still referring to a debt account shape.
+export type DebtAccount = Account;
 
 export type LedgerState = {
   schemaVersion: number;
@@ -90,7 +113,8 @@ export type LedgerState = {
   months: Record<string, MonthBudget>;
   goal: Goal;
   savingsTarget: number;
-  debts: DebtAccount[];
+  accounts: Account[];
+  assumedInvestmentReturn: number;
   categoryRules: CategoryRule[];
   importBatches: ImportBatch[];
   privacyMode: boolean;
@@ -119,13 +143,32 @@ export type DebtSummary = {
   nextDueDay: number | null;
 };
 
+export type AssetSummary = {
+  totalAssets: number;
+  totalCash: number;
+  totalSavings: number;
+  totalInvestments: number;
+  monthlyContributions: number;
+  weightedAssetRate: number;
+};
+
+export type NetWorthSummary = {
+  netWorth: number;
+  totalAssets: number;
+  totalDebt: number;
+};
+
 export type NetWorthPoint = {
   monthIndex: number;
   label: string;
   netWorth: number;
+  assetBalance: number;
+  cashBalance: number;
+  savingsBalance: number;
+  investmentBalance: number;
   debtBalance: number;
-  projectedCash: number;
   interestCharged: number;
+  growthEarned: number;
 };
 
 export type MonthlyFlowPoint = {
