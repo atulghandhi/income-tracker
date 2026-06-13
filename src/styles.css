@@ -3161,7 +3161,8 @@ hr {
 }
 
 .bottomRail {
-  position: static;
+  position: sticky;
+  bottom: 0;
   z-index: 45;
   justify-content: center;
   gap: 44px;
