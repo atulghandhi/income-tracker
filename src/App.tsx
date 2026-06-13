@@ -3481,7 +3481,15 @@ function GoalsPanel({
 
   return (
     <article className="miniPanel goalPanel">
-      <PanelTitle title="Notes and goals" icon={<Info size={16} />} />
+      <PanelTitle
+        title="Notes and goals"
+        icon={
+          <InfoHint
+            label="What is Notes and goals for?"
+            text="Set a savings goal (e.g. emergency fund or holiday) and track how close you are. The runway shows how many months your saved amount would cover your current expenses. Use the notes area to log anything worth remembering about this month — unusual one-off costs, pay changes, or reminders for next month."
+          />
+        }
+      />
       <p className="panelSubcopy">Track your emergency fund or savings goal progress, and jot down notes for this month — e.g. unusual expenses, reminders, or context for future you.</p>
       <label className="goalName">
         <Target size={16} />
