@@ -243,7 +243,7 @@ textarea {
 .workspace {
   min-height: 100vh;
   margin-left: var(--nav-width);
-  padding-bottom: 86px;
+  padding-bottom: 74px;
 }
 
 .brandCluster,
@@ -391,6 +391,97 @@ textarea {
   margin-top: auto;
   padding: 14px 8px 0;
   border-top: 1px solid var(--line);
+}
+
+/* ─── Profile popup ───────────────────────────────── */
+.profilePopupRoot {
+  position: relative;
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.profileTrigger {
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 150ms ease;
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.profileTrigger:hover {
+  background: rgba(167, 200, 255, 0.07);
+}
+
+.profilePopup {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 200;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: rgba(13, 28, 45, 0.97);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.38);
+  overflow: hidden;
+  animation: menuIn 150ms ease both;
+}
+
+.profilePopupUser {
+  padding: 14px 14px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.profilePopupName {
+  display: block;
+  font-size: 13px;
+  font-weight: 640;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profilePopupEmail {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profileSignOutBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 14px;
+  border: none;
+  background: none;
+  color: rgba(212, 228, 250, 0.82);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+  text-align: left;
+}
+
+.profileSignOutBtn:hover {
+  background: rgba(255, 107, 107, 0.1);
+  color: #ff9a9a;
+}
+
+.profileSignOutBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .identityMark {
@@ -3236,15 +3327,17 @@ hr {
 }
 
 .bottomRail {
-  position: sticky;
+  position: fixed;
   bottom: 0;
+  left: var(--nav-width);
+  right: 0;
   z-index: 45;
   justify-content: center;
   gap: 44px;
   min-height: 58px;
   padding: 0 28px;
   border-top: 1px solid var(--line);
-  background: rgba(28, 43, 60, 0.86);
+  background: rgba(28, 43, 60, 0.92);
   backdrop-filter: blur(18px);
   color: rgba(212, 228, 250, 0.78);
   font-family: var(--mono);
@@ -3434,7 +3527,8 @@ hr {
   }
 
   .bottomRail {
-    position: static;
+    position: fixed;
+    left: 0;
     flex-wrap: wrap;
     gap: 12px 24px;
     min-height: auto;

@@ -26,7 +26,6 @@ import {
   LineChart,
   LogIn,
   LogOut,
-  Pencil,
   PiggyBank,
   Plus,
   ReceiptText,
@@ -1274,10 +1273,7 @@ function App() {
           </div>
         </div>
 
-        <button className="navCta" type="button" onClick={openNewTransaction} aria-keyshortcuts="N C Meta+N Control+N">
-          <Plus size={18} />
-          New Transaction
-        </button>
+
 
         <nav className="navStack">
           {navItems.map((item) => (
@@ -1295,19 +1291,13 @@ function App() {
         </nav>
 
         {user ? (
-          <div className="localIdentity">
-            {userAvatar ? (
-              <img className="identityAvatar" src={userAvatar} alt="" referrerPolicy="no-referrer" />
-            ) : (
-              <div className="identityMark">
-                <ShieldCheck size={17} />
-              </div>
-            )}
-            <div>
-              <strong>{userName}</strong>
-              <span>{user.email}</span>
-            </div>
-          </div>
+          <UserProfilePopup
+            userName={userName}
+            userAvatar={userAvatar}
+            userEmail={user.email ?? ""}
+            onSignOut={handleSignOut}
+            authWorking={authWorking}
+          />
         ) : (
           <button className="sideSignInBtn" type="button" onClick={() => setShowSignInModal(true)}>
             <LogIn size={16} />
@@ -2305,12 +2295,79 @@ function ledgerSummary(state: LedgerState): { months: number; transactions: numb
   return { months, transactions };
 }
 
+function UserProfilePopup({
+  userName,
+  userAvatar,
+  userEmail,
+  onSignOut,
+  authWorking,
+}: {
+  userName: string;
+  userAvatar: string;
+  userEmail: string;
+  onSignOut: () => void;
+  authWorking: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function scheduleClose() {
+    hideTimerRef.current = setTimeout(() => setOpen(false), 500);
+  }
+
+  function cancelClose() {
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+  }
+
+  return (
+    <div
+      className="profilePopupRoot"
+      onMouseEnter={() => { cancelClose(); setOpen(true); }}
+      onMouseLeave={scheduleClose}
+      onFocus={() => { cancelClose(); setOpen(true); }}
+      onBlur={scheduleClose}
+    >
+      <button className="localIdentity profileTrigger" type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="true">
+        {userAvatar ? (
+          <img className="identityAvatar" src={userAvatar} alt="" referrerPolicy="no-referrer" />
+        ) : (
+          <div className="identityMark">
+            <ShieldCheck size={17} />
+          </div>
+        )}
+        <div>
+          <strong>{userName}</strong>
+          <span>{userEmail}</span>
+        </div>
+      </button>
+      {open && (
+        <div className="profilePopup" role="menu">
+          <div className="profilePopupUser">
+            <span className="profilePopupName">{userName}</span>
+            <span className="profilePopupEmail">{userEmail}</span>
+          </div>
+          <button
+            className="profileSignOutBtn"
+            type="button"
+            onClick={onSignOut}
+            disabled={authWorking}
+            role="menuitem"
+          >
+            <LogOut size={15} />
+            Sign out
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StatusPill({ state, toast }: { state: SaveState; toast: string }) {
   return (
     <div className={`statusPill ${state}`}>
       <span />
       <div>
-        <strong>{state === "saved" ? "Local data" : state === "saving" ? "Saving" : state === "offline" ? "Local mode" : "Loading"}</strong>
+        <strong>{state === "saved" ? "Synced" : state === "saving" ? "Saving" : state === "offline" ? "Local mode" : "Loading"}</strong>
         <small>{toast}</small>
       </div>
     </div>
@@ -3397,7 +3454,8 @@ function GoalsPanel({
 
   return (
     <article className="miniPanel goalPanel">
-      <PanelTitle title="Notes and goals" icon={<Pencil size={16} />} />
+      <PanelTitle title="Notes and goals" icon={<Info size={16} />} />
+      <p className="panelSubcopy">Track your emergency fund or savings goal progress, and jot down notes for this month — e.g. unusual expenses, reminders, or context for future you.</p>
       <label className="goalName">
         <Target size={16} />
         <input
