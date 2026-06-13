@@ -1506,7 +1506,7 @@ function App() {
                       id="add-income-source"
                       ref={incomeSourceInputRef}
                       value={incomeDraft.source}
-                      placeholder="Add income source"
+                      placeholder="Income source, e.g. Salary"
                       onChange={(event) => setIncomeDraft((draft) => ({ ...draft, source: event.target.value }))}
                       onKeyDown={(event) => handleDraftEnter(event, addIncome)}
                     />
@@ -1652,7 +1652,7 @@ function App() {
                     <input
                       ref={expenseNameInputRef}
                       value={expenseDraft.name}
-                      placeholder="Expense name"
+                      placeholder="What did you spend on?"
                       onChange={(event) => setExpenseDraft((draft) => ({ ...draft, name: event.target.value }))}
                       onKeyDown={(event) => handleDraftEnter(event, addExpense)}
                     />

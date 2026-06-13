@@ -901,7 +901,8 @@ textarea::placeholder {
 }
 
 .panel {
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   min-height: 420px;
 }
 
@@ -988,7 +989,8 @@ textarea::placeholder {
 }
 
 .rowStack {
-  min-height: 258px;
+  flex: 1;
+  min-height: 200px;
 }
 
 .financeRow {
@@ -1531,7 +1533,11 @@ textarea:focus,
   gap: 10px;
   padding: 12px;
   border-top: 1px dashed rgba(198, 198, 203, 0.16);
-  background: rgba(1, 15, 31, 0.16);
+  background: rgba(1, 15, 31, 0.6);
+  backdrop-filter: blur(12px);
+  position: sticky;
+  bottom: 58px;
+  z-index: 10;
 }
 
 .expenseAddRow {
