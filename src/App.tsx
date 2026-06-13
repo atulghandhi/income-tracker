@@ -30,6 +30,7 @@ import {
   PiggyBank,
   Plus,
   ReceiptText,
+  Repeat,
   TrendingUp,
   RotateCcw,
   Search,
@@ -538,6 +539,7 @@ function App() {
           source: incomeDraft.source.trim(),
           amount,
           color: colors[month.incomes.length % colors.length],
+          recurring: true,
         },
       ],
     }));
@@ -570,6 +572,7 @@ function App() {
           amount,
           category: "",
           color: colors[(month.expenses.length + 2) % colors.length],
+          recurring: true,
         },
       ],
     }));
@@ -715,9 +718,20 @@ function App() {
   function reorderExpense(sourceId: string, targetId: string, edge: "before" | "after") {
     if (sourceId === targetId) return;
 
+    let movedCategory: string | null = null;
     updateCurrentMonth((month) => {
       const source = month.expenses.find((expense) => expense.id === sourceId);
-      if (!source || !month.expenses.some((expense) => expense.id === targetId)) return month;
+      const target = month.expenses.find((expense) => expense.id === targetId);
+      if (!source || !target) return month;
+
+      // Dropping next to a target also moves the item into that target's category. This is what
+      // makes dragging out to the ungrouped zone work — the source adopts the empty category and
+      // leaves its old group, instead of just shuffling array order while staying categorised.
+      const moved =
+        source.category === target.category
+          ? source
+          : { ...source, category: target.category, color: target.category ? target.color : source.color };
+      movedCategory = moved.category;
 
       const remaining = month.expenses.filter((expense) => expense.id !== sourceId);
       const targetIndex = remaining.findIndex((expense) => expense.id === targetId);
@@ -726,10 +740,10 @@ function App() {
       const insertIndex = edge === "before" ? targetIndex : targetIndex + 1;
       return {
         ...month,
-        expenses: [...remaining.slice(0, insertIndex), source, ...remaining.slice(insertIndex)],
+        expenses: [...remaining.slice(0, insertIndex), moved, ...remaining.slice(insertIndex)],
       };
     });
-    setToast("Expense reordered");
+    setToast(movedCategory === "" ? "Removed from category" : "Expense reordered");
     setGroupingSourceId(null);
   }
 
@@ -1017,6 +1031,8 @@ function App() {
             source: row.description,
             amount: Math.abs(row.amount),
             color: row.color || colors[index % colors.length],
+            // Imported bank rows are historical actuals — one-off by default, not run-rate.
+            recurring: false,
             date: row.date,
             imported,
           };
@@ -1034,6 +1050,8 @@ function App() {
           amount: Math.abs(row.amount),
           category: row.category.trim() || (row.kind === "debt-payment" ? "Debt payments" : "Unsorted"),
           color: row.color || colors[(index + 2) % colors.length],
+          // Imported bank rows are historical actuals — one-off by default, not run-rate.
+          recurring: false,
           date: row.date,
           imported,
         };
@@ -1400,7 +1418,7 @@ function App() {
                     icon={<LineChart size={16} />}
                     action={<NetWorthHorizonTabs horizon={netWorthHorizon} onChange={setNetWorthHorizon} compact />}
                   />
-                  <p className="panelSubcopy">Projects monthly cash flow, debt payments, and interest after any 0% period ends.</p>
+                  <p className="panelSubcopy">Projects your recurring monthly surplus, debt payments, and interest after any 0% period ends. One-off items are not extrapolated.</p>
                   <NetWorthChart points={netWorthOutlook} formatter={moneyFormatter} privacy={ledger.privacyMode} compact />
                 </article>
                 <article className="miniPanel ledgerPreview">
@@ -2721,10 +2739,43 @@ function IncomeRow({
         onEnter={({ currentTarget }) => currentTarget.blur()}
         onChange={(value) => onChange({ amount: Number(value) })}
       />
-      <button className="iconButton rowAction" type="button" onClick={onRemove} aria-label="Remove income">
-        <Trash2 size={17} />
-      </button>
+      <div className="rowActions">
+        <RecurringToggle
+          recurring={income.recurring}
+          kind="income"
+          onToggle={() => onChange({ recurring: !income.recurring })}
+        />
+        <button className="iconButton rowAction" type="button" onClick={onRemove} aria-label="Remove income">
+          <Trash2 size={17} />
+        </button>
+      </div>
     </div>
+  );
+}
+
+function RecurringToggle({
+  recurring,
+  kind,
+  onToggle,
+}: {
+  recurring: boolean;
+  kind: "income" | "expense";
+  onToggle: () => void;
+}) {
+  const label = recurring
+    ? `Recurring ${kind} — counts every month in the projection`
+    : `One-off ${kind} — counted once, not projected forward`;
+  return (
+    <button
+      className={recurring ? "recurToggle active" : "recurToggle"}
+      type="button"
+      onClick={onToggle}
+      aria-pressed={recurring}
+      aria-label={label}
+      title={label}
+    >
+      <Repeat size={15} />
+    </button>
   );
 }
 
@@ -2813,9 +2864,16 @@ function ExpenseRow({
         onChange={(value) => onChange({ amount: Number(value) })}
       />
       <span className={privacy ? "rowTotal masked" : "rowTotal"}>{formatter.format(expense.amount)}</span>
-      <button className="iconButton rowAction" type="button" onClick={onRemove} aria-label="Remove expense">
-        <Trash2 size={17} />
-      </button>
+      <div className="rowActions">
+        <RecurringToggle
+          recurring={expense.recurring}
+          kind="expense"
+          onToggle={() => onChange({ recurring: !expense.recurring })}
+        />
+        <button className="iconButton rowAction" type="button" onClick={onRemove} aria-label="Remove expense">
+          <Trash2 size={17} />
+        </button>
+      </div>
     </div>
   );
 }
@@ -3200,7 +3258,12 @@ function AnnualSnapshot({ projection, privacy, formatter }: { projection: Projec
         <Fact label={projection.annualSurplus >= 0 ? "Projected surplus" : "Projected shortfall"} value={projection.annualSurplus} privacy={privacy} tone={projection.annualSurplus >= 0 ? "good" : "bad"} formatter={formatter} />
         <Fact label="Savings rate" value={projection.savingsRate} suffix="%" tone={projection.savingsRate >= 0 ? "good" : "bad"} />
       </div>
-      <small>Based on this month repeated 12 times</small>
+      <small>
+        Recurring items × 12, plus this month&rsquo;s one-offs once
+        {projection.oneOffCount > 0
+          ? ` · ${projection.oneOffCount} one-off ${projection.oneOffCount === 1 ? "item" : "items"} not projected forward`
+          : ""}
+      </small>
     </article>
   );
 }
@@ -3855,6 +3918,8 @@ function normalizeMonths(months: LedgerState["months"] | undefined, fallback: Le
               source: income.source ?? "Imported income",
               amount: finiteNumber(income.amount, 0),
               color: income.color || colors[index % colors.length],
+              // Migration: untagged manual entries become recurring, imported rows become one-off.
+              recurring: typeof income.recurring === "boolean" ? income.recurring : !income.imported,
             }))
           : [],
         expenses: Array.isArray(month?.expenses)
@@ -3865,6 +3930,8 @@ function normalizeMonths(months: LedgerState["months"] | undefined, fallback: Le
               category: expense.category ?? "",
               amount: finiteNumber(expense.amount, 0),
               color: expense.color || colors[(index + 2) % colors.length],
+              // Migration: untagged manual entries become recurring, imported rows become one-off.
+              recurring: typeof expense.recurring === "boolean" ? expense.recurring : !expense.imported,
             }))
           : [],
         note: month?.note ?? "",

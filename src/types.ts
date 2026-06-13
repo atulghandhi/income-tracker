@@ -3,6 +3,10 @@ export type IncomeEntry = {
   source: string;
   amount: number;
   color: string;
+  // Whether this inflow repeats every month. Recurring items drive the annual run-rate and
+  // net-worth forecast; one-offs are counted once. Manual entries default to recurring,
+  // imported bank rows default to one-off.
+  recurring: boolean;
   date?: string;
   imported?: ImportedTransactionMeta;
 };
@@ -13,6 +17,8 @@ export type ExpenseEntry = {
   category: string;
   amount: number;
   color: string;
+  // See IncomeEntry.recurring — same meaning for outflows.
+  recurring: boolean;
   date?: string;
   imported?: ImportedTransactionMeta;
 };
@@ -122,15 +128,23 @@ export type LedgerState = {
 };
 
 export type Projection = {
+  // Actuals for the selected month — every item, recurring and one-off.
   monthlyIncome: number;
   monthlyExpenses: number;
   monthlySurplus: number;
+  // Recurring-only run rate — the steady monthly flow that repeats. Used by the net-worth forecast.
+  recurringMonthlyIncome: number;
+  recurringMonthlyExpenses: number;
+  recurringMonthlySurplus: number;
+  // Annual projection: recurring items × 12, plus this month's one-offs counted once.
   annualIncome: number;
   annualExpenses: number;
   annualSurplus: number;
   savingsRate: number;
   paidTotal: number;
   unpaidTotal: number;
+  // How many items in the selected month are flagged one-off (excluded from the run rate).
+  oneOffCount: number;
 };
 
 export type DebtSummary = {

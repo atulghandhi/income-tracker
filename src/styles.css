@@ -962,12 +962,50 @@ textarea::placeholder {
 }
 
 .incomeRow {
-  grid-template-columns: 22px 42px minmax(140px, 1fr) 150px 40px;
+  grid-template-columns: 22px 42px minmax(140px, 1fr) 150px auto;
 }
 
 .expenseRow {
-  grid-template-columns: 24px minmax(160px, 1fr) 132px 98px 38px;
+  grid-template-columns: 24px minmax(160px, 1fr) 132px 98px auto;
   padding-left: 24px;
+}
+
+.rowActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  justify-self: end;
+}
+
+.recurToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--muted);
+  opacity: 0.55;
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease,
+    opacity 150ms ease;
+}
+
+.recurToggle:hover {
+  background: rgba(39, 54, 71, 0.4);
+  opacity: 1;
+}
+
+.recurToggle.active {
+  color: var(--mint);
+  opacity: 1;
+  background: rgba(0, 223, 193, 0.1);
+  border-color: rgba(0, 223, 193, 0.32);
 }
 
 .financeRow input,
@@ -3577,14 +3615,19 @@ hr {
   }
 
   .incomeRow .moneyInput,
-  .incomeRow .rowAction {
+  .incomeRow .rowActions {
     grid-column: 1 / -1;
   }
 
   .expenseRow .moneyInput,
   .expenseRow .rowTotal,
-  .expenseRow .rowAction {
+  .expenseRow .rowActions {
     grid-column: 1 / -1;
+  }
+
+  .rowActions {
+    justify-self: stretch;
+    justify-content: flex-end;
   }
 
   .financeRow:hover {

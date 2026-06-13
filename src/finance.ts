@@ -17,7 +17,7 @@ import type {
   Projection,
 } from "./types";
 
-export const CURRENT_SCHEMA_VERSION = 5;
+export const CURRENT_SCHEMA_VERSION = 6;
 
 export const DEFAULT_INVESTMENT_RETURN = 6;
 
@@ -131,29 +131,52 @@ export function seedMonthFromPrevious(previous?: MonthBudget): MonthBudget {
   };
 }
 
+// A transaction repeats unless it has been explicitly flagged one-off. Treating undefined as
+// recurring keeps the steady run rate stable for any data that predates the recurring flag.
+export function isRecurring(item: { recurring?: boolean }): boolean {
+  return item.recurring !== false;
+}
+
 export function calculateProjection(month: MonthBudget): Projection {
   const monthlyIncome = sumAmounts(month.incomes);
   const monthlyExpenses = sumAmounts(month.expenses);
+
+  // Recurring-only run rate: the part of this month that repeats every month.
+  const recurringMonthlyIncome = sumAmounts(month.incomes.filter(isRecurring));
+  const recurringMonthlyExpenses = sumAmounts(month.expenses.filter(isRecurring));
+  const recurringMonthlySurplus = recurringMonthlyIncome - recurringMonthlyExpenses;
+
+  // One-offs happen once, not twelve times — so annual = recurring × 12 + this month's one-offs.
+  const oneOffIncome = monthlyIncome - recurringMonthlyIncome;
+  const oneOffExpenses = monthlyExpenses - recurringMonthlyExpenses;
+  const oneOffCount =
+    month.incomes.filter((income) => !isRecurring(income)).length +
+    month.expenses.filter((expense) => !isRecurring(expense)).length;
+
   const paidTotal = month.expenses
     .filter((expense) => expense.category.trim())
     .reduce((sum, expense) => sum + expense.amount, 0);
   const unpaidTotal = monthlyExpenses - paidTotal;
   const monthlySurplus = monthlyIncome - monthlyExpenses;
-  const annualIncome = monthlyIncome * 12;
-  const annualExpenses = monthlyExpenses * 12;
-  const annualSurplus = monthlySurplus * 12;
+  const annualIncome = recurringMonthlyIncome * 12 + oneOffIncome;
+  const annualExpenses = recurringMonthlyExpenses * 12 + oneOffExpenses;
+  const annualSurplus = annualIncome - annualExpenses;
   const savingsRate = monthlyIncome > 0 ? (monthlySurplus / monthlyIncome) * 100 : 0;
 
   return {
     monthlyIncome,
     monthlyExpenses,
     monthlySurplus,
+    recurringMonthlyIncome,
+    recurringMonthlyExpenses,
+    recurringMonthlySurplus,
     annualIncome,
     annualExpenses,
     annualSurplus,
     savingsRate,
     paidTotal,
     unpaidTotal,
+    oneOffCount,
   };
 }
 
@@ -257,8 +280,9 @@ export function buildNetWorthOutlook({
     let growthEarned = 0;
 
     if (monthIndex > 0) {
-      // 1. Fresh surplus arrives.
-      unallocatedCash += projection.monthlySurplus;
+      // 1. Fresh surplus arrives. Only the recurring run rate repeats month to month — a one-off
+      //    expense or windfall this month should not be extrapolated across the whole forecast.
+      unallocatedCash += projection.recurringMonthlySurplus;
 
       // 2. Route contributions into asset accounts (transfer out of cash — net worth unchanged).
       working.forEach((account) => {
