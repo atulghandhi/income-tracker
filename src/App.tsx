@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Analytics } from "@vercel/analytics/react";
 import LandingPage from "./LandingPage";
 import type { CSSProperties, Dispatch, DragEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode, Ref, SetStateAction } from "react";
 import {
@@ -2142,6 +2143,7 @@ function App() {
           onUseCloud={handleUseCloud}
         />
       )}
+      <Analytics />
     </div>
   );
 }
