@@ -400,13 +400,21 @@ function App() {
         if (!alive) return;
 
         if (cloudState) {
+          const normalizedCloud = normalizeState(cloudState);
           if (hasLocalData(ledger)) {
-            // Both sides have data — let the user choose
-            setSyncConflict({ local: ledger, cloud: normalizeState(cloudState) });
-            return;
+            // Only show conflict modal if the two sides are genuinely different.
+            // If they're identical (e.g. same device, same session) silently adopt cloud.
+            if (statesAreEquivalent(ledger, normalizedCloud)) {
+              setLedger(normalizedCloud);
+              setToast("Cloud data restored");
+            } else {
+              setSyncConflict({ local: ledger, cloud: normalizedCloud });
+              return;
+            }
+          } else {
+            setLedger(normalizedCloud);
+            setToast("Cloud data restored");
           }
-          setLedger(normalizeState(cloudState));
-          setToast("Cloud data restored");
         } else {
           await saveCloudLedgerState(user.id, ledger);
           if (!alive) return;
@@ -2281,6 +2289,25 @@ function hasLocalData(state: LedgerState): boolean {
     Object.values(state.months).some((m) => m.incomes.length > 0 || m.expenses.length > 0) ||
     state.accounts.length > 0
   );
+}
+
+// Two states are considered equivalent when every month has the same number of transactions
+// and the same total amounts. This is fast enough to run on every page load and avoids a
+// spurious conflict prompt when the same user opens the app on the same device after a sync.
+function statesAreEquivalent(a: LedgerState, b: LedgerState): boolean {
+  const keysA = Object.keys(a.months).sort();
+  const keysB = Object.keys(b.months).sort();
+  if (keysA.join(",") !== keysB.join(",")) return false;
+  return keysA.every((key) => {
+    const ma = a.months[key];
+    const mb = b.months[key];
+    if (!ma || !mb) return false;
+    if (ma.incomes.length !== mb.incomes.length) return false;
+    if (ma.expenses.length !== mb.expenses.length) return false;
+    const sumA = ma.incomes.reduce((s, i) => s + i.amount, 0) + ma.expenses.reduce((s, e) => s + e.amount, 0);
+    const sumB = mb.incomes.reduce((s, i) => s + i.amount, 0) + mb.expenses.reduce((s, e) => s + e.amount, 0);
+    return Math.abs(sumA - sumB) < 0.01;
+  });
 }
 
 function ledgerSummary(state: LedgerState): { months: number; transactions: number } {
