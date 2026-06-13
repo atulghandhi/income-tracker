@@ -785,12 +785,20 @@ const CSS = `
 }
 
 /* ── Mini ledger demo ── */
-.lp-mini-ledger { display: flex; flex-direction: column; gap: 12px; }
+.lp-mini-ledger {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  align-items: flex-start;
+}
 .lp-mini-panel {
+  flex: 1;
+  min-width: 0;
   border: 1px solid rgba(212, 228, 250, 0.09);
   border-radius: 10px; overflow: hidden;
   background: rgba(10, 24, 40, 0.8);
 }
+
 .lp-mini-panel--income { border-color: rgba(0, 223, 193, 0.16); }
 .lp-mini-panel--expense { border-color: rgba(255, 118, 117, 0.12); }
 .lp-mini-head {

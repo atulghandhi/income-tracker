@@ -373,6 +373,32 @@ export function calculateHealthScore({
   savingsTarget: number;
 }): HealthScoreBreakdown {
   const debts = getDebtAccounts(accounts);
+
+  // Nothing entered yet — return a blank result rather than a misleading score.
+  const hasAnyData =
+    projection.monthlyIncome > 0 ||
+    projection.monthlyExpenses > 0 ||
+    debtSummary.totalDebt > 0 ||
+    debtSummary.monthlyMinimums > 0;
+
+  const NO_DATA_DETAIL =
+    "Add income or expenses for the current month to generate a financial health score. The score requires at least some data to be meaningful.";
+
+  if (!hasAnyData) {
+    return {
+      score: 0,
+      estimatedCreditScore: 0,
+      cashFlowScore: 0,
+      debtLoadScore: 0,
+      utilizationScore: 0,
+      paymentPressureScore: 0,
+      savingsScore: 0,
+      summary: "N/A",
+      detail: NO_DATA_DETAIL,
+      noData: true,
+    };
+  }
+
   const income = projection.monthlyIncome;
   const expenseRatio = income > 0 ? projection.monthlyExpenses / income : projection.monthlyExpenses > 0 ? 2 : 0;
   const paymentPressure = income > 0 ? debtSummary.monthlyMinimums / income : debtSummary.monthlyMinimums > 0 ? 1 : 0;
@@ -424,6 +450,7 @@ export function calculateHealthScore({
     summary: score >= 78 ? "Strong" : score >= 58 ? "Stable" : score >= 38 ? "Tight" : "At risk",
     detail:
       "Calculated from income cover, outflow, savings rate, debt balance, monthly payment pressure, card utilisation, active APR exposure, and whether payments appear to reduce balances. The credit score is a rough local estimate, not a bureau score.",
+    noData: false,
   };
 }
 

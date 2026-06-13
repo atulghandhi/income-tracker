@@ -1516,7 +1516,12 @@ function App() {
                     ) : currentMonth.incomes.length ? (
                       <EmptyState icon={<Search size={18} />} title="No income matches" text="Clear search to see all income sources." />
                     ) : (
-                      <EmptyState icon={<Plus size={18} />} title="Start with income" text="Add salary, invoices, side work, or any money coming in this month." />
+                      <EmptyState
+                        icon={<Plus size={18} />}
+                        title="Start with income"
+                        text="Add salary, invoices, side work, or any money coming in this month."
+                        onAction={() => focusNextFrame(incomeSourceInputRef)}
+                      />
                     )}
                   </div>
                   <div className="addRow">
@@ -1663,6 +1668,7 @@ function App() {
                         icon={<FolderPlus size={18} />}
                         title="Add a few expenses"
                         text="Then drag one expense onto another to create a category you can name."
+                        onAction={() => focusNextFrame(expenseNameInputRef)}
                       />
                     )}
                   </div>
@@ -1830,19 +1836,25 @@ function App() {
                     icon={<Gauge size={16} />}
                     action={<InfoHint label="How health score is calculated" text={healthScore.detail} />}
                   />
-                  <div className="scoreNumber">{formatDecimal(healthScore.score)}</div>
-                  <span className="scoreCaption">/10 · {healthScore.summary}</span>
-                  <div className="creditEstimate">
-                    <span>Estimated credit score</span>
-                    <strong>{healthScore.estimatedCreditScore}</strong>
-                  </div>
-                  <div className="ruleList">
-                    <ProgressRule label="Cash flow" value={healthScore.cashFlowScore} target={75} tone="good" />
-                    <ProgressRule label="Debt load" value={healthScore.debtLoadScore} target={75} tone="neutral" />
-                    <ProgressRule label="Payments" value={healthScore.paymentPressureScore} target={75} tone="neutral" />
-                    <ProgressRule label="Card headroom" value={healthScore.utilizationScore} target={75} tone="neutral" />
-                    <ProgressRule label="Savings" value={healthScore.savingsScore} target={75} tone="good" />
-                  </div>
+                  <div className="scoreNumber">{healthScore.noData ? "N/A" : formatDecimal(healthScore.score)}</div>
+                  <span className="scoreCaption">
+                    {healthScore.noData ? "Add data to generate a score" : `/10 · ${healthScore.summary}`}
+                  </span>
+                  {!healthScore.noData && (
+                    <>
+                      <div className="creditEstimate">
+                        <span>Estimated credit score</span>
+                        <strong>{healthScore.estimatedCreditScore}</strong>
+                      </div>
+                      <div className="ruleList">
+                        <ProgressRule label="Cash flow" value={healthScore.cashFlowScore} target={75} tone="good" />
+                        <ProgressRule label="Debt load" value={healthScore.debtLoadScore} target={75} tone="neutral" />
+                        <ProgressRule label="Payments" value={healthScore.paymentPressureScore} target={75} tone="neutral" />
+                        <ProgressRule label="Card headroom" value={healthScore.utilizationScore} target={75} tone="neutral" />
+                        <ProgressRule label="Savings" value={healthScore.savingsScore} target={75} tone="good" />
+                      </div>
+                    </>
+                  )}
                 </article>
                 <article className="miniPanel chartPanel">
                   <PanelTitle
@@ -2682,12 +2694,19 @@ function MetricCard({
   );
 }
 
-function EmptyState({ icon, title, text }: { icon: ReactNode; title: string; text: string }) {
+function EmptyState({ icon, title, text, onAction }: { icon: ReactNode; title: string; text: string; onAction?: () => void }) {
   return (
-    <div className="emptyState">
+    <div
+      className={`emptyState${onAction ? " emptyState--clickable" : ""}`}
+      onClick={onAction}
+      role={onAction ? "button" : undefined}
+      tabIndex={onAction ? 0 : undefined}
+      onKeyDown={onAction ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onAction(); } } : undefined}
+    >
       <div className="emptyIcon">{icon}</div>
       <strong>{title}</strong>
       <p>{text}</p>
+      {onAction && <span className="emptyStateHint">Click to start adding</span>}
     </div>
   );
 }

@@ -214,6 +214,8 @@ export type HealthScoreBreakdown = {
   savingsScore: number;
   summary: string;
   detail: string;
+  /** True when there is no income, expense, or debt data to score against. */
+  noData: boolean;
 };
 
 export type CurrencyCode = "GBP" | "USD" | "EUR" | "CAD" | "AUD" | "INR" | "JPY";

@@ -1230,7 +1230,8 @@ textarea:focus,
   align-content: start;
   max-height: calc(64px * 10);
   overflow-y: auto;
-  overscroll-behavior-y: contain;
+  /* allow the scroll chain to continue to the page when the list hits its limit */
+  overscroll-behavior-y: auto;
   scrollbar-gutter: stable;
 }
 
@@ -1594,6 +1595,30 @@ textarea:focus,
   padding: 28px;
   text-align: center;
   color: var(--muted);
+}
+
+.emptyState--clickable {
+  cursor: pointer;
+  border-radius: var(--radius-lg);
+  transition: background 140ms ease;
+  outline: none;
+}
+
+.emptyState--clickable:hover,
+.emptyState--clickable:focus-visible {
+  background: rgba(39, 54, 71, 0.22);
+}
+
+.emptyStateHint {
+  font-size: 11.5px;
+  color: var(--mint);
+  opacity: 0.7;
+  letter-spacing: 0.01em;
+}
+
+.emptyState--clickable:hover .emptyStateHint,
+.emptyState--clickable:focus-visible .emptyStateHint {
+  opacity: 1;
 }
 
 .emptyIcon {
