@@ -108,6 +108,25 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
     return () => mq.removeEventListener("change", h);
   }, []);
 
+  // Ensure the page body is freely scrollable while the landing page is active.
+  // The main app shell uses a fixed-height flex layout; without this the first
+  // scroll gesture gets absorbed by an implicit scroll container and does nothing.
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+    html.style.overflow = "unset";
+    body.style.overflow = "unset";
+    // Scroll to top on mount so the page always starts at the beginning.
+    window.scrollTo(0, 0);
+    return () => {
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
+    };
+  }, []);
+
+
   // Nav slide-in + opening chime
   useEffect(() => {
     const t1 = setTimeout(() => setNavIn(true), 120);
@@ -491,9 +510,11 @@ const CSS = `
   background: #010f1f;
   color: #d4e4fa;
   line-height: 1.6;
-  overflow-x: hidden;
+  /* No overflow-x:hidden here — setting overflow on one axis creates an
+     implicit scroll container in Safari/Chrome that swallows scroll events. */
   padding-top: 56px;
 }
+
 
 /* ── Nav ── */
 .lp-nav {
