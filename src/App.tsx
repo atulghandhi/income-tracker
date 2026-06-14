@@ -69,7 +69,7 @@ import {
   seedMonthFromPrevious,
   shiftMonth,
 } from "./finance";
-import { buildRulePattern, parseBankCsv, sortImportRows, type CsvImportRow } from "./importer";
+import { buildRulePattern, isTransferDescription, parseBankCsv, sortImportRows, type CsvImportRow } from "./importer";
 import { GoalsView } from "./GoalsView";
 import { loadLedgerState, saveLedgerState } from "./storage";
 import {
@@ -243,6 +243,7 @@ function App() {
   const [categoryMenu, setCategoryMenu] = useState<CategoryMenuState | null>(null);
   const [importReview, setImportReview] = useState<ImportReviewState | null>(null);
   const [lastImportAction, setLastImportAction] = useState<LastImportAction | null>(null);
+  const [transferRuleInput, setTransferRuleInput] = useState("");
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(() => new Set());
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const incomeSourceInputRef = useRef<HTMLInputElement | null>(null);
@@ -298,6 +299,10 @@ function App() {
     });
     return Array.from(names).sort((a, b) => a.localeCompare(b));
   }, [categoryOptions, importReview?.rows]);
+  const transferRules = useMemo(
+    () => ledger.categoryRules.filter((rule) => rule.kind === "transfer"),
+    [ledger.categoryRules],
+  );
   const normalizedQuery = query.trim().toLowerCase();
   const visibleIncomes = useMemo(() => {
     if (!normalizedQuery) return currentMonth.incomes;
@@ -1073,10 +1078,41 @@ function App() {
     });
   }
 
+  function addTransferRule() {
+    const pattern = buildRulePattern(transferRuleInput);
+    if (!pattern) {
+      setToast("Enter a payee to match");
+      return;
+    }
+    // Preview the sweep against the current snapshot so the toast can report removals.
+    const previewRules = upsertTransferRule(ledger.categoryRules, pattern, new Date().toISOString());
+    const removed = sweepTransferEntries(ledger.months, previewRules).removed;
+
+    updateLedger((current) => {
+      const rules = upsertTransferRule(current.categoryRules, pattern, new Date().toISOString());
+      const swept = sweepTransferEntries(current.months, rules);
+      return { ...current, categoryRules: rules, months: swept.months };
+    });
+
+    setTransferRuleInput("");
+    setToast(removed ? `Transfer rule added — removed ${removed} matching` : "Transfer rule added");
+  }
+
+  function removeTransferRule(id: string) {
+    updateLedger((current) => ({
+      ...current,
+      categoryRules: current.categoryRules.filter((rule) => rule.id !== id),
+    }));
+    setToast("Transfer rule removed");
+  }
+
   function confirmCsvImport() {
     if (!importReview) return;
     const rowsToImport = importReview.rows.filter((row) => row.include && row.kind !== "transfer");
-    if (!rowsToImport.length) {
+    // Rows flagged as transfers between the user's own accounts: never imported, but their
+    // payee patterns are saved so future imports auto-skip them and existing matches are swept.
+    const transferRows = importReview.rows.filter((row) => row.kind === "transfer");
+    if (!rowsToImport.length && !transferRows.length) {
       setToast("No transactions selected");
       return;
     }
@@ -1136,28 +1172,51 @@ function App() {
         transactionRefs.push({ monthKey: row.monthKey, entryId: entry.id, kind: "expense" });
       });
 
-      const batch: ImportBatch = {
-        id: batchId,
-        fileName: importReview.fileName,
-        importedAt,
-        totalRows: importReview.totalRows,
-        importedRows: transactionRefs.length,
-        skippedRows: Math.max(0, importReview.totalRows - transactionRefs.length),
-        transactionRefs,
-      };
+      // Learn rules from both imported rows and transfer rows, then sweep any existing ledger
+      // entries (from earlier imports) that match the now-known transfer payees.
+      const nextRules = mergeCategoryRules(current.categoryRules, [...rowsToImport, ...transferRows], importedAt);
+      const swept = sweepTransferEntries(months, nextRules);
+
+      const importBatches =
+        transactionRefs.length > 0
+          ? [
+              {
+                id: batchId,
+                fileName: importReview.fileName,
+                importedAt,
+                totalRows: importReview.totalRows,
+                importedRows: transactionRefs.length,
+                skippedRows: Math.max(0, importReview.totalRows - transactionRefs.length),
+                transactionRefs,
+              } satisfies ImportBatch,
+              ...current.importBatches,
+            ].slice(0, 25)
+          : current.importBatches;
 
       return {
         ...current,
-        months,
-        categoryRules: mergeCategoryRules(current.categoryRules, rowsToImport, importedAt),
-        importBatches: [batch, ...current.importBatches].slice(0, 25),
+        months: swept.months,
+        categoryRules: nextRules,
+        importBatches,
       };
     });
 
+    // Recompute against the current snapshot so the toast can report how many existing
+    // entries the new transfer rules swept out.
+    const learnedRules = mergeCategoryRules(ledger.categoryRules, [...rowsToImport, ...transferRows], importedAt);
+    const removed = sweepTransferEntries(ledger.months, learnedRules).removed;
+
     setImportReview(null);
-    setLastImportAction({ batchId, fileName: importReview.fileName, importedRows: rowsToImport.length });
+    if (rowsToImport.length) {
+      setLastImportAction({ batchId, fileName: importReview.fileName, importedRows: rowsToImport.length });
+    }
     setActiveView("ledger");
-    setToast(`Imported ${rowsToImport.length} transactions`);
+
+    const parts: string[] = [];
+    if (rowsToImport.length) parts.push(`Imported ${rowsToImport.length} transaction${rowsToImport.length === 1 ? "" : "s"}`);
+    if (transferRows.length) parts.push(`saved ${transferRows.length} transfer rule${transferRows.length === 1 ? "" : "s"}`);
+    if (removed) parts.push(`removed ${removed} matching`);
+    setToast(parts.join(" · ") || "Nothing to import");
   }
 
   function undoImportBatch(batchId: string) {
@@ -2146,6 +2205,50 @@ function App() {
                 </aside>
               </section>
 
+              <article className="settingsPanel transferRulesPanel">
+                <PanelTitle title="Transfer rules" icon={<Repeat size={17} />} />
+                <p className="panelSubcopy">
+                  Money moving between your own accounts isn’t income or spending. Mark a payee as a transfer during import — or add one
+                  here — and it’s skipped on every future import and removed from your ledger.
+                </p>
+                <div className="transferRuleAdd">
+                  <input
+                    value={transferRuleInput}
+                    placeholder="Payee to treat as a transfer, e.g. Transfer to Savings"
+                    aria-label="Add a transfer payee"
+                    onChange={(event) => setTransferRuleInput(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") addTransferRule();
+                    }}
+                  />
+                  <button className="commandButton" type="button" onClick={addTransferRule}>
+                    <Plus size={16} />
+                    Add
+                  </button>
+                </div>
+                {transferRules.length ? (
+                  <ul className="transferRuleList">
+                    {transferRules.map((rule) => (
+                      <li key={rule.id}>
+                        <span>{rule.pattern}</span>
+                        <button
+                          className="iconButton"
+                          type="button"
+                          aria-label={`Remove transfer rule ${rule.pattern}`}
+                          onClick={() => removeTransferRule(rule.id)}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="transferRuleEmpty">
+                    No transfer rules yet. Set a transaction’s type to “Transfer” during import, or add a payee above.
+                  </p>
+                )}
+              </article>
+
               <article className="dangerPanel">
                 <div>
                   <h3>Danger Zone</h3>
@@ -2699,7 +2802,7 @@ function ImportReviewTableRow({
           <option value="expense">Expense</option>
           <option value="income">Income</option>
           <option value="debt-payment">Debt payment</option>
-          <option value="transfer">Transfer</option>
+          <option value="transfer">Transfer (between accounts)</option>
         </select>
       </td>
       <td>
@@ -2736,7 +2839,7 @@ function importKindPatch(kind: TransactionKind, row: CsvImportRow): Partial<CsvI
       kind,
       category: "Transfers",
       include: false,
-      note: row.suggestedKind === kind ? row.note : "Edited",
+      note: "Won’t import — saved as transfer",
     };
   }
 
@@ -4333,6 +4436,51 @@ function normalizeImportBatches(batches: ImportBatch[] | undefined): ImportBatch
     skippedRows: finiteNumber(batch.skippedRows, 0),
     transactionRefs: Array.isArray(batch.transactionRefs) ? batch.transactionRefs : [],
   }));
+}
+
+// Add or refresh a "transfer between my accounts" rule keyed by its merchant pattern.
+function upsertTransferRule(rules: CategoryRule[], pattern: string, timestamp: string): CategoryRule[] {
+  const map = new Map(rules.map((rule) => [rule.pattern, rule]));
+  const existing = map.get(pattern);
+  map.set(pattern, {
+    id: existing?.id ?? createId("rule"),
+    pattern,
+    category: "Transfers",
+    kind: "transfer",
+    createdAt: existing?.createdAt ?? timestamp,
+    updatedAt: timestamp,
+  });
+  return Array.from(map.values());
+}
+
+// Remove every ledger entry whose description matches a saved transfer rule. Returns the
+// pruned months plus how many entries were swept, so callers can report it.
+function sweepTransferEntries(
+  months: Record<string, MonthBudget>,
+  rules: CategoryRule[],
+): { months: Record<string, MonthBudget>; removed: number } {
+  const transferRules = rules.filter((rule) => rule.kind === "transfer");
+  if (!transferRules.length) return { months, removed: 0 };
+
+  let removed = 0;
+  const next: Record<string, MonthBudget> = {};
+  for (const [monthKey, month] of Object.entries(months)) {
+    const incomes = month.incomes.filter((income) => {
+      const hit = isTransferDescription(income.source, transferRules);
+      if (hit) removed += 1;
+      return !hit;
+    });
+    const expenses = month.expenses.filter((expense) => {
+      const hit = isTransferDescription(expense.name, transferRules);
+      if (hit) removed += 1;
+      return !hit;
+    });
+    next[monthKey] =
+      incomes.length === month.incomes.length && expenses.length === month.expenses.length
+        ? month
+        : { ...month, incomes, expenses };
+  }
+  return { months: next, removed };
 }
 
 function mergeCategoryRules(existingRules: CategoryRule[], importedRows: CsvImportRow[], timestamp: string): CategoryRule[] {

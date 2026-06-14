@@ -153,6 +153,26 @@ export function parseBankCsv({ text, fileName, state, fallbackMonthKey }: ParseB
   };
 }
 
+// A saved rule matches when every word in its pattern appears in the description (as a
+// token substring). This survives stop-words like "to"/"from" that buildRulePattern strips,
+// so a pattern of "transfer savings" still matches "Transfer to Savings".
+export function descriptionMatchesPattern(normalizedDescription: string, pattern: string): boolean {
+  const normalizedPattern = pattern.trim().toLowerCase();
+  if (!normalizedPattern) return false;
+  const descTokens = normalizedDescription.split(" ").filter(Boolean);
+  const patternTokens = normalizedPattern.split(" ").filter(Boolean);
+  if (!patternTokens.length) return false;
+  return patternTokens.every((patternToken) => descTokens.some((descToken) => descToken.includes(patternToken)));
+}
+
+// True when a description matches any saved transfer rule — used to skip inter-account
+// transfers on import and to retroactively sweep them out of the ledger.
+export function isTransferDescription(description: string, rules: CategoryRule[]): boolean {
+  const normalized = normalizeMerchant(description);
+  if (!normalized) return false;
+  return rules.some((rule) => rule.kind === "transfer" && descriptionMatchesPattern(normalized, rule.pattern));
+}
+
 export function createTransactionHash(date: string, description: string, amount: number): string {
   const key = `${date}|${normalizeMerchant(description)}|${amount.toFixed(2)}`;
   let hash = 0;
@@ -386,7 +406,7 @@ function monthStartDate(monthKey: string): string {
 
 function suggestCategory(description: string, amount: number, rules: CategoryRule[], bankCategory: string): CategorySuggestion {
   const normalized = normalizeMerchant(description);
-  const learnedRule = rules.find((rule) => normalized.includes(rule.pattern.toLowerCase()));
+  const learnedRule = rules.find((rule) => descriptionMatchesPattern(normalized, rule.pattern));
   if (learnedRule) {
     return {
       kind: learnedRule.kind,

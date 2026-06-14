@@ -2022,6 +2022,67 @@ textarea:focus,
   min-height: auto;
 }
 
+.transferRulesPanel {
+  min-height: auto;
+}
+
+.transferRuleAdd {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.transferRuleAdd input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(5, 20, 36, 0.74);
+  color: var(--ink);
+}
+
+.transferRuleAdd .commandButton {
+  flex: 0 0 auto;
+}
+
+.transferRuleList {
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  margin: 16px 0 0;
+  padding: 0;
+}
+
+.transferRuleList li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(18, 33, 49, 0.54);
+}
+
+.transferRuleList li span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.transferRuleEmpty {
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .assumedReturnField {
   max-width: 220px;
   margin-top: 18px;
