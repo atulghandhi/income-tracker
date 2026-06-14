@@ -1228,10 +1228,10 @@ textarea:focus,
 .expenseGroups {
   display: grid;
   align-content: start;
-  max-height: calc(64px * 10);
-  overflow-y: auto;
-  /* allow the scroll chain to continue to the page when the list hits its limit */
-  overscroll-behavior-y: auto;
+  /* No max-height or overflow-y — inner scroll containers compete with
+     the page scroll and always break one or the other. The panel grows
+     to its natural height; the window scrolls. The sticky addRow handles
+     the input bar. */
   scrollbar-gutter: stable;
 }
 
