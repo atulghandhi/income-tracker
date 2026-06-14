@@ -396,7 +396,7 @@ textarea {
 /* ─── Profile popup ───────────────────────────────── */
 .profilePopupRoot {
   position: relative;
-  margin-top: auto;
+  margin-top: 0;
   padding-top: 14px;
   border-top: 1px solid var(--line);
 }
@@ -1753,10 +1753,10 @@ textarea:focus,
 }
 
 .accountsGrid {
-  /* Only go two-up when the canvas can actually hold two full account rows;
-     otherwise a single column so nothing clips or needs horizontal scrolling.
-     min(560px, 100%) keeps a single column from overflowing narrow/phone widths. */
-  grid-template-columns: repeat(auto-fit, minmax(min(560px, 100%), 1fr));
+  /* Single column at every width. Each account row packs many fields, so a
+     two-up layout crams the numeric inputs down to a character or two. Giving
+     each panel the full canvas keeps every value readable. */
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
 }
 
@@ -1849,9 +1849,9 @@ textarea:focus,
     "swatch main balance minimum remove"
     "swatch meta limit apr due"
     "swatch meta interest interest due";
-  grid-template-columns: 28px minmax(140px, 1.2fr) minmax(104px, 0.8fr) minmax(104px, 0.8fr) 72px;
-  gap: 10px;
-  align-items: center;
+  grid-template-columns: 28px minmax(160px, 1.3fr) minmax(128px, 0.9fr) minmax(128px, 0.9fr) 76px;
+  gap: 10px 12px;
+  align-items: start;
   min-height: 112px;
   padding: 12px;
   border: 1px solid var(--line);
@@ -1971,12 +1971,30 @@ textarea:focus,
 .debtField {
   min-width: 0;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 8px;
+  /* Label sits above the input so the number gets the full column width. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
 }
 
 .debtField > span {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 720;
+}
+
+/* Account-row numeric fields (rate, promo months, due day): label on its own
+   row above the input + info icon, matching the stacked money fields. */
+.debtAccountRow .numberField.hintField,
+.debtAccountRow .numberField.compact.hintField {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-content: start;
+  gap: 4px 6px;
+}
+
+.debtAccountRow .numberField .fieldLabel {
+  grid-column: 1 / -1;
   color: var(--muted);
   font-family: var(--mono);
   font-size: 11px;
@@ -2286,6 +2304,46 @@ textarea:focus,
 .infoHint:focus-visible > span {
   opacity: 1;
   transform: translateY(0);
+}
+
+/* Themed instant tooltip for icon buttons and toggles — replaces native title
+   attributes (the delayed grey browser tooltips) with an on-brand popup. */
+[data-tip] {
+  position: relative;
+}
+
+[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  z-index: 60;
+  width: max-content;
+  max-width: min(260px, calc(100vw - 36px));
+  padding: 7px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: rgba(5, 20, 36, 0.98);
+  color: rgba(212, 228, 250, 0.92);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.35);
+  font-family: var(--body);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
+  white-space: normal;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease;
+}
+
+[data-tip]:hover::after,
+[data-tip]:focus-visible::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
 
 .healthPanel .infoHint {
@@ -4121,7 +4179,7 @@ hr {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: auto;
+  margin-top: 0;
   padding: 10px 10px;
   border: 1px dashed rgba(0, 223, 193, 0.28);
   border-radius: var(--radius-lg);
@@ -4135,6 +4193,216 @@ hr {
   border-color: var(--mint);
   color: var(--ink);
   background: var(--mint-soft);
+}
+
+/* Sidebar Tutorial button — sits just above the profile / sign-in block and
+   pushes that whole cluster to the bottom of the nav. */
+.sideTutorialBtn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: auto;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(18, 33, 49, 0.5);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease;
+}
+
+.sideTutorialBtn:hover {
+  border-color: var(--mint);
+  background: rgba(18, 184, 134, 0.1);
+}
+
+.sideTutorialBtn > svg {
+  color: var(--mint);
+  flex: 0 0 auto;
+}
+
+/* ─── Tutorial overlay ─────────────────────────────── */
+.tutorialBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(1, 10, 22, 0.72);
+  backdrop-filter: blur(8px);
+  animation: tutorialFade 160ms ease both;
+}
+
+.tutorialCard {
+  width: min(460px, 100%);
+  display: grid;
+  gap: 14px;
+  padding: 26px 26px 22px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, rgba(18, 33, 49, 0.98), rgba(9, 22, 38, 0.98));
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.5);
+  animation: tutorialPop 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.tutorialBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(18, 184, 134, 0.14);
+  color: var(--mint);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 720;
+  letter-spacing: 0.02em;
+}
+
+.tutorialTitle {
+  margin: 0;
+  color: var(--ink);
+  font-size: 23px;
+  font-weight: 640;
+  line-height: 1.15;
+}
+
+.tutorialStepHeading {
+  margin: 0;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 640;
+}
+
+.tutorialBullets {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+
+.tutorialBullets li {
+  position: relative;
+  padding-left: 22px;
+  color: rgba(212, 228, 250, 0.86);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.tutorialBullets li::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 8px;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--mint);
+}
+
+.tutorialDots {
+  display: flex;
+  gap: 6px;
+}
+
+.tutorialDots span {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(167, 200, 255, 0.25);
+  transition:
+    background 150ms ease,
+    width 150ms ease;
+}
+
+.tutorialDots span.active {
+  width: 20px;
+  background: var(--mint);
+}
+
+.tutorialActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.tutorialNav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tutorialSkip {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 2px;
+}
+
+.tutorialSkip:hover {
+  color: var(--ink);
+}
+
+/* Dedicated primary button so it stays visible on mobile (the shared .navCta is
+   hidden under 900px). */
+.tutorialNext {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 20px;
+  border: 1px solid rgba(50, 145, 255, 0.55);
+  border-radius: var(--radius);
+  background: var(--blue);
+  color: #001b3c;
+  font-weight: 720;
+  font-size: 14px;
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    transform 150ms ease;
+}
+
+.tutorialNext:hover {
+  background: #58a6ff;
+}
+
+.tutorialNext:active {
+  transform: scale(0.97);
+}
+
+@keyframes tutorialFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes tutorialPop {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .sideSignInBtn > svg {

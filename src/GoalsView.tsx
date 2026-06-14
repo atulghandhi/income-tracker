@@ -551,7 +551,7 @@ function GoalEditor({
               key={mode.value}
               className={`goalFundingBtn${goal.fundingMode === mode.value ? " active" : ""}`}
               type="button"
-              title={mode.hint}
+              data-tip={mode.hint}
               onClick={() => onUpdate({ fundingMode: mode.value })}
             >
               {mode.label}
@@ -606,11 +606,10 @@ function GoalEditor({
               tabIndex={0}
               role="button"
               aria-label="About interest rate"
-              title="Optional. If set, the engine compounds interest monthly on the accumulated balance — simulating the return you'd earn in a savings account or ISA."
             >
               <Info size={13} />
               <span className="goalEditorInfoTooltip">
-                Optional. Compounds interest monthly on accumulated balance — simulating returns from a savings account or ISA.
+                Optional. If set, the engine compounds interest monthly on the accumulated balance — simulating the return you'd earn in a savings account or ISA.
               </span>
             </span>
           </div>

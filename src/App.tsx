@@ -23,6 +23,7 @@ import {
   FileJson,
   FolderPlus,
   Gauge,
+  GraduationCap,
   Info,
   LayoutDashboard,
   LineChart,
@@ -109,6 +110,128 @@ import type {
 
 type ProjectionView = "overview" | "category" | "month";
 type AppView = "dashboard" | "ledger" | "accounts" | "goals" | "insights" | "settings";
+
+type TutorialStep = { heading: string; bullets: string[] };
+type PageTutorial = { title: string; badge: string; steps: TutorialStep[] };
+
+// Short, skimmable per-page walkthroughs. Auto-shown the first time each page is
+// opened (ledger first), and replayable anytime from the sidebar "Tutorial" button.
+const TUTORIALS: Record<AppView, PageTutorial> = {
+  ledger: {
+    title: "Track a month in seconds",
+    badge: "Ledger",
+    steps: [
+      {
+        heading: "Add what comes in and goes out",
+        bullets: [
+          "Left column is income, right column is expenses.",
+          "Type a name and an amount — totals update as you type.",
+          "Use the arrows up top to move between months.",
+        ],
+      },
+      {
+        heading: "Organise it",
+        bullets: [
+          "Drag one expense onto another to group them into a category.",
+          "Toggle the loop icon to mark an item recurring, so it counts every month.",
+          "Use the search bar up top to filter rows fast.",
+        ],
+      },
+      {
+        heading: "See the picture",
+        bullets: [
+          "Your surplus (income minus expenses) updates live.",
+          "Import a bank CSV to fill a whole month in one go.",
+          "Rough estimates are fine — you still get useful insights.",
+        ],
+      },
+    ],
+  },
+  dashboard: {
+    title: "Your money at a glance",
+    badge: "Dashboard",
+    steps: [
+      {
+        heading: "",
+        bullets: [
+          "The net-worth outlook projects where your finances are heading.",
+          "The ledger summary shows this month's income vs spending.",
+          "Quick links jump you straight to accounts and imports.",
+        ],
+      },
+    ],
+  },
+  accounts: {
+    title: "Your whole net worth",
+    badge: "Accounts",
+    steps: [
+      {
+        heading: "",
+        bullets: [
+          "Add savings, current and investment accounts as assets.",
+          "Add credit cards, loans and overdrafts as debts.",
+          "Net worth = assets minus debts, updated as you type.",
+          "Set rates, limits and 0% intro periods to power the forecast.",
+        ],
+      },
+    ],
+  },
+  goals: {
+    title: "Plan what you're saving for",
+    badge: "Goals",
+    steps: [
+      {
+        heading: "",
+        bullets: [
+          "Add a goal with a target amount and an optional deadline.",
+          "Pick how it's funded: Fixed, Auto, or Fill from spare surplus.",
+          "The timeline shows when each goal completes.",
+          "Higher-priority goals are funded first.",
+        ],
+      },
+    ],
+  },
+  insights: {
+    title: "Spot the trends",
+    badge: "Insights",
+    steps: [
+      {
+        heading: "",
+        bullets: [
+          "Your health score rates cash flow, debt and savings.",
+          "Charts show monthly cash flow and your category breakdown.",
+          "Anomalies flag unusual spending worth a second look.",
+        ],
+      },
+    ],
+  },
+  settings: {
+    title: "Data, privacy & rules",
+    badge: "Settings",
+    steps: [
+      {
+        heading: "",
+        bullets: [
+          "Export or import your whole vault as JSON or CSV.",
+          "Transfer rules auto-skip money moved between your own accounts.",
+          "Privacy mode hides amounts; switch currency or animations anytime.",
+        ],
+      },
+    ],
+  },
+};
+
+const TUTORIAL_SEEN_KEY = "tutorialSeenPages";
+
+function readSeenTutorials(): Set<AppView> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(TUTORIAL_SEEN_KEY) ?? "[]");
+    return new Set(Array.isArray(raw) ? (raw as AppView[]) : []);
+  } catch {
+    return new Set();
+  }
+}
+
 type SaveState = "loading" | "saved" | "saving" | "offline";
 type SyncConflict = { local: LedgerState; cloud: LedgerState };
 type NetWorthHorizon = 12 | 24 | 60;
@@ -173,7 +296,7 @@ const ACCOUNT_TYPE_OPTIONS: Record<AccountClass, Array<{ value: AccountType; lab
     { value: "other", label: "Other" },
   ],
   cash: [
-    { value: "current", label: "Current / debit" },
+    { value: "current", label: "Current" },
     { value: "other-asset", label: "Other cash" },
   ],
   savings: [
@@ -234,6 +357,7 @@ function App() {
   const [insightChartView, setInsightChartView] = useState<InsightChartView>("inflow-outflow");
   const [netWorthHorizon, setNetWorthHorizon] = useState<NetWorthHorizon>(24);
   const [activeView, setActiveView] = useState<AppView>("ledger");
+  const [tutorialView, setTutorialView] = useState<AppView | null>(null);
   const [animationsEnabled, setAnimationsEnabled] = useState(true);
   const [query, setQuery] = useState("");
   const [toast, setToast] = useState("Loading secure vault");
@@ -489,6 +613,29 @@ function App() {
 
     return () => window.clearTimeout(timeout);
   }, [ledger, hydrated, authLoading, cloudHydrated, user?.id]);
+
+  // Auto-show a page's tutorial the first time it's opened (ledger first, since it's
+  // the default view). Once dismissed it won't reappear; the sidebar button replays it.
+  useEffect(() => {
+    if (showLanding || !hydrated) return;
+    if (readSeenTutorials().has(activeView)) return;
+    setTutorialView((current) => current ?? activeView);
+  }, [activeView, showLanding, hydrated]);
+
+  function closeTutorial() {
+    setTutorialView((current) => {
+      if (current) {
+        const seen = readSeenTutorials();
+        seen.add(current);
+        try {
+          localStorage.setItem(TUTORIAL_SEEN_KEY, JSON.stringify([...seen]));
+        } catch {
+          // localStorage unavailable — tutorial will simply show again next time.
+        }
+      }
+      return null;
+    });
+  }
 
   useEffect(() => {
     if (!categoryMenu) return;
@@ -1431,6 +1578,16 @@ function App() {
           ))}
         </nav>
 
+        <button
+          className="sideTutorialBtn"
+          type="button"
+          onClick={() => setTutorialView(activeView)}
+          data-tip={`Replay the ${TUTORIALS[activeView].badge} tutorial`}
+        >
+          <GraduationCap size={16} />
+          Tutorial
+        </button>
+
         {user ? (
           <UserProfilePopup
             userName={userName}
@@ -1507,20 +1664,20 @@ function App() {
               type="button"
               onClick={() => updateLedger((current) => ({ ...current, privacyMode: !current.privacyMode }))}
               aria-label={ledger.privacyMode ? "Show amounts" : "Hide amounts"}
-              title={ledger.privacyMode ? "Show amounts" : "Hide amounts"}
+              data-tip={ledger.privacyMode ? "Show amounts" : "Hide amounts"}
             >
               {ledger.privacyMode ? <EyeOff size={19} /> : <Eye size={19} />}
             </button>
             {user ? (
-              <button className="iconButton" type="button" onClick={handleSignOut} aria-label="Sign out" title="Sign out" disabled={authWorking}>
+              <button className="iconButton" type="button" onClick={handleSignOut} aria-label="Sign out" data-tip="Sign out" disabled={authWorking}>
                 <LogOut size={18} />
               </button>
             ) : (
-              <button className="iconButton" type="button" onClick={() => setShowSignInModal(true)} aria-label="Sign in" title="Sign in to sync">
+              <button className="iconButton" type="button" onClick={() => setShowSignInModal(true)} aria-label="Sign in" data-tip="Sign in to sync">
                 <LogIn size={18} />
               </button>
             )}
-            <button className="iconButton" type="button" onClick={() => setActiveView("settings")} aria-label="Help">
+            <button className="iconButton" type="button" onClick={() => setActiveView("settings")} aria-label="Help" data-tip="Help">
               <CircleHelp size={18} />
             </button>
           </div>
@@ -2285,6 +2442,8 @@ function App() {
             </button>
           </div>
         )}
+
+        {tutorialView && <TutorialOverlay tutorial={TUTORIALS[tutorialView]} onClose={closeTutorial} />}
 
         {importReview && (
           <ImportReviewModal
@@ -3086,7 +3245,7 @@ function RecurringToggle({
       onClick={onToggle}
       aria-pressed={recurring}
       aria-label={label}
-      title={label}
+      data-tip={label}
     >
       <Repeat size={15} />
     </button>
@@ -3164,7 +3323,7 @@ function ExpenseRow({
         onDragEnd={onDragEnd}
         onClick={onSelectForGroup}
         aria-label={`Select ${expense.name} for grouping`}
-        title="Drag onto another expense, or tap two handles to group"
+        data-tip="Drag onto another expense, or tap two handles to group"
       >
         ::
       </button>
@@ -3273,6 +3432,7 @@ function AccountRow({
       )}
 
       <label className="numberField compact hintField aprField">
+        <span className="fieldLabel">{rateLabel(account.accountClass)}</span>
         <input
           value={String(account.rate)}
           inputMode="decimal"
@@ -3283,6 +3443,7 @@ function AccountRow({
         <InfoHint label={`Rate help for ${account.name}`} text={rateHelp(account.accountClass)} />
       </label>
       <label className="numberField compact hintField interestFreeField">
+        <span className="fieldLabel">{isDebt ? "0% months" : "Intro months"}</span>
         <input
           value={String(account.promoMonths)}
           inputMode="numeric"
@@ -3314,12 +3475,14 @@ function AccountRow({
             />
           </div>
           <label className="numberField compact hintField dueField">
+            <span className="fieldLabel">Due day</span>
             <input value={String(account.dueDay)} inputMode="numeric" placeholder="Due day (1-31)" onChange={(event) => onChange({ dueDay: clampDueDay(Number(event.target.value) || 1) })} aria-label={`Due day for ${account.name}`} />
             <InfoHint label={`Payment date help for ${account.name}`} text="Day of the month this account payment is due." />
           </label>
         </>
       ) : (
         <label className="numberField compact hintField introRateField">
+          <span className="fieldLabel">Intro rate %</span>
           <input
             value={String(account.promoRate)}
             inputMode="decimal"
@@ -3373,7 +3536,7 @@ function AccountEditor({
           aria-label="Account kind"
         >
           <option value="savings">Savings account</option>
-          <option value="cash">Current / debit account</option>
+          <option value="cash">Current account</option>
           <option value="investment">Investment / stocks</option>
           <option value="debt">Debt account</option>
         </select>
@@ -3840,9 +4003,70 @@ function PanelTitle({ title, icon, action }: { title: string; icon?: ReactNode; 
   );
 }
 
+function TutorialOverlay({ tutorial, onClose }: { tutorial: PageTutorial; onClose: () => void }) {
+  const [step, setStep] = useState(0);
+  const total = tutorial.steps.length;
+  const current = tutorial.steps[Math.min(step, total - 1)];
+  const isLast = step >= total - 1;
+
+  useEffect(() => {
+    function onKey(event: globalThis.KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="tutorialBackdrop" role="dialog" aria-modal="true" aria-label={`${tutorial.title} tutorial`}>
+      <div className="tutorialCard">
+        <span className="tutorialBadge">
+          <GraduationCap size={13} />
+          {tutorial.badge} · 60-second tour
+        </span>
+        <h2 className="tutorialTitle">{tutorial.title}</h2>
+        {current.heading ? <h3 className="tutorialStepHeading">{current.heading}</h3> : null}
+        <ul className="tutorialBullets">
+          {current.bullets.map((bullet, index) => (
+            <li key={index}>{bullet}</li>
+          ))}
+        </ul>
+
+        {total > 1 ? (
+          <div className="tutorialDots" aria-hidden="true">
+            {tutorial.steps.map((_, index) => (
+              <span key={index} className={index === step ? "active" : ""} />
+            ))}
+          </div>
+        ) : null}
+
+        <div className="tutorialActions">
+          <button className="tutorialSkip" type="button" onClick={onClose}>
+            Skip tutorial
+          </button>
+          <div className="tutorialNav">
+            {step > 0 ? (
+              <button className="commandButton" type="button" onClick={() => setStep((value) => value - 1)}>
+                Back
+              </button>
+            ) : null}
+            <button
+              className="tutorialNext"
+              type="button"
+              onClick={() => (isLast ? onClose() : setStep((value) => value + 1))}
+            >
+              {isLast ? "Got it" : "Next"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function InfoHint({ text, label = "More information" }: { text: string; label?: string }) {
   return (
-    <span className="infoHint" tabIndex={0} role="button" aria-label={label} title={text}>
+    <span className="infoHint" tabIndex={0} role="button" aria-label={label}>
       <Info size={15} aria-hidden="true" />
       <span role="tooltip">{text}</span>
     </span>
