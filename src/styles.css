@@ -4266,6 +4266,39 @@ hr {
 .goalEditorRow--2col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .goalEditorRow--2col > div { display: flex; flex-direction: column; gap: 6px; }
 
+/* Inline field: label and input on same row */
+.goalEditorInlineField { display: flex; flex-direction: column; gap: 4px; }
+.goalEditorInlineField label { font-size: 11.5px; color: var(--muted); font-weight: 500; letter-spacing: 0.02em; }
+.goalEditorInputRow {
+  display: flex; align-items: center; gap: 6px;
+}
+.goalEditorInputRow input[type="number"] {
+  flex: 1; min-width: 0; padding: 7px 10px;
+  background: rgba(18,33,49,0.7); border: 1px solid var(--line);
+  border-radius: var(--radius); color: var(--ink); font-size: 13px;
+  width: 100%;
+}
+.goalEditorInputRow input:focus { outline: none; border-color: rgba(0,223,193,0.4); }
+
+/* Info icon + tooltip */
+.goalEditorInfoIcon {
+  position: relative; display: inline-flex; align-items: center;
+  color: var(--muted); cursor: default; flex-shrink: 0; opacity: 0.6;
+  transition: opacity 120ms;
+}
+.goalEditorInfoIcon:hover,
+.goalEditorInfoIcon:focus { opacity: 1; outline: none; }
+.goalEditorInfoTooltip {
+  display: none; position: absolute; bottom: calc(100% + 6px); right: 0;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: 0 6px 20px rgba(0,0,0,0.45);
+  padding: 8px 11px; font-size: 11.5px; color: var(--ink); line-height: 1.5;
+  width: 200px; text-align: left; z-index: 60; pointer-events: none;
+  white-space: normal;
+}
+.goalEditorInfoIcon:hover .goalEditorInfoTooltip,
+.goalEditorInfoIcon:focus .goalEditorInfoTooltip { display: block; }
+
 .goalFundingMode { display: flex; gap: 6px; }
 .goalFundingBtn {
   flex: 1; background: rgba(18,33,49,0.5); border: 1px solid var(--line);

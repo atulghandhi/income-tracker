@@ -575,29 +575,45 @@ function GoalEditor({
       )}
 
       <div className="goalEditorRow goalEditorRow--2col">
-        <div>
-          <label htmlFor={`${uid}-deadline`}>Deadline (months, 0 = none)</label>
-          <input
-            id={`${uid}-deadline`}
-            type="number"
-            min={0}
-            value={goal.deadlineMonths || ""}
-            placeholder="0"
-            onChange={(e) => onUpdate({ deadlineMonths: parseInt(e.target.value) || 0 })}
-          />
+        <div className="goalEditorInlineField">
+          <label htmlFor={`${uid}-deadline`}>Deadline</label>
+          <div className="goalEditorInputRow">
+            <input
+              id={`${uid}-deadline`}
+              type="number"
+              min={0}
+              value={goal.deadlineMonths || ""}
+              placeholder="months"
+              onChange={(e) => onUpdate({ deadlineMonths: parseInt(e.target.value) || 0 })}
+            />
+          </div>
         </div>
-        <div>
-          <label htmlFor={`${uid}-rate`}>Interest rate AER % (optional)</label>
-          <input
-            id={`${uid}-rate`}
-            type="number"
-            min={0}
-            max={50}
-            step={0.1}
-            value={goal.interestRate || ""}
-            placeholder="0"
-            onChange={(e) => onUpdate({ interestRate: parseFloat(e.target.value) || 0 })}
-          />
+        <div className="goalEditorInlineField">
+          <label htmlFor={`${uid}-rate`}>Interest AER %</label>
+          <div className="goalEditorInputRow">
+            <input
+              id={`${uid}-rate`}
+              type="number"
+              min={0}
+              max={50}
+              step={0.1}
+              value={goal.interestRate || ""}
+              placeholder="0"
+              onChange={(e) => onUpdate({ interestRate: parseFloat(e.target.value) || 0 })}
+            />
+            <span
+              className="goalEditorInfoIcon"
+              tabIndex={0}
+              role="button"
+              aria-label="About interest rate"
+              title="Optional. If set, the engine compounds interest monthly on the accumulated balance — simulating the return you'd earn in a savings account or ISA."
+            >
+              <Info size={13} />
+              <span className="goalEditorInfoTooltip">
+                Optional. Compounds interest monthly on accumulated balance — simulating returns from a savings account or ISA.
+              </span>
+            </span>
+          </div>
         </div>
       </div>
 
