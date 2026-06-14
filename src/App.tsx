@@ -1903,7 +1903,7 @@ function App() {
               goalsHorizonMonths={ledger.goalsHorizonMonths}
               currency={ledger.currency}
               symbol={currencySymbol}
-              formatter={currencyFormatter}
+              formatter={moneyFormatter}
               privacy={ledger.privacyMode}
               onAddGoal={addGoal}
               onUpdateGoal={updateGoal}
