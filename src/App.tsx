@@ -65,10 +65,12 @@ import {
   formatMonth,
   getCurrencyFormatter,
   getCurrencySymbol,
+  runGoalSequence,
   seedMonthFromPrevious,
   shiftMonth,
 } from "./finance";
 import { buildRulePattern, parseBankCsv, sortImportRows, type CsvImportRow } from "./importer";
+import { GoalsView } from "./GoalsView";
 import { loadLedgerState, saveLedgerState } from "./storage";
 import {
   getCurrentSession,
@@ -89,6 +91,9 @@ import type {
   CurrencyCode,
   ExpenseEntry,
   FinancialSignal,
+  GoalOutcome,
+  GoalSequenceResult,
+  GoalStatus,
   HealthScoreBreakdown,
   ImportBatch,
   ImportedTransactionRef,
@@ -98,11 +103,12 @@ import type {
   MonthlyFlowPoint,
   NetWorthPoint,
   Projection,
+  SavingsGoal,
   TransactionKind,
 } from "./types";
 
 type ProjectionView = "overview" | "category" | "month";
-type AppView = "dashboard" | "ledger" | "accounts" | "insights" | "settings";
+type AppView = "dashboard" | "ledger" | "accounts" | "goals" | "insights" | "settings";
 type SaveState = "loading" | "saved" | "saving" | "offline";
 type SyncConflict = { local: LedgerState; cloud: LedgerState };
 type NetWorthHorizon = 12 | 24 | 60;
@@ -317,7 +323,14 @@ function App() {
     () => buildFinancialSignals({ projection, debtSummary, accounts: ledger.accounts, assetSummary, month: currentMonth, savingsTarget: ledger.savingsTarget }),
     [currentMonth, debtSummary, assetSummary, ledger.accounts, ledger.savingsTarget, projection],
   );
-  const goalPercent = clampPercent((ledger.goal.saved / Math.max(ledger.goal.target, 1)) * 100);
+  const goalPlannerSurplus = ledger.goalPlannerSurplus ?? projection.recurringMonthlySurplus;
+  const goalSequence = useMemo(
+    () => runGoalSequence({ goals: ledger.goals, monthlySurplus: goalPlannerSurplus, horizonMonths: ledger.goalsHorizonMonths }),
+    [ledger.goals, goalPlannerSurplus, ledger.goalsHorizonMonths],
+  );
+  const ledgerGoal = ledger.goals.find((g) => g.id === ledger.ledgerGoalId) ?? ledger.goals[0] ?? null;
+  const ledgerGoalOutcome = ledgerGoal ? goalSequence.goals.find((o) => o.goalId === ledgerGoal.id) ?? null : null;
+  const ledgerGoalPercent = ledgerGoal ? clampPercent((ledgerGoal.saved / Math.max(ledgerGoal.target, 1)) * 100) : 0;
   const selectedYear = ledger.selectedMonth.split("-")[0];
   const menuExpense = categoryMenu ? currentMonth.expenses.find((expense) => expense.id === categoryMenu.expenseId) : undefined;
 
@@ -679,6 +692,57 @@ function App() {
   function changeCurrency(currency: CurrencyCode) {
     updateLedger((current) => ({ ...current, currency }));
     setToast(`Currency set to ${currency}`);
+  }
+
+  function addGoal() {
+    const newGoal: SavingsGoal = {
+      id: createId("goal"),
+      name: "",
+      target: 0,
+      saved: 0,
+      color: colors[ledger.goals.length % colors.length],
+      priority: ledger.goals.length + 1,
+      fundingMode: "fixed",
+      monthlyAmount: 0,
+      deadlineMonths: 0,
+      interestRate: 0,
+      note: "",
+      createdAt: new Date().toISOString(),
+    };
+    updateLedger((current) => ({ ...current, goals: [...current.goals, newGoal] }));
+    return newGoal.id;
+  }
+
+  function updateGoal(id: string, patch: Partial<SavingsGoal>) {
+    updateLedger((current) => ({
+      ...current,
+      goals: current.goals.map((g) => (g.id === id ? { ...g, ...patch } : g)),
+    }));
+  }
+
+  function removeGoal(id: string) {
+    updateLedger((current) => ({
+      ...current,
+      goals: current.goals.filter((g) => g.id !== id).map((g, i) => ({ ...g, priority: i + 1 })),
+      ledgerGoalId: current.ledgerGoalId === id ? null : current.ledgerGoalId,
+    }));
+    setToast("Goal removed");
+  }
+
+  function reorderGoal(id: string, direction: "up" | "down") {
+    updateLedger((current) => {
+      const sorted = [...current.goals].sort((a, b) => a.priority - b.priority);
+      const idx = sorted.findIndex((g) => g.id === id);
+      if (idx < 0) return current;
+      const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+      if (swapIdx < 0 || swapIdx >= sorted.length) return current;
+      const newOrder = [...sorted];
+      [newOrder[idx], newOrder[swapIdx]] = [newOrder[swapIdx], newOrder[idx]];
+      return {
+        ...current,
+        goals: newOrder.map((g, i) => ({ ...g, priority: i + 1 })),
+      };
+    });
   }
 
   function assignCategoryByDrop(sourceId: string, targetId: string) {
@@ -1224,6 +1288,7 @@ function App() {
     { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard size={20} /> },
     { id: "ledger", label: "Ledger", icon: <ReceiptText size={20} /> },
     { id: "accounts", label: "Accounts", icon: <CreditCard size={20} /> },
+    { id: "goals", label: "Goals", icon: <Target size={20} /> },
     { id: "insights", label: "Insights", icon: <LineChart size={20} /> },
     { id: "settings", label: "Settings", icon: <SettingsIcon size={20} /> },
   ];
@@ -1234,9 +1299,11 @@ function App() {
         ? "Ledger"
         : activeView === "accounts"
           ? "Accounts"
-          : activeView === "insights"
-            ? "Spending Intelligence"
-            : "Management Hub";
+          : activeView === "goals"
+            ? "Goals"
+            : activeView === "insights"
+              ? "Spending Intelligence"
+              : "Management Hub";
   const insightChartTitle =
     insightChartView === "cash-flow"
       ? "Cash flow volatility"
@@ -1703,9 +1770,15 @@ function App() {
                 <GoalsPanel
                   ledger={ledger}
                   month={currentMonth}
-                  goalPercent={goalPercent}
+                  goal={ledgerGoal}
+                  goalPercent={ledgerGoalPercent}
+                  goalOutcome={ledgerGoalOutcome}
+                  allGoals={ledger.goals}
+                  ledgerGoalId={ledger.ledgerGoalId}
                   projection={projection}
-                  onGoalChange={(patch) => updateLedger((current) => ({ ...current, goal: { ...current.goal, ...patch } }))}
+                  onSelectGoal={(id) => updateLedger((c) => ({ ...c, ledgerGoalId: id }))}
+                  onGoToGoals={() => setActiveView("goals")}
+                  onGoalChange={(patch) => ledgerGoal && updateGoal(ledgerGoal.id, patch)}
                   onNoteChange={(note) => updateCurrentMonth((month) => ({ ...month, note }))}
                   onResetMonth={resetMonth}
                   privacy={ledger.privacyMode}
@@ -1819,6 +1892,26 @@ function App() {
               </section>
 
             </section>
+          )}
+
+          {activeView === "goals" && (
+            <GoalsView
+              goals={ledger.goals}
+              goalSequence={goalSequence}
+              goalPlannerSurplus={goalPlannerSurplus}
+              surplexOverridden={ledger.goalPlannerSurplus !== null}
+              goalsHorizonMonths={ledger.goalsHorizonMonths}
+              currency={ledger.currency}
+              symbol={currencySymbol}
+              formatter={currencyFormatter}
+              privacy={ledger.privacyMode}
+              onAddGoal={addGoal}
+              onUpdateGoal={updateGoal}
+              onRemoveGoal={removeGoal}
+              onReorderGoal={reorderGoal}
+              onSurplusOverride={(v) => updateLedger((c) => ({ ...c, goalPlannerSurplus: v }))}
+              onHorizonChange={(h) => updateLedger((c) => ({ ...c, goalsHorizonMonths: h }))}
+            />
           )}
 
           {activeView === "insights" && (
@@ -3493,8 +3586,14 @@ function ProjectionDetail({
 function GoalsPanel({
   ledger,
   month,
+  goal,
   goalPercent,
+  goalOutcome,
+  allGoals,
+  ledgerGoalId,
   projection,
+  onSelectGoal,
+  onGoToGoals,
   onGoalChange,
   onNoteChange,
   onResetMonth,
@@ -3503,15 +3602,22 @@ function GoalsPanel({
 }: {
   ledger: LedgerState;
   month: MonthBudget;
+  goal: SavingsGoal | null;
   goalPercent: number;
+  goalOutcome: GoalOutcome | null;
+  allGoals: SavingsGoal[];
+  ledgerGoalId: string | null;
   projection: Projection;
-  onGoalChange: (patch: Partial<LedgerState["goal"]>) => void;
+  onSelectGoal: (id: string) => void;
+  onGoToGoals: () => void;
+  onGoalChange: (patch: Partial<SavingsGoal>) => void;
   onNoteChange: (note: string) => void;
   onResetMonth: () => void;
   privacy: boolean;
   symbol: string;
 }) {
-  const runway = projection.monthlyExpenses > 0 ? ledger.goal.saved / projection.monthlyExpenses : 0;
+  const [showGoalPicker, setShowGoalPicker] = useState(false);
+  const runway = goal && projection.monthlyExpenses > 0 ? goal.saved / projection.monthlyExpenses : 0;
 
   return (
     <article className="miniPanel goalPanel">
@@ -3520,38 +3626,86 @@ function GoalsPanel({
         icon={
           <InfoHint
             label="What is Notes and goals for?"
-            text="Set a savings goal (e.g. emergency fund or holiday) and track how close you are. The runway shows how many months your saved amount would cover your current expenses. Use the notes area to log anything worth remembering about this month — unusual one-off costs, pay changes, or reminders for next month."
+            text="Track a savings goal — emergency fund, holiday, house deposit — and see how close you are. The runway shows how many months your saved amount would cover expenses. Use notes to log anything worth remembering about this month."
           />
         }
       />
-      <p className="panelSubcopy">Track your emergency fund or savings goal progress, and jot down notes for this month — e.g. unusual expenses, reminders, or context for future you.</p>
-      <label className="goalName">
-        <Target size={16} />
-        <input
-          value={ledger.goal.name}
-          placeholder="Emergency fund goal"
-          onChange={(event) => onGoalChange({ name: event.target.value })}
-          onKeyDown={blurOnEnter}
-          aria-label="Goal name"
-        />
-      </label>
-      <div className="goalAmounts">
-        <label className="goalAmountField">
-          <span>Saved</span>
-          <MoneyInput ariaLabel="Goal saved" value={String(ledger.goal.saved)} symbol={symbol} privacy={privacy} onChange={(value) => onGoalChange({ saved: Number(value) })} />
-        </label>
-        <label className="goalAmountField">
-          <span>Target</span>
-          <MoneyInput ariaLabel="Goal target" value={String(ledger.goal.target)} symbol={symbol} privacy={privacy} onChange={(value) => onGoalChange({ target: Number(value) })} />
-        </label>
-      </div>
-      <div className="progressLine">
-        <span style={{ width: `${goalPercent}%` }} />
-      </div>
-      <div className="goalMeta">
-        <b className={privacy ? "masked" : ""}>{formatDecimal(goalPercent)}%</b>
-        <span>{formatDecimal(runway)} month runway</span>
-      </div>
+      <p className="panelSubcopy">Track goal progress and jot down notes for this month.</p>
+
+      {goal ? (
+        <>
+          <div className="goalSwitcherRow">
+            <button
+              className="goalSwitcherTrigger"
+              type="button"
+              onClick={() => setShowGoalPicker((v) => !v)}
+              aria-expanded={showGoalPicker}
+            >
+              <Target size={13} />
+              {goal.name || "Unnamed goal"}
+              <ChevronDown size={13} />
+            </button>
+            <button className="goalSwitcherLink" type="button" onClick={onGoToGoals}>
+              Manage goals
+            </button>
+            {showGoalPicker && (
+              <div className="goalPickerPopover">
+                {allGoals.map((g) => (
+                  <button
+                    key={g.id}
+                    className={`goalPickerOption${g.id === (ledgerGoalId ?? allGoals[0]?.id) ? " selected" : ""}`}
+                    type="button"
+                    onClick={() => { onSelectGoal(g.id); setShowGoalPicker(false); }}
+                  >
+                    <span className="goalPickerDot" style={{ background: g.color }} />
+                    {g.name || "Unnamed goal"}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <label className="goalName">
+            <input
+              value={goal.name}
+              placeholder="Goal name, e.g. Emergency fund"
+              onChange={(event) => onGoalChange({ name: event.target.value })}
+              onKeyDown={blurOnEnter}
+              aria-label="Goal name"
+            />
+          </label>
+          <div className="goalAmounts">
+            <label className="goalAmountField">
+              <span>Saved</span>
+              <MoneyInput ariaLabel="Goal saved" value={String(goal.saved)} symbol={symbol} privacy={privacy} onChange={(value) => onGoalChange({ saved: Number(value) })} />
+            </label>
+            <label className="goalAmountField">
+              <span>Target</span>
+              <MoneyInput ariaLabel="Goal target" value={String(goal.target)} symbol={symbol} privacy={privacy} onChange={(value) => onGoalChange({ target: Number(value) })} />
+            </label>
+          </div>
+          <div className="progressLine">
+            <span style={{ width: `${goalPercent}%`, background: goal.color }} />
+          </div>
+          <div className="goalMeta">
+            <b className={privacy ? "masked" : ""}>{formatDecimal(goalPercent)}%</b>
+            {goalOutcome?.completionDate ? (
+              <span>Completes {goalOutcome.completionDate}</span>
+            ) : (
+              <span>{formatDecimal(runway)} month runway</span>
+            )}
+          </div>
+        </>
+      ) : (
+        <div className="goalEmptyNudge">
+          <button className="commandButton" type="button" onClick={onGoToGoals}>
+            <Target size={15} />
+            Set up goals
+          </button>
+          <p>Track savings targets in the Goals view.</p>
+        </div>
+      )}
+
       <textarea
         value={month.note}
         placeholder="Add notes for this month..."
@@ -3997,8 +4151,33 @@ function useAnimatedNumber(value: number) {
   return display;
 }
 
-function normalizeState(state: Partial<LedgerState>): LedgerState {
+function normalizeState(rawState: Partial<LedgerState>): LedgerState {
   const fallback = createInitialState();
+
+  // ── v6 → v7 migration: single `goal` → `goals[]` ──
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const state = rawState as any;
+  if (!Array.isArray(state.goals)) {
+    const old = state.goal as { id?: string; name?: string; saved?: number; target?: number } | undefined;
+    state.goals = old && (old.name || (old.target ?? 0) > 0)
+      ? [{
+          id: old.id ?? createId("goal"),
+          name: old.name || "Savings goal",
+          target: finiteNumber(old.target, 0),
+          saved: finiteNumber(old.saved, 0),
+          color: colors[0],
+          priority: 1,
+          fundingMode: "fixed",
+          monthlyAmount: 0,
+          deadlineMonths: 0,
+          interestRate: 0,
+          note: "",
+          createdAt: new Date().toISOString(),
+        }]
+      : [];
+    delete state.goal;
+  }
+
   const selectedMonth = typeof state.selectedMonth === "string" && state.selectedMonth ? state.selectedMonth : fallback.selectedMonth;
   const months = normalizeMonths(state.months, fallback.months);
   const normalizedMonths = months[selectedMonth]
@@ -4013,12 +4192,10 @@ function normalizeState(state: Partial<LedgerState>): LedgerState {
     currency: currencyOptions.some((option) => option.code === state.currency) ? state.currency! : fallback.currency,
     selectedMonth,
     months: normalizedMonths,
-    goal: {
-      id: state.goal?.id || fallback.goal.id,
-      name: state.goal?.name ?? fallback.goal.name,
-      saved: finiteNumber(state.goal?.saved, fallback.goal.saved),
-      target: finiteNumber(state.goal?.target, fallback.goal.target),
-    },
+    goals: normalizeGoals(state.goals),
+    goalPlannerSurplus: Number.isFinite(state.goalPlannerSurplus) ? state.goalPlannerSurplus : null,
+    goalsHorizonMonths: Number.isFinite(state.goalsHorizonMonths) && state.goalsHorizonMonths > 0 ? state.goalsHorizonMonths : 60,
+    ledgerGoalId: typeof state.ledgerGoalId === "string" ? state.ledgerGoalId : null,
     savingsTarget: Number.isFinite(state.savingsTarget) ? state.savingsTarget : fallback.savingsTarget,
     accounts: normalizeAccounts(state),
     assumedInvestmentReturn: Number.isFinite(state.assumedInvestmentReturn)
@@ -4069,6 +4246,25 @@ function normalizeMonths(months: LedgerState["months"] | undefined, fallback: Le
 
 // Reads the new accounts[] array if present, otherwise migrates the legacy debts[] array
 // (schema < 5), mapping apr -> rate and interestFreeMonths -> promoMonths.
+
+function normalizeGoals(raw: unknown): SavingsGoal[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((g, index) => ({
+    id: typeof g.id === "string" ? g.id : createId("goal"),
+    name: typeof g.name === "string" ? g.name : "Goal",
+    target: finiteNumber(g.target, 0),
+    saved: finiteNumber(g.saved, 0),
+    color: typeof g.color === "string" ? g.color : colors[index % colors.length],
+    priority: Number.isFinite(g.priority) ? g.priority : index + 1,
+    fundingMode: ["fixed", "fill", "auto"].includes(g.fundingMode) ? g.fundingMode : "fixed",
+    monthlyAmount: finiteNumber(g.monthlyAmount, 0),
+    deadlineMonths: finiteNumber(g.deadlineMonths, 0),
+    interestRate: finiteNumber(g.interestRate, 0),
+    note: typeof g.note === "string" ? g.note : "",
+    createdAt: typeof g.createdAt === "string" ? g.createdAt : new Date().toISOString(),
+  }));
+}
+
 function normalizeAccounts(state: Partial<LedgerState>): Account[] {
   const raw = state as Record<string, unknown>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

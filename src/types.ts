@@ -23,11 +23,21 @@ export type ExpenseEntry = {
   imported?: ImportedTransactionMeta;
 };
 
-export type Goal = {
+export type GoalFundingMode = "fixed" | "fill" | "auto";
+
+export type SavingsGoal = {
   id: string;
   name: string;
-  saved: number;
   target: number;
+  saved: number;            // already saved (seed value counts from day 0)
+  color: string;
+  priority: number;         // 1 = highest; goals sorted ascending
+  fundingMode: GoalFundingMode;
+  monthlyAmount: number;    // contribution per month (fixed/auto); engine writes auto
+  deadlineMonths: number;   // 0 = no deadline; >0 = must complete within N months
+  interestRate: number;     // optional AER % compounded monthly on accumulated balance; 0 = flat
+  note: string;
+  createdAt: string;
 };
 
 export type MonthBudget = {
@@ -117,7 +127,14 @@ export type LedgerState = {
   currency: CurrencyCode;
   selectedMonth: string;
   months: Record<string, MonthBudget>;
-  goal: Goal;
+  /** Multi-goal list, ordered by priority ascending. Replaces the old single `goal`. */
+  goals: SavingsGoal[];
+  /** Surplus figure used by the goal planner. null = derive from live ledger recurring surplus. */
+  goalPlannerSurplus: number | null;
+  /** How many months the goal waterfall simulates. Default 60. */
+  goalsHorizonMonths: number;
+  /** Which goal ID the Ledger view widget shows. null = show goals[0]. */
+  ledgerGoalId: string | null;
   savingsTarget: number;
   accounts: Account[];
   assumedInvestmentReturn: number;
@@ -216,6 +233,41 @@ export type HealthScoreBreakdown = {
   detail: string;
   /** True when there is no income, expense, or debt data to score against. */
   noData: boolean;
+};
+
+// ─── Goal sequencing ─────────────────────────────────────────────────────────
+
+export type GoalMonthPoint = {
+  month: number;       // 1-based index in the simulation
+  label: string;       // e.g. "Jul 2025"
+  perGoal: Record<string, {
+    accumulated: number;
+    contribution: number;
+    complete: boolean;
+  }>;
+  unallocated: number; // surplus left after all goals this month
+};
+
+export type GoalStatus = "complete" | "on-track" | "tight" | "at-risk" | "no-deadline";
+
+export type GoalOutcome = {
+  goalId: string;
+  name: string;
+  color: string;
+  target: number;
+  completionMonth: number | null; // null = not reached within horizon
+  completionDate: string | null;
+  shortfall: number;
+  extraMonthlyNeeded: number;     // add this much per month to hit deadline
+  extraMonthsNeeded: number;      // extend deadline by this many months
+  status: GoalStatus;
+};
+
+export type GoalSequenceResult = {
+  timeline: GoalMonthPoint[];
+  goals: GoalOutcome[];
+  horizonMonths: number;
+  avgUnallocatedSurplus: number;
 };
 
 export type CurrencyCode = "GBP" | "USD" | "EUR" | "CAD" | "AUD" | "INR" | "JPY";

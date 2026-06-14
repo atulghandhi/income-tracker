@@ -7,6 +7,10 @@ import type {
   DebtSummary,
   ExpenseEntry,
   FinancialSignal,
+  GoalMonthPoint,
+  GoalOutcome,
+  GoalSequenceResult,
+  GoalStatus,
   HealthScoreBreakdown,
   IncomeEntry,
   LedgerState,
@@ -15,9 +19,10 @@ import type {
   NetWorthPoint,
   NetWorthSummary,
   Projection,
+  SavingsGoal,
 } from "./types";
 
-export const CURRENT_SCHEMA_VERSION = 6;
+export const CURRENT_SCHEMA_VERSION = 7;
 
 export const DEFAULT_INVESTMENT_RETURN = 6;
 
@@ -99,12 +104,10 @@ export function createInitialState(): LedgerState {
     months: {
       [selectedMonth]: emptyBudget,
     },
-    goal: {
-      id: createId("goal"),
-      name: "",
-      saved: 0,
-      target: 0,
-    },
+    goals: [],
+    goalPlannerSurplus: null,
+    goalsHorizonMonths: 60,
+    ledgerGoalId: null,
     savingsTarget: 20,
     accounts: [],
     assumedInvestmentReturn: DEFAULT_INVESTMENT_RETURN,
@@ -777,4 +780,237 @@ export function buildCsvExport(state: LedgerState): string {
         .join(","),
     )
     .join("\n");
+}
+
+// ─── Goal sequencing engine ───────────────────────────────────────────────────
+
+/**
+ * Runs a month-by-month waterfall simulation over a list of SavingsGoals.
+ *
+ * Priority ordering: goals with lower `priority` number are funded first each month.
+ * Fill goals (fundingMode === "fill") always receive leftover surplus after fixed goals.
+ * Optional AER % compounds the accumulated balance monthly before the contribution is added.
+ * When a goal completes, its monthly allocation is freed and available the following month.
+ */
+export function runGoalSequence({
+  goals,
+  monthlySurplus,
+  horizonMonths,
+  startDate = new Date(),
+}: {
+  goals: SavingsGoal[];
+  monthlySurplus: number;
+  horizonMonths: number;
+  startDate?: Date;
+}): GoalSequenceResult {
+  if (!goals.length || monthlySurplus <= 0) {
+    return {
+      timeline: [],
+      goals: goals.map((g) => ({
+        goalId: g.id,
+        name: g.name,
+        color: g.color,
+        target: g.target,
+        completionMonth: null,
+        completionDate: null,
+        shortfall: Math.max(0, g.target - g.saved),
+        extraMonthlyNeeded: 0,
+        extraMonthsNeeded: 0,
+        status: "no-deadline" as GoalStatus,
+      })),
+      horizonMonths,
+      avgUnallocatedSurplus: Math.max(0, monthlySurplus),
+    };
+  }
+
+  // Sort: fixed/auto before fill, then by priority ascending.
+  const sorted = [...goals].sort((a, b) => {
+    if (a.fundingMode === "fill" && b.fundingMode !== "fill") return 1;
+    if (b.fundingMode === "fill" && a.fundingMode !== "fill") return -1;
+    return a.priority - b.priority;
+  });
+
+  // Working state per goal.
+  type WorkingGoal = {
+    goal: SavingsGoal;
+    accumulated: number;
+    completionMonth: number | null;
+  };
+
+  function simulate(surplus: number, horizon: number): { working: WorkingGoal[]; timeline: GoalMonthPoint[] } {
+    const working: WorkingGoal[] = sorted.map((g) => ({
+      goal: g,
+      accumulated: Math.min(g.saved, g.target),
+      completionMonth: g.saved >= g.target ? 0 : null,
+    }));
+
+    const timeline: GoalMonthPoint[] = [];
+    let totalUnallocated = 0;
+
+    for (let month = 1; month <= horizon; month++) {
+      const date = new Date(startDate.getFullYear(), startDate.getMonth() + month, 1);
+      const label = new Intl.DateTimeFormat("en", { month: "short", year: "2-digit" }).format(date);
+
+      let remaining = surplus;
+      const perGoal: GoalMonthPoint["perGoal"] = {};
+
+      // Active = not yet complete.
+      const active = working.filter((w) => w.completionMonth === null);
+      const fillGoals = active.filter((w) => w.goal.fundingMode === "fill");
+      const fixedGoals = active.filter((w) => w.goal.fundingMode !== "fill");
+
+      // Fund fixed/auto goals first.
+      for (const w of fixedGoals) {
+        if (remaining <= 0) break;
+        const contribution = Math.min(w.goal.monthlyAmount, remaining);
+
+        // Apply monthly compounding on accumulated balance.
+        if (w.goal.interestRate > 0) {
+          const monthlyRate = Math.pow(1 + w.goal.interestRate / 100, 1 / 12) - 1;
+          w.accumulated *= 1 + monthlyRate;
+        }
+
+        w.accumulated = Math.min(w.accumulated + contribution, w.goal.target);
+        remaining = Math.max(0, remaining - contribution);
+
+        perGoal[w.goal.id] = { accumulated: w.accumulated, contribution, complete: false };
+
+        if (w.accumulated >= w.goal.target) {
+          w.completionMonth = month;
+          perGoal[w.goal.id].complete = true;
+          // Refund unused allocation.
+          remaining += Math.max(0, w.goal.monthlyAmount - contribution);
+        }
+      }
+
+      // Fill goal(s) absorb remaining surplus.
+      for (const w of fillGoals) {
+        if (remaining <= 0) break;
+        const contribution = remaining;
+
+        if (w.goal.interestRate > 0) {
+          const monthlyRate = Math.pow(1 + w.goal.interestRate / 100, 1 / 12) - 1;
+          w.accumulated *= 1 + monthlyRate;
+        }
+
+        w.accumulated = Math.min(w.accumulated + contribution, w.goal.target);
+        remaining = 0;
+
+        perGoal[w.goal.id] = { accumulated: w.accumulated, contribution, complete: false };
+
+        if (w.accumulated >= w.goal.target) {
+          w.completionMonth = month;
+          perGoal[w.goal.id].complete = true;
+        }
+      }
+
+      // Already-complete goals: mark in timeline.
+      for (const w of working) {
+        if (!perGoal[w.goal.id]) {
+          perGoal[w.goal.id] = { accumulated: w.accumulated, contribution: 0, complete: w.completionMonth !== null };
+        }
+      }
+
+      totalUnallocated += remaining;
+      timeline.push({ month, label, perGoal, unallocated: remaining });
+    }
+
+    return { working, timeline };
+  }
+
+  const { working, timeline } = simulate(monthlySurplus, horizonMonths);
+
+  // Build outcomes + gap analysis.
+  const outcomeGoals: GoalOutcome[] = sorted.map((g) => {
+    const w = working.find((x) => x.goal.id === g.id)!;
+    const completionMonth = w.completionMonth;
+    const completionDate = completionMonth !== null && completionMonth > 0
+      ? new Intl.DateTimeFormat("en", { month: "short", year: "numeric" }).format(
+          new Date(startDate.getFullYear(), startDate.getMonth() + completionMonth, 1),
+        )
+      : completionMonth === 0 ? "Already complete" : null;
+
+    const shortfall = Math.max(0, g.target - w.accumulated);
+
+    let extraMonthlyNeeded = 0;
+    let extraMonthsNeeded = 0;
+    let status: GoalStatus = "no-deadline";
+
+    if (g.saved >= g.target) {
+      status = "complete";
+    } else if (g.deadlineMonths > 0) {
+      const withinDeadline = completionMonth !== null && completionMonth <= g.deadlineMonths;
+      if (withinDeadline) {
+        const monthsToSpare = g.deadlineMonths - (completionMonth ?? g.deadlineMonths);
+        status = monthsToSpare <= 2 ? "tight" : "on-track";
+      } else {
+        status = "at-risk";
+        // Solve: how much extra monthly surplus is needed?
+        extraMonthlyNeeded = solveExtraMonthly(g, sorted, monthlySurplus, g.deadlineMonths, startDate);
+        // Solve: how many extra months are needed at current surplus?
+        extraMonthsNeeded = solveExtraMonths(g, sorted, monthlySurplus, horizonMonths, startDate);
+      }
+    } else {
+      status = completionMonth !== null ? "no-deadline" : "no-deadline";
+    }
+
+    return {
+      goalId: g.id,
+      name: g.name,
+      color: g.color,
+      target: g.target,
+      completionMonth,
+      completionDate,
+      shortfall,
+      extraMonthlyNeeded,
+      extraMonthsNeeded,
+      status,
+    };
+  });
+
+  const avgUnallocated = horizonMonths > 0 ? timeline.reduce((s, p) => s + p.unallocated, 0) / horizonMonths : 0;
+
+  return { timeline, goals: outcomeGoals, horizonMonths, avgUnallocatedSurplus: roundTo(avgUnallocated, 2) };
+}
+
+/** Binary-search for how much extra monthly surplus makes goal g hit its deadline. */
+function solveExtraMonthly(
+  target: SavingsGoal,
+  allGoals: SavingsGoal[],
+  baseSurplus: number,
+  deadlineMonths: number,
+  startDate: Date,
+): number {
+  let lo = 0;
+  let hi = target.target; // worst-case upper bound
+  for (let iter = 0; iter < 32; iter++) {
+    const mid = (lo + hi) / 2;
+    const result = runGoalSequence({ goals: allGoals, monthlySurplus: baseSurplus + mid, horizonMonths: deadlineMonths, startDate });
+    const outcome = result.goals.find((g) => g.goalId === target.id);
+    const hits = outcome?.completionMonth !== null && outcome!.completionMonth! <= deadlineMonths;
+    if (hits) hi = mid; else lo = mid;
+    if (hi - lo < 0.5) break;
+  }
+  return Math.ceil(hi);
+}
+
+/** Binary-search for how many extra months are needed at the current surplus. */
+function solveExtraMonths(
+  target: SavingsGoal,
+  allGoals: SavingsGoal[],
+  surplus: number,
+  baseHorizon: number,
+  startDate: Date,
+): number {
+  let lo = baseHorizon;
+  let hi = baseHorizon + 120;
+  for (let iter = 0; iter < 32; iter++) {
+    const mid = Math.ceil((lo + hi) / 2);
+    const result = runGoalSequence({ goals: allGoals, monthlySurplus: surplus, horizonMonths: mid, startDate });
+    const outcome = result.goals.find((g) => g.goalId === target.id);
+    const hits = outcome?.completionMonth !== null;
+    if (hits) hi = mid; else lo = mid;
+    if (hi - lo <= 1) break;
+  }
+  return Math.max(0, hi - baseHorizon);
 }
