@@ -829,7 +829,9 @@ textarea::placeholder {
 
 .summaryStrip {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* Wrap the metric cards instead of forcing four across — keeps them readable
+     on laptops and folds to 2x2 / single column on smaller screens. */
+  grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr));
   gap: 18px;
 }
 
@@ -1751,7 +1753,10 @@ textarea:focus,
 }
 
 .accountsGrid {
-  grid-template-columns: 1fr 1fr;
+  /* Only go two-up when the canvas can actually hold two full account rows;
+     otherwise a single column so nothing clips or needs horizontal scrolling.
+     min(560px, 100%) keeps a single column from overflowing narrow/phone widths. */
+  grid-template-columns: repeat(auto-fit, minmax(min(560px, 100%), 1fr));
   align-items: start;
 }
 
@@ -1844,7 +1849,7 @@ textarea:focus,
     "swatch main balance minimum remove"
     "swatch meta limit apr due"
     "swatch meta interest interest due";
-  grid-template-columns: 28px minmax(180px, 1.2fr) minmax(120px, 0.8fr) minmax(120px, 0.8fr) 76px;
+  grid-template-columns: 28px minmax(140px, 1.2fr) minmax(104px, 0.8fr) minmax(104px, 0.8fr) 72px;
   gap: 10px;
   align-items: center;
   min-height: 112px;
@@ -3666,9 +3671,24 @@ hr {
       "balance balance balance"
       "limit limit limit"
       "minimum minimum minimum"
-      "apr interest interest"
+      "apr apr apr"
+      "interest interest interest"
       "due due due";
     grid-template-columns: 28px minmax(0, 1fr) 38px;
+    row-gap: 12px;
+  }
+
+  /* Each stacked field gets a label above a full-width control on phones,
+     instead of the cramped label-beside-input used on wide screens. */
+  .debtAccountRow .debtField,
+  .debtAccountRow .numberField {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .debtAccountRow .numberField.hintField,
+  .debtAccountRow .numberField.compact.hintField {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .debtAccountMain {
