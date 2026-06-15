@@ -50,8 +50,18 @@ const CSV_ROWS = [
   { date: "09 Jun", desc: "BUPA DENTAL PLAN", amt: "75.00", cat: "Health" },
 ] as const;
 
-// 20-month bar data: 8 older + 12 current — scrolls left to reveal recent months
+// 40-month bar data — SVG 1044px wide, scrolls 312px (12 bars = 1 year) left
 const BAR_EXT = [
+  { m: "Nov", v: -340 }, { m: "Dec", v:  920 },
+  { m: "Jan", v:  580 }, { m: "Feb", v: -240 },
+  { m: "Mar", v: -160 }, { m: "Apr", v:  760 },
+  { m: "May", v:  420 }, { m: "Jun", v: -580 },
+  { m: "Jul", v:  310 }, { m: "Aug", v: -450 },
+  { m: "Sep", v:  670 }, { m: "Oct", v: -120 },
+  { m: "Nov", v:  840 }, { m: "Dec", v: -960 },
+  { m: "Jan", v:  450 }, { m: "Feb", v:  -80 },
+  { m: "Mar", v: -530 }, { m: "Apr", v:  680 },
+  { m: "May", v: -290 }, { m: "Jun", v:  340 },
   { m: "Jul", v: -320 }, { m: "Aug", v:  680 },
   { m: "Sep", v: -450 }, { m: "Oct", v:  290 },
   { m: "Nov", v: -720 }, { m: "Dec", v:  840 },
@@ -285,7 +295,7 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
         if (!alive) return;
         setAnnualPhase("proj");
         tids.push(setTimeout(() => { if (alive) loop(); }, 3500));
-      }, 3000));
+      }, 3500));
     }
 
     loop();
@@ -352,8 +362,8 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
   const fmt = (n: number) => n.toLocaleString("en-GB", { minimumFractionDigits: 2 });
 
   const maxV   = Math.max(...BAR_EXT.map(b => Math.abs(b.v)));
-  const svgW   = 4 + BAR_EXT.length * 26; // 524px for 20 bars
-  const scrollX = 8 * 26;                  // 208px — reveals last 12 months
+  const svgW   = 4 + BAR_EXT.length * 26; // 1044px for 40 bars
+  const scrollX = 12 * 26;                 // 312px — scrolls one full year (12 bars)
 
   // Savings-rate arc
   const dialR    = 20;
@@ -582,14 +592,14 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
           <div className="lp-demo-media">
             <div className="lp-chart">
               <div className="lp-chart-title" style={{ transition: "opacity 400ms ease", opacity: 1 }}>
-                {annualPhase === "chart" ? "Net flow · 24 months" : "Annual projection · 2025 ↗"}
+                {annualPhase === "chart" ? "Net flow · 40 months" : `Annual projection · ${new Date().getFullYear()} ↗`}
               </div>
               <div className="lp-chart-stage">
 
                 {/* Scrolling bar chart */}
                 <div
                   key={chartKey}
-                  className={`lp-chart-scroll${annualPhase === "chart" ? " lp-chart-scroll--run" : ""}`}
+                  className="lp-chart-scroll lp-chart-scroll--run"
                   style={{ opacity: annualPhase === "proj" ? 0 : 1 }}
                 >
                   <svg
@@ -1083,7 +1093,7 @@ const CSS = `
 }
 @keyframes lpBarScroll {
   from { transform: translateX(0); }
-  to   { transform: translateX(-208px); }
+  to   { transform: translateX(-312px); }
 }
 .lp-chart-scroll--run {
   animation: lpBarScroll 3.2s ease-in-out forwards;
