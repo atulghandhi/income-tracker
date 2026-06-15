@@ -114,6 +114,10 @@ type AppView = "dashboard" | "ledger" | "accounts" | "goals" | "insights" | "set
 type TutorialStep = { heading: string; bullets: string[] };
 type PageTutorial = { title: string; badge: string; steps: TutorialStep[] };
 
+function capitalizeFirst(s: string) {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+}
+
 // Short, skimmable per-page walkthroughs. Auto-shown the first time each page is
 // opened (ledger first), and replayable anytime from the sidebar "Tutorial" button.
 const TUTORIALS: Record<AppView, PageTutorial> = {
@@ -1817,7 +1821,7 @@ function App() {
                       ref={incomeSourceInputRef}
                       value={incomeDraft.source}
                       placeholder="Income source, e.g. Salary"
-                      onChange={(event) => setIncomeDraft((draft) => ({ ...draft, source: event.target.value }))}
+                      onChange={(event) => setIncomeDraft((draft) => ({ ...draft, source: capitalizeFirst(event.target.value) }))}
                       onKeyDown={(event) => handleDraftEnter(event, addIncome)}
                     />
                     <MoneyInput
@@ -1964,7 +1968,7 @@ function App() {
                       ref={expenseNameInputRef}
                       value={expenseDraft.name}
                       placeholder="What did you spend on?"
-                      onChange={(event) => setExpenseDraft((draft) => ({ ...draft, name: event.target.value }))}
+                      onChange={(event) => setExpenseDraft((draft) => ({ ...draft, name: capitalizeFirst(event.target.value) }))}
                       onKeyDown={(event) => handleDraftEnter(event, addExpense)}
                     />
                     <MoneyInput
@@ -3203,7 +3207,7 @@ function IncomeRow({
         onClick={() => onChange({ color: nextColor(income.color) })}
         aria-label="Cycle income color"
       />
-      <input value={income.source} onChange={(event) => onChange({ source: event.target.value })} onKeyDown={blurOnEnter} aria-label="Income source" />
+      <input value={income.source} onChange={(event) => onChange({ source: capitalizeFirst(event.target.value) })} onKeyDown={blurOnEnter} aria-label="Income source" />
       <MoneyInput
         ariaLabel="Income amount"
         value={String(income.amount)}
@@ -3327,7 +3331,7 @@ function ExpenseRow({
       >
         ::
       </button>
-      <input value={expense.name} onChange={(event) => onChange({ name: event.target.value })} onKeyDown={blurOnEnter} aria-label="Expense name" />
+      <input value={expense.name} onChange={(event) => onChange({ name: capitalizeFirst(event.target.value) })} onKeyDown={blurOnEnter} aria-label="Expense name" />
       <MoneyInput
         ariaLabel="Expense amount"
         value={String(expense.amount)}

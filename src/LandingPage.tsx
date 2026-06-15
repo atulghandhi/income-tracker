@@ -44,13 +44,18 @@ function sndChime(ctx: AudioContext) {
 // ─── Data ────────────────────────────────────────────────────────────────────
 
 const CSV_ROWS = [
-  { date: "13 Jun", desc: "TESCO EXTRA 4261",  amt: "42.61", cat: "Food" },
-  { date: "12 Jun", desc: "SOUTHERN RAIL",      amt: "12.40", cat: "Transport" },
-  { date: "11 Jun", desc: "COSTA COFFEE",       amt: "4.35",  cat: "Eating out" },
-  { date: "09 Jun", desc: "BUPA DENTAL PLAN",   amt: "75.00", cat: "Health" },
+  { date: "13 Jun", desc: "TESCO EXTRA 4261", amt: "42.61", cat: "Food" },
+  { date: "12 Jun", desc: "SOUTHERN RAIL",    amt: "12.40", cat: "Transport" },
+  { date: "11 Jun", desc: "COSTA COFFEE",     amt: "4.35",  cat: "Eating out" },
+  { date: "09 Jun", desc: "BUPA DENTAL PLAN", amt: "75.00", cat: "Health" },
 ] as const;
 
-const BAR = [
+// 20-month bar data: 8 older + 12 current — scrolls left to reveal recent months
+const BAR_EXT = [
+  { m: "Jul", v: -320 }, { m: "Aug", v:  680 },
+  { m: "Sep", v: -450 }, { m: "Oct", v:  290 },
+  { m: "Nov", v: -720 }, { m: "Dec", v:  840 },
+  { m: "Jan", v:  530 }, { m: "Feb", v: -180 },
   { m: "Jul", v: -180 }, { m: "Aug", v:  420 },
   { m: "Sep", v:  -95 }, { m: "Oct", v:  310 },
   { m: "Nov", v: -520 }, { m: "Dec", v: -890 },
@@ -60,25 +65,40 @@ const BAR = [
 ];
 
 const CMP = [
-  { label: "Works across accounts from different banks", l: true,  s: "Yes",          b: "Their accounts only" },
-  { label: "Import your own CSV files",                  l: true,  s: "Manual paste", b: "Rarely" },
-  { label: "No bank credentials required",               l: true,  s: "Yes",          b: "No" },
-  { label: "Drag-and-drop categorisation",               l: true,  s: "No",           b: "No" },
-  { label: "Month-by-month ledger view",                 l: true,  s: "Manual",       b: "No" },
-  { label: "Free",                                       l: true,  s: "Yes",          b: "Yes" },
+  { label: "Works across accounts from different banks", s: "Yes",          b: "Their accounts only" },
+  { label: "Import your own CSV files",                  s: "Manual paste", b: "Rarely" },
+  { label: "No bank credentials required",               s: "Yes",          b: "No" },
+  { label: "Drag-and-drop categorisation",               s: "No",           b: "No" },
+  { label: "Month-by-month ledger view",                 s: "Manual",       b: "No" },
+  { label: "Free",                                       s: "Yes",          b: "Yes" },
 ];
 
-const TYPED_TARGET = "Costa Coffee";
+type HeroFocus = "inc-name" | "inc-amt" | "exp-name" | "exp-amt" | null;
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function LandingPage({ onEnter }: { onEnter: () => void }) {
-  const ctxRef  = useRef<AudioContext | null>(null);
-  const csvRef  = useRef<HTMLElement | null>(null);
+  const ctxRef    = useRef<AudioContext | null>(null);
+  const csvRef    = useRef<HTMLElement | null>(null);
+  const annualRef = useRef<HTMLElement | null>(null);
+
   const [navIn,    setNavIn]    = useState(false);
   const [reduced,  setReduced]  = useState(false);
-  const [typed,    setTyped]    = useState("");
   const [csvStep,  setCsvStep]  = useState(0);
+
+  // Hero animation
+  const [heroFocus,      setHeroFocus]      = useState<HeroFocus>(null);
+  const [heroName,       setHeroName]       = useState("");
+  const [heroAmt,        setHeroAmt]        = useState("");
+  const [heroTabBadge,   setHeroTabBadge]   = useState(false);
+  const [heroEnterBadge, setHeroEnterBadge] = useState(false);
+  const [heroIncAdded,   setHeroIncAdded]   = useState<{ name: string; amt: string }[]>([]);
+  const [heroExpAdded,   setHeroExpAdded]   = useState<{ name: string; amt: string }[]>([]);
+
+  // Annual chart
+  const [annualPhase,   setAnnualPhase]   = useState<"chart" | "proj">("chart");
+  const [annualVisible, setAnnualVisible] = useState(false);
+  const [chartKey,      setChartKey]      = useState(0);
 
   function getCtx(): AudioContext | null {
     if (reduced) return null;
@@ -99,7 +119,7 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
     if (c) sndHover(c);
   }
 
-  // Reduced motion preference
+  // Reduced-motion preference
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     setReduced(mq.matches);
@@ -108,24 +128,17 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
     return () => mq.removeEventListener("change", h);
   }, []);
 
-  // Ensure the page body is freely scrollable while the landing page is active.
-  // The main app shell uses a fixed-height flex layout; without this the first
-  // scroll gesture gets absorbed by an implicit scroll container and does nothing.
+  // Body scroll unlock
   useEffect(() => {
     const html = document.documentElement;
     const body = document.body;
-    const prevHtmlOverflow = html.style.overflow;
-    const prevBodyOverflow = body.style.overflow;
+    const prevHtml = html.style.overflow;
+    const prevBody = body.style.overflow;
     html.style.overflow = "unset";
     body.style.overflow = "unset";
-    // Scroll to top on mount so the page always starts at the beginning.
     window.scrollTo(0, 0);
-    return () => {
-      html.style.overflow = prevHtmlOverflow;
-      body.style.overflow = prevBodyOverflow;
-    };
+    return () => { html.style.overflow = prevHtml; body.style.overflow = prevBody; };
   }, []);
-
 
   // Nav slide-in + opening chime
   useEffect(() => {
@@ -138,7 +151,7 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [reduced]);
 
-  // Scroll reveal via IntersectionObserver
+  // Scroll reveal
   useEffect(() => {
     if (reduced) {
       document.querySelectorAll(".lp-r").forEach(el => {
@@ -157,28 +170,129 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
     return () => io.disconnect();
   }, [reduced]);
 
-  // Typewriter animation for the add-row
+  // ── Hero animation loop ───────────────────────────────────────────────────
   useEffect(() => {
-    if (reduced) { setTyped(TYPED_TARGET); return; }
-    let tid: ReturnType<typeof setTimeout>;
-    const st = { i: 0, fwd: true };
-    function tick() {
-      if (st.fwd) {
-        st.i++;
-        setTyped(TYPED_TARGET.slice(0, st.i));
-        if (st.i >= TYPED_TARGET.length) { tid = setTimeout(() => { st.fwd = false; tick(); }, 1600); return; }
-      } else {
-        st.i--;
-        setTyped(TYPED_TARGET.slice(0, st.i));
-        if (st.i <= 0) { tid = setTimeout(() => { st.fwd = true; tick(); }, 500); return; }
-      }
-      tid = setTimeout(tick, st.fwd ? 105 : 60);
+    if (reduced) {
+      setHeroIncAdded([{ name: "Interest", amt: "78.00" }]);
+      setHeroExpAdded([
+        { name: "Costa Coffee", amt: "4.20" },
+        { name: "Work commute", amt: "120.00" },
+      ]);
+      return;
     }
-    tid = setTimeout(tick, 1100);
-    return () => clearTimeout(tid);
+
+    const tids: ReturnType<typeof setTimeout>[] = [];
+    let alive = true;
+
+    const push = (fn: () => void, ms: number) => {
+      const id = setTimeout(() => { if (alive) fn(); }, ms);
+      tids.push(id);
+    };
+
+    const typeStr = (str: string, setter: (s: string) => void, startMs: number, charMs = 90): number => {
+      for (let i = 1; i <= str.length; i++) {
+        push(() => setter(str.slice(0, i)), startMs + i * charMs);
+      }
+      return startMs + str.length * charMs;
+    };
+
+    function runLoop() {
+      setHeroFocus("inc-name");
+      setHeroName("");
+      setHeroAmt("");
+      setHeroTabBadge(false);
+      setHeroEnterBadge(false);
+      setHeroIncAdded([]);
+      setHeroExpAdded([]);
+
+      let t = 0;
+
+      // Income: "Interest" → Tab → "78" → Enter
+      t = 600;
+      t = typeStr("Interest", setHeroName, t);
+      t += 320; push(() => setHeroTabBadge(true), t);
+      t += 350; push(() => { setHeroTabBadge(false); setHeroFocus("inc-amt"); }, t);
+      t += 100; t = typeStr("78", setHeroAmt, t, 200);
+      t += 250; push(() => setHeroEnterBadge(true), t);
+      t += 350; push(() => {
+        setHeroEnterBadge(false);
+        setHeroFocus(null);
+        setHeroIncAdded([{ name: "Interest", amt: "78.00" }]);
+        setHeroName(""); setHeroAmt("");
+      }, t);
+      t += 400;
+
+      // Expense 1: "Costa Coffee" → Tab → "4.20" → Enter
+      push(() => setHeroFocus("exp-name"), t);
+      t += 250; t = typeStr("Costa Coffee", setHeroName, t);
+      t += 320; push(() => setHeroTabBadge(true), t);
+      t += 350; push(() => { setHeroTabBadge(false); setHeroFocus("exp-amt"); }, t);
+      t += 100; t = typeStr("4.20", setHeroAmt, t, 200);
+      t += 250; push(() => setHeroEnterBadge(true), t);
+      t += 350; push(() => {
+        setHeroEnterBadge(false);
+        setHeroFocus(null);
+        setHeroExpAdded([{ name: "Costa Coffee", amt: "4.20" }]);
+        setHeroName(""); setHeroAmt("");
+      }, t);
+      t += 400;
+
+      // Expense 2: "Work commute" → Tab → "120" → Enter
+      push(() => setHeroFocus("exp-name"), t);
+      t += 250; t = typeStr("Work commute", setHeroName, t);
+      t += 320; push(() => setHeroTabBadge(true), t);
+      t += 350; push(() => { setHeroTabBadge(false); setHeroFocus("exp-amt"); }, t);
+      t += 100; t = typeStr("120", setHeroAmt, t, 200);
+      t += 250; push(() => setHeroEnterBadge(true), t);
+      t += 350; push(() => {
+        setHeroEnterBadge(false);
+        setHeroFocus(null);
+        setHeroExpAdded(prev => [...prev, { name: "Work commute", amt: "120.00" }]);
+        setHeroName(""); setHeroAmt("");
+      }, t);
+
+      // Hold 2.5s then loop
+      t += 2500;
+      push(runLoop, t);
+    }
+
+    push(runLoop, 800);
+    return () => { alive = false; tids.forEach(clearTimeout); };
   }, [reduced]);
 
-  // CSV animation: starts when the section enters the viewport
+  // ── Annual chart: visibility tracking ────────────────────────────────────
+  useEffect(() => {
+    const el = annualRef.current;
+    if (!el || reduced) return;
+    const io = new IntersectionObserver(
+      ([entry]) => setAnnualVisible(entry.isIntersecting),
+      { threshold: 0.15 }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [reduced]);
+
+  // ── Annual chart: phase loop ──────────────────────────────────────────────
+  useEffect(() => {
+    if (reduced || !annualVisible) return;
+    let alive = true;
+    const tids: ReturnType<typeof setTimeout>[] = [];
+
+    function loop() {
+      setAnnualPhase("chart");
+      setChartKey(k => k + 1);
+      tids.push(setTimeout(() => {
+        if (!alive) return;
+        setAnnualPhase("proj");
+        tids.push(setTimeout(() => { if (alive) loop(); }, 3500));
+      }, 3000));
+    }
+
+    loop();
+    return () => { alive = false; tids.forEach(clearTimeout); };
+  }, [reduced, annualVisible]);
+
+  // ── CSV animation ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (reduced) { setCsvStep(99); return; }
     const el = csvRef.current;
@@ -201,19 +315,16 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
     }, { threshold: 0.25 });
     io.observe(el);
     return () => { io.disconnect(); tids.forEach(clearTimeout); };
-  }, [reduced]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [reduced]);
 
-  // Re-trigger CSV loop when step resets to 0
   const prevCsvStep = useRef(csvStep);
   useEffect(() => {
     if (prevCsvStep.current !== 0 && csvStep === 0 && csvRef.current && !reduced) {
-      // small pause before restarting
       const t = setTimeout(() => {
         const el = csvRef.current;
         if (el) {
           const io = new IntersectionObserver(([entry]) => {
             if (entry.isIntersecting) {
-              // trigger one run
               let active = true;
               const tids: ReturnType<typeof setTimeout>[] = [];
               const push = (fn: () => void, ms: number) => { const t = setTimeout(fn, ms); tids.push(t); };
@@ -233,7 +344,21 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
     prevCsvStep.current = csvStep;
   }, [csvStep, reduced]);
 
-  const maxV = Math.max(...BAR.map(b => Math.abs(b.v)));
+  // ── Derived hero values ───────────────────────────────────────────────────
+  const incomeTotal  = 3248.72 + heroIncAdded.reduce((s, r) => s + parseFloat(r.amt), 0);
+  const expenseTotal = heroExpAdded.reduce((s, r) => s + parseFloat(r.amt), 0);
+  const incomeCount  = 1 + heroIncAdded.length;
+  const expenseCount = heroExpAdded.length;
+  const fmt = (n: number) => n.toLocaleString("en-GB", { minimumFractionDigits: 2 });
+
+  const maxV   = Math.max(...BAR_EXT.map(b => Math.abs(b.v)));
+  const svgW   = 4 + BAR_EXT.length * 26; // 524px for 20 bars
+  const scrollX = 8 * 26;                  // 208px — reveals last 12 months
+
+  // Savings-rate arc
+  const dialR    = 20;
+  const dialCirc = 2 * Math.PI * dialR;
+  const dialFill = 0.157 * dialCirc;
 
   return (
     <>
@@ -274,65 +399,105 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
           </div>
 
           <div className="lp-hero-mock lp-r" style={{ transitionDelay: "200ms" }}>
-            {/* Browser chrome wrapper */}
             <div className="lp-browser">
               <div className="lp-chrome">
                 <div className="lp-dots"><span /><span /><span /></div>
                 <div className="lp-url">theincometracker.app &nbsp;/&nbsp; Jun 2025</div>
               </div>
 
-              <div className="lp-mock-body">
-                {/* Income panel */}
+              {/* Two-column ledger mock */}
+              <div className="lp-mock-body" aria-hidden="true">
+
+                {/* ── Income panel ── */}
                 <div className="lp-mp lp-mp--income">
                   <div className="lp-mp-head">
                     <div>
                       <div className="lp-mp-title"><span className="lp-glyph lp-glyph--in">↓</span> Income</div>
-                      <div className="lp-mp-sub">1 item</div>
+                      <div className="lp-mp-sub">{incomeCount} item{incomeCount !== 1 ? "s" : ""}</div>
                     </div>
-                    <span className="lp-mp-total lp-mp-total--income">£3,248.72</span>
+                    <span className="lp-mp-total lp-mp-total--income">£{fmt(incomeTotal)}</span>
                   </div>
                   <div className="lp-col-head"><span>Source</span><span>Amount</span></div>
                   <div className="lp-mrow">
                     <span className="lp-dot-swatch" style={{ background: "#6c5ce7" }} />
-                    <span className="lp-mname">Salary (BACS)</span>
+                    <span className="lp-mname">Salary</span>
                     <span className="lp-mamt">£ 3,248.72</span>
+                  </div>
+                  {heroIncAdded.map(r => (
+                    <div key={r.name} className="lp-mrow lp-mrow--new">
+                      <span className="lp-dot-swatch" style={{ background: "#00b894" }} />
+                      <span className="lp-mname">{r.name}</span>
+                      <span className="lp-mamt">£ {r.amt}</span>
+                    </div>
+                  ))}
+                  <div className="lp-madd">
+                    <span className="lp-madd-plus">+</span>
+                    <span className={`lp-madd-field${heroFocus === "inc-name" ? " lp-madd-field--focus" : ""}`}>
+                      {heroFocus === "inc-name"
+                        ? <>{heroName}<span className="lp-cursor" /></>
+                        : heroFocus === "inc-amt" && heroName
+                          ? heroName
+                          : <span className="lp-ph">Source</span>}
+                    </span>
+                    <span className="lp-key-badge lp-key-badge--tab"
+                      style={{ opacity: heroTabBadge && heroFocus === "inc-name" ? 1 : 0 }}>
+                      ⇥ Tab
+                    </span>
+                    <span className={`lp-madd-field lp-madd-field--amt${heroFocus === "inc-amt" ? " lp-madd-field--focus" : ""}`}>
+                      {heroFocus === "inc-amt"
+                        ? <>£{heroAmt}<span className="lp-cursor" /></>
+                        : <span className="lp-ph">£</span>}
+                    </span>
+                    <span className="lp-key-badge lp-key-badge--enter"
+                      style={{ opacity: heroEnterBadge && heroFocus === "inc-amt" ? 1 : 0 }}>
+                      ↵
+                    </span>
+                    <span className="lp-madd-check">✓</span>
                   </div>
                 </div>
 
-                {/* Expense panel */}
+                {/* ── Expense panel ── */}
                 <div className="lp-mp lp-mp--expense">
                   <div className="lp-mp-head">
                     <div>
                       <div className="lp-mp-title"><span className="lp-glyph lp-glyph--out">↑</span> Expenses</div>
-                      <div className="lp-mp-sub">5 items</div>
+                      <div className="lp-mp-sub">{expenseCount} item{expenseCount !== 1 ? "s" : ""}</div>
                     </div>
-                    <span className="lp-mp-total">£144.35</span>
+                    <span className="lp-mp-total">£{fmt(expenseTotal)}</span>
                   </div>
                   <div className="lp-col-head"><span>Expense</span><span>Amount</span></div>
-                  {[
-                    { name: "Tesco Extra",    amt: "£42.61" },
-                    { name: "Southern Rail",  amt: "£12.40" },
-                    { name: "Costa Coffee",   amt: "£4.35"  },
-                    { name: "Dentist (Bupa)", amt: "£75.00" },
-                    { name: "Spotify",        amt: "£9.99"  },
-                  ].map(r => (
-                    <div key={r.name} className="lp-mrow">
+                  {heroExpAdded.map(r => (
+                    <div key={r.name} className="lp-mrow lp-mrow--new">
                       <span className="lp-mname">{r.name}</span>
-                      <span className="lp-mamt lp-mamt--exp">{r.amt}</span>
+                      <span className="lp-mamt lp-mamt--exp">£ {r.amt}</span>
                     </div>
                   ))}
-                  {/* Add row with typewriter */}
-                  <div className="lp-madd">
-                    <span className="lp-madd-plus">+</span>
-                    <span className="lp-madd-input">
-                      {typed
-                        ? <>{typed}<span className="lp-cursor" /></>
-                        : <><span className="lp-ph">What did you spend on?</span><span className="lp-cursor" /></>
-                      }
+                  <div className="lp-madd lp-madd--exp">
+                    <span className="lp-madd-plus lp-madd-plus--exp">+</span>
+                    <span className={`lp-madd-field${heroFocus === "exp-name" ? " lp-madd-field--focus" : ""}`}>
+                      {heroFocus === "exp-name"
+                        ? <>{heroName}<span className="lp-cursor" /></>
+                        : heroFocus === "exp-amt" && heroName
+                          ? heroName
+                          : <span className="lp-ph">Expense</span>}
                     </span>
-                    <span className="lp-madd-sym">£</span>
+                    <span className="lp-key-badge lp-key-badge--tab"
+                      style={{ opacity: heroTabBadge && heroFocus === "exp-name" ? 1 : 0 }}>
+                      ⇥ Tab
+                    </span>
+                    <span className={`lp-madd-field lp-madd-field--amt${heroFocus === "exp-amt" ? " lp-madd-field--focus" : ""}`}>
+                      {heroFocus === "exp-amt"
+                        ? <>£{heroAmt}<span className="lp-cursor" /></>
+                        : <span className="lp-ph">£</span>}
+                    </span>
+                    <span className="lp-key-badge lp-key-badge--enter"
+                      style={{ opacity: heroEnterBadge && heroFocus === "exp-amt" ? 1 : 0 }}>
+                      ↵
+                    </span>
+                    <span className="lp-madd-check lp-madd-check--exp">✓</span>
                   </div>
                 </div>
+
               </div>
             </div>
           </div>
@@ -350,10 +515,7 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
           <div className="lp-demo-media">
             <div className="lp-csv-table">
               <div className="lp-csv-head">
-                <span>Date</span>
-                <span>Description</span>
-                <span>Amount</span>
-                <span>Category</span>
+                <span>Date</span><span>Description</span><span>Amount</span><span>Category</span>
               </div>
               {CSV_ROWS.map((row, i) => (
                 <div key={row.desc} className={`lp-csv-row${csvStep > i ? " lp-csv-row--in" : ""}`}>
@@ -403,8 +565,7 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
                   <span className="lp-mini-total">£144.35</span>
                 </div>
                 <div className="lp-mini-cat">
-                  <span className="lp-mini-cat-pip" />
-                  <span>Food</span>
+                  <span className="lp-mini-cat-pip" /><span>Food</span>
                   <span className="lp-mini-cat-amt">£42.61</span>
                 </div>
                 <div className="lp-mini-row lp-mini-row--indent"><span>Tesco Extra</span><span>£42.61</span></div>
@@ -416,30 +577,86 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
           </div>
         </section>
 
-        {/* ════ DEMO 3: Annual chart ════ */}
-        <section className="lp-demo lp-r">
+        {/* ════ DEMO 3: Annual chart ⇄ projection card ════ */}
+        <section className="lp-demo lp-r" ref={el => { annualRef.current = el; }}>
           <div className="lp-demo-media">
             <div className="lp-chart">
-              <div className="lp-chart-title">Net flow &nbsp;·&nbsp; Jul 2024 to Jun 2025</div>
-              <svg viewBox="0 0 312 118" className="lp-chart-svg" aria-hidden="true">
-                <line x1={0} y1={62} x2={312} y2={62} stroke="rgba(212,228,250,0.09)" strokeWidth={1} />
-                {BAR.map((b, i) => {
-                  const h = Math.max((Math.abs(b.v) / maxV) * 52, 2);
-                  const pos = b.v >= 0;
-                  const x = 4 + i * 26;
-                  const y = pos ? 62 - h : 62;
-                  return (
-                    <g key={b.m}>
-                      <rect x={x} y={y} width={18} height={h} rx={3}
-                        fill={pos ? "#00dfc1" : "#ff7675"}
-                        opacity={b.m === "Jun" ? 0.4 : 0.82}
-                      />
-                      <text x={x + 9} y={112} textAnchor="middle" className="lp-chart-lbl">{b.m}</text>
-                    </g>
-                  );
-                })}
-              </svg>
-              <div className="lp-chart-legend">
+              <div className="lp-chart-title" style={{ transition: "opacity 400ms ease", opacity: 1 }}>
+                {annualPhase === "chart" ? "Net flow · 24 months" : "Annual projection · 2025 ↗"}
+              </div>
+              <div className="lp-chart-stage">
+
+                {/* Scrolling bar chart */}
+                <div
+                  key={chartKey}
+                  className={`lp-chart-scroll${annualPhase === "chart" ? " lp-chart-scroll--run" : ""}`}
+                  style={{ opacity: annualPhase === "proj" ? 0 : 1 }}
+                >
+                  <svg
+                    viewBox={`0 0 ${svgW} 118`}
+                    style={{ width: svgW, height: 118, display: "block" }}
+                    aria-hidden="true"
+                  >
+                    <line x1={0} y1={62} x2={svgW} y2={62}
+                      stroke="rgba(212,228,250,0.09)" strokeWidth={1} />
+                    {BAR_EXT.map((b, i) => {
+                      const h = Math.max((Math.abs(b.v) / maxV) * 52, 2);
+                      const pos = b.v >= 0;
+                      const x = 4 + i * 26;
+                      const y = pos ? 62 - h : 62;
+                      return (
+                        <g key={i}>
+                          <rect x={x} y={y} width={18} height={h} rx={3}
+                            fill={pos ? "#00dfc1" : "#ff7675"} opacity={0.82} />
+                          {i % 2 === 0 && (
+                            <text x={x + 9} y={112} textAnchor="middle" className="lp-chart-lbl">{b.m}</text>
+                          )}
+                        </g>
+                      );
+                    })}
+                  </svg>
+                </div>
+
+                {/* Projection card */}
+                <div className="lp-chart-proj" style={{ opacity: annualPhase === "proj" ? 1 : 0 }}>
+                  <div className="lp-proj-grid">
+                    <div className="lp-proj-stat">
+                      <span className="lp-proj-label">Projected income</span>
+                      <span className="lp-proj-val">£39,330</span>
+                    </div>
+                    <div className="lp-proj-stat">
+                      <span className="lp-proj-label">Projected outgoings</span>
+                      <span className="lp-proj-val">£33,140</span>
+                    </div>
+                    <div className="lp-proj-stat">
+                      <span className="lp-proj-label">Projected surplus</span>
+                      <span className="lp-proj-val lp-proj-val--pos">+£6,190</span>
+                    </div>
+                    <div className="lp-proj-stat lp-proj-stat--rate">
+                      <div>
+                        <span className="lp-proj-label">Savings rate</span>
+                        <span className="lp-proj-val lp-proj-val--pos">15.7%</span>
+                      </div>
+                      <div className="lp-proj-dial-wrap">
+                        <svg width={46} height={46} viewBox="0 0 46 46" aria-hidden="true">
+                          <circle cx={23} cy={23} r={dialR}
+                            fill="none" stroke="rgba(212,228,250,0.12)" strokeWidth={5} />
+                          <circle cx={23} cy={23} r={dialR}
+                            fill="none" stroke="#00dfc1" strokeWidth={5}
+                            strokeDasharray={`${dialFill} ${dialCirc}`}
+                            strokeLinecap="round"
+                            transform="rotate(-90 23 23)" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="lp-chart-legend" style={{
+                opacity: annualPhase === "chart" ? 1 : 0,
+                transition: "opacity 500ms ease",
+              }}>
                 <span className="lp-chart-pip lp-chart-pip--pos" />Surplus
                 <span className="lp-chart-pip lp-chart-pip--neg" />Deficit
               </div>
@@ -469,9 +686,7 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
             {CMP.map(row => (
               <div key={row.label} className="lp-cmp-row">
                 <div className="lp-cmp-label">{row.label}</div>
-                <div className="lp-cmp-cell lp-cmp-cell--hi">
-                  <Check size={16} strokeWidth={2.5} />
-                </div>
+                <div className="lp-cmp-cell lp-cmp-cell--hi"><Check size={16} strokeWidth={2.5} /></div>
                 <div className="lp-cmp-cell">
                   {row.s === "Yes" ? <Check size={15} strokeWidth={2} className="lp-check-muted" /> : <span className="lp-cmp-text">{row.s}</span>}
                 </div>
@@ -510,11 +725,8 @@ const CSS = `
   background: #010f1f;
   color: #d4e4fa;
   line-height: 1.6;
-  /* No overflow-x:hidden here — setting overflow on one axis creates an
-     implicit scroll container in Safari/Chrome that swallows scroll events. */
   padding-top: 56px;
 }
-
 
 /* ── Nav ── */
 .lp-nav {
@@ -553,24 +765,20 @@ const CSS = `
 
 /* ── Hero ── */
 .lp-hero {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: grid; grid-template-columns: 1fr 1fr;
   min-height: calc(100vh - 56px);
   max-width: 1180px; margin: 0 auto;
-  padding: 60px 40px;
-  gap: 56px; align-items: center;
+  padding: 60px 40px; gap: 56px; align-items: center;
 }
 .lp-h1 {
   font-size: clamp(30px, 4vw, 56px);
   font-weight: 840; letter-spacing: -0.03em;
-  line-height: 1.1; color: #eef4ff;
-  margin-bottom: 22px;
+  line-height: 1.1; color: #eef4ff; margin-bottom: 22px;
 }
 .lp-accent { color: #00dfc1; }
 .lp-sub {
   font-size: 16px; color: rgba(212, 228, 250, 0.66);
-  line-height: 1.7; max-width: 420px;
-  margin-bottom: 36px;
+  line-height: 1.7; max-width: 420px; margin-bottom: 36px;
 }
 .lp-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; }
 .lp-skip {
@@ -586,11 +794,10 @@ const CSS = `
   border-radius: 12px; overflow: hidden;
   border: 1px solid rgba(212, 228, 250, 0.11);
   box-shadow: 0 40px 90px rgba(0,0,0,0.45), 0 0 0 1px rgba(212,228,250,0.03);
-  max-width: 540px;
+  max-width: 560px;
 }
 .lp-chrome {
-  background: rgba(22, 36, 52, 0.98);
-  padding: 9px 14px;
+  background: rgba(22, 36, 52, 0.98); padding: 9px 14px;
   display: flex; align-items: center; gap: 12px;
   border-bottom: 1px solid rgba(212, 228, 250, 0.07);
 }
@@ -606,93 +813,135 @@ const CSS = `
   flex: 1; background: rgba(1, 15, 31, 0.5); border-radius: 6px;
   padding: 4px 12px; font-size: 11px;
   color: rgba(212, 228, 250, 0.32); text-align: center;
-  font-family: system-ui, sans-serif; letter-spacing: 0;
+  font-family: system-ui, sans-serif;
 }
 
-/* ── Mock panels ── */
-.lp-mock-body { background: #010f1f; }
-.lp-mp {
-  border-bottom: 1px solid rgba(212, 228, 250, 0.06);
+/* ── Mock body: two-column ledger ── */
+.lp-mock-body {
+  background: #010f1f;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
 }
-.lp-mp--income { border-left: 2px solid rgba(0, 223, 193, 0.22); }
-.lp-mp--expense { border-left: 2px solid rgba(255, 118, 117, 0.18); }
+.lp-mp { /* each panel */ }
+.lp-mp--income {
+  border-left: 2px solid rgba(0, 223, 193, 0.22);
+  border-right: 1px solid rgba(212, 228, 250, 0.07);
+}
+.lp-mp--expense {
+  border-left: 2px solid rgba(255, 118, 117, 0.18);
+}
 .lp-mp-head {
   display: flex; justify-content: space-between; align-items: flex-start;
-  padding: 12px 14px;
+  padding: 10px 12px;
   background: rgba(39, 54, 71, 0.16);
   border-bottom: 1px solid rgba(212, 228, 250, 0.055);
 }
 .lp-mp-title {
-  font-size: 15px; font-weight: 680; color: #eef4ff;
-  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 680; color: #eef4ff;
+  display: flex; align-items: center; gap: 5px;
 }
-.lp-glyph { font-size: 13px; display: inline-block; }
+.lp-glyph { font-size: 12px; display: inline-block; }
 .lp-glyph--in  { color: #00dfc1; }
 .lp-glyph--out { color: #ff7675; }
-.lp-mp-sub { font-size: 11px; color: rgba(212, 228, 250, 0.38); margin-top: 3px; }
-.lp-mp-total { font-family: 'SF Mono', monospace; font-size: 14px; font-weight: 660; color: #d4e4fa; }
+.lp-mp-sub { font-size: 10px; color: rgba(212, 228, 250, 0.38); margin-top: 2px; }
+.lp-mp-total {
+  font-family: 'SF Mono', monospace; font-size: 12px; font-weight: 660;
+  color: #d4e4fa; text-align: right; max-width: 50%; word-break: break-all;
+}
 .lp-mp-total--income { color: #00dfc1; }
 .lp-col-head {
-  display: flex; justify-content: space-between;
-  padding: 6px 14px;
-  font-size: 10px; font-weight: 700; letter-spacing: 0.07em;
+  display: flex; justify-content: space-between; padding: 5px 12px;
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.07em;
   color: rgba(212, 228, 250, 0.3); text-transform: uppercase;
-  background: rgba(1, 15, 31, 0.1);
   border-bottom: 1px solid rgba(212, 228, 250, 0.05);
 }
 .lp-mrow {
-  display: flex; align-items: center; gap: 9px;
-  padding: 9px 14px;
+  display: flex; align-items: center; gap: 7px;
+  padding: 8px 12px;
   border-bottom: 1px solid rgba(212, 228, 250, 0.04);
 }
-.lp-dot-swatch {
-  width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0;
-}
-.lp-mname { flex: 1; font-size: 12.5px; color: rgba(212, 228, 250, 0.88); }
-.lp-mamt {
-  font-family: 'SF Mono', monospace; font-size: 12px;
-  color: rgba(212, 228, 250, 0.88);
-}
+.lp-dot-swatch { width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0; }
+.lp-mname { flex: 1; font-size: 11.5px; color: rgba(212, 228, 250, 0.88); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lp-mamt { font-family: 'SF Mono', monospace; font-size: 11px; color: rgba(212, 228, 250, 0.88); white-space: nowrap; }
 .lp-mamt--exp { color: rgba(212, 228, 250, 0.6); }
 
-/* ── Add row with typewriter ── */
+/* New row slide-in animation */
+@keyframes lpRowIn {
+  from { opacity: 0; transform: translateY(-5px); max-height: 0; }
+  to   { opacity: 1; transform: none; max-height: 40px; }
+}
+.lp-mrow--new { animation: lpRowIn 300ms ease forwards; }
+
+/* ── Add row (hero mock) ── */
 .lp-madd {
-  display: flex; align-items: center; gap: 7px;
-  padding: 9px 14px;
+  position: relative;
+  display: flex; align-items: center; gap: 5px;
+  padding: 7px 10px;
   background: rgba(1, 15, 31, 0.28);
   border-top: 1px dashed rgba(212, 228, 250, 0.09);
 }
 .lp-madd-plus {
-  width: 24px; height: 24px; border-radius: 5px;
-  border: 1px solid rgba(0, 223, 193, 0.28);
+  width: 20px; height: 20px; border-radius: 4px;
+  border: 1px solid rgba(0, 223, 193, 0.3);
   display: grid; place-items: center;
-  color: #00dfc1; font-size: 15px; line-height: 1;
-  flex-shrink: 0;
+  color: #00dfc1; font-size: 14px; line-height: 1; flex-shrink: 0;
 }
-.lp-madd-input {
+.lp-madd-plus--exp {
+  border-color: rgba(255, 118, 117, 0.3);
+  color: #ff7675;
+}
+.lp-madd-field {
   flex: 1; min-width: 0;
   background: rgba(18, 33, 49, 0.7);
   border: 1px solid rgba(212, 228, 250, 0.1);
-  border-radius: 5px; padding: 5px 9px;
-  font-size: 12px; color: #d4e4fa;
-  display: flex; align-items: center; gap: 1px;
-  min-height: 30px;
+  border-radius: 4px; padding: 4px 7px;
+  font-size: 11px; color: #d4e4fa;
+  display: flex; align-items: center;
+  min-height: 26px; overflow: hidden;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.lp-madd-field--amt {
+  flex: 0 0 52px; font-family: 'SF Mono', monospace;
+}
+.lp-madd-field--focus {
+  border-color: rgba(0, 223, 193, 0.45);
+  box-shadow: 0 0 0 2px rgba(0, 223, 193, 0.12);
+}
+.lp-madd-check {
+  width: 20px; height: 20px; border-radius: 4px;
+  border: 1px solid rgba(0, 223, 193, 0.25);
+  display: grid; place-items: center;
+  color: #00dfc1; font-size: 11px; flex-shrink: 0;
+}
+.lp-madd-check--exp {
+  border-color: rgba(255, 118, 117, 0.22);
+  color: #ff7675;
 }
 .lp-ph { color: rgba(212, 228, 250, 0.25); }
 .lp-cursor {
-  display: inline-block; width: 1.5px; height: 13px;
+  display: inline-block; width: 1.5px; height: 12px;
   background: #00dfc1;
   animation: lpBlink 1s step-end infinite;
-  margin-left: 1px; flex-shrink: 0;
+  margin-left: 1px; flex-shrink: 0; vertical-align: middle;
 }
 @keyframes lpBlink { 0%,100%{opacity:1} 50%{opacity:0} }
-.lp-madd-sym {
-  background: rgba(18, 33, 49, 0.7);
-  border: 1px solid rgba(212, 228, 250, 0.1);
-  border-radius: 5px; padding: 5px 10px;
-  font-size: 12px; color: rgba(212, 228, 250, 0.35);
-  flex-shrink: 0;
+
+/* ── Key hint badges ── */
+.lp-key-badge {
+  position: absolute;
+  bottom: calc(100% + 3px);
+  background: rgba(10, 25, 44, 0.96);
+  border: 1px solid rgba(0, 223, 193, 0.38);
+  border-radius: 4px; padding: 2px 6px;
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.04em;
+  color: #00dfc1;
+  font-family: 'SF Mono', 'Courier New', monospace;
+  white-space: nowrap; pointer-events: none; z-index: 5;
+  transition: opacity 150ms ease;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
 }
+.lp-key-badge--tab  { left: 50%; transform: translateX(-50%); }
+.lp-key-badge--enter { right: 6px; }
 
 /* ── Privacy strip ── */
 .lp-strip {
@@ -713,52 +962,36 @@ const CSS = `
 .lp-demo {
   display: grid; grid-template-columns: 1fr 1fr;
   gap: 64px; align-items: center;
-  max-width: 1100px; margin: 0 auto;
-  padding: 88px 40px;
+  max-width: 1100px; margin: 0 auto; padding: 88px 40px;
 }
-.lp-demo--flip .lp-demo-copy   { order: 1; }
-.lp-demo--flip .lp-demo-media  { order: 2; }
+.lp-demo--flip .lp-demo-copy  { order: 1; }
+.lp-demo--flip .lp-demo-media { order: 2; }
 .lp-eyebrow {
   display: inline-block; margin-bottom: 10px;
-  color: #00dfc1;
-  font-family: 'SF Mono', 'Fira Code', monospace;
-  font-size: 11px; font-weight: 720;
-  letter-spacing: 0.12em; text-transform: uppercase;
+  color: #00dfc1; font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 11px; font-weight: 720; letter-spacing: 0.12em; text-transform: uppercase;
 }
 .lp-demo-h2 {
-  font-size: clamp(22px, 2.8vw, 34px);
-  font-weight: 760; letter-spacing: -0.022em;
-  color: #eef4ff; line-height: 1.2;
-  margin-bottom: 14px;
+  font-size: clamp(22px, 2.8vw, 34px); font-weight: 760;
+  letter-spacing: -0.022em; color: #eef4ff; line-height: 1.2; margin-bottom: 14px;
 }
-.lp-demo-p {
-  font-size: 15px; color: rgba(212, 228, 250, 0.66);
-  line-height: 1.7; margin-bottom: 12px;
-}
-.lp-demo-note {
-  font-size: 13px; color: rgba(212, 228, 250, 0.35); line-height: 1.55;
-}
+.lp-demo-p  { font-size: 15px; color: rgba(212, 228, 250, 0.66); line-height: 1.7; margin-bottom: 12px; }
+.lp-demo-note { font-size: 13px; color: rgba(212, 228, 250, 0.35); line-height: 1.55; }
 
 /* ── CSV table ── */
 .lp-csv-table {
-  background: rgba(8, 22, 38, 0.92);
-  border: 1px solid rgba(212, 228, 250, 0.1);
-  border-radius: 10px; overflow: hidden;
-  font-family: 'SF Mono', 'Fira Code', monospace;
-  font-size: 12px;
+  background: rgba(8, 22, 38, 0.92); border: 1px solid rgba(212, 228, 250, 0.1);
+  border-radius: 10px; overflow: hidden; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px;
 }
 .lp-csv-head {
-  display: grid;
-  grid-template-columns: 54px 1fr 60px 90px;
+  display: grid; grid-template-columns: 54px 1fr 60px 90px;
   padding: 9px 14px;
-  background: rgba(39, 54, 71, 0.26);
-  border-bottom: 1px solid rgba(212, 228, 250, 0.07);
+  background: rgba(39, 54, 71, 0.26); border-bottom: 1px solid rgba(212, 228, 250, 0.07);
   font-size: 10.5px; font-weight: 720; letter-spacing: 0.06em;
   text-transform: uppercase; color: rgba(212, 228, 250, 0.35);
 }
 .lp-csv-row {
-  display: grid;
-  grid-template-columns: 54px 1fr 60px 90px;
+  display: grid; grid-template-columns: 54px 1fr 60px 90px;
   padding: 8px 14px; align-items: center;
   border-bottom: 1px solid rgba(212, 228, 250, 0.04);
   color: rgba(212, 228, 250, 0.72);
@@ -770,35 +1003,20 @@ const CSS = `
 .lp-csv-desc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 8px; }
 .lp-csv-amt  { text-align: right; }
 .lp-csv-cat {
-  display: inline-block;
-  background: rgba(0, 223, 193, 0.07);
-  border: 1px solid transparent;
-  border-radius: 4px; padding: 1px 6px;
-  font-size: 11px; color: transparent;
-  white-space: nowrap;
+  display: inline-block; background: rgba(0, 223, 193, 0.07);
+  border: 1px solid transparent; border-radius: 4px; padding: 1px 6px;
+  font-size: 11px; color: transparent; white-space: nowrap;
   transition: color 260ms ease, border-color 260ms ease, background 260ms ease;
 }
-.lp-csv-cat--in {
-  color: #00dfc1;
-  border-color: rgba(0, 223, 193, 0.22);
-  background: rgba(0, 223, 193, 0.09);
-}
+.lp-csv-cat--in { color: #00dfc1; border-color: rgba(0, 223, 193, 0.22); background: rgba(0, 223, 193, 0.09); }
 
 /* ── Mini ledger demo ── */
-.lp-mini-ledger {
-  display: flex;
-  flex-direction: row;
-  gap: 12px;
-  align-items: flex-start;
-}
+.lp-mini-ledger { display: flex; flex-direction: row; gap: 12px; align-items: flex-start; }
 .lp-mini-panel {
-  flex: 1;
-  min-width: 0;
-  border: 1px solid rgba(212, 228, 250, 0.09);
-  border-radius: 10px; overflow: hidden;
-  background: rgba(10, 24, 40, 0.8);
+  flex: 1; min-width: 0;
+  border: 1px solid rgba(212, 228, 250, 0.09); border-radius: 10px;
+  overflow: hidden; background: rgba(10, 24, 40, 0.8);
 }
-
 .lp-mini-panel--income { border-color: rgba(0, 223, 193, 0.16); }
 .lp-mini-panel--expense { border-color: rgba(255, 118, 117, 0.12); }
 .lp-mini-head {
@@ -810,9 +1028,8 @@ const CSS = `
 .lp-mini-total { font-family: 'SF Mono', monospace; font-size: 13px; }
 .lp-mini-total--income { color: #00dfc1; }
 .lp-mini-row {
-  display: flex; justify-content: space-between;
-  padding: 8px 14px; font-size: 12.5px;
-  color: rgba(212, 228, 250, 0.78);
+  display: flex; justify-content: space-between; padding: 8px 14px;
+  font-size: 12.5px; color: rgba(212, 228, 250, 0.78);
   border-bottom: 1px solid rgba(212, 228, 250, 0.04);
 }
 .lp-mini-row--indent { padding-left: 26px; color: rgba(212, 228, 250, 0.6); }
@@ -820,82 +1037,100 @@ const CSS = `
   display: flex; align-items: center; gap: 8px;
   padding: 7px 14px; font-size: 11.5px; font-weight: 700;
   color: rgba(212, 228, 250, 0.45);
-  background: rgba(1, 15, 31, 0.18);
-  border-bottom: 1px solid rgba(212, 228, 250, 0.04);
+  background: rgba(1, 15, 31, 0.18); border-bottom: 1px solid rgba(212, 228, 250, 0.04);
 }
-.lp-mini-cat-pip {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: #fd79a8; flex-shrink: 0;
-}
+.lp-mini-cat-pip { width: 7px; height: 7px; border-radius: 50%; background: #fd79a8; flex-shrink: 0; }
 .lp-mini-cat-amt { margin-left: auto; font-family: 'SF Mono', monospace; }
 
 /* ── Bar chart ── */
 .lp-chart {
-  background: rgba(8, 22, 38, 0.9);
-  border: 1px solid rgba(212, 228, 250, 0.09);
-  border-radius: 12px; padding: 20px 18px 14px;
+  background: rgba(8, 22, 38, 0.9); border: 1px solid rgba(212, 228, 250, 0.09);
+  border-radius: 12px; padding: 18px 18px 14px;
 }
 .lp-chart-title {
-  font-size: 11px; font-weight: 720;
-  color: rgba(212, 228, 250, 0.35);
-  letter-spacing: 0.04em; text-transform: uppercase;
-  margin-bottom: 14px;
+  font-size: 11px; font-weight: 720; color: rgba(212, 228, 250, 0.35);
+  letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 12px;
   font-family: 'SF Mono', monospace;
 }
-.lp-chart-svg { width: 100%; display: block; }
-.lp-chart-lbl {
-  font-size: 8.5px; fill: rgba(212, 228, 250, 0.3);
-  font-family: 'SF Mono', monospace;
-}
+.lp-chart-lbl { font-size: 8.5px; fill: rgba(212, 228, 250, 0.3); font-family: 'SF Mono', monospace; }
 .lp-chart-legend {
-  display: flex; align-items: center; gap: 6px;
-  margin-top: 10px; font-size: 12px;
-  color: rgba(212, 228, 250, 0.42);
+  display: flex; align-items: center; gap: 6px; margin-top: 10px;
+  font-size: 12px; color: rgba(212, 228, 250, 0.42);
 }
-.lp-chart-pip {
-  display: inline-block; width: 9px; height: 9px;
-  border-radius: 2px; flex-shrink: 0;
-}
+.lp-chart-pip { display: inline-block; width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
 .lp-chart-pip--pos { background: #00dfc1; margin-right: 4px; }
 .lp-chart-pip--neg { background: #ff7675; margin-left: 14px; margin-right: 4px; }
 
-/* ── Comparison table ── */
-.lp-cmp {
-  max-width: 900px; margin: 0 auto;
-  padding: 80px 40px;
+/* ── Chart stage: clips the scrolling SVG ── */
+.lp-chart-stage {
+  position: relative; overflow: hidden; height: 126px;
 }
+
+/* Scrolling bar chart layer */
+.lp-chart-scroll {
+  position: absolute; top: 0; left: 0;
+  transition: opacity 500ms ease;
+}
+@keyframes lpBarScroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-208px); }
+}
+.lp-chart-scroll--run {
+  animation: lpBarScroll 3.2s ease-in-out forwards;
+}
+
+/* Projection card layer */
+.lp-chart-proj {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; justify-content: center;
+  transition: opacity 500ms ease;
+  background: rgba(8, 22, 38, 0.9);
+  padding: 4px 2px;
+}
+.lp-proj-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 10px 16px;
+}
+.lp-proj-stat {
+  display: flex; flex-direction: column; gap: 2px;
+}
+.lp-proj-stat--rate {
+  flex-direction: row; align-items: center; justify-content: space-between;
+}
+.lp-proj-label {
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.05em;
+  text-transform: uppercase; color: rgba(212, 228, 250, 0.38);
+  font-family: 'SF Mono', monospace;
+}
+.lp-proj-val {
+  font-family: 'SF Mono', monospace; font-size: 16px; font-weight: 700;
+  color: #d4e4fa; letter-spacing: -0.02em;
+}
+.lp-proj-val--pos { color: #00dfc1; }
+.lp-proj-dial-wrap { flex-shrink: 0; }
+
+/* ── Comparison table ── */
+.lp-cmp { max-width: 900px; margin: 0 auto; padding: 80px 40px; }
 .lp-cmp-h2 {
   font-size: clamp(24px, 3vw, 38px); font-weight: 760;
-  letter-spacing: -0.022em; color: #eef4ff;
-  margin-bottom: 28px;
+  letter-spacing: -0.022em; color: #eef4ff; margin-bottom: 28px;
 }
 .lp-cmp-table {
-  border: 1px solid rgba(212, 228, 250, 0.09);
-  border-radius: 12px; overflow: hidden;
-  background: rgba(8, 22, 38, 0.7);
+  border: 1px solid rgba(212, 228, 250, 0.09); border-radius: 12px;
+  overflow: hidden; background: rgba(8, 22, 38, 0.7);
 }
 .lp-cmp-head {
-  display: grid;
-  grid-template-columns: 1fr repeat(3, 140px);
-  background: rgba(39, 54, 71, 0.2);
-  border-bottom: 1px solid rgba(212, 228, 250, 0.07);
+  display: grid; grid-template-columns: 1fr repeat(3, 140px);
+  background: rgba(39, 54, 71, 0.2); border-bottom: 1px solid rgba(212, 228, 250, 0.07);
 }
-.lp-cmp-col {
-  padding: 13px 12px; font-size: 13px; font-weight: 700;
-  color: rgba(212, 228, 250, 0.42); text-align: center;
-}
+.lp-cmp-col { padding: 13px 12px; font-size: 13px; font-weight: 700; color: rgba(212, 228, 250, 0.42); text-align: center; }
 .lp-cmp-col--hi { color: #00dfc1; }
 .lp-cmp-row {
-  display: grid;
-  grid-template-columns: 1fr repeat(3, 140px);
-  border-bottom: 1px solid rgba(212, 228, 250, 0.05);
-  align-items: center;
+  display: grid; grid-template-columns: 1fr repeat(3, 140px);
+  border-bottom: 1px solid rgba(212, 228, 250, 0.05); align-items: center;
 }
 .lp-cmp-row:last-child { border-bottom: none; }
-.lp-cmp-label {
-  padding: 13px 16px; font-size: 13.5px;
-  color: rgba(212, 228, 250, 0.72);
-}
+.lp-cmp-label { padding: 13px 16px; font-size: 13.5px; color: rgba(212, 228, 250, 0.72); }
 .lp-cmp-cell {
   padding: 13px 12px; text-align: center;
   display: flex; align-items: center; justify-content: center;
@@ -907,49 +1142,29 @@ const CSS = `
 
 /* ── Final CTA ── */
 .lp-end {
-  text-align: center;
-  padding: 100px 40px 80px;
+  text-align: center; padding: 100px 40px 80px;
   border-top: 1px solid rgba(212, 228, 250, 0.06);
   background: rgba(5, 20, 36, 0.48);
 }
-.lp-end-h2 {
-  font-size: clamp(30px, 4vw, 52px); font-weight: 820;
-  letter-spacing: -0.03em; color: #eef4ff;
-  margin-bottom: 10px;
-}
-.lp-end-deck {
-  font-size: 18px; color: rgba(212, 228, 250, 0.44);
-  margin-bottom: 36px;
-}
-.lp-end-note {
-  margin-top: 18px; font-size: 13.5px;
-  color: rgba(212, 228, 250, 0.3);
-}
+.lp-end-h2 { font-size: clamp(30px, 4vw, 52px); font-weight: 820; letter-spacing: -0.03em; color: #eef4ff; margin-bottom: 10px; }
+.lp-end-deck { font-size: 18px; color: rgba(212, 228, 250, 0.44); margin-bottom: 36px; }
+.lp-end-note { margin-top: 18px; font-size: 13.5px; color: rgba(212, 228, 250, 0.3); }
 
 /* ── Scroll reveal ── */
 .lp-r {
   opacity: 0; transform: translateY(24px);
-  transition:
-    opacity 560ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 560ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 560ms cubic-bezier(0.16, 1, 0.3, 1), transform 560ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 .lp-ri { opacity: 1; transform: none; }
 
 /* ── Responsive ── */
 @media (max-width: 880px) {
-  .lp-hero {
-    grid-template-columns: 1fr;
-    min-height: auto;
-    padding: 40px 24px 52px;
-    gap: 40px;
-  }
+  .lp-hero { grid-template-columns: 1fr; min-height: auto; padding: 40px 24px 52px; gap: 40px; }
   .lp-hero-mock { order: -1; }
   .lp-browser { max-width: 100%; }
   .lp-h1 { font-size: clamp(28px, 7vw, 44px); }
   .lp-sub { max-width: 100%; }
-  .lp-demo {
-    grid-template-columns: 1fr; padding: 64px 24px; gap: 36px;
-  }
+  .lp-demo { grid-template-columns: 1fr; padding: 64px 24px; gap: 36px; }
   .lp-demo--flip .lp-demo-copy  { order: 0; }
   .lp-demo--flip .lp-demo-media { order: 0; }
   .lp-cmp { padding: 60px 24px; }
@@ -960,6 +1175,12 @@ const CSS = `
   .lp-strip { font-size: 12.5px; padding: 14px 20px; }
 }
 
+/* Stack mock panels vertically on small phones */
+@media (max-width: 460px) {
+  .lp-mock-body { grid-template-columns: 1fr; }
+  .lp-mp--income { border-right: none; border-bottom: 1px solid rgba(212, 228, 250, 0.07); }
+}
+
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
   .lp-r, .lp-btn, .lp-cursor { transition: none; animation: none; }
@@ -968,5 +1189,7 @@ const CSS = `
   .lp-csv-row { opacity: 1; transform: none; transition: none; }
   .lp-csv-cat { color: #00dfc1; border-color: rgba(0, 223, 193, 0.22); }
   .lp-nav { transition: none; }
+  .lp-chart-scroll--run { animation: none; }
+  .lp-mrow--new { animation: none; opacity: 1; transform: none; }
 }
 `;
