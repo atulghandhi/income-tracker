@@ -10,6 +10,6 @@ export default defineConfig({
     dedupe: ["react", "react-dom"],
   },
   optimizeDeps: {
-    include: ["@vercel/analytics/react"],
+    include: ["@vercel/analytics/react", "@vercel/speed-insights"],
   },
 });
