@@ -3384,7 +3384,7 @@ function AccountRow({
         aria-label="Cycle account color"
       />
       <div className="debtAccountMain">
-        <input value={account.name} onChange={(event) => onChange({ name: event.target.value })} aria-label="Account name" />
+        <input value={account.name} onChange={(event) => onChange({ name: capitalizeFirst(event.target.value) })} aria-label="Account name" />
         <select
           value={account.type}
           onChange={(event) => onChange({ type: event.target.value as AccountType })}
@@ -3558,7 +3558,7 @@ function AccountEditor({
         <input
           value={draft.name}
           placeholder="Account name"
-          onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+          onChange={(event) => setDraft((current) => ({ ...current, name: capitalizeFirst(event.target.value) }))}
           onKeyDown={(event) => handleDraftEnter(event, onAdd)}
           aria-label="Account name"
         />
@@ -3939,7 +3939,7 @@ function GoalsPanel({
             <input
               value={goal.name}
               placeholder="Goal name, e.g. Emergency fund"
-              onChange={(event) => onGoalChange({ name: event.target.value })}
+              onChange={(event) => onGoalChange({ name: capitalizeFirst(event.target.value) })}
               onKeyDown={blurOnEnter}
               aria-label="Goal name"
             />

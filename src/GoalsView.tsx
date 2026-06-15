@@ -19,6 +19,10 @@ import { colors, getCurrencySymbol } from "./finance";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+function capitalizeFirst(s: string) {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+}
+
 type HorizonOption = 12 | 24 | 36 | 60 | 120;
 const HORIZON_OPTIONS: HorizonOption[] = [12, 24, 36, 60, 120];
 
@@ -514,7 +518,7 @@ function GoalEditor({
           id={`${uid}-name`}
           value={goal.name}
           placeholder="e.g. Emergency fund"
-          onChange={(e) => onUpdate({ name: e.target.value })}
+          onChange={(e) => onUpdate({ name: capitalizeFirst(e.target.value) })}
         />
       </div>
 
@@ -638,7 +642,7 @@ function GoalEditor({
           id={`${uid}-note`}
           value={goal.note}
           placeholder="Optional note"
-          onChange={(e) => onUpdate({ note: e.target.value })}
+          onChange={(e) => onUpdate({ note: capitalizeFirst(e.target.value) })}
         />
       </div>
 

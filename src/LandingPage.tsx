@@ -708,6 +708,16 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
           <p className="lp-end-note">Free. No credit card. No bank login.</p>
         </section>
 
+        {/* ════ FOOTER ════ */}
+        <footer className="lp-footer">
+          <span className="lp-footer-brand">© {new Date().getFullYear()} The Income Tracker</span>
+          <nav className="lp-footer-links" aria-label="Legal">
+            <a href="/privacy.html" className="lp-footer-link">Privacy Policy</a>
+            <span aria-hidden="true">·</span>
+            <a href="/tos.html" className="lp-footer-link">Terms of Service</a>
+          </nav>
+        </footer>
+
       </main>
     </>
   );
@@ -1179,6 +1189,26 @@ const CSS = `
 @media (max-width: 460px) {
   .lp-mock-body { grid-template-columns: 1fr; }
   .lp-mp--income { border-right: none; border-bottom: 1px solid rgba(212, 228, 250, 0.07); }
+}
+
+/* ── Footer ── */
+.lp-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 10px;
+  padding: 20px 40px;
+  border-top: 1px solid rgba(212, 228, 250, 0.07);
+  background: rgba(1, 15, 31, 0.6);
+  font-size: 13px; color: rgba(212, 228, 250, 0.35);
+}
+.lp-footer-brand { letter-spacing: -0.01em; }
+.lp-footer-links { display: flex; align-items: center; gap: 10px; }
+.lp-footer-link {
+  color: rgba(212, 228, 250, 0.45); text-decoration: none;
+  transition: color 120ms ease;
+}
+.lp-footer-link:hover { color: #00dfc1; }
+@media (max-width: 880px) {
+  .lp-footer { padding: 18px 24px; }
 }
 
 /* ── Reduced motion ── */
