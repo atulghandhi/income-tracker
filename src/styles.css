@@ -4084,6 +4084,160 @@ hr {
   color: var(--faint);
 }
 
+/* ─── Feedback modal ─────────────────────────────────── */
+.feedbackBackdrop {
+  z-index: 200;
+  animation: fadeIn 180ms ease both;
+}
+
+.feedbackModal {
+  position: relative;
+  width: min(480px, 100%);
+  padding: 28px 28px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: rgba(13, 28, 45, 0.98);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
+}
+
+.feedbackModal h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 640;
+  color: var(--ink);
+  letter-spacing: 0;
+}
+
+.feedbackModal > p,
+.feedbackModal form > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.feedbackClose {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+}
+
+.feedbackModal form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.feedbackTypeRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.feedbackTypeBtn {
+  padding: 5px 14px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 150ms ease, color 150ms ease, background 150ms ease;
+}
+
+.feedbackTypeBtn:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.feedbackTypeBtn.active {
+  border-color: rgba(59, 130, 246, 0.6);
+  background: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
+}
+
+.feedbackLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.feedbackModal input,
+.feedbackModal textarea {
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ink);
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  transition: border-color 150ms ease;
+}
+
+.feedbackModal input:focus,
+.feedbackModal textarea:focus {
+  outline: none;
+  border-color: rgba(59, 130, 246, 0.6);
+}
+
+.feedbackOptional {
+  color: var(--faint);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.feedbackError {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #f87171;
+  font-size: 13px;
+  margin: 0;
+}
+
+.feedbackFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.feedbackSubmit {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.35);
+  color: #60a5fa;
+}
+
+.feedbackSubmit:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.25);
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+.feedbackSuccess {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 0 8px;
+  text-align: center;
+  color: var(--mint);
+}
+
+.feedbackSuccess h2 {
+  color: var(--ink);
+}
+
+.feedbackCtaPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 /* ─── Sync nudge ────────────────────────────────────── */
 .syncNudge {
   position: fixed;
