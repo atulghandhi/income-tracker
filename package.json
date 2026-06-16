@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "content": "node scripts/build-content.mjs",
+    "prebuild": "node scripts/build-content.mjs",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
     "e2e": "playwright test"

@@ -721,7 +721,11 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
         {/* ════ FOOTER ════ */}
         <footer className="lp-footer">
           <span className="lp-footer-brand">© {new Date().getFullYear()} The Income Tracker</span>
-          <nav className="lp-footer-links" aria-label="Legal">
+          <nav className="lp-footer-links" aria-label="Footer">
+            <a href="/import/" className="lp-footer-link">Bank CSV guides</a>
+            <span aria-hidden="true">·</span>
+            <a href="/guides/" className="lp-footer-link">Guides</a>
+            <span aria-hidden="true">·</span>
             <a href="/privacy.html" className="lp-footer-link">Privacy Policy</a>
             <span aria-hidden="true">·</span>
             <a href="/tos.html" className="lp-footer-link">Terms of Service</a>
