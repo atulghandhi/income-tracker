@@ -1,37 +1,151 @@
 <!doctype html>
-<html lang="en">
+<html lang="en-GB">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>The Income Tracker — Free UK Income &amp; Expense Tracker (No Bank Login)</title>
     <meta
       name="description"
-      content="The Income Tracker — a local-first monthly finance tracker that stores your budget in this browser. No account required."
+      content="A free, easy-to-use income and expense tracker for the UK. Import a CSV from Barclays, HSBC, Monzo or Starling, see every month side by side, and track your budget. No account, no bank login — your data stays in your browser."
     />
-    <title>The Income Tracker</title>
+    <meta
+      name="keywords"
+      content="income tracker, finance tracker, expense tracker, budget tracker UK, free budgeting app, money tracker, personal finance app, UK budget app, spending tracker, CSV budget tracker, no bank login budgeting"
+    />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="author" content="The Income Tracker" />
+    <meta name="application-name" content="The Income Tracker" />
+    <meta name="theme-color" content="#051424" />
+    <link rel="canonical" href="https://www.theincometracker.com/" />
+
+    <!-- UK / geo targeting -->
+    <meta name="geo.region" content="GB" />
+    <meta name="geo.placename" content="United Kingdom" />
+    <meta name="language" content="en-GB" />
+    <meta http-equiv="content-language" content="en-GB" />
 
     <!-- Open Graph / LinkedIn / Facebook -->
     <meta property="og:type" content="website" />
+    <meta property="og:locale" content="en_GB" />
     <meta property="og:url" content="https://www.theincometracker.com/" />
     <meta property="og:site_name" content="The Income Tracker" />
-    <meta property="og:title" content="The Income Tracker — Track Your Finances Privately" />
-    <meta property="og:description" content="A local-first monthly finance tracker that stores your budget in this browser. No account, no server, no data leaving your device." />
+    <meta property="og:title" content="The Income Tracker — Free UK Income &amp; Expense Tracker" />
+    <meta property="og:description" content="A free, easy-to-use income and expense tracker for the UK. Import a CSV from Barclays, HSBC, Monzo or Starling. No account, no bank login — your data stays in your browser." />
     <meta property="og:image" content="https://www.theincometracker.com/og-image.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="The Income Tracker — private, local-first budget tracker" />
+    <meta property="og:image:alt" content="The Income Tracker — free, private, local-first budget tracker for the UK" />
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:url" content="https://www.theincometracker.com/" />
-    <meta name="twitter:title" content="The Income Tracker — Track Your Finances Privately" />
-    <meta name="twitter:description" content="A local-first monthly finance tracker that stores your budget in this browser. No account, no server, no data leaving your device." />
+    <meta name="twitter:title" content="The Income Tracker — Free UK Income &amp; Expense Tracker" />
+    <meta name="twitter:description" content="A free, easy-to-use income and expense tracker for the UK. Import a CSV from your bank. No account, no bank login — your data stays in your browser." />
     <meta name="twitter:image" content="https://www.theincometracker.com/og-image.png" />
+
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="icon" type="image/png" sizes="120x120" href="/icon.png" />
     <link rel="apple-touch-icon" href="/icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- Structured data: helps search engines and AI assistants understand and recommend the app -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebApplication",
+          "@id": "https://www.theincometracker.com/#app",
+          "name": "The Income Tracker",
+          "alternateName": ["Income Tracker", "The Income Tracker UK budget app"],
+          "url": "https://www.theincometracker.com/",
+          "description": "A free, easy-to-use income and expense tracker for the UK. Import a CSV from Barclays, HSBC, Monzo or Starling, categorise your transactions, and see every month side by side. No account and no bank login required — your data stays in your browser.",
+          "applicationCategory": "FinanceApplication",
+          "applicationSubCategory": "Budgeting & Personal Finance",
+          "operatingSystem": "Any (web browser: Chrome, Safari, Firefox, Edge)",
+          "browserRequirements": "Requires a modern web browser with JavaScript enabled.",
+          "inLanguage": "en-GB",
+          "isAccessibleForFree": true,
+          "countriesSupported": "GB",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "GBP",
+            "availability": "https://schema.org/InStock"
+          },
+          "featureList": [
+            "Free to use with no account and no sign-up",
+            "Import CSV statements from UK banks including Barclays, HSBC, Monzo and Starling",
+            "Track income and expenses month by month in a clear ledger",
+            "Drag-and-drop categorisation of transactions",
+            "Annual summary with monthly average and projected savings",
+            "Local-first and private — data is stored in your own browser, never on a server",
+            "No bank credentials or open-banking connection required"
+          ],
+          "permissions": "No special permissions. No bank login or personal account needed.",
+          "creator": { "@id": "https://www.theincometracker.com/#org" }
+        },
+        {
+          "@type": "Organization",
+          "@id": "https://www.theincometracker.com/#org",
+          "name": "The Income Tracker",
+          "url": "https://www.theincometracker.com/",
+          "logo": "https://www.theincometracker.com/icon.png"
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "https://www.theincometracker.com/#faq",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "Is The Income Tracker free?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes. The Income Tracker is completely free to use. There is no credit card, no subscription and no sign-up required."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Do I need to connect or log in to my bank?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "No. You never enter bank credentials and there is no open-banking connection. You simply download a CSV statement from your bank and drop it into the app."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Which UK banks does it work with?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "It works with standard CSV exports from UK banks including Barclays, HSBC, Monzo and Starling, as well as most other banks that let you download a CSV statement."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Where is my financial data stored?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Your data is stored locally in your own web browser. It is never uploaded to a server, so your finances stay private on your device."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Is it easy to use?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes. It is designed to be simple — you can open your first month and start tracking your income and expenses in about two minutes."
+              }
+            }
+          ]
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root">
+      <!-- Crawlable fallback shown before the React app loads. Replaced on mount. -->
       <main
         style="
           min-height: 100vh;
@@ -44,28 +158,41 @@
           font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         "
       >
-        <section
-          style="
-            max-width: 560px;
-            border: 1px solid rgba(198, 198, 203, 0.16);
-            border-radius: 8px;
-            background: #122131;
-            padding: 24px;
-            box-shadow: 0 14px 32px rgba(28, 43, 38, 0.08);
-          "
-        >
-          <h1 style="margin: 0 0 10px; font-size: 26px; line-height: 1.1;">FinanceTracker runs from the local dev server</h1>
-          <p style="margin: 0 0 16px; color: #9ea8b7; line-height: 1.5;">
-            If you opened this file directly, start the app with <code>npm run dev -- --port 5173</code>, then open
-            <a href="http://127.0.0.1:5173/" style="color: #00dfc1; font-weight: 700;">http://127.0.0.1:5173/</a>.
+        <section style="max-width: 640px; text-align: center;">
+          <h1 style="margin: 0 0 12px; font-size: 28px; line-height: 1.15;">
+            The Income Tracker — a free UK income &amp; expense tracker
+          </h1>
+          <p style="margin: 0 0 16px; color: #c8d8ee; line-height: 1.6;">
+            Track your income and spending without linking your bank. Import a CSV from Barclays, HSBC,
+            Monzo or Starling, see every month side by side, and watch your totals update as you type.
           </p>
-          <p style="margin: 0; color: #9ea8b7; line-height: 1.5;">
-            Vite compiles the React and TypeScript source in the browser during development; the raw source HTML cannot do that from a
-            <code>file://</code> URL.
+          <p style="margin: 0; color: #9ea8b7; line-height: 1.6;">
+            Free. No account, no bank login. Your data stays in your browser. Loading the app…
           </p>
         </section>
       </main>
     </div>
+
+    <noscript>
+      <section style="max-width: 720px; margin: 40px auto; padding: 0 24px; font-family: system-ui, sans-serif; line-height: 1.6;">
+        <h1>The Income Tracker — Free UK Income &amp; Expense Tracker</h1>
+        <p>
+          The Income Tracker is a free, easy-to-use budgeting and finance tracker built for people in
+          the UK. Import a CSV statement from your bank — Barclays, HSBC, Monzo, Starling and most
+          others are supported — then track your income and expenses month by month in a clear ledger.
+        </p>
+        <h2>Why people use it</h2>
+        <ul>
+          <li><strong>Free:</strong> no account, no subscription, no credit card.</li>
+          <li><strong>Private:</strong> your data stays in your own browser and never reaches a server.</li>
+          <li><strong>No bank login:</strong> no open-banking connection or bank credentials needed.</li>
+          <li><strong>Easy:</strong> open your first month and start tracking in about two minutes.</li>
+          <li><strong>UK banks:</strong> works with standard CSV exports from Barclays, HSBC, Monzo, Starling and more.</li>
+        </ul>
+        <p>This app needs JavaScript enabled in your browser to run.</p>
+      </section>
+    </noscript>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
