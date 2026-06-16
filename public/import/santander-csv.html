@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>How to export your Santander UK statement to CSV (free, 2026) · The Income Tracker</title>
+    <meta name="description" content="Step-by-step: download your Santander UK transactions as a CSV file and track your income and spending free — no account and no bank login required." />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+    <meta name="author" content="The Income Tracker" />
+    <link rel="canonical" href="https://www.theincometracker.com/import/santander-csv.html" />
+    <meta name="geo.region" content="GB" />
+    <meta http-equiv="content-language" content="en-GB" />
+    <meta property="og:type" content="article" />
+    <meta property="og:locale" content="en_GB" />
+    <meta property="og:site_name" content="The Income Tracker" />
+    <meta property="og:url" content="https://www.theincometracker.com/import/santander-csv.html" />
+    <meta property="og:title" content="How to export your Santander UK statement to CSV (free, 2026) · The Income Tracker" />
+    <meta property="og:description" content="Step-by-step: download your Santander UK transactions as a CSV file and track your income and spending free — no account and no bank login required." />
+    <meta property="og:image" content="https://www.theincometracker.com/og-image.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="How to export your Santander UK statement to CSV (free, 2026) · The Income Tracker" />
+    <meta name="twitter:description" content="Step-by-step: download your Santander UK transactions as a CSV file and track your income and spending free — no account and no bank login required." />
+    <meta name="twitter:image" content="https://www.theincometracker.com/og-image.png" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/icon.png" />
+    <style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0 24px 96px; background: #051424; color: #d4e4fa;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 16px; line-height: 1.7;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  a { color: #00dfc1; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  header.top { padding: 28px 0 8px; }
+  nav.crumbs { font-size: 0.85rem; color: #9ea8b7; }
+  nav.crumbs a { color: #9ea8b7; }
+  nav.crumbs a:hover { color: #00dfc1; }
+  h1 { font-size: clamp(1.7rem, 4vw, 2.3rem); font-weight: 800; line-height: 1.15; margin: 18px 0 10px; color: #fff; letter-spacing: -0.02em; }
+  .meta { color: #9ea8b7; font-size: 0.85rem; margin-bottom: 28px; }
+  .lede { font-size: 1.12rem; color: #eaf2ff; line-height: 1.65; margin: 0 0 24px; }
+  .tldr { background: rgba(0,223,193,0.07); border: 1px solid rgba(0,223,193,0.22); border-radius: 12px; padding: 16px 20px; margin: 0 0 32px; }
+  .tldr strong { color: #00dfc1; letter-spacing: 0.02em; font-size: 0.8rem; text-transform: uppercase; display: block; margin-bottom: 6px; }
+  .tldr p { margin: 0; color: #d4e4fa; }
+  h2 { font-size: 1.3rem; font-weight: 700; color: #fff; margin: 40px 0 12px; letter-spacing: -0.01em; }
+  h3 { font-size: 1.05rem; font-weight: 650; color: #fff; margin: 28px 0 8px; }
+  p, li { color: #c8d8ee; }
+  ul, ol { padding-left: 22px; }
+  li + li { margin-top: 8px; }
+  ol.steps { counter-reset: step; list-style: none; padding-left: 0; }
+  ol.steps > li { position: relative; padding: 0 0 4px 44px; margin-top: 18px; }
+  ol.steps > li::before {
+    counter-increment: step; content: counter(step);
+    position: absolute; left: 0; top: 0; width: 30px; height: 30px;
+    background: rgba(0,223,193,0.12); border: 1px solid rgba(0,223,193,0.4);
+    color: #00dfc1; border-radius: 50%; display: grid; place-items: center;
+    font-weight: 700; font-size: 0.9rem;
+  }
+  .note { background: rgba(212,228,250,0.05); border-left: 3px solid rgba(212,228,250,0.25); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 20px 0; font-size: 0.95rem; color: #b8c8e0; }
+  .cta { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin: 34px 0; padding: 24px; background: rgba(8,22,38,0.85); border: 1px solid rgba(0,223,193,0.18); border-radius: 14px; }
+  .cta .cta-text { flex: 1; min-width: 220px; }
+  .cta .cta-text strong { color: #fff; display: block; font-size: 1.05rem; margin-bottom: 2px; }
+  .cta .cta-text span { color: #9ea8b7; font-size: 0.9rem; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; background: #00dfc1; color: #051424; font-weight: 700; padding: 13px 22px; border-radius: 10px; white-space: nowrap; }
+  .btn:hover { text-decoration: none; filter: brightness(1.06); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; margin: 24px 0; }
+  .card { display: block; padding: 16px 18px; background: rgba(8,22,38,0.7); border: 1px solid rgba(212,228,250,0.1); border-radius: 12px; transition: border-color 140ms ease, transform 140ms ease; }
+  .card:hover { text-decoration: none; border-color: rgba(0,223,193,0.4); transform: translateY(-2px); }
+  .card .card-t { color: #fff; font-weight: 650; display: block; margin-bottom: 4px; }
+  .card .card-d { color: #9ea8b7; font-size: 0.88rem; }
+  .faq dt { font-weight: 650; color: #fff; margin-top: 22px; }
+  .faq dd { margin: 6px 0 0; color: #c8d8ee; }
+  .related { margin-top: 8px; }
+  hr { border: none; border-top: 1px solid rgba(212,228,250,0.1); margin: 48px 0 24px; }
+  footer { color: #9ea8b7; font-size: 0.85rem; }
+  footer a { color: #9ea8b7; }
+  footer a:hover { color: #00dfc1; }
+</style>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "Home",
+      "item": "https://www.theincometracker.com/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "Bank CSV guides",
+      "item": "https://www.theincometracker.com/import/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 3,
+      "name": "Santander UK",
+      "item": "https://www.theincometracker.com/import/santander-csv.html"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "HowTo",
+  "name": "How to export your Santander UK statement to CSV",
+  "description": "Step-by-step: download your Santander UK transactions as a CSV file and track your income and spending free — no account and no bank login required.",
+  "totalTime": "PT3M",
+  "step": [
+    {
+      "@type": "HowToStep",
+      "position": 1,
+      "text": "Log in to Santander Online Banking on a computer."
+    },
+    {
+      "@type": "HowToStep",
+      "position": 2,
+      "text": "From My accounts and transactions, choose the account."
+    },
+    {
+      "@type": "HowToStep",
+      "position": 3,
+      "text": "Click Download transactions above the transactions table."
+    },
+    {
+      "@type": "HowToStep",
+      "position": 4,
+      "text": "In the Download to drop-down, choose midata (CSV)."
+    },
+    {
+      "@type": "HowToStep",
+      "position": 5,
+      "text": "Click Download, save the file, and import it into The Income Tracker."
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Can I export Santander UK transactions to CSV for free?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. Santander UK lets you download your own transactions as a CSV file at no cost from Online Banking (desktop). You then import that file into a budgeting tool such as The Income Tracker."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Do I need to connect or log in to my bank to use The Income Tracker?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. There is no open-banking connection and you never enter bank credentials into The Income Tracker. You download the CSV from Santander UK yourself and drop it into the app, which runs entirely in your browser."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is my Santander UK data kept private?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. The Income Tracker is local-first: your imported transactions are stored in your own browser and are never uploaded to a server unless you choose to sign in to sync across devices."
+      }
+    }
+  ]
+}
+</script>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="top"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> &rsaquo; <a href="/import/">Bank CSV guides</a> &rsaquo; <a href="/import/santander-csv.html">Santander UK</a></nav></header>
+      <h1>How to export your Santander UK statement to CSV</h1>
+      <p class="meta">By The Income Tracker · Updated 16 June 2026</p>
+      <div class="tldr"><strong>In short</strong><p>Log in to Online Banking (desktop), open the account, choose a date range and export the transactions as a <strong>CSV</strong> file. Then import that file into The Income Tracker to track your income and spending — free, with no bank login.</p></div>
+      <p class="lede">A CSV is just a spreadsheet of your transactions. Once you have it, The Income Tracker reads the dates, descriptions and amounts automatically, so you can fill a whole month in seconds without typing anything in by hand.</p>
+
+      <h2>Export Santander UK transactions as CSV, step by step</h2>
+      <ol class="steps">
+        <li>Log in to Santander Online Banking on a computer.</li>
+        <li>From <em>My accounts and transactions</em>, choose the account.</li>
+        <li>Click <em>Download transactions</em> above the transactions table.</li>
+        <li>In the <em>Download to</em> drop-down, choose <em>midata (CSV)</em>.</li>
+        <li>Click <em>Download</em>, save the file, and import it into The Income Tracker.</li>
+      </ol>
+      <p class="note">Santander's midata export covers up to 12 months and masks some sensitive details for security — that's normal and still imports fine.</p>
+
+      <div class="cta">
+  <div class="cta-text"><strong>The Income Tracker</strong><span>Import your Santander UK CSV — free, no account, no bank login</span></div>
+  <a class="btn" href="/">Open the tracker &rarr;</a>
+</div>
+
+      <h2>What happens after you import the CSV</h2>
+      <p>Drop the file into The Income Tracker and you'll see every transaction laid out in a month-by-month ledger. Drag transactions into categories, mark recurring items, and watch your surplus update live. Money moved between your own accounts can be auto-skipped so transfers don't double-count.</p>
+
+      <h2>Frequently asked questions</h2>
+<dl class="faq">
+<dt>Can I export Santander UK transactions to CSV for free?</dt>
+<dd>Yes. Santander UK lets you download your own transactions as a CSV file at no cost from Online Banking (desktop). You then import that file into a budgeting tool such as The Income Tracker.</dd>
+<dt>Do I need to connect or log in to my bank to use The Income Tracker?</dt>
+<dd>No. There is no open-banking connection and you never enter bank credentials into The Income Tracker. You download the CSV from Santander UK yourself and drop it into the app, which runs entirely in your browser.</dd>
+<dt>Is my Santander UK data kept private?</dt>
+<dd>Yes. The Income Tracker is local-first: your imported transactions are stored in your own browser and are never uploaded to a server unless you choose to sign in to sync across devices.</dd>
+</dl>
+
+      <h2>Other banks</h2>
+      <div class="grid">
+        <a class="card" href="/import/barclays-csv.html"><span class="card-t">Barclays &rarr; CSV</span><span class="card-d">Export Barclays transactions</span></a>
+        <a class="card" href="/import/hsbc-csv.html"><span class="card-t">HSBC UK &rarr; CSV</span><span class="card-d">Export HSBC UK transactions</span></a>
+        <a class="card" href="/import/monzo-csv.html"><span class="card-t">Monzo &rarr; CSV</span><span class="card-d">Export Monzo transactions</span></a>
+        <a class="card" href="/import/starling-csv.html"><span class="card-t">Starling Bank &rarr; CSV</span><span class="card-d">Export Starling Bank transactions</span></a>
+        <a class="card" href="/import/lloyds-csv.html"><span class="card-t">Lloyds Bank &rarr; CSV</span><span class="card-d">Export Lloyds Bank transactions</span></a>
+        <a class="card" href="/import/natwest-csv.html"><span class="card-t">NatWest &rarr; CSV</span><span class="card-d">Export NatWest transactions</span></a>
+        <a class="card" href="/import/revolut-csv.html"><span class="card-t">Revolut &rarr; CSV</span><span class="card-d">Export Revolut transactions</span></a>
+      </div>
+      <hr />
+      <footer>
+        &copy; 2026 The Income Tracker &nbsp;·&nbsp;
+        <a href="/">Home</a> &nbsp;·&nbsp;
+        <a href="/import/">Bank CSV guides</a> &nbsp;·&nbsp;
+        <a href="/guides/">Guides</a> &nbsp;·&nbsp;
+        <a href="/privacy.html">Privacy</a> &nbsp;·&nbsp;
+        <a href="/tos.html">Terms</a>
+      </footer>
+    </div>
+  </body>
+</html>
