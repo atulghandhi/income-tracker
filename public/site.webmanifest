@@ -1,0 +1,27 @@
+{
+  "name": "The Income Tracker — Free UK Income & Expense Tracker",
+  "short_name": "Income Tracker",
+  "description": "A free, easy-to-use income and expense tracker for the UK. Import a CSV from your bank, track your budget month by month. No account, no bank login — your data stays in your browser.",
+  "lang": "en-GB",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#051424",
+  "theme_color": "#051424",
+  "categories": ["finance", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.png",
+      "sizes": "120x120",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
