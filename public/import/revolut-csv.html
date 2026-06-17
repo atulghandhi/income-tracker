@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>How to export your Revolut statement to CSV (free, 2026) · The Income Tracker</title>
-    <meta name="description" content="Step-by-step: download your Revolut transactions as a CSV file and track your income and spending free — no account and no bank login required." />
+    <meta name="description" content="Step-by-step: download your Revolut transactions as a CSV file and track your income and spending free. No account and no bank login required." />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
     <meta name="author" content="The Income Tracker" />
     <link rel="canonical" href="https://www.theincometracker.com/import/revolut-csv.html" />
@@ -15,11 +15,11 @@
     <meta property="og:site_name" content="The Income Tracker" />
     <meta property="og:url" content="https://www.theincometracker.com/import/revolut-csv.html" />
     <meta property="og:title" content="How to export your Revolut statement to CSV (free, 2026) · The Income Tracker" />
-    <meta property="og:description" content="Step-by-step: download your Revolut transactions as a CSV file and track your income and spending free — no account and no bank login required." />
+    <meta property="og:description" content="Step-by-step: download your Revolut transactions as a CSV file and track your income and spending free. No account and no bank login required." />
     <meta property="og:image" content="https://www.theincometracker.com/og-image.png" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="How to export your Revolut statement to CSV (free, 2026) · The Income Tracker" />
-    <meta name="twitter:description" content="Step-by-step: download your Revolut transactions as a CSV file and track your income and spending free — no account and no bank login required." />
+    <meta name="twitter:description" content="Step-by-step: download your Revolut transactions as a CSV file and track your income and spending free. No account and no bank login required." />
     <meta name="twitter:image" content="https://www.theincometracker.com/og-image.png" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="apple-touch-icon" href="/icon.png" />
@@ -38,9 +38,9 @@
   nav.crumbs a { color: #9ea8b7; }
   nav.crumbs a:hover { color: #00dfc1; }
   h1 { font-size: clamp(1.7rem, 4vw, 2.3rem); font-weight: 800; line-height: 1.15; margin: 18px 0 10px; color: #fff; letter-spacing: -0.02em; }
-  .meta { color: #9ea8b7; font-size: 0.85rem; margin-bottom: 28px; }
+  .meta { color: #9ea8b7; font-size: 0.85rem; margin-bottom: 24px; }
   .lede { font-size: 1.12rem; color: #eaf2ff; line-height: 1.65; margin: 0 0 24px; }
-  .tldr { background: rgba(0,223,193,0.07); border: 1px solid rgba(0,223,193,0.22); border-radius: 12px; padding: 16px 20px; margin: 0 0 32px; }
+  .tldr { background: rgba(0,223,193,0.07); border: 1px solid rgba(0,223,193,0.22); border-radius: 12px; padding: 16px 20px; margin: 0 0 28px; }
   .tldr strong { color: #00dfc1; letter-spacing: 0.02em; font-size: 0.8rem; text-transform: uppercase; display: block; margin-bottom: 6px; }
   .tldr p { margin: 0; color: #d4e4fa; }
   h2 { font-size: 1.3rem; font-weight: 700; color: #fff; margin: 40px 0 12px; letter-spacing: -0.01em; }
@@ -71,7 +71,24 @@
   .card .card-d { color: #9ea8b7; font-size: 0.88rem; }
   .faq dt { font-weight: 650; color: #fff; margin-top: 22px; }
   .faq dd { margin: 6px 0 0; color: #c8d8ee; }
-  .related { margin-top: 8px; }
+  /* Calculator widget */
+  .calc { background: rgba(8,22,38,0.9); border: 1px solid rgba(0,223,193,0.2); border-radius: 16px; padding: 22px; margin: 0 0 14px; }
+  .calc-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
+  .calc-field { display: flex; flex-direction: column; gap: 6px; }
+  .calc-label { font-size: 0.82rem; color: #9ea8b7; font-weight: 600; }
+  .calc-inwrap { display: flex; align-items: center; background: #06182b; border: 1px solid rgba(212,228,250,0.16); border-radius: 10px; padding: 0 12px; }
+  .calc-inwrap:focus-within { border-color: rgba(0,223,193,0.5); }
+  .calc-inwrap i { color: #9ea8b7; font-style: normal; font-size: 0.95rem; }
+  .calc-inwrap input { flex: 1; min-width: 0; background: none; border: none; color: #fff; font-size: 1.05rem; font-weight: 600; padding: 11px 6px; outline: none; font-family: inherit; }
+  .calc-inwrap input::-webkit-outer-spin-button, .calc-inwrap input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .calc-out { margin-top: 18px; padding-top: 18px; border-top: 1px solid rgba(212,228,250,0.1); }
+  .calc-out p { margin: 8px 0 0; }
+  .calc-headline { font-size: 2rem; font-weight: 800; color: #00dfc1; line-height: 1.1; letter-spacing: -0.02em; }
+  .calc-headline small { font-size: 0.9rem; font-weight: 600; color: #9ea8b7; letter-spacing: 0; }
+  .calc-hint { color: #9ea8b7; }
+  .calc-good { color: #00dfc1; }
+  .calc-warn { color: #ffd479; }
+  .calc-bad { color: #ff8b8b; }
   hr { border: none; border-top: 1px solid rgba(212,228,250,0.1); margin: 48px 0 24px; }
   footer { color: #9ea8b7; font-size: 0.85rem; }
   footer a { color: #9ea8b7; }
@@ -108,7 +125,7 @@
   "@context": "https://schema.org",
   "@type": "HowTo",
   "name": "How to export your Revolut statement to CSV",
-  "description": "Step-by-step: download your Revolut transactions as a CSV file and track your income and spending free — no account and no bank login required.",
+  "description": "Step-by-step: download your Revolut transactions as a CSV file and track your income and spending free. No account and no bank login required.",
   "totalTime": "PT3M",
   "step": [
     {
@@ -124,7 +141,7 @@
     {
       "@type": "HowToStep",
       "position": 3,
-      "text": "Choose your account/currency and date range."
+      "text": "Choose your account or currency and date range."
     },
     {
       "@type": "HowToStep",
@@ -149,7 +166,7 @@
       "name": "Can I export Revolut transactions to CSV for free?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Yes. Revolut lets you download your own transactions as a CSV file at no cost from The Revolut app or web app. You then import that file into a budgeting tool such as The Income Tracker."
+        "text": "Yes. Revolut lets you download your own transactions as a CSV file at no cost from the Revolut app or web app. You then import that file into a budgeting tool such as The Income Tracker."
       }
     },
     {
@@ -165,7 +182,7 @@
       "name": "Is my Revolut data kept private?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Yes. The Income Tracker is local-first: your imported transactions are stored in your own browser and are never uploaded to a server unless you choose to sign in to sync across devices."
+        "text": "Yes. The Income Tracker is local-first. Your imported transactions stay in your own browser and are never uploaded to a server, unless you choose to sign in to sync across devices."
       }
     }
   ]
@@ -177,35 +194,34 @@
       <header class="top"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> &rsaquo; <a href="/import/">Bank CSV guides</a> &rsaquo; <a href="/import/revolut-csv.html">Revolut</a></nav></header>
       <h1>How to export your Revolut statement to CSV</h1>
       <p class="meta">By The Income Tracker · Updated 16 June 2026</p>
-      <div class="tldr"><strong>In short</strong><p>Log in to The Revolut app or web app, open the account, choose a date range and export the transactions as a <strong>CSV</strong> file. Then import that file into The Income Tracker to track your income and spending — free, with no bank login.</p></div>
-      <p class="lede">A CSV is just a spreadsheet of your transactions. Once you have it, The Income Tracker reads the dates, descriptions and amounts automatically, so you can fill a whole month in seconds without typing anything in by hand.</p>
+      <div class="tldr"><strong>In short</strong><p>Log in to the Revolut app or web app, open the account, pick a date range and export as <strong>CSV</strong>. Then import that file into The Income Tracker and track your money for free, with no bank login.</p></div>
 
-      <h2>Export Revolut transactions as CSV, step by step</h2>
+      <h2>Export Revolut transactions as CSV</h2>
       <ol class="steps">
         <li>Open Revolut and go to <em>Accounts</em>.</li>
         <li>Tap <em>Statements</em> (under the account or in <em>Documents</em>).</li>
-        <li>Choose your account/currency and date range.</li>
+        <li>Choose your account or currency and date range.</li>
         <li>Select <em>Excel/CSV</em> as the format and generate it.</li>
         <li>Save the file and import it into The Income Tracker.</li>
       </ol>
-      <p class="note">Revolut's CSV can include multi-currency columns. If a file looks messy, export a single currency per file for the cleanest import.</p>
+      <p class="note">Revolut's CSV can include multi-currency columns. If a file looks messy, export one currency per file for the cleanest import.</p>
 
       <div class="cta">
-  <div class="cta-text"><strong>The Income Tracker</strong><span>Import your Revolut CSV — free, no account, no bank login</span></div>
+  <div class="cta-text"><strong>The Income Tracker</strong><span>Import your Revolut CSV. Free, no account, no bank login.</span></div>
   <a class="btn" href="/">Open the tracker &rarr;</a>
 </div>
 
-      <h2>What happens after you import the CSV</h2>
-      <p>Drop the file into The Income Tracker and you'll see every transaction laid out in a month-by-month ledger. Drag transactions into categories, mark recurring items, and watch your surplus update live. Money moved between your own accounts can be auto-skipped so transfers don't double-count.</p>
+      <h2>What happens after you import</h2>
+      <p>Drop the file in and every transaction lands in a month-by-month ledger. Drag items into categories, flag the recurring ones, and watch your surplus update as you go. Money moved between your own accounts gets auto-skipped, so transfers never double-count.</p>
 
       <h2>Frequently asked questions</h2>
 <dl class="faq">
 <dt>Can I export Revolut transactions to CSV for free?</dt>
-<dd>Yes. Revolut lets you download your own transactions as a CSV file at no cost from The Revolut app or web app. You then import that file into a budgeting tool such as The Income Tracker.</dd>
+<dd>Yes. Revolut lets you download your own transactions as a CSV file at no cost from the Revolut app or web app. You then import that file into a budgeting tool such as The Income Tracker.</dd>
 <dt>Do I need to connect or log in to my bank to use The Income Tracker?</dt>
 <dd>No. There is no open-banking connection and you never enter bank credentials into The Income Tracker. You download the CSV from Revolut yourself and drop it into the app, which runs entirely in your browser.</dd>
 <dt>Is my Revolut data kept private?</dt>
-<dd>Yes. The Income Tracker is local-first: your imported transactions are stored in your own browser and are never uploaded to a server unless you choose to sign in to sync across devices.</dd>
+<dd>Yes. The Income Tracker is local-first. Your imported transactions stay in your own browser and are never uploaded to a server, unless you choose to sign in to sync across devices.</dd>
 </dl>
 
       <h2>Other banks</h2>
@@ -222,6 +238,7 @@
       <footer>
         &copy; 2026 The Income Tracker &nbsp;·&nbsp;
         <a href="/">Home</a> &nbsp;·&nbsp;
+        <a href="/tools/">Calculators</a> &nbsp;·&nbsp;
         <a href="/import/">Bank CSV guides</a> &nbsp;·&nbsp;
         <a href="/guides/">Guides</a> &nbsp;·&nbsp;
         <a href="/privacy.html">Privacy</a> &nbsp;·&nbsp;
@@ -229,5 +246,6 @@
         <a href="/tos.html">Terms</a>
       </footer>
     </div>
+
   </body>
 </html>

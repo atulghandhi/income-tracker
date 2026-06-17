@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Budgeting guides — private, free, no bank login · The Income Tracker</title>
-    <meta name="description" content="Practical guides to budgeting without open banking: how to track spending from a bank CSV, free YNAB alternatives, and whether it's safe to upload a bank statement." />
+    <title>Budgeting guides: private, free, no bank login · The Income Tracker</title>
+    <meta name="description" content="Practical guides to budgeting without open banking: how to track spending from a bank CSV, free YNAB alternatives, and whether it is safe to upload a bank statement." />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
     <meta name="author" content="The Income Tracker" />
     <link rel="canonical" href="https://www.theincometracker.com/guides/" />
@@ -14,12 +14,12 @@
     <meta property="og:locale" content="en_GB" />
     <meta property="og:site_name" content="The Income Tracker" />
     <meta property="og:url" content="https://www.theincometracker.com/guides/" />
-    <meta property="og:title" content="Budgeting guides — private, free, no bank login · The Income Tracker" />
-    <meta property="og:description" content="Practical guides to budgeting without open banking: how to track spending from a bank CSV, free YNAB alternatives, and whether it's safe to upload a bank statement." />
+    <meta property="og:title" content="Budgeting guides: private, free, no bank login · The Income Tracker" />
+    <meta property="og:description" content="Practical guides to budgeting without open banking: how to track spending from a bank CSV, free YNAB alternatives, and whether it is safe to upload a bank statement." />
     <meta property="og:image" content="https://www.theincometracker.com/og-image.png" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Budgeting guides — private, free, no bank login · The Income Tracker" />
-    <meta name="twitter:description" content="Practical guides to budgeting without open banking: how to track spending from a bank CSV, free YNAB alternatives, and whether it's safe to upload a bank statement." />
+    <meta name="twitter:title" content="Budgeting guides: private, free, no bank login · The Income Tracker" />
+    <meta name="twitter:description" content="Practical guides to budgeting without open banking: how to track spending from a bank CSV, free YNAB alternatives, and whether it is safe to upload a bank statement." />
     <meta name="twitter:image" content="https://www.theincometracker.com/og-image.png" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="apple-touch-icon" href="/icon.png" />
@@ -38,9 +38,9 @@
   nav.crumbs a { color: #9ea8b7; }
   nav.crumbs a:hover { color: #00dfc1; }
   h1 { font-size: clamp(1.7rem, 4vw, 2.3rem); font-weight: 800; line-height: 1.15; margin: 18px 0 10px; color: #fff; letter-spacing: -0.02em; }
-  .meta { color: #9ea8b7; font-size: 0.85rem; margin-bottom: 28px; }
+  .meta { color: #9ea8b7; font-size: 0.85rem; margin-bottom: 24px; }
   .lede { font-size: 1.12rem; color: #eaf2ff; line-height: 1.65; margin: 0 0 24px; }
-  .tldr { background: rgba(0,223,193,0.07); border: 1px solid rgba(0,223,193,0.22); border-radius: 12px; padding: 16px 20px; margin: 0 0 32px; }
+  .tldr { background: rgba(0,223,193,0.07); border: 1px solid rgba(0,223,193,0.22); border-radius: 12px; padding: 16px 20px; margin: 0 0 28px; }
   .tldr strong { color: #00dfc1; letter-spacing: 0.02em; font-size: 0.8rem; text-transform: uppercase; display: block; margin-bottom: 6px; }
   .tldr p { margin: 0; color: #d4e4fa; }
   h2 { font-size: 1.3rem; font-weight: 700; color: #fff; margin: 40px 0 12px; letter-spacing: -0.01em; }
@@ -71,7 +71,24 @@
   .card .card-d { color: #9ea8b7; font-size: 0.88rem; }
   .faq dt { font-weight: 650; color: #fff; margin-top: 22px; }
   .faq dd { margin: 6px 0 0; color: #c8d8ee; }
-  .related { margin-top: 8px; }
+  /* Calculator widget */
+  .calc { background: rgba(8,22,38,0.9); border: 1px solid rgba(0,223,193,0.2); border-radius: 16px; padding: 22px; margin: 0 0 14px; }
+  .calc-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
+  .calc-field { display: flex; flex-direction: column; gap: 6px; }
+  .calc-label { font-size: 0.82rem; color: #9ea8b7; font-weight: 600; }
+  .calc-inwrap { display: flex; align-items: center; background: #06182b; border: 1px solid rgba(212,228,250,0.16); border-radius: 10px; padding: 0 12px; }
+  .calc-inwrap:focus-within { border-color: rgba(0,223,193,0.5); }
+  .calc-inwrap i { color: #9ea8b7; font-style: normal; font-size: 0.95rem; }
+  .calc-inwrap input { flex: 1; min-width: 0; background: none; border: none; color: #fff; font-size: 1.05rem; font-weight: 600; padding: 11px 6px; outline: none; font-family: inherit; }
+  .calc-inwrap input::-webkit-outer-spin-button, .calc-inwrap input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .calc-out { margin-top: 18px; padding-top: 18px; border-top: 1px solid rgba(212,228,250,0.1); }
+  .calc-out p { margin: 8px 0 0; }
+  .calc-headline { font-size: 2rem; font-weight: 800; color: #00dfc1; line-height: 1.1; letter-spacing: -0.02em; }
+  .calc-headline small { font-size: 0.9rem; font-weight: 600; color: #9ea8b7; letter-spacing: 0; }
+  .calc-hint { color: #9ea8b7; }
+  .calc-good { color: #00dfc1; }
+  .calc-warn { color: #ffd479; }
+  .calc-bad { color: #ff8b8b; }
   hr { border: none; border-top: 1px solid rgba(212,228,250,0.1); margin: 48px 0 24px; }
   footer { color: #9ea8b7; font-size: 0.85rem; }
   footer a { color: #9ea8b7; }
@@ -103,21 +120,23 @@
       <header class="top"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> &rsaquo; <a href="/guides/">Guides</a></nav></header>
       <h1>Budgeting guides</h1>
       <p class="meta">By The Income Tracker · Updated 16 June 2026</p>
-      <p class="lede">Straightforward guides for tracking your money privately — no open banking, no subscription, no jargon.</p>
+      <p class="lede">Straightforward guides for tracking your money privately. No open banking, no subscription, no jargon.</p>
       <div class="grid">
-        <a class="card" href="/guides/budget-without-linking-bank.html"><span class="card-t">How to budget without linking your bank account</span><span class="card-d">You don't need open banking to budget. Here's how to track your income and spending privately in 2026 using a bank CSV — no account connection, no credentials shared.</span></a>
-        <a class="card" href="/guides/free-ynab-alternative-uk.html"><span class="card-t">A free YNAB alternative for the UK</span><span class="card-d">Looking for a free YNAB alternative in the UK? The Income Tracker is a free, no-subscription budgeting tool that imports your bank CSV — no account and no bank login needed.</span></a>
-        <a class="card" href="/guides/is-it-safe-to-upload-bank-statements.html"><span class="card-t">Is it safe to upload your bank statement to a budgeting app?</span><span class="card-d">Is it safe to upload a bank statement or CSV to a budgeting app? It depends entirely on where the data goes. Here's what to check — and how a local-first tool keeps it private.</span></a>
+        <a class="card" href="/guides/budget-without-linking-bank.html"><span class="card-t">How to budget without linking your bank account</span><span class="card-d">You do not need open banking to budget. Here is how to track your income and spending privately in 2026 using a bank CSV. No account connection, no credentials shared.</span></a>
+        <a class="card" href="/guides/free-ynab-alternative-uk.html"><span class="card-t">A free YNAB alternative for the UK</span><span class="card-d">Looking for a free YNAB alternative in the UK? The Income Tracker is free, needs no sign-up, and imports your bank CSV. No account and no bank login needed.</span></a>
+        <a class="card" href="/guides/is-it-safe-to-upload-bank-statements.html"><span class="card-t">Is it safe to upload your bank statement to a budgeting app?</span><span class="card-d">Is it safe to upload a bank statement or CSV to a budgeting app? It depends on where the data goes. Here is what to check, and how a local-first tool keeps it private.</span></a>
+        <a class="card" href="/tools/"><span class="card-t">Free money calculators</span><span class="card-d">Payoff, utilisation, savings and more</span></a>
         <a class="card" href="/import/"><span class="card-t">Bank CSV import guides</span><span class="card-d">Export from any UK bank, step by step</span></a>
       </div>
       <div class="cta">
-  <div class="cta-text"><strong>The Income Tracker</strong><span>Track it free — no account, no bank login</span></div>
+  <div class="cta-text"><strong>The Income Tracker</strong><span>Track it free. No account, no bank login.</span></div>
   <a class="btn" href="/">Open the tracker &rarr;</a>
 </div>
       <hr />
       <footer>
         &copy; 2026 The Income Tracker &nbsp;·&nbsp;
         <a href="/">Home</a> &nbsp;·&nbsp;
+        <a href="/tools/">Calculators</a> &nbsp;·&nbsp;
         <a href="/import/">Bank CSV guides</a> &nbsp;·&nbsp;
         <a href="/guides/">Guides</a> &nbsp;·&nbsp;
         <a href="/privacy.html">Privacy</a> &nbsp;·&nbsp;
@@ -125,5 +144,6 @@
         <a href="/tos.html">Terms</a>
       </footer>
     </div>
+
   </body>
 </html>

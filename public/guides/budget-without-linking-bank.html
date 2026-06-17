@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>How to budget without linking your bank account (2026) · The Income Tracker</title>
-    <meta name="description" content="You don't need open banking to budget. Here's how to track your income and spending privately in 2026 using a bank CSV — no account connection, no credentials shared." />
+    <meta name="description" content="You do not need open banking to budget. Here is how to track your income and spending privately in 2026 using a bank CSV. No account connection, no credentials shared." />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
     <meta name="author" content="The Income Tracker" />
     <link rel="canonical" href="https://www.theincometracker.com/guides/budget-without-linking-bank.html" />
@@ -15,11 +15,11 @@
     <meta property="og:site_name" content="The Income Tracker" />
     <meta property="og:url" content="https://www.theincometracker.com/guides/budget-without-linking-bank.html" />
     <meta property="og:title" content="How to budget without linking your bank account (2026) · The Income Tracker" />
-    <meta property="og:description" content="You don't need open banking to budget. Here's how to track your income and spending privately in 2026 using a bank CSV — no account connection, no credentials shared." />
+    <meta property="og:description" content="You do not need open banking to budget. Here is how to track your income and spending privately in 2026 using a bank CSV. No account connection, no credentials shared." />
     <meta property="og:image" content="https://www.theincometracker.com/og-image.png" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="How to budget without linking your bank account (2026) · The Income Tracker" />
-    <meta name="twitter:description" content="You don't need open banking to budget. Here's how to track your income and spending privately in 2026 using a bank CSV — no account connection, no credentials shared." />
+    <meta name="twitter:description" content="You do not need open banking to budget. Here is how to track your income and spending privately in 2026 using a bank CSV. No account connection, no credentials shared." />
     <meta name="twitter:image" content="https://www.theincometracker.com/og-image.png" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="apple-touch-icon" href="/icon.png" />
@@ -38,9 +38,9 @@
   nav.crumbs a { color: #9ea8b7; }
   nav.crumbs a:hover { color: #00dfc1; }
   h1 { font-size: clamp(1.7rem, 4vw, 2.3rem); font-weight: 800; line-height: 1.15; margin: 18px 0 10px; color: #fff; letter-spacing: -0.02em; }
-  .meta { color: #9ea8b7; font-size: 0.85rem; margin-bottom: 28px; }
+  .meta { color: #9ea8b7; font-size: 0.85rem; margin-bottom: 24px; }
   .lede { font-size: 1.12rem; color: #eaf2ff; line-height: 1.65; margin: 0 0 24px; }
-  .tldr { background: rgba(0,223,193,0.07); border: 1px solid rgba(0,223,193,0.22); border-radius: 12px; padding: 16px 20px; margin: 0 0 32px; }
+  .tldr { background: rgba(0,223,193,0.07); border: 1px solid rgba(0,223,193,0.22); border-radius: 12px; padding: 16px 20px; margin: 0 0 28px; }
   .tldr strong { color: #00dfc1; letter-spacing: 0.02em; font-size: 0.8rem; text-transform: uppercase; display: block; margin-bottom: 6px; }
   .tldr p { margin: 0; color: #d4e4fa; }
   h2 { font-size: 1.3rem; font-weight: 700; color: #fff; margin: 40px 0 12px; letter-spacing: -0.01em; }
@@ -71,7 +71,24 @@
   .card .card-d { color: #9ea8b7; font-size: 0.88rem; }
   .faq dt { font-weight: 650; color: #fff; margin-top: 22px; }
   .faq dd { margin: 6px 0 0; color: #c8d8ee; }
-  .related { margin-top: 8px; }
+  /* Calculator widget */
+  .calc { background: rgba(8,22,38,0.9); border: 1px solid rgba(0,223,193,0.2); border-radius: 16px; padding: 22px; margin: 0 0 14px; }
+  .calc-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
+  .calc-field { display: flex; flex-direction: column; gap: 6px; }
+  .calc-label { font-size: 0.82rem; color: #9ea8b7; font-weight: 600; }
+  .calc-inwrap { display: flex; align-items: center; background: #06182b; border: 1px solid rgba(212,228,250,0.16); border-radius: 10px; padding: 0 12px; }
+  .calc-inwrap:focus-within { border-color: rgba(0,223,193,0.5); }
+  .calc-inwrap i { color: #9ea8b7; font-style: normal; font-size: 0.95rem; }
+  .calc-inwrap input { flex: 1; min-width: 0; background: none; border: none; color: #fff; font-size: 1.05rem; font-weight: 600; padding: 11px 6px; outline: none; font-family: inherit; }
+  .calc-inwrap input::-webkit-outer-spin-button, .calc-inwrap input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .calc-out { margin-top: 18px; padding-top: 18px; border-top: 1px solid rgba(212,228,250,0.1); }
+  .calc-out p { margin: 8px 0 0; }
+  .calc-headline { font-size: 2rem; font-weight: 800; color: #00dfc1; line-height: 1.1; letter-spacing: -0.02em; }
+  .calc-headline small { font-size: 0.9rem; font-weight: 600; color: #9ea8b7; letter-spacing: 0; }
+  .calc-hint { color: #9ea8b7; }
+  .calc-good { color: #00dfc1; }
+  .calc-warn { color: #ffd479; }
+  .calc-bad { color: #ff8b8b; }
   hr { border: none; border-top: 1px solid rgba(212,228,250,0.1); margin: 48px 0 24px; }
   footer { color: #9ea8b7; font-size: 0.85rem; }
   footer a { color: #9ea8b7; }
@@ -108,7 +125,7 @@
   "@context": "https://schema.org",
   "@type": "Article",
   "headline": "How to budget without linking your bank account",
-  "description": "You don't need open banking to budget. Here's how to track your income and spending privately in 2026 using a bank CSV — no account connection, no credentials shared.",
+  "description": "You do not need open banking to budget. Here is how to track your income and spending privately in 2026 using a bank CSV. No account connection, no credentials shared.",
   "datePublished": "2026-06-16",
   "dateModified": "2026-06-16",
   "inLanguage": "en-GB",
@@ -147,7 +164,7 @@
       "name": "Is it safe to budget with a CSV instead of connecting my bank?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "It's safer in the sense that no third party gets ongoing access to your accounts. You export the file yourself, and with a local-first tool like The Income Tracker the data stays in your own browser."
+        "text": "It is safer in the sense that no third party gets ongoing access to your accounts. You export the file yourself, and with a local-first tool like The Income Tracker the data stays in your own browser."
       }
     },
     {
@@ -155,7 +172,7 @@
       "name": "Which UK banks let you export a CSV?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "All the major ones — Barclays, HSBC, Monzo, Starling, Lloyds, NatWest, Santander and Revolut among them. The Income Tracker has a step-by-step CSV guide for each."
+        "text": "All the major ones, including Barclays, HSBC, Monzo, Starling, Lloyds, NatWest, Santander and Revolut. The Income Tracker has a step-by-step CSV guide for each."
       }
     }
   ]
@@ -167,25 +184,25 @@
       <header class="top"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> &rsaquo; <a href="/guides/">Guides</a> &rsaquo; <a href="/guides/budget-without-linking-bank.html">How to budget without linking your bank account</a></nav></header>
       <h1>How to budget without linking your bank account</h1>
       <p class="meta">By The Income Tracker · Updated 16 June 2026</p>
-      <div class="tldr"><strong>The short answer</strong><p>You can budget without open banking by downloading a CSV of your transactions from your bank and importing it into a local-first tool like The Income Tracker. Nothing connects to your bank, no credentials are shared, and your data stays in your browser.</p></div>
+      <div class="tldr"><strong>The short answer</strong><p>Yes, you can budget without open banking. Download a CSV of your transactions from your bank, import it into a local-first tool like The Income Tracker, and you are done. Nothing connects to your bank. No credentials shared. Your data stays in your browser.</p></div>
 
-      <h2>Why avoid linking your bank?</h2>
-      <p>Most budgeting apps ask you to connect your bank through open banking (Plaid, TrueLayer and similar). That gives a third party ongoing read access to your accounts. Plenty of people are reasonably uncomfortable with that — they'd rather not hand a continuous feed of their finances to another company.</p>
-      <p>The good news: you don't have to. Every UK bank lets you download your own transactions as a CSV file, and that's all a budgeting tool actually needs.</p>
+      <h2>Why skip the bank connection?</h2>
+      <p>Most budgeting apps want to plug into your bank through open banking (Plaid, TrueLayer and the like). That hands a third party an ongoing feed of everything you spend. Plenty of people are not comfortable with that, and fair enough.</p>
+      <p>Here is the good news. You do not need it. Every UK bank lets you download your own transactions as a CSV, and a CSV is all a good budgeting tool actually needs.</p>
 
-      <h2>The CSV method, in three steps</h2>
-      <p>It takes about two minutes:</p>
+      <h2>The method, start to finish</h2>
+      <p>Two minutes, tops.</p>
       <ol class="steps">
-        <li>Download a CSV of your transactions from your bank's website or app.</li>
-        <li>Import the CSV into The Income Tracker — it reads the dates, descriptions and amounts automatically.</li>
-        <li>Categorise anything you like by dragging it, and watch your monthly surplus update live.</li>
+        <li>Download a CSV of your transactions from your bank's app or website.</li>
+        <li>Import it into The Income Tracker. It reads the dates, descriptions and amounts for you.</li>
+        <li>Drag transactions into categories and watch your monthly surplus update live.</li>
       </ol>
 
-      <h2>Is this less convenient than open banking?</h2>
-      <p>Slightly — you download a file once a month instead of it syncing automatically. In return you give up nothing: no third party can see your accounts, there's no connection to break or re-authorise, and it works across every bank you use. For most people that's a trade worth making.</p>
+      <h2>What you give up</h2>
+      <p>Honestly? Very little. You download a file once a month instead of letting it sync on its own. In return, no third party can see your accounts, there is no connection to break or renew, and it works across every bank you use. For most people that trade is a no-brainer.</p>
 
       <div class="cta">
-  <div class="cta-text"><strong>The Income Tracker</strong><span>Track it free — no account, no bank login</span></div>
+  <div class="cta-text"><strong>The Income Tracker</strong><span>Track it free. No account, no bank login.</span></div>
   <a class="btn" href="/">Open the tracker &rarr;</a>
 </div>
 
@@ -194,21 +211,23 @@
 <dt>Can you budget without open banking?</dt>
 <dd>Yes. Download a CSV of your transactions from your bank and import it into a budgeting tool such as The Income Tracker. No open-banking connection or bank login is required.</dd>
 <dt>Is it safe to budget with a CSV instead of connecting my bank?</dt>
-<dd>It's safer in the sense that no third party gets ongoing access to your accounts. You export the file yourself, and with a local-first tool like The Income Tracker the data stays in your own browser.</dd>
+<dd>It is safer in the sense that no third party gets ongoing access to your accounts. You export the file yourself, and with a local-first tool like The Income Tracker the data stays in your own browser.</dd>
 <dt>Which UK banks let you export a CSV?</dt>
-<dd>All the major ones — Barclays, HSBC, Monzo, Starling, Lloyds, NatWest, Santander and Revolut among them. The Income Tracker has a step-by-step CSV guide for each.</dd>
+<dd>All the major ones, including Barclays, HSBC, Monzo, Starling, Lloyds, NatWest, Santander and Revolut. The Income Tracker has a step-by-step CSV guide for each.</dd>
 </dl>
 
       <h2>Related</h2>
       <div class="grid">
         <a class="card" href="/import/"><span class="card-t">Bank CSV import guides</span><span class="card-d">Export from any UK bank</span></a>
-        <a class="card" href="/guides/is-it-safe-to-upload-bank-statements.html"><span class="card-t">Is it safe to upload your bank statement to a budgeting app?</span><span class="card-d">Is it safe to upload a bank statement or CSV to a budgeting app? It depends entirely on where the data goes. Here's what to check — and how a local-first tool keeps it private.</span></a>
-        <a class="card" href="/guides/free-ynab-alternative-uk.html"><span class="card-t">The best free YNAB alternative in the UK (no subscription)</span><span class="card-d">Looking for a free YNAB alternative in the UK? The Income Tracker is a free, no-subscription budgeting tool that imports your bank CSV — no account and no bank login needed.</span></a>
+        <a class="card" href="/tools/"><span class="card-t">Free money calculators</span><span class="card-d">Payoff, utilisation, savings and more</span></a>
+        <a class="card" href="/guides/is-it-safe-to-upload-bank-statements.html"><span class="card-t">Is it safe to upload your bank statement to a budgeting app?</span><span class="card-d">Is it safe to upload a bank statement or CSV to a budgeting app? It depends on where the data goes. Here is what to check, and how a local-first tool keeps it private.</span></a>
+        <a class="card" href="/guides/free-ynab-alternative-uk.html"><span class="card-t">A free YNAB alternative for the UK</span><span class="card-d">Looking for a free YNAB alternative in the UK? The Income Tracker is free, needs no sign-up, and imports your bank CSV. No account and no bank login needed.</span></a>
       </div>
       <hr />
       <footer>
         &copy; 2026 The Income Tracker &nbsp;·&nbsp;
         <a href="/">Home</a> &nbsp;·&nbsp;
+        <a href="/tools/">Calculators</a> &nbsp;·&nbsp;
         <a href="/import/">Bank CSV guides</a> &nbsp;·&nbsp;
         <a href="/guides/">Guides</a> &nbsp;·&nbsp;
         <a href="/privacy.html">Privacy</a> &nbsp;·&nbsp;
@@ -216,5 +235,6 @@
         <a href="/tos.html">Terms</a>
       </footer>
     </div>
+
   </body>
 </html>
