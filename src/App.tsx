@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Analytics } from "@vercel/analytics/react";
 import LandingPage from "./LandingPage";
-import type { CSSProperties, Dispatch, DragEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode, Ref, SetStateAction } from "react";
+import type { CSSProperties, Dispatch, DragEvent, FormEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode, Ref, SetStateAction } from "react";
 import {
   AlertCircle,
   ArrowDown,
@@ -29,6 +29,7 @@ import {
   LineChart,
   LogIn,
   LogOut,
+  MessageSquarePlus,
   PiggyBank,
   Plus,
   ReceiptText,
@@ -80,9 +81,11 @@ import {
   saveCloudLedgerState,
   signInWithGoogle,
   signOut,
+  submitFeedback,
   supabase,
   upsertUserProfile,
   type AuthSession,
+  type FeedbackType,
 } from "./supabase";
 import type {
   Account,
@@ -350,6 +353,7 @@ function App() {
   const [cloudHydrated, setCloudHydrated] = useState(false);
   const authUserIdRef = useRef<string | null>(null);
   const [showSignInModal, setShowSignInModal] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [showSyncNudge, setShowSyncNudge] = useState(false);
   const [syncConflict, setSyncConflict] = useState<SyncConflict | null>(null);
   const nudgeDismissedRef = useRef(false);
@@ -2410,6 +2414,15 @@ function App() {
                 )}
               </article>
 
+              <article className="settingsPanel feedbackCtaPanel">
+                <PanelTitle title="Feedback" icon={<MessageSquarePlus size={17} />} />
+                <p className="panelSubcopy">Found a bug, have a feature request, or just want to share a thought? We read every submission.</p>
+                <button className="commandButton" type="button" onClick={() => setShowFeedbackModal(true)}>
+                  <MessageSquarePlus size={16} />
+                  Send feedback
+                </button>
+              </article>
+
               <article className="dangerPanel">
                 <div>
                   <h3>Danger Zone</h3>
@@ -2500,6 +2513,13 @@ function App() {
           conflict={syncConflict}
           onKeepLocal={() => { void handleKeepLocal(); }}
           onUseCloud={handleUseCloud}
+        />
+      )}
+
+      {showFeedbackModal && (
+        <FeedbackModal
+          userId={user?.id}
+          onDismiss={() => setShowFeedbackModal(false)}
         />
       )}
       <Analytics />
@@ -2627,6 +2647,130 @@ function MergeConflictModal({
             <small>Local data will be cleared.</small>
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function FeedbackModal({
+  userId,
+  onDismiss,
+}: {
+  userId?: string;
+  onDismiss: () => void;
+}) {
+  const [feedbackType, setFeedbackType] = useState<FeedbackType>("general");
+  const [subject, setSubject] = useState("");
+  const [description, setDescription] = useState("");
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!subject.trim() || !description.trim()) return;
+    setStatus("sending");
+    try {
+      await submitFeedback({
+        type: feedbackType,
+        subject: subject.trim(),
+        description: description.trim(),
+        email: email.trim() || undefined,
+        userId,
+      });
+      setStatus("sent");
+      setTimeout(onDismiss, 2000);
+    } catch {
+      setStatus("error");
+    }
+  }
+
+  const placeholder =
+    feedbackType === "bug"
+      ? "What went wrong?"
+      : feedbackType === "feature"
+        ? "What would you like to see?"
+        : "Your message";
+
+  return (
+    <div
+      className="modalBackdrop feedbackBackdrop"
+      role="presentation"
+      onClick={(e) => { if (e.target === e.currentTarget) onDismiss(); }}
+    >
+      <div className="feedbackModal" role="dialog" aria-modal="true" aria-labelledby="feedback-title">
+        <button className="iconButton feedbackClose" type="button" onClick={onDismiss} aria-label="Close">
+          <X size={18} />
+        </button>
+        {status === "sent" ? (
+          <div className="feedbackSuccess">
+            <Check size={32} />
+            <h2 id="feedback-title">Thanks for your feedback!</h2>
+            <p>We'll review it shortly.</p>
+          </div>
+        ) : (
+          <form onSubmit={(e) => { void handleSubmit(e); }}>
+            <h2 id="feedback-title">Send feedback</h2>
+            <p>Help us improve the Income Tracker.</p>
+            <div className="feedbackTypeRow">
+              {(["bug", "feature", "general"] as FeedbackType[]).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  className={feedbackType === t ? "feedbackTypeBtn active" : "feedbackTypeBtn"}
+                  onClick={() => setFeedbackType(t)}
+                >
+                  {t === "bug" ? "Bug report" : t === "feature" ? "Feature request" : "General"}
+                </button>
+              ))}
+            </div>
+            <label className="feedbackLabel">
+              Subject
+              <input
+                type="text"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder={placeholder}
+                required
+                maxLength={200}
+              />
+            </label>
+            <label className="feedbackLabel">
+              Description
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Add more detail…"
+                required
+                rows={4}
+                maxLength={2000}
+              />
+            </label>
+            <label className="feedbackLabel">
+              <span>Email <span className="feedbackOptional">(optional, for follow-up)</span></span>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+              />
+            </label>
+            {status === "error" && (
+              <p className="feedbackError" role="alert">
+                <AlertCircle size={14} /> Couldn't send feedback. Please try again.
+              </p>
+            )}
+            <div className="feedbackFooter">
+              <button type="button" className="commandButton" onClick={onDismiss}>Cancel</button>
+              <button
+                type="submit"
+                className="commandButton feedbackSubmit"
+                disabled={status === "sending" || !subject.trim() || !description.trim()}
+              >
+                {status === "sending" ? "Sending…" : "Send feedback"}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );

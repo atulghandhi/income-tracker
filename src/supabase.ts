@@ -96,3 +96,28 @@ export async function saveCloudLedgerState(userId: string, state: LedgerState) {
 
   if (error) throw error;
 }
+
+export type FeedbackType = "bug" | "feature" | "general";
+
+export interface FeedbackPayload {
+  type: FeedbackType;
+  subject: string;
+  description: string;
+  email?: string;
+  userId?: string;
+}
+
+export async function submitFeedback(payload: FeedbackPayload): Promise<void> {
+  if (!supabase) throw new Error("Supabase is not configured");
+
+  const { error } = await supabase.from("ledgerlite_feedback").insert({
+    type: payload.type,
+    subject: payload.subject,
+    description: payload.description,
+    email: payload.email ?? null,
+    user_id: payload.userId ?? null,
+    user_agent: navigator.userAgent,
+  });
+
+  if (error) throw error;
+}
