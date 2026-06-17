@@ -722,6 +722,8 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
         <footer className="lp-footer">
           <span className="lp-footer-brand">© {new Date().getFullYear()} The Income Tracker</span>
           <nav className="lp-footer-links" aria-label="Footer">
+            <a href="/tools/" className="lp-footer-link">Calculators</a>
+            <span aria-hidden="true">·</span>
             <a href="/import/" className="lp-footer-link">Bank CSV guides</a>
             <span aria-hidden="true">·</span>
             <a href="/guides/" className="lp-footer-link">Guides</a>
