@@ -133,6 +133,7 @@ ${body}
         <a href="/import/">Bank CSV guides</a> &nbsp;·&nbsp;
         <a href="/guides/">Guides</a> &nbsp;·&nbsp;
         <a href="/privacy.html">Privacy</a> &nbsp;·&nbsp;
+        <a href="mailto:support@theincometracker.com">Contact us</a> &nbsp;·&nbsp;
         <a href="/tos.html">Terms</a>
       </footer>
     </div>

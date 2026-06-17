@@ -726,6 +726,8 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
             <span aria-hidden="true">·</span>
             <a href="/guides/" className="lp-footer-link">Guides</a>
             <span aria-hidden="true">·</span>
+            <a href="mailto:support@theincometracker.com" className="lp-footer-link">Contact us</a>
+            <span aria-hidden="true">·</span>
             <a href="/privacy.html" className="lp-footer-link">Privacy Policy</a>
             <span aria-hidden="true">·</span>
             <a href="/tos.html" className="lp-footer-link">Terms of Service</a>
