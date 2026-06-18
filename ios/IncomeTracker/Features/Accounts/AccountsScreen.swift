@@ -216,11 +216,11 @@ struct NetWorthSummaryCard: View {
                         Text("Utilization")
                             .font(.caption)
                             .foregroundStyle(Color.muted)
-                        Text(String(format: "%.0f%%", debt.utilization * 100))
+                        Text(String(format: "%.0f%%", debt.utilization))
                             .font(.moneySmall)
                             .foregroundStyle(
-                                debt.utilization > 0.75 ? Color.brandRed
-                                : debt.utilization > 0.3 ? Color.brandAmber
+                                debt.utilization > 75 ? Color.brandRed
+                                : debt.utilization > 30 ? Color.brandAmber
                                 : Color.ink
                             )
                     }
