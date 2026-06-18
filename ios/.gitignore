@@ -1,0 +1,45 @@
+# Xcode user-specific files
+xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+
+# Xcode derived data and build output
+DerivedData/
+build/
+
+# Swift Package Manager build artifacts
+.build/
+.swiftpm/
+
+# Xcode generated project (regenerate with xcodegen)
+*.xcodeproj/
+!*.xcodeproj/project.pbxproj
+
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# Compiled object and dependency files
+*.o
+*.d
+
+# CocoaPods (if used in future)
+Pods/
+*.xcworkspace
+
+# Carthage (if used in future)
+Carthage/Build/
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+
+# Code coverage
+*.gcda
+*.gcno
