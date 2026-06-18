@@ -87,7 +87,7 @@ type HeroFocus = "inc-name" | "inc-amt" | "exp-name" | "exp-amt" | null;
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function LandingPage({ onEnter }: { onEnter: () => void }) {
+export default function LandingPage({ onEnter, onFeedback }: { onEnter: () => void; onFeedback: () => void }) {
   const ctxRef    = useRef<AudioContext | null>(null);
   const csvRef    = useRef<HTMLElement | null>(null);
   const annualRef = useRef<HTMLElement | null>(null);
@@ -728,7 +728,7 @@ export default function LandingPage({ onEnter }: { onEnter: () => void }) {
             <span aria-hidden="true">·</span>
             <a href="/guides/" className="lp-footer-link">Guides</a>
             <span aria-hidden="true">·</span>
-            <a href="mailto:support@theincometracker.com" className="lp-footer-link">Contact us</a>
+            <button type="button" className="lp-footer-link lp-footer-linkbtn" onClick={onFeedback}>Contact us</button>
             <span aria-hidden="true">·</span>
             <a href="/privacy.html" className="lp-footer-link">Privacy Policy</a>
             <span aria-hidden="true">·</span>
@@ -1225,6 +1225,10 @@ const CSS = `
   transition: color 120ms ease;
 }
 .lp-footer-link:hover { color: #00dfc1; }
+.lp-footer-linkbtn {
+  background: none; border: none; padding: 0; margin: 0;
+  font: inherit; cursor: pointer;
+}
 @media (max-width: 880px) {
   .lp-footer { padding: 18px 24px; }
 }
