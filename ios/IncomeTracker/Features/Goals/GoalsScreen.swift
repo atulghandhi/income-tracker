@@ -120,9 +120,11 @@ struct GoalsScreen: View {
         }
         .sheet(isPresented: $showAddGoal) {
             GoalEditorSheet(goal: nil)
+                .environment(store)
         }
         .sheet(item: $editingGoal) { goal in
             GoalEditorSheet(goal: goal)
+                .environment(store)
         }
         .task(id: store.state.goals) {
             await recomputeSequence()

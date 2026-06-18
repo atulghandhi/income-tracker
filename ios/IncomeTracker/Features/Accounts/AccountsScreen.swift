@@ -108,9 +108,11 @@ struct AccountsScreen: View {
         }
         .sheet(isPresented: $showAddAccount) {
             AccountEditorSheet(account: nil)
+                .environment(store)
         }
         .sheet(item: $editingAccount) { account in
             AccountEditorSheet(account: account)
+                .environment(store)
         }
     }
 }
