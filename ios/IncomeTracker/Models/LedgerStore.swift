@@ -84,14 +84,6 @@ public final class LedgerStore {
         }
     }
 
-    // MARK: - Persistence stubs
-
-    private func persistLocally() async {
-        saveStatus = .saving
-        // TODO: encode `state` and write to local file / UserDefaults.
-        saveStatus = .loaded
-    }
-
     private func syncToCloud() async {
         saveStatus = .saving
         // TODO: upsert `state` JSON to Supabase.

@@ -6,7 +6,7 @@ import Foundation
 
 // MARK: - Currency
 
-public enum CurrencyCode: String, Codable, Hashable, CaseIterable {
+public enum CurrencyCode: String, Codable, Hashable, CaseIterable, Sendable {
     case gbp = "GBP"
     case usd = "USD"
     case eur = "EUR"
@@ -18,7 +18,7 @@ public enum CurrencyCode: String, Codable, Hashable, CaseIterable {
 
 // MARK: - Transaction / entry primitives
 
-public struct ImportedTransactionMeta: Codable, Hashable {
+public struct ImportedTransactionMeta: Codable, Hashable, Sendable {
     public var batchId: String
     public var fileName: String
     public var rowNumber: Int
@@ -43,7 +43,7 @@ public struct ImportedTransactionMeta: Codable, Hashable {
     }
 }
 
-public struct IncomeEntry: Codable, Identifiable, Hashable {
+public struct IncomeEntry: Codable, Identifiable, Hashable, Sendable {
     public var id: String
     public var source: String
     public var amount: Double
@@ -71,7 +71,7 @@ public struct IncomeEntry: Codable, Identifiable, Hashable {
     }
 }
 
-public struct ExpenseEntry: Codable, Identifiable, Hashable {
+public struct ExpenseEntry: Codable, Identifiable, Hashable, Sendable {
     public var id: String
     public var name: String
     public var category: String
@@ -104,13 +104,13 @@ public struct ExpenseEntry: Codable, Identifiable, Hashable {
 
 // MARK: - Goals
 
-public enum GoalFundingMode: String, Codable, Hashable {
+public enum GoalFundingMode: String, Codable, Hashable, Sendable {
     case fixed = "fixed"
     case fill = "fill"
     case auto = "auto"
 }
 
-public struct SavingsGoal: Codable, Identifiable, Hashable {
+public struct SavingsGoal: Codable, Identifiable, Hashable, Sendable {
     public var id: String
     public var name: String
     public var target: Double
@@ -155,7 +155,7 @@ public struct SavingsGoal: Codable, Identifiable, Hashable {
 
 // MARK: - Budget month
 
-public struct MonthBudget: Codable, Hashable {
+public struct MonthBudget: Codable, Hashable, Sendable {
     public var incomes: [IncomeEntry]
     public var expenses: [ExpenseEntry]
     public var note: String
@@ -171,7 +171,7 @@ public struct MonthBudget: Codable, Hashable {
 
 // MARK: - Import
 
-public struct ImportedTransactionRef: Codable, Hashable {
+public struct ImportedTransactionRef: Codable, Hashable, Sendable {
     public var monthKey: String
     public var entryId: String
     public var kind: TransactionKind
@@ -183,7 +183,7 @@ public struct ImportedTransactionRef: Codable, Hashable {
     }
 }
 
-public struct ImportBatch: Codable, Identifiable, Hashable {
+public struct ImportBatch: Codable, Identifiable, Hashable, Sendable {
     public var id: String
     public var fileName: String
     public var importedAt: String
@@ -213,7 +213,7 @@ public struct ImportBatch: Codable, Identifiable, Hashable {
 
 // MARK: - Transaction kind
 
-public enum TransactionKind: String, Codable, Hashable {
+public enum TransactionKind: String, Codable, Hashable, Sendable {
     case income = "income"
     case expense = "expense"
     case debtPayment = "debt-payment"
@@ -222,7 +222,7 @@ public enum TransactionKind: String, Codable, Hashable {
 
 // MARK: - Category rules
 
-public struct CategoryRule: Codable, Identifiable, Hashable {
+public struct CategoryRule: Codable, Identifiable, Hashable, Sendable {
     public var id: String
     public var pattern: String
     public var category: String
@@ -250,7 +250,7 @@ public struct CategoryRule: Codable, Identifiable, Hashable {
 // MARK: - Account types
 
 /// High-level class: determines how the balance affects net worth and which fields are relevant.
-public enum AccountClass: String, Codable, Hashable {
+public enum AccountClass: String, Codable, Hashable, Sendable {
     case cash = "cash"
     case savings = "savings"
     case investment = "investment"
@@ -258,7 +258,7 @@ public enum AccountClass: String, Codable, Hashable {
 }
 
 /// Union of DebtAccountType | AssetAccountType — raw values must match TypeScript strings.
-public enum AccountType: String, Codable, Hashable {
+public enum AccountType: String, Codable, Hashable, Sendable {
     // Debt sub-types
     case creditCard = "credit-card"
     case loan = "loan"
@@ -273,7 +273,7 @@ public enum AccountType: String, Codable, Hashable {
     case otherAsset = "other-asset"
 }
 
-public struct Account: Codable, Identifiable, Hashable {
+public struct Account: Codable, Identifiable, Hashable, Sendable {
     public var id: String
     public var name: String
     public var accountClass: AccountClass
@@ -332,7 +332,7 @@ public typealias DebtAccount = Account
 
 // MARK: - Ledger state
 
-public struct LedgerState: Codable, Hashable {
+public struct LedgerState: Codable, Hashable, Sendable {
     public var schemaVersion: Int
     public var currency: CurrencyCode
     public var selectedMonth: String
@@ -410,7 +410,7 @@ public struct LedgerState: Codable, Hashable {
 
 // MARK: - Derived / computed types
 
-public struct Projection: Codable, Hashable {
+public struct Projection: Codable, Hashable, Sendable {
     public var monthlyIncome: Double
     public var monthlyExpenses: Double
     public var monthlySurplus: Double
@@ -456,7 +456,7 @@ public struct Projection: Codable, Hashable {
     }
 }
 
-public struct DebtSummary: Codable, Hashable {
+public struct DebtSummary: Codable, Hashable, Sendable {
     public var totalDebt: Double
     public var totalCreditLimit: Double
     public var availableCredit: Double
@@ -484,7 +484,7 @@ public struct DebtSummary: Codable, Hashable {
     }
 }
 
-public struct AssetSummary: Codable, Hashable {
+public struct AssetSummary: Codable, Hashable, Sendable {
     public var totalAssets: Double
     public var totalCash: Double
     public var totalSavings: Double
@@ -509,7 +509,7 @@ public struct AssetSummary: Codable, Hashable {
     }
 }
 
-public struct NetWorthSummary: Codable, Hashable {
+public struct NetWorthSummary: Codable, Hashable, Sendable {
     public var netWorth: Double
     public var totalAssets: Double
     public var totalDebt: Double
@@ -521,7 +521,8 @@ public struct NetWorthSummary: Codable, Hashable {
     }
 }
 
-public struct NetWorthPoint: Codable, Hashable {
+public struct NetWorthPoint: Codable, Hashable, Identifiable, Sendable {
+    public var id: Int { monthIndex }
     public var monthIndex: Int
     public var label: String
     public var netWorth: Double
@@ -558,7 +559,8 @@ public struct NetWorthPoint: Codable, Hashable {
     }
 }
 
-public struct MonthlyFlowPoint: Codable, Hashable {
+public struct MonthlyFlowPoint: Codable, Hashable, Identifiable, Sendable {
+    public var id: String { monthKey }
     public var monthKey: String
     public var label: String
     public var income: Double
@@ -576,14 +578,14 @@ public struct MonthlyFlowPoint: Codable, Hashable {
     }
 }
 
-public enum FinancialSignalTone: String, Codable, Hashable {
+public enum FinancialSignalTone: String, Codable, Hashable, Sendable {
     case good = "good"
     case info = "info"
     case warning = "warning"
     case danger = "danger"
 }
 
-public struct FinancialSignal: Codable, Identifiable, Hashable {
+public struct FinancialSignal: Codable, Identifiable, Hashable, Sendable {
     public var id: String
     public var title: String
     public var summary: String
@@ -599,7 +601,7 @@ public struct FinancialSignal: Codable, Identifiable, Hashable {
     }
 }
 
-public struct HealthScoreBreakdown: Codable, Hashable {
+public struct HealthScoreBreakdown: Codable, Hashable, Sendable {
     public var score: Double
     public var estimatedCreditScore: Double
     public var cashFlowScore: Double
@@ -638,7 +640,7 @@ public struct HealthScoreBreakdown: Codable, Hashable {
 
 // MARK: - Goal sequencing
 
-public struct GoalMonthPointPerGoal: Codable, Hashable {
+public struct GoalMonthPointPerGoal: Codable, Hashable, Sendable {
     public var accumulated: Double
     public var contribution: Double
     public var complete: Bool
@@ -650,7 +652,7 @@ public struct GoalMonthPointPerGoal: Codable, Hashable {
     }
 }
 
-public struct GoalMonthPoint: Codable, Hashable {
+public struct GoalMonthPoint: Codable, Hashable, Sendable {
     /// 1-based index in the simulation.
     public var month: Int
     public var label: String
@@ -666,7 +668,7 @@ public struct GoalMonthPoint: Codable, Hashable {
     }
 }
 
-public enum GoalStatus: String, Codable, Hashable {
+public enum GoalStatus: String, Codable, Hashable, Sendable {
     case complete = "complete"
     case onTrack = "on-track"
     case tight = "tight"
@@ -674,7 +676,7 @@ public enum GoalStatus: String, Codable, Hashable {
     case noDeadline = "no-deadline"
 }
 
-public struct GoalOutcome: Codable, Hashable {
+public struct GoalOutcome: Codable, Hashable, Sendable {
     public var goalId: String
     public var name: String
     public var color: String
@@ -712,7 +714,7 @@ public struct GoalOutcome: Codable, Hashable {
     }
 }
 
-public struct GoalSequenceResult: Codable, Hashable {
+public struct GoalSequenceResult: Codable, Hashable, Sendable {
     public var timeline: [GoalMonthPoint]
     public var goals: [GoalOutcome]
     public var horizonMonths: Int
