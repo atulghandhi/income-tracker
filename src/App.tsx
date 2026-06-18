@@ -622,6 +622,20 @@ function App() {
     return () => window.clearTimeout(timeout);
   }, [ledger, hydrated, authLoading, cloudHydrated, user?.id]);
 
+  // Static content pages (guides, tools, privacy) link "Contact us" to /?feedback=1.
+  // Pick that up on load, open the feedback modal, then strip the param from the URL
+  // so a refresh doesn't reopen it.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("feedback")) {
+      setShowFeedbackModal(true);
+      params.delete("feedback");
+      const query = params.toString();
+      const url = window.location.pathname + (query ? `?${query}` : "") + window.location.hash;
+      window.history.replaceState(null, "", url);
+    }
+  }, []);
+
   // Auto-show a page's tutorial the first time it's opened (ledger first, since it's
   // the default view). Once dismissed it won't reappear; the sidebar button replays it.
   useEffect(() => {
@@ -1531,7 +1545,7 @@ function App() {
   const userAvatar = typeof user?.user_metadata.avatar_url === "string" ? user.user_metadata.avatar_url : "";
 
   if (showLanding) {
-    return <LandingPage onEnter={() => setShowLanding(false)} />;
+    return <LandingPage onEnter={() => setShowLanding(false)} onFeedback={() => setShowFeedbackModal(true)} />;
   }
 
   if (authLoading || !hydrated) {
