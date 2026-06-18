@@ -57,7 +57,6 @@ public final class LedgerStore {
             try? await Task.sleep(nanoseconds: 300_000_000)
             guard !Task.isCancelled else { return }
             await persistLocally()
-            await syncToCloud()
         }
     }
 
@@ -80,14 +79,7 @@ public final class LedgerStore {
             try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 s
             guard !Task.isCancelled else { return }
             await persistLocally()
-            await syncToCloud()
         }
-    }
-
-    private func syncToCloud() async {
-        saveStatus = .saving
-        // TODO: upsert `state` JSON to Supabase.
-        saveStatus = .loaded
     }
 
     // MARK: - Month navigation
