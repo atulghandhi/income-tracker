@@ -3012,6 +3012,13 @@ hr {
   font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.privacyBadge:hover {
+  background: rgba(0, 223, 193, 0.12);
+  border-color: rgba(0, 223, 193, 0.4);
 }
 
 .architectureNote {
@@ -4230,12 +4237,6 @@ hr {
 
 .feedbackSuccess h2 {
   color: var(--ink);
-}
-
-.feedbackCtaPanel {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
 }
 
 /* ─── Sync nudge ────────────────────────────────────── */
