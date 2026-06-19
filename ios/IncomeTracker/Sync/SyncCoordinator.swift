@@ -10,6 +10,7 @@
 
 import Foundation
 import AuthenticationServices
+import CryptoKit
 
 // MARK: - SyncCoordinator
 
@@ -57,6 +58,8 @@ final class SyncCoordinator {
 
     /// Held strongly so the session is not deallocated mid-flow.
     private var webAuthSession: ASWebAuthenticationSession?
+    /// PKCE code verifier generated at sign-in start; used in the token exchange.
+    private var pkceCodeVerifier: String?
 
     // MARK: - Init
 
@@ -132,6 +135,11 @@ final class SyncCoordinator {
     /// endpoint.  The session redirects to incometracker://auth-callback which
     /// is caught by handleAuthCallback(url:).
     func signInWithGoogle() async throws {
+        // Generate PKCE verifier + challenge.
+        let verifier = Self.generateCodeVerifier()
+        let challenge = Self.generateCodeChallenge(from: verifier)
+        pkceCodeVerifier = verifier
+
         // Build the OAuth URL.
         var components = URLComponents(
             url: supabaseURL.appendingPathComponent("/auth/v1/authorize"),
@@ -140,14 +148,14 @@ final class SyncCoordinator {
         components.queryItems = [
             URLQueryItem(name: "provider", value: "google"),
             URLQueryItem(name: "redirect_to", value: "incometracker://auth-callback"),
-            URLQueryItem(name: "response_type", value: "code"),
+            URLQueryItem(name: "code_challenge", value: challenge),
+            URLQueryItem(name: "code_challenge_method", value: "S256"),
         ]
         guard let authURL = components.url else {
             throw SyncError.badURL
         }
 
         // Present the web authentication session.
-        // TODO: full PKCE code-verifier / code-challenge generation for production.
         return try await withCheckedThrowingContinuation { continuation in
             let session = ASWebAuthenticationSession(
                 url: authURL,
@@ -416,10 +424,13 @@ final class SyncCoordinator {
         if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
            let code = components.queryItems?.first(where: { $0.name == "code" })?.value
         {
-            // TODO: send the stored PKCE code_verifier with this request for full PKCE.
+            guard let verifier = pkceCodeVerifier else {
+                throw SyncError.missingCodeVerifier
+            }
+            pkceCodeVerifier = nil
             let body: [String: String] = [
                 "auth_code": code,
-                "redirect_uri": "incometracker://auth-callback",
+                "code_verifier": verifier,
             ]
             let payload = try JSONEncoder().encode(body)
             let data = try await supabaseRequest(
@@ -504,6 +515,7 @@ enum SyncError: LocalizedError {
     case notSignedIn
     case badURL
     case missingCallbackURL
+    case missingCodeVerifier
     case httpError(statusCode: Int)
     case decodingFailed
 
@@ -512,6 +524,7 @@ enum SyncError: LocalizedError {
         case .notSignedIn:           return "Not signed in."
         case .badURL:                return "Invalid Supabase URL."
         case .missingCallbackURL:    return "OAuth callback did not return a URL."
+        case .missingCodeVerifier:   return "PKCE code verifier missing from sign-in session."
         case .httpError(let code):   return "Server returned HTTP \(code)."
         case .decodingFailed:        return "Could not decode server response."
         }
@@ -538,6 +551,30 @@ private extension JSONEncoder {
     }()
 }
 
+// MARK: - PKCE helpers
+
+private extension SyncCoordinator {
+    static func generateCodeVerifier() -> String {
+        var bytes = [UInt8](repeating: 0, count: 32)
+        _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        return Data(bytes).base64URLEncoded()
+    }
+
+    static func generateCodeChallenge(from verifier: String) -> String {
+        let digest = SHA256.hash(data: Data(verifier.utf8))
+        return Data(digest).base64URLEncoded()
+    }
+}
+
+private extension Data {
+    func base64URLEncoded() -> String {
+        base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+}
+
 // MARK: - ASWebAuthenticationSession presentation context
 
 /// Minimal presentationContextProvider that returns the key window.
@@ -547,11 +584,18 @@ private final class PresentationContextProvider: NSObject,
     static let shared = PresentationContextProvider()
 
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        // Returns the first connected window scene's key window.
+        // keyWindow is deprecated on iOS 15+; search windows directly so we don't
+        // fall back to a detached UIWindow() that causes ASWebAuthenticationSession
+        // to immediately fire error 1 (canceledLogin) without showing the browser.
         UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
-            .first?
-            .keyWindow
+            .filter { $0.activationState == .foregroundActive }
+            .flatMap { $0.windows }
+            .first(where: { $0.isKeyWindow })
+            ?? UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .first
             ?? ASPresentationAnchor()
     }
 }
