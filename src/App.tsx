@@ -29,7 +29,6 @@ import {
   LineChart,
   LogIn,
   LogOut,
-  MessageSquarePlus,
   PiggyBank,
   Plus,
   ReceiptText,
@@ -635,6 +634,14 @@ function App() {
       window.history.replaceState(null, "", url);
     }
   }, []);
+
+  // Auto-dismiss the "imported" toast after 5 seconds. The user can still undo from the
+  // settings import history; they can also close it early with the X button.
+  useEffect(() => {
+    if (!lastImportAction) return;
+    const timer = window.setTimeout(() => setLastImportAction(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [lastImportAction]);
 
   // Auto-show a page's tutorial the first time it's opened (ledger first, since it's
   // the default view). Once dismissed it won't reappear; the sidebar button replays it.
@@ -1670,7 +1677,6 @@ function App() {
           </label>
 
           <div className="topActions">
-            <StatusPill state={saveState} toast={toast} />
             <label className="currencyControl">
               <span>{currencySymbol}</span>
               <select value={ledger.currency} onChange={(event) => changeCurrency(event.target.value as CurrencyCode)} aria-label="Currency">
@@ -1689,18 +1695,6 @@ function App() {
               data-tip={ledger.privacyMode ? "Show amounts" : "Hide amounts"}
             >
               {ledger.privacyMode ? <EyeOff size={19} /> : <Eye size={19} />}
-            </button>
-            {user ? (
-              <button className="iconButton" type="button" onClick={handleSignOut} aria-label="Sign out" data-tip="Sign out" disabled={authWorking}>
-                <LogOut size={18} />
-              </button>
-            ) : (
-              <button className="iconButton" type="button" onClick={() => setShowSignInModal(true)} aria-label="Sign in" data-tip="Sign in to sync">
-                <LogIn size={18} />
-              </button>
-            )}
-            <button className="iconButton" type="button" onClick={() => setActiveView("settings")} aria-label="Help" data-tip="Help">
-              <CircleHelp size={18} />
             </button>
           </div>
         </header>
@@ -2271,10 +2265,10 @@ function App() {
                   <h2>Management Hub</h2>
                   <p>Configure your cloud vault, exports, and interface preferences.</p>
                 </div>
-                <span className="privacyBadge">
-                  <ShieldCheck size={15} />
-                  Protected by Supabase RLS
-                </span>
+                <button className="privacyBadge" type="button" onClick={() => setShowFeedbackModal(true)}>
+                  <CircleHelp size={15} />
+                  Submit feedback
+                </button>
               </div>
 
               <article className="architectureNote">
@@ -2357,19 +2351,6 @@ function App() {
                   </article>
 
                   <article className="settingsPanel compactSetting">
-                    <PanelTitle title="Privacy mode" icon={ledger.privacyMode ? <EyeOff size={17} /> : <Eye size={17} />} />
-                    <p>Obfuscates exact numerical values while you work in public spaces.</p>
-                    <button
-                      className={ledger.privacyMode ? "switch on" : "switch"}
-                      type="button"
-                      aria-label="Toggle privacy mode"
-                      onClick={() => updateLedger((current) => ({ ...current, privacyMode: !current.privacyMode }))}
-                    >
-                      <span />
-                    </button>
-                  </article>
-
-                  <article className="settingsPanel compactSetting">
                     <PanelTitle title="Animations" icon={<LineChart size={17} />} />
                     <p>Enable interface motion and animated totals.</p>
                     <button
@@ -2428,15 +2409,6 @@ function App() {
                 )}
               </article>
 
-              <article className="settingsPanel feedbackCtaPanel">
-                <PanelTitle title="Feedback" icon={<MessageSquarePlus size={17} />} />
-                <p className="panelSubcopy">Found a bug, have a feature request, or just want to share a thought? We read every submission.</p>
-                <button className="commandButton" type="button" onClick={() => setShowFeedbackModal(true)}>
-                  <MessageSquarePlus size={16} />
-                  Send feedback
-                </button>
-              </article>
-
               <article className="dangerPanel">
                 <div>
                   <h3>Danger Zone</h3>
@@ -2470,6 +2442,15 @@ function App() {
             </span>
             <button className="commandButton" type="button" onClick={() => undoImportBatch(lastImportAction.batchId)}>
               Undo import
+            </button>
+            <button
+              className="iconButton undoImportClose"
+              type="button"
+              onClick={() => setLastImportAction(null)}
+              aria-label="Dismiss"
+              data-tip="Dismiss"
+            >
+              <X size={16} />
             </button>
           </div>
         )}
@@ -2929,18 +2910,6 @@ function UserProfilePopup({
           </button>
         </div>
       )}
-    </div>
-  );
-}
-
-function StatusPill({ state, toast }: { state: SaveState; toast: string }) {
-  return (
-    <div className={`statusPill ${state}`}>
-      <span />
-      <div>
-        <strong>{state === "saved" ? "Synced" : state === "saving" ? "Saving" : state === "offline" ? "Local mode" : "Loading"}</strong>
-        <small>{toast}</small>
-      </div>
     </div>
   );
 }
