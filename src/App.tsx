@@ -1545,7 +1545,20 @@ function App() {
   const userAvatar = typeof user?.user_metadata.avatar_url === "string" ? user.user_metadata.avatar_url : "";
 
   if (showLanding) {
-    return <LandingPage onEnter={() => setShowLanding(false)} onFeedback={() => setShowFeedbackModal(true)} />;
+    // The feedback modal lives in the main shell below, but the landing page
+    // (and first-time visitors arriving via /?feedback=1) never reach it, so
+    // "Contact us" would set state with nothing rendered. Render it here too.
+    return (
+      <>
+        <LandingPage onEnter={() => setShowLanding(false)} onFeedback={() => setShowFeedbackModal(true)} />
+        {showFeedbackModal && (
+          <FeedbackModal
+            userId={user?.id}
+            onDismiss={() => setShowFeedbackModal(false)}
+          />
+        )}
+      </>
+    );
   }
 
   if (authLoading || !hydrated) {
