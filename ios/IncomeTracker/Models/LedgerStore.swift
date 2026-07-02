@@ -24,7 +24,15 @@ public final class LedgerStore {
         case offline
     }
 
-    public private(set) var saveStatus: SaveStatus = .loaded
+    public internal(set) var saveStatus: SaveStatus = .loaded
+
+    // MARK: - Cloud push hook
+
+    /// Set at app startup. Pushes the freshly saved state to the cloud after
+    /// every debounced local save. Returns false when the push failed (offline
+    /// or server error) so the save status can reflect it. Implementations
+    /// should return true when the user is signed out (nothing to push).
+    public var cloudPusher: (@MainActor (LedgerState) async -> Bool)?
 
     // MARK: - Undo
 
@@ -44,6 +52,9 @@ public final class LedgerStore {
     public func update(_ mutation: (inout LedgerState) -> Void) {
         scheduleSave()          // snapshot current state onto undo stack before applying
         mutation(&state)
+        // Stamp the modification time so cross-device conflict resolution
+        // (which compares lastSavedAt) sees local edits as fresh.
+        state.lastSavedAt = ISO8601DateFormatter().string(from: .now)
     }
 
     // MARK: - Undo
@@ -56,7 +67,7 @@ public final class LedgerStore {
         saveTask = Task {
             try? await Task.sleep(nanoseconds: 300_000_000)
             guard !Task.isCancelled else { return }
-            await persistLocally()
+            await performSave()
         }
     }
 
@@ -78,7 +89,18 @@ public final class LedgerStore {
         saveTask = Task {
             try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 s
             guard !Task.isCancelled else { return }
-            await persistLocally()
+            await performSave()
+        }
+    }
+
+    /// Persists locally, then pushes to the cloud (when a pusher is installed).
+    private func performSave() async {
+        saveStatus = .saving
+        await persistLocally()
+        if let cloudPusher {
+            saveStatus = await cloudPusher(state) ? .loaded : .offline
+        } else {
+            saveStatus = .loaded
         }
     }
 
@@ -260,6 +282,27 @@ public final class LedgerStore {
 
             // Suppress the "unused variable" warning for refsToRemove.
             _ = refsToRemove
+        }
+    }
+
+    /// Commits reviewed CSV rows in a single atomic update. Runs commitImport
+    /// against a snapshot first so the store mutation stays all-or-nothing.
+    public func commitCSVImport(rows: [CsvImportRow], fileName: String) {
+        let includedRows = rows.filter(\.include)
+        guard !includedRows.isEmpty else { return }
+
+        var tempState = state
+        let batch = commitImport(rows: rows, into: &tempState, fileName: fileName)
+
+        update { s in
+            for ref in batch.transactionRefs {
+                s.months[ref.monthKey] = tempState.months[ref.monthKey]
+            }
+            s.importBatches.append(batch)
+            for rule in tempState.categoryRules
+                where !s.categoryRules.contains(where: { $0.id == rule.id }) {
+                s.categoryRules.append(rule)
+            }
         }
     }
 

@@ -8,6 +8,8 @@ import SwiftUI
 
 struct LedgerScreen: View {
     @Environment(LedgerStore.self) var store
+    @Environment(SyncCoordinator.self) var sync
+    @State private var showSettings = false
     @State private var showAddSheet = false
     @State private var addKind: TransactionKind = .income
     @State private var editingEntry: EntryEdit? = nil
@@ -29,7 +31,7 @@ struct LedgerScreen: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            SurplusBar(projection: projection)
+            MonthOverviewHeader(projection: projection)
 
             List {
                 // MARK: Income Section
@@ -285,9 +287,37 @@ struct LedgerScreen: View {
             .searchable(text: $searchText, prompt: "Search transactions")
         }
         .background(Color.bg.ignoresSafeArea())
+        // Floating quick-add button — the primary way to log an expense.
+        .overlay(alignment: .bottomTrailing) {
+            Button {
+                addKind = .expense
+                showAddSheet = true
+                Haptics.impact(.medium)
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 58, height: 58)
+                    .background(Color.brandBlue)
+                    .clipShape(Circle())
+                    .shadow(color: Color.brandBlue.opacity(0.4), radius: 12, y: 6)
+            }
+            .accessibilityLabel("Add transaction")
+            .padding(.trailing, 20)
+            .padding(.bottom, 24)
+        }
         .navigationTitle(formatMonth(store.selectedMonth))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    showSettings = true
+                    Haptics.impact(.light)
+                } label: {
+                    Image(systemName: "gearshape")
+                        .foregroundStyle(Color.muted)
+                }
+            }
             ToolbarItem(placement: .principal) {
                 MonthSwitcherControl(
                     month: store.selectedMonth,
@@ -310,6 +340,11 @@ struct LedgerScreen: View {
                     Image(systemName: "plus")
                 }
             }
+        }
+        .sheet(isPresented: $showSettings) {
+            SettingsSheet()
+                .environment(store)
+                .environment(sync)
         }
         .sheet(isPresented: $showAddSheet) {
             AddEntrySheet(kind: $addKind)
@@ -381,9 +416,11 @@ struct LedgerScreen: View {
     }
 }
 
-// MARK: - SurplusBar
+// MARK: - MonthOverviewHeader
 
-struct SurplusBar: View {
+/// At-a-glance month summary pinned above the transaction list:
+/// income so far, spending so far, and what's left, plus a spend bar.
+struct MonthOverviewHeader: View {
     var projection: Projection
     @Environment(LedgerStore.self) var store
 
@@ -391,42 +428,32 @@ struct SurplusBar: View {
     private var isPositive: Bool { surplus >= 0 }
     private var barColor: Color { isPositive ? .brandMint : .brandRed }
 
-    // Fill ratio capped 0…1 based on income
-    private var fillFraction: CGFloat {
-        guard projection.monthlyIncome > 0 else { return 0 }
-        return CGFloat(min(abs(surplus) / projection.monthlyIncome, 1.0))
+    // Fraction of income already spent, capped 0…1.
+    private var spendFraction: CGFloat {
+        guard projection.monthlyIncome > 0 else { return projection.monthlyExpenses > 0 ? 1 : 0 }
+        return CGFloat(min(projection.monthlyExpenses / projection.monthlyIncome, 1.0))
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Text(isPositive ? "Surplus" : "Deficit")
-                    .font(.caption)
-                    .foregroundStyle(Color.muted)
-
-                Spacer()
-
-                Text(formatted(surplus))
-                    .font(.moneySmall)
-                    .foregroundStyle(barColor)
-                    .contentTransition(.numericText())
-                    .animation(Motion.standard, value: surplus)
+            HStack(spacing: 0) {
+                stat(label: "Income", amount: projection.monthlyIncome, color: .brandMint)
+                stat(label: "Spent", amount: projection.monthlyExpenses, color: .brandRed)
+                stat(label: isPositive ? "Left" : "Over", amount: abs(surplus), color: barColor)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 6)
+            .padding(.vertical, 10)
 
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    // Track
                     Rectangle()
-                        .fill(barColor.opacity(0.12))
+                        .fill(Color.brandMint.opacity(0.18))
                         .frame(height: 4)
 
-                    // Fill
                     Rectangle()
-                        .fill(barColor)
-                        .frame(width: geo.size.width * fillFraction, height: 4)
-                        .animation(Motion.standard, value: fillFraction)
+                        .fill(spendFraction >= 1 ? Color.brandRed : Color.brandRed.opacity(0.75))
+                        .frame(width: geo.size.width * spendFraction, height: 4)
+                        .animation(Motion.standard, value: spendFraction)
                 }
             }
             .frame(height: 4)
@@ -435,6 +462,23 @@ struct SurplusBar: View {
                 .background(Color.line)
         }
         .background(Color.surface)
+    }
+
+    @ViewBuilder
+    private func stat(label: String, amount: Double, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(Color.muted)
+            Text(formatted(amount))
+                .font(.moneySmall)
+                .foregroundStyle(color)
+                .contentTransition(.numericText())
+                .animation(Motion.standard, value: amount)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func formatted(_ amount: Double) -> String {
@@ -578,31 +622,89 @@ struct MonthSwitcherControl: View {
 
 // MARK: - AddEntrySheet
 
+/// Fast entry sheet, built for end-of-day expense logging: the name field is
+/// focused the moment the sheet appears, the category is picked automatically
+/// from the name (user can override), and the date is stamped automatically —
+/// today when viewing the current month, or the viewed month when the user
+/// deliberately navigated elsewhere.
 struct AddEntrySheet: View {
     @Binding var kind: TransactionKind
     @Environment(LedgerStore.self) var store
     @Environment(\.dismiss) private var dismiss
 
+    private enum Field: Hashable {
+        case name, amount, customCategory
+    }
+    @FocusState private var focusedField: Field?
+
     // Shared fields
     @State private var name: String = ""
     @State private var amountText: String = ""
-    @State private var recurring: Bool = true
-    @State private var selectedColor: String = CATEGORY_COLORS.first ?? "#00B89E"
+    @State private var recurring: Bool = false
     @State private var showValidationError = false
+    @State private var savedFlash = false
 
-    // Expense-only
-    @State private var category: String = "General"
-    @State private var newCategoryText: String = ""
+    // Category: nil = follow the automatic suggestion.
+    @State private var categoryOverride: String? = nil
+    @State private var customCategoryText: String = ""
     @State private var isAddingCategory = false
 
-    private var amount: Double { Double(amountText) ?? 0 }
-    private var isValid: Bool { !name.trimmingCharacters(in: .whitespaces).isEmpty && amount > 0 }
+    // Date within the viewed month.
+    @State private var entryDate: Date = .now
+
+    private var amount: Double {
+        Double(amountText.replacingOccurrences(of: ",", with: ".")) ?? 0
+    }
+    private var isValid: Bool {
+        !name.trimmingCharacters(in: .whitespaces).isEmpty && amount > 0
+    }
+
+    /// Automatic category suggestion from the same rules the CSV importer uses.
+    private var suggestion: CategorySuggestion {
+        suggestEntryCategory(
+            description: name,
+            amount: kind == .income ? abs(amount) : -abs(amount),
+            rules: store.state.categoryRules
+        )
+    }
+
+    private var resolvedCategory: String {
+        if isAddingCategory {
+            let custom = customCategoryText.trimmingCharacters(in: .whitespaces)
+            return custom.isEmpty ? "General" : custom
+        }
+        if let override = categoryOverride { return override }
+        // Never auto-file an expense under "Income".
+        let suggested = suggestion.category
+        return (kind == .expense && suggested == "Income") ? "General" : suggested
+    }
 
     private var existingCategories: [String] {
         var seen = Set<String>()
-        return store.currentMonthBudget.expenses.compactMap { e in
+        var cats = store.currentMonthBudget.expenses.compactMap { e in
             seen.insert(e.category).inserted ? e.category : nil
         }
+        if !cats.contains(resolvedCategory) && !isAddingCategory {
+            cats.insert(resolvedCategory, at: 0)
+        }
+        return cats
+    }
+
+    /// True when the user is viewing the month that contains "today".
+    private var isCurrentMonth: Bool {
+        store.selectedMonth == getMonthKey()
+    }
+
+    private var monthDateRange: ClosedRange<Date> {
+        let parts = store.selectedMonth.split(separator: "-")
+        var comps = DateComponents()
+        comps.year = Int(parts.first ?? "") ?? Calendar.current.component(.year, from: .now)
+        comps.month = parts.count > 1 ? Int(parts[1]) : Calendar.current.component(.month, from: .now)
+        comps.day = 1
+        let cal = Calendar.current
+        let start = cal.date(from: comps) ?? .now
+        let end = cal.date(byAdding: DateComponents(month: 1, day: -1), to: start) ?? start
+        return start...end
     }
 
     var body: some View {
@@ -611,89 +713,98 @@ struct AddEntrySheet: View {
                 // Kind picker
                 Section {
                     Picker("Type", selection: $kind) {
-                        Text("Income").tag(TransactionKind.income)
                         Text("Expense").tag(TransactionKind.expense)
+                        Text("Income").tag(TransactionKind.income)
                     }
                     .pickerStyle(.segmented)
                     .listRowBackground(Color.clear)
                     .listRowInsets(.init(top: 0, leading: 0, bottom: 0, trailing: 0))
                 }
 
-                // Name / Source
-                Section(kind == .income ? "Source" : "Name") {
+                Section {
                     TextField(
-                        kind == .income ? "e.g. Salary, Freelance" : "e.g. Netflix, Groceries",
+                        kind == .income ? "Income source (e.g. Salary)" : "Transaction name (e.g. Tesco)",
                         text: $name
                     )
                     .autocorrectionDisabled()
-                }
+                    .focused($focusedField, equals: .name)
+                    .submitLabel(.next)
+                    .onSubmit { focusedField = .amount }
 
-                // Amount
-                Section("Amount") {
                     HStack {
                         Text(FinanceEngine.currencySymbol(for: store.state.currency))
                             .foregroundStyle(Color.muted)
                         TextField("0.00", text: $amountText)
                             .keyboardType(.decimalPad)
+                            .focused($focusedField, equals: .amount)
                     }
                 }
 
-                // Expense-only: Category
+                // Category (expenses only) — automatic, tap to change.
                 if kind == .expense {
-                    Section("Category") {
-                        if existingCategories.isEmpty {
-                            TextField("e.g. Housing, Transport", text: $category)
-                        } else {
-                            Picker("Category", selection: $category) {
-                                ForEach(existingCategories, id: \.self) { cat in
-                                    Text(cat).tag(cat)
-                                }
-                                Text("New category…").tag("__new__")
-                            }
-                            .onChange(of: category) { _, new in
-                                if new == "__new__" {
+                    Section {
+                        Picker(selection: Binding(
+                            get: { isAddingCategory ? "__new__" : resolvedCategory },
+                            set: { newValue in
+                                if newValue == "__new__" {
                                     isAddingCategory = true
-                                    category = newCategoryText.isEmpty ? "General" : newCategoryText
+                                    focusedField = .customCategory
+                                } else {
+                                    isAddingCategory = false
+                                    categoryOverride = newValue
                                 }
                             }
-
-                            if isAddingCategory {
-                                TextField("Category name", text: $newCategoryText)
-                                    .onChange(of: newCategoryText) { _, v in
-                                        if !v.isEmpty { category = v }
-                                    }
+                        )) {
+                            ForEach(existingCategories, id: \.self) { cat in
+                                Text(cat).tag(cat)
                             }
+                            Text("New category…").tag("__new__")
+                        } label: {
+                            HStack(spacing: 8) {
+                                Text("Category")
+                                if categoryOverride == nil && !isAddingCategory && !name.isEmpty {
+                                    Text("auto")
+                                        .font(.caption2.weight(.semibold))
+                                        .foregroundStyle(Color.brandBlue)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Color.brandBlue.opacity(0.12))
+                                        .clipShape(Capsule())
+                                }
+                            }
+                        }
+
+                        if isAddingCategory {
+                            TextField("Category name", text: $customCategoryText)
+                                .focused($focusedField, equals: .customCategory)
+                        }
+                    } footer: {
+                        if categoryOverride == nil && !isAddingCategory && !name.isEmpty {
+                            Text("Sorted automatically — change it if it's wrong.")
                         }
                     }
                 }
 
-                // Color
-                Section("Colour") {
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 8), spacing: 10) {
-                        ForEach(CATEGORY_COLORS, id: \.self) { hex in
-                            Button {
-                                selectedColor = hex
-                                Haptics.selection()
-                            } label: {
-                                Circle()
-                                    .fill(Color(hex: hex))
-                                    .frame(width: 28, height: 28)
-                                    .overlay(
-                                        Circle()
-                                            .strokeBorder(Color.ink.opacity(selectedColor == hex ? 0.8 : 0), lineWidth: 2.5)
-                                            .padding(2)
-                                    )
-                                    .scaleEffect(selectedColor == hex ? 1.15 : 1)
-                                    .animation(Motion.snappy, value: selectedColor)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.vertical, 6)
-                }
-
-                // Recurring
                 Section {
+                    if isCurrentMonth {
+                        DatePicker(
+                            "Date",
+                            selection: $entryDate,
+                            in: monthDateRange,
+                            displayedComponents: .date
+                        )
+                    } else {
+                        DatePicker(
+                            "Date",
+                            selection: $entryDate,
+                            in: monthDateRange,
+                            displayedComponents: .date
+                        )
+                        Text("Adding to \(formatMonth(store.selectedMonth))")
+                            .font(.caption)
+                            .foregroundStyle(Color.muted)
+                    }
+
                     Toggle("Recurring monthly", isOn: $recurring)
                         .tint(.brandMint)
                 }
@@ -703,7 +814,35 @@ struct AddEntrySheet: View {
                     Section {
                         Text("Please enter a name and a valid amount.")
                             .font(.caption)
-                            .foregroundStyle(.brandRed)
+                            .foregroundStyle(Color.brandRed)
+                    }
+                }
+
+                Section {
+                    Button {
+                        if save() {
+                            // Reset for the next entry, keep the keyboard up.
+                            name = ""
+                            amountText = ""
+                            categoryOverride = nil
+                            isAddingCategory = false
+                            customCategoryText = ""
+                            recurring = false
+                            focusedField = .name
+                            withAnimation(Motion.snappy) { savedFlash = true }
+                            Task {
+                                try? await Task.sleep(for: .seconds(1.2))
+                                withAnimation { savedFlash = false }
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            Spacer()
+                            Label(savedFlash ? "Saved!" : "Save & add another",
+                                  systemImage: savedFlash ? "checkmark.circle.fill" : "plus.circle")
+                                .foregroundStyle(savedFlash ? Color.brandMint : Color.brandBlue)
+                            Spacer()
+                        }
                     }
                 }
             }
@@ -716,49 +855,65 @@ struct AddEntrySheet: View {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { save() }
-                        .fontWeight(.semibold)
-                        .tint(.brandBlue)
+                    Button("Save") {
+                        if save() { dismiss() }
+                    }
+                    .fontWeight(.semibold)
+                    .tint(.brandBlue)
+                    .disabled(!isValid)
                 }
             }
         }
+        .presentationDetents([.large])
+        .onAppear {
+            // Default the date: today inside the current month, otherwise the
+            // first day of whichever month the user navigated to.
+            entryDate = isCurrentMonth ? .now : monthDateRange.lowerBound
+            // Pop the keyboard with the cursor on the name field immediately.
+            focusedField = .name
+        }
     }
 
-    private func save() {
+    @discardableResult
+    private func save() -> Bool {
         guard isValid else {
             withAnimation(Motion.snappy) { showValidationError = true }
             Haptics.notification(.error)
-            return
+            return false
         }
+        showValidationError = false
 
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let isoDate = dateFormatter.string(from: entryDate)
 
         if kind == .income {
             let entry = IncomeEntry(
                 id: createId(prefix: "inc"),
                 source: trimmedName,
                 amount: amount,
-                color: selectedColor,
-                recurring: recurring
+                color: categoryColor(for: "Income"),
+                recurring: recurring,
+                date: isoDate
             )
             store.addIncome(entry)
         } else {
-            let resolvedCategory = category == "__new__"
-                ? (newCategoryText.isEmpty ? "General" : newCategoryText)
-                : category
+            let category = resolvedCategory
             let entry = ExpenseEntry(
                 id: createId(prefix: "exp"),
                 name: trimmedName,
-                category: resolvedCategory,
+                category: category,
                 amount: amount,
-                color: selectedColor,
-                recurring: recurring
+                color: categoryColor(for: category),
+                recurring: recurring,
+                date: isoDate
             )
             store.addExpense(entry)
         }
 
         Haptics.confirmSave()
-        dismiss()
+        return true
     }
 }
 
@@ -836,7 +991,7 @@ struct EditIncomeSheet: View {
                     Section {
                         Text("Please enter a source and a valid amount.")
                             .font(.caption)
-                            .foregroundStyle(.brandRed)
+                            .foregroundStyle(Color.brandRed)
                     }
                 }
             }
@@ -980,7 +1135,7 @@ struct EditExpenseSheet: View {
                     Section {
                         Text("Please enter a name and a valid amount.")
                             .font(.caption)
-                            .foregroundStyle(.brandRed)
+                            .foregroundStyle(Color.brandRed)
                     }
                 }
             }

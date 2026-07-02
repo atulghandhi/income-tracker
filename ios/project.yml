@@ -14,7 +14,7 @@ configs:
 settings:
   base:
     SWIFT_VERSION: "6.0"
-    DEVELOPMENT_TEAM: ""
+    DEVELOPMENT_TEAM: "M4XK94CMJX"
     TARGETED_DEVICE_FAMILY: "1"
     SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
 
@@ -49,17 +49,25 @@ targets:
           - UIInterfaceOrientationLandscapeRight
           - UIInterfaceOrientationLandscapeLeft
         NSFaceIDUsageDescription: "Used to protect your financial data"
-        NSCameraUsageDescription: ""
+        SUPABASE_URL: "https://hgzacqveqrccnvjwumkz.supabase.co"
+        SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhnemFjcXZlcXJjY252and1bWt6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwMDAzNDUsImV4cCI6MjA4ODU3NjM0NX0.ymfxr4YzbspKit3BoVTWICgDiz-DMnCvJb6CZWBQ0wE"
     entitlements:
       path: IncomeTracker/Resources/IncomeTracker.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.incometracker
+        com.apple.developer.applesignin:
+          - Default
     settings:
       base:
         CODE_SIGN_ENTITLEMENTS: IncomeTracker/Resources/IncomeTracker.entitlements
         PRODUCT_BUNDLE_IDENTIFIER: com.incometracker.app
         APP_GROUP_ID: group.com.incometracker
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     dependencies:
       - target: IncomeTrackerWidgets
-      - target: IncomeTrackerIntents
+      - sdk: WidgetKit.framework
+        embed: false
       - package: supabase-swift
         product: Supabase
 
@@ -69,22 +77,16 @@ targets:
     deploymentTarget: "17.0"
     sources:
       - IncomeTrackerWidgets/
+    info:
+      path: IncomeTrackerWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: "Income Tracker"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.incometracker.app.widgets
-    dependencies:
-      - package: supabase-swift
-        product: Supabase
-
-  IncomeTrackerIntents:
-    type: app-extension
-    platform: iOS
-    deploymentTarget: "17.0"
-    sources:
-      - IncomeTrackerIntents/
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.incometracker.app.intents
+        CODE_SIGN_ENTITLEMENTS: IncomeTrackerWidgets/IncomeTrackerWidgets.entitlements
 
   IncomeTrackerTests:
     type: bundle.unit-test

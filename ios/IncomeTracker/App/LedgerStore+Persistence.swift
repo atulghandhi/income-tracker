@@ -34,6 +34,9 @@ extension LedgerStore {
     ///   • If the two states diverge meaningfully (both have recent activity),
     ///     set sync.mergeConflict so the user can pick a winner.
     func hydrate(sync: SyncCoordinator) async {
+        saveStatus = .loading
+        defer { saveStatus = .loaded }
+
         // 1. Load local state.
         let localState = loadFromUserDefaults()
 
@@ -119,9 +122,10 @@ extension LedgerStore {
         do {
             sync.isSyncing = true
             try await sync.saveCloudState(state, userId: userId)
+            saveStatus = .loaded
         } catch {
-            // TODO: surface persistent failure via saveStatus = .offline
-            print("[LedgerStore] syncToCloud failed: \(error)")
+            sync.lastSyncError = error.localizedDescription
+            saveStatus = .offline
         }
         sync.isSyncing = false
     }
@@ -137,7 +141,7 @@ extension LedgerStore {
 
     /// Returns the current state as a CSV string using FinanceEngine.
     func exportCSV() -> String {
-        FinanceEngine.csvExport(state: state)
+        FinanceEngine.csvExport(state)
     }
 
     // MARK: - Import
@@ -161,7 +165,9 @@ extension LedgerStore {
         }
 
         let imported = try decoder.decode(LedgerState.self, from: data)
-        state = imported
+        // Route through update() so the import is undoable and triggers the
+        // debounced local save + cloud push like any other mutation.
+        update { $0 = imported }
     }
 
     // MARK: - Private helpers

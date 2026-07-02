@@ -18,6 +18,7 @@
 //   xcodebuild test -scheme IncomeTrackerTests -destination 'platform=iOS Simulator,name=iPhone 16'
 
 import XCTest
+@testable import IncomeTracker
 
 // MARK: - Codable shims for fixture JSON
 
@@ -64,7 +65,8 @@ final class FinanceEngineTests: XCTestCase {
 
     // MARK: - Fixture loading (loaded once per test run)
 
-    private static var fixtures: [Fixture] = []
+    // Written once in class setUp() before any test runs, read-only afterwards.
+    nonisolated(unsafe) private static var fixtures: [Fixture] = []
 
     override class func setUp() {
         super.setUp()

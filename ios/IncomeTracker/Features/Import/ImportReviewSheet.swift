@@ -259,6 +259,15 @@ private struct ImportRowCell: View {
                     .font(.subheadline)
                     .foregroundStyle(row.include ? Color.ink : Color.muted)
                     .lineLimit(1)
+
+                // Point at the entry this row appears to duplicate so the
+                // user can compare before opting in.
+                if let match = row.duplicateOf {
+                    Label("May duplicate “\(match)”", systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption2)
+                        .foregroundStyle(Color.brandAmber)
+                        .lineLimit(2)
+                }
             }
 
             Spacer()

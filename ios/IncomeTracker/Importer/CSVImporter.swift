@@ -23,6 +23,9 @@ public struct CsvImportRow: Codable, Sendable, Identifiable {
     public var color: String
     public var include: Bool
     public var duplicate: Bool
+    /// Label of the existing ledger entry this row appears to duplicate
+    /// (same day + same amount, typically a manually added transaction).
+    public var duplicateOf: String?
     public var confidence: Double
     public var note: String
     public var hash: String
@@ -133,6 +136,7 @@ public func parseBankCsv(
     let columns = detectColumns(normalizedHeaders)
     let validationErrors = validateColumns(columns)
     let existingHashes = collectExistingTransactionHashes(state)
+    let existingByDateAmount = collectManualEntriesByDateAmount(state)
 
     if !validationErrors.isEmpty {
         return CsvImportResult(
@@ -158,8 +162,24 @@ public func parseBankCsv(
         let suggestion = suggestCategory(description: desc, amount: parsedAmount,
                                           rules: state.categoryRules, bankCategory: bankCategory)
         let h = createTransactionHash(date: isoDate, description: desc, amount: parsedAmount)
-        let isDuplicate = existingHashes.contains(h)
+        let exactDuplicate = existingHashes.contains(h)
+        // Fuzzy check: an existing entry (typically added by hand) with the
+        // same amount on the same day is very likely the same transaction,
+        // even when the typed name doesn't match the bank's description.
+        let sameDayMatch = exactDuplicate
+            ? nil
+            : existingByDateAmount[dateAmountKey(date: isoDate, amount: parsedAmount)]
+        let isDuplicate = exactDuplicate || sameDayMatch != nil
         let kind = suggestion.kind
+
+        let note: String
+        if exactDuplicate {
+            note = "Possible duplicate"
+        } else if let sameDayMatch {
+            note = "Same amount on the same day as “\(sameDayMatch)”"
+        } else {
+            note = suggestion.note
+        }
 
         rows.append(CsvImportRow(
             id: "draft-\(rowNumber)-\(h)",
@@ -176,8 +196,9 @@ public func parseBankCsv(
             color: csvCategoryColor(suggestion.category),
             include: !isDuplicate && kind != .transfer,
             duplicate: isDuplicate,
+            duplicateOf: sameDayMatch,
             confidence: suggestion.confidence,
-            note: isDuplicate ? "Possible duplicate" : suggestion.note,
+            note: note,
             hash: h
         ))
     }
@@ -601,11 +622,27 @@ private func monthStartDate(_ monthKey: String) -> String {
 
 // MARK: - Category suggestion
 
-private struct CategorySuggestion {
-    let kind: TransactionKind
-    let category: String
-    let confidence: Double
-    let note: String
+public struct CategorySuggestion: Sendable {
+    public let kind: TransactionKind
+    public let category: String
+    public let confidence: Double
+    public let note: String
+}
+
+/// Suggests a category/kind for a manually typed entry name using the same
+/// learned + system rules as the CSV importer. `amount` follows the CSV sign
+/// convention (negative = money out).
+public func suggestEntryCategory(
+    description: String,
+    amount: Double,
+    rules: [CategoryRule]
+) -> CategorySuggestion {
+    suggestCategory(description: description, amount: amount, rules: rules, bankCategory: "")
+}
+
+/// Stable palette color for a category name (shared with the CSV importer).
+public func categoryColor(for category: String) -> String {
+    csvCategoryColor(category)
 }
 
 private func suggestCategory(description: String, amount: Double,
@@ -649,6 +686,29 @@ private func suggestCategory(description: String, amount: Double,
 }
 
 // MARK: - Duplicate detection
+
+/// Key for the same-day/same-amount duplicate index. Amounts follow the CSV
+/// sign convention (negative = money out) rounded to 2 dp.
+func dateAmountKey(date: String, amount: Double) -> String {
+    "\(date)|\(String(format: "%.2f", amount))"
+}
+
+/// Indexes manually added entries (no import metadata) by date + signed amount
+/// so CSV rows that mirror a hand-typed transaction can be flagged for review.
+private func collectManualEntriesByDateAmount(_ state: LedgerState) -> [String: String] {
+    var index: [String: String] = [:]
+    for (_, month) in state.months {
+        for income in month.incomes where income.imported == nil {
+            guard let d = income.date else { continue }
+            index[dateAmountKey(date: d, amount: abs(income.amount))] = income.source
+        }
+        for expense in month.expenses where expense.imported == nil {
+            guard let d = expense.date else { continue }
+            index[dateAmountKey(date: d, amount: -abs(expense.amount))] = expense.name
+        }
+    }
+    return index
+}
 
 private func collectExistingTransactionHashes(_ state: LedgerState) -> Set<String> {
     var hashes = Set<String>()

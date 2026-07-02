@@ -15,13 +15,14 @@ struct RootView: View {
 
     var body: some View {
         TabView {
-            // Tab 1: Dashboard
-            NavigationStack { DashboardScreen() }
-                .tabItem { Label("Dashboard", systemImage: "square.grid.2x2") }
-
-            // Tab 2: Ledger
+            // Tab 1: Ledger — the quick-add home screen. Opening the app lands
+            // here so logging a transaction is one tap away.
             NavigationStack { LedgerScreen() }
                 .tabItem { Label("Ledger", systemImage: "list.bullet.rectangle") }
+
+            // Tab 2: Dashboard
+            NavigationStack { DashboardScreen() }
+                .tabItem { Label("Dashboard", systemImage: "square.grid.2x2") }
 
             // Tab 3: Accounts
             NavigationStack { AccountsScreen() }
@@ -48,7 +49,7 @@ struct RootView: View {
                 SyncNudgeBanner(
                     onSignIn: {
                         withAnimation { showSyncNudge = false }
-                        // TODO: trigger Google / Apple sign-in sheet from here.
+                        showSettings = true
                     },
                     onDismiss: {
                         syncNudgeDismissed = true
@@ -70,16 +71,36 @@ struct RootView: View {
                 .interactiveDismissDisabled(true)
         }
         .task {
-            // 1. Restore any persisted auth session before touching the cloud.
+            // 1. Install the cloud pusher so every debounced local save is
+            //    followed by a push to Supabase while signed in.
+            store.cloudPusher = { state in
+                guard sync.isSignedIn, let userId = sync.currentUser?.id else { return true }
+                do {
+                    try await sync.saveCloudState(state, userId: userId)
+                    return true
+                } catch {
+                    sync.lastSyncError = error.localizedDescription
+                    return false
+                }
+            }
+
+            // 2. Restore any persisted auth session before touching the cloud.
             await sync.restoreSession()
 
-            // 2. Hydrate store: local first, then cloud if signed in.
+            // 3. Hydrate store: local first, then cloud if signed in.
             await store.hydrate(sync: sync)
 
-            // 3. After 60 s show the sync nudge if the user is still signed out.
+            // 4. After 60 s show the sync nudge if the user is still signed out.
             try? await Task.sleep(for: .seconds(60))
             if !sync.isSignedIn {
                 withAnimation { showSyncNudge = true }
+            }
+        }
+        // Signing in after launch (from Settings or the nudge) pulls the cloud
+        // copy and merges it with whatever exists locally.
+        .onChange(of: sync.isSignedIn) { wasSignedIn, isSignedIn in
+            if !wasSignedIn && isSignedIn {
+                Task { await store.hydrate(sync: sync) }
             }
         }
     }

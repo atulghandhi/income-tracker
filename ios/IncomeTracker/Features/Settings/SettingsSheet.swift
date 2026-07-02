@@ -17,6 +17,9 @@ struct SettingsSheet: View {
     @State private var appleSignIn = AppleSignInCoordinator()
     @State private var signInError: String? = nil
     @State private var isSigningIn = false
+    @State private var emailField = ""
+    @State private var passwordField = ""
+    @State private var emailAuthNotice: String? = nil
 
     // Cloud vault
     @State private var isSyncing = false
@@ -154,7 +157,7 @@ struct SettingsSheet: View {
                         Text(user.email ?? "Signed in")
                             .font(.subheadline.weight(.medium))
                             .foregroundStyle(Color.ink)
-                        Text("Connected via Apple / Google")
+                        Text("Syncing across your devices")
                             .font(.caption)
                             .foregroundStyle(Color.muted)
                     }
@@ -163,7 +166,7 @@ struct SettingsSheet: View {
 
                 Button(role: .destructive) {
                     Task {
-                        try? await sync.signOut()
+                        await sync.signOut()
                         Haptics.impact(.light)
                     }
                 } label: {
@@ -173,6 +176,7 @@ struct SettingsSheet: View {
                 // Apple sign-in
                 Button {
                     isSigningIn = true
+                    signInError = nil
                     appleSignIn.onSuccess = { idToken, nonce in
                         Task {
                             do {
@@ -199,6 +203,7 @@ struct SettingsSheet: View {
 
                 // Google sign-in (secondary, text-link style)
                 Button {
+                    signInError = nil
                     Task {
                         do {
                             try await sync.signInWithGoogle()
@@ -219,6 +224,105 @@ struct SettingsSheet: View {
                         .foregroundStyle(Color.brandRed)
                 }
             }
+        }
+
+        if !sync.isSignedIn {
+            emailAuthSection
+        }
+    }
+
+    // MARK: - Email / password section
+
+    @ViewBuilder
+    private var emailAuthSection: some View {
+        Section {
+            TextField("Email", text: $emailField)
+                .keyboardType(.emailAddress)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .textContentType(.username)
+
+            SecureField("Password", text: $passwordField)
+                .textContentType(.password)
+
+            HStack(spacing: 12) {
+                Button {
+                    runEmailAuth {
+                        try await sync.signInWithEmail(
+                            emailField.trimmingCharacters(in: .whitespaces),
+                            password: passwordField
+                        )
+                        emailAuthNotice = nil
+                    }
+                } label: {
+                    if isSigningIn {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Text("Sign in").fontWeight(.semibold)
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.brandBlue)
+                .disabled(!emailFormValid || isSigningIn)
+
+                Button("Create account") {
+                    runEmailAuth {
+                        let result = try await sync.signUpWithEmail(
+                            emailField.trimmingCharacters(in: .whitespaces),
+                            password: passwordField
+                        )
+                        emailAuthNotice = result == .confirmationRequired
+                            ? "Check your inbox — confirm your email, then sign in here."
+                            : nil
+                    }
+                }
+                .buttonStyle(.bordered)
+                .disabled(!emailFormValid || isSigningIn)
+            }
+
+            Button("Forgot password?") {
+                runEmailAuth {
+                    try await sync.sendPasswordReset(
+                        email: emailField.trimmingCharacters(in: .whitespaces)
+                    )
+                    emailAuthNotice = "Password reset email sent."
+                }
+            }
+            .font(.caption)
+            .buttonStyle(.plain)
+            .foregroundStyle(Color.brandBlue)
+            .disabled(emailField.trimmingCharacters(in: .whitespaces).isEmpty || isSigningIn)
+
+            if let notice = emailAuthNotice {
+                Label(notice, systemImage: "envelope.badge")
+                    .font(.caption)
+                    .foregroundStyle(Color.brandMint)
+            }
+        } header: {
+            Text("Or use email")
+        } footer: {
+            Text("Passwords need at least 6 characters. New accounts must confirm their email before the first sign-in.")
+        }
+    }
+
+    private var emailFormValid: Bool {
+        emailField.contains("@") && passwordField.count >= 6
+    }
+
+    /// Shared wrapper: clears errors, shows the spinner, and reports failures.
+    private func runEmailAuth(_ operation: @escaping () async throws -> Void) {
+        signInError = nil
+        emailAuthNotice = nil
+        isSigningIn = true
+        Task {
+            do {
+                try await operation()
+                Haptics.impact(.light)
+            } catch {
+                signInError = error.localizedDescription
+                Haptics.notification(.error)
+            }
+            isSigningIn = false
         }
     }
 
@@ -262,6 +366,12 @@ struct SettingsSheet: View {
                 }
             }
             .disabled(isSyncing || sync.isSyncing || !sync.isSignedIn)
+
+            if let error = sync.lastSyncError {
+                Label(error, systemImage: "exclamationmark.icloud")
+                    .font(.caption)
+                    .foregroundStyle(Color.brandRed)
+            }
         } header: {
             Text("Cloud vault")
         }
@@ -484,9 +594,15 @@ struct SettingsSheet: View {
     private func handleCSVImport(result: Result<URL, Error>) {
         switch result {
         case .success(let url):
-            guard url.startAccessingSecurityScopedResource() else { return }
+            guard url.startAccessingSecurityScopedResource() else {
+                jsonImportError = "Could not open the selected file."
+                return
+            }
             defer { url.stopAccessingSecurityScopedResource() }
-            guard let text = try? String(contentsOf: url, encoding: .utf8) else { return }
+            guard let text = try? String(contentsOf: url, encoding: .utf8) else {
+                jsonImportError = "Could not read the selected file."
+                return
+            }
             let parsed = parseBankCsv(
                 text: text,
                 fileName: url.lastPathComponent,
@@ -496,35 +612,16 @@ struct SettingsSheet: View {
                 csvFileName = url.lastPathComponent
                 csvImportRows = parsed.rows
                 showCSVReview = true
+            } else {
+                jsonImportError = parsed.errors.first ?? "No importable transactions were found."
             }
-        case .failure:
-            break
+        case .failure(let error):
+            jsonImportError = error.localizedDescription
         }
     }
 
     private func commitCSVImport(rows: [CsvImportRow], fileName: String) {
-        let includedRows = rows.filter(\.include)
-        guard !includedRows.isEmpty else { return }
-
-        // Run commitImport against a snapshot so we can inspect the result before
-        // writing to the store in a single atomic update() call.
-        var tempState = store.state
-        let batch = commitImport(rows: rows, into: &tempState, fileName: fileName)
-
-        // Push the computed result into the store atomically.
-        store.update { s in
-            // Copy the affected month budgets (which now carry the new entries).
-            for ref in batch.transactionRefs {
-                s.months[ref.monthKey] = tempState.months[ref.monthKey]
-            }
-            // Record the batch.
-            s.importBatches.append(batch)
-            // Merge any new category rules that commitImport created.
-            for rule in tempState.categoryRules
-                where !s.categoryRules.contains(where: { $0.id == rule.id }) {
-                s.categoryRules.append(rule)
-            }
-        }
+        store.commitCSVImport(rows: rows, fileName: fileName)
         Haptics.confirmSave()
     }
 

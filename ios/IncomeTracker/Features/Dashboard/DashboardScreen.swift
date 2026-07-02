@@ -468,14 +468,14 @@ struct QuickActionsRow: View {
     @Environment(LedgerStore.self) var store
     @State private var showAddEntry = false
     @State private var showImport = false
-    @State private var addKind: TransactionKind = .income
+    @State private var addKind: TransactionKind = .expense
     @State private var appeared = false
 
-    private let actions: [(label: String, icon: String, color: Color, index: Int)] = [
-        ("Add Entry",   "plus.circle.fill",              .brandMint,  0),
-        ("Import CSV",  "square.and.arrow.down.fill",    .brandBlue,  1),
-        ("Accounts",    "creditcard.fill",               .brandAmber, 2),
-    ]
+    // CSV import review
+    @State private var csvImportRows: [CsvImportRow] = []
+    @State private var csvFileName = ""
+    @State private var showCSVReview = false
+    @State private var csvImportError: String? = nil
 
     var body: some View {
         HStack(spacing: 12) {
@@ -490,11 +490,6 @@ struct QuickActionsRow: View {
                 Haptics.impact(.light)
                 showImport = true
             }
-
-            // Accounts (placeholder — navigates via tab bar in real app)
-            quickButton(label: "Accounts", icon: "creditcard.fill", color: .brandAmber, delayIndex: 2) {
-                Haptics.impact(.light)
-            }
         }
         .onAppear {
             withAnimation(Motion.bouncy.delay(0.1)) { appeared = true }
@@ -502,6 +497,61 @@ struct QuickActionsRow: View {
         .sheet(isPresented: $showAddEntry) {
             AddEntrySheet(kind: $addKind)
                 .environment(store)
+        }
+        .fileImporter(
+            isPresented: $showImport,
+            allowedContentTypes: [.commaSeparatedText]
+        ) { result in
+            handleCSVImport(result: result)
+        }
+        .sheet(isPresented: $showCSVReview) {
+            ImportReviewSheet(
+                rows: csvImportRows,
+                fileName: csvFileName,
+                onConfirm: { confirmedRows in
+                    store.commitCSVImport(rows: confirmedRows, fileName: csvFileName)
+                    Haptics.confirmSave()
+                    showCSVReview = false
+                },
+                onDismiss: { showCSVReview = false }
+            )
+        }
+        .alert("Import error", isPresented: Binding(
+            get: { csvImportError != nil },
+            set: { if !$0 { csvImportError = nil } }
+        )) {
+            Button("OK") { csvImportError = nil }
+        } message: {
+            Text(csvImportError ?? "")
+        }
+    }
+
+    private func handleCSVImport(result: Result<URL, Error>) {
+        switch result {
+        case .success(let url):
+            guard url.startAccessingSecurityScopedResource() else {
+                csvImportError = "Could not open the selected file."
+                return
+            }
+            defer { url.stopAccessingSecurityScopedResource() }
+            guard let text = try? String(contentsOf: url, encoding: .utf8) else {
+                csvImportError = "Could not read the selected file."
+                return
+            }
+            let parsed = parseBankCsv(
+                text: text,
+                fileName: url.lastPathComponent,
+                state: store.state
+            )
+            if parsed.rows.isEmpty {
+                csvImportError = parsed.errors.first ?? "No importable transactions were found."
+            } else {
+                csvFileName = url.lastPathComponent
+                csvImportRows = parsed.rows
+                showCSVReview = true
+            }
+        case .failure(let error):
+            csvImportError = error.localizedDescription
         }
     }
 

@@ -42,7 +42,7 @@ struct FeedbackSheet: View {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 56))
                             .foregroundStyle(Color.brandMint)
-                            .symbolEffect(.bounce)
+                            .symbolEffect(.bounce, value: submitStatus)
                         Text("Thanks for your feedback!")
                             .font(.title2.bold())
                         Text("We'll review it shortly.")
@@ -168,8 +168,8 @@ extension SyncCoordinator {
             let subject: String
             let description: String
             let email: String?
-            let app_version: String
-            let created_at: String
+            let user_id: String?
+            let user_agent: String
         }
 
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
@@ -178,8 +178,8 @@ extension SyncCoordinator {
             subject: subject,
             description: description,
             email: email,
-            app_version: version,
-            created_at: ISO8601DateFormatter().string(from: .now)
+            user_id: currentUser?.id,
+            user_agent: "IncomeTracker-iOS/\(version)"
         )
 
         let body = try JSONEncoder().encode(payload)
