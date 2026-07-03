@@ -64,6 +64,9 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.incometracker.app
         APP_GROUP_ID: group.com.incometracker
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # xcodegen's iOS target defaults set "1,2"; pin to iPhone-only so App
+        # Store validation doesn't demand iPad multitasking orientations.
+        TARGETED_DEVICE_FAMILY: "1"
     dependencies:
       - target: IncomeTrackerWidgets
       - sdk: WidgetKit.framework
@@ -87,6 +90,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.incometracker.app.widgets
         CODE_SIGN_ENTITLEMENTS: IncomeTrackerWidgets/IncomeTrackerWidgets.entitlements
+        TARGETED_DEVICE_FAMILY: "1"
 
   IncomeTrackerTests:
     type: bundle.unit-test
@@ -101,6 +105,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.incometracker.tests
+        TARGETED_DEVICE_FAMILY: "1"
 
 schemes:
   IncomeTracker:
