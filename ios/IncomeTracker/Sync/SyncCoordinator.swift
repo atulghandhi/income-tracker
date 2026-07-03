@@ -635,7 +635,10 @@ final class SyncCoordinator {
             let expires_in: Double?
             let user: SupabaseUser?
         }
-        let response = try JSONDecoder.supabase.decode(AuthResponse.self, from: data)
+        // Plain decoder: property names above already match the snake_case wire
+        // keys. JSONDecoder.supabase's convertFromSnakeCase would rename
+        // "access_token" → "accessToken" and fail with keyNotFound.
+        let response = try JSONDecoder().decode(AuthResponse.self, from: data)
         let previous = loadStoredSession()
         let session = StoredSession(
             accessToken: response.access_token,

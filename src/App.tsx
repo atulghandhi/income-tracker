@@ -1745,10 +1745,6 @@ function App() {
                   <p className="panelSubcopy">Projects your recurring monthly surplus, debt payments, and interest after any 0% period ends. One-off items are not extrapolated.</p>
                   <NetWorthChart points={netWorthOutlook} formatter={moneyFormatter} privacy={ledger.privacyMode} compact />
                 </article>
-                <article className="miniPanel ledgerPreview">
-                  <PanelTitle title="Master ledger" icon={<ReceiptText size={16} />} />
-                  <TransactionHistory month={currentMonth} privacy={ledger.privacyMode} formatter={moneyFormatter} />
-                </article>
                 <article className="miniPanel debtPanel">
                   <PanelTitle title="Accounts and imports" icon={<CreditCard size={16} />} />
                   <div className="debtMiniGrid">
@@ -4409,29 +4405,49 @@ function NetWorthChart({
   const width = 720;
   const height = 260;
   const padding = 28;
+  const plotTop = padding;
+  const plotBottom = height - padding;
+  const plotHeight = plotBottom - plotTop;
   const values = points.map((point) => point.netWorth);
-  const minValue = Math.min(...values, 0);
-  const maxValue = Math.max(...values, 1);
-  const range = Math.max(1, maxValue - minValue);
+  // Scale to the actual data so small movements stay visible even deep in the
+  // red — never anchor the domain to zero (that flattens all-negative data
+  // into a line pinned at the bottom of the plot).
+  const rawMin = Math.min(...values);
+  const rawMax = Math.max(...values);
+  const spread = Math.max(rawMax - rawMin, Math.max(Math.abs(rawMax), Math.abs(rawMin)) * 0.02, 1);
+  const domainPad = spread * 0.12;
+  const minValue = rawMin - domainPad;
+  const maxValue = rawMax + domainPad;
+  const range = maxValue - minValue;
+  const yFor = (value: number) => plotTop + ((maxValue - value) / range) * plotHeight;
+  const zeroY = yFor(0);
+  const zeroVisible = zeroY >= plotTop && zeroY <= plotBottom;
+  // Fraction of the plot height where the zero line sits — the stroke/fill
+  // gradients flip from green to red at this offset.
+  const zeroOffset = Math.min(1, Math.max(0, (zeroY - plotTop) / plotHeight));
+  const areaBaselineY = Math.min(plotBottom, Math.max(plotTop, zeroY));
   const lastPoint = points[points.length - 1] ?? points[0];
   const totalInterest = points.reduce((sum, point) => sum + point.interestCharged, 0);
   const totalGrowth = points.reduce((sum, point) => sum + point.growthEarned, 0);
+  const xFor = (index: number) => padding + (index / Math.max(points.length - 1, 1)) * (width - padding * 2);
   const path = points
-    .map((point, index) => {
-      const x = padding + (index / Math.max(points.length - 1, 1)) * (width - padding * 2);
-      const y = padding + ((maxValue - point.netWorth) / range) * (height - padding * 2);
-      return `${index === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
-    })
+    .map((point, index) => `${index === 0 ? "M" : "L"} ${xFor(index).toFixed(1)} ${yFor(point.netWorth).toFixed(1)}`)
     .join(" ");
-  const areaPath = `${path} L ${width - padding} ${height - padding} L ${padding} ${height - padding} Z`;
+  // Shade between the line and the zero axis (or the nearest plot edge when
+  // zero is out of frame) so negative territory reads as a red region.
+  const areaPath = `${path} L ${width - padding} ${areaBaselineY.toFixed(1)} L ${padding} ${areaBaselineY.toFixed(1)} Z`;
   const markerPoints = points.filter((point) => point.monthIndex % 12 === 0 || point.monthIndex === points.length - 1);
+  const mint = "#00dfc1";
+  const red = "#ff8a7a";
 
   return (
     <div className={compact ? "netWorthChart compact" : "netWorthChart"}>
       <div className="netWorthStats">
         <div>
           <span>Ending net worth</span>
-          <strong className={privacy ? "masked" : ""}>{formatter.format(lastPoint?.netWorth ?? 0)}</strong>
+          <strong className={`${(lastPoint?.netWorth ?? 0) >= 0 ? "positiveText" : "negativeText"} ${privacy ? "masked" : ""}`}>
+            {formatter.format(lastPoint?.netWorth ?? 0)}
+          </strong>
         </div>
         <div>
           <span>Ending assets</span>
@@ -4443,25 +4459,46 @@ function NetWorthChart({
         </div>
         <div>
           <span>Interest paid</span>
-          <strong className={privacy ? "masked" : ""}>{formatter.format(totalInterest)}</strong>
+          <strong className={`${totalInterest > 0 ? "negativeText" : ""} ${privacy ? "masked" : ""}`}>{formatter.format(totalInterest)}</strong>
         </div>
       </div>
       <div className="netWorthSvgWrap">
         <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Projected net worth over selected horizon">
           <defs>
-            <linearGradient id="netWorthFill" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor="rgba(0, 223, 193, 0.24)" />
-              <stop offset="100%" stopColor="rgba(0, 223, 193, 0.02)" />
+            <linearGradient id="netWorthStroke" gradientUnits="userSpaceOnUse" x1="0" y1={plotTop} x2="0" y2={plotBottom}>
+              <stop offset="0" stopColor={mint} />
+              <stop offset={zeroOffset} stopColor={mint} />
+              <stop offset={zeroOffset} stopColor={red} />
+              <stop offset="1" stopColor={red} />
+            </linearGradient>
+            <linearGradient id="netWorthFill" gradientUnits="userSpaceOnUse" x1="0" y1={plotTop} x2="0" y2={plotBottom}>
+              <stop offset="0" stopColor="rgba(0, 223, 193, 0.22)" />
+              <stop offset={zeroOffset} stopColor="rgba(0, 223, 193, 0.03)" />
+              <stop offset={zeroOffset} stopColor="rgba(255, 138, 122, 0.05)" />
+              <stop offset="1" stopColor="rgba(255, 138, 122, 0.24)" />
             </linearGradient>
           </defs>
-          <line className="netWorthAxis" x1={padding} x2={width - padding} y1={height - padding} y2={height - padding} />
+          <line className="netWorthAxis" x1={padding} x2={width - padding} y1={plotBottom} y2={plotBottom} />
+          {zeroVisible && (
+            <>
+              <line className="netWorthZeroAxis" x1={padding} x2={width - padding} y1={zeroY} y2={zeroY} />
+              <text className="netWorthZeroLabel" x={width - padding} y={zeroY - 6} textAnchor="end">
+                {formatter.format(0)}
+              </text>
+            </>
+          )}
           <path d={areaPath} fill="url(#netWorthFill)" />
-          <path className="netWorthLine" d={path} />
-          {markerPoints.map((point) => {
-            const x = padding + (point.monthIndex / Math.max(points.length - 1, 1)) * (width - padding * 2);
-            const y = padding + ((maxValue - point.netWorth) / range) * (height - padding * 2);
-            return <circle key={point.monthIndex} className="netWorthDot" cx={x} cy={y} r="4" />;
-          })}
+          <path className="netWorthLine" d={path} style={{ stroke: "url(#netWorthStroke)" }} />
+          {markerPoints.map((point) => (
+            <circle
+              key={point.monthIndex}
+              className="netWorthDot"
+              cx={xFor(point.monthIndex)}
+              cy={yFor(point.netWorth)}
+              r="4"
+              style={{ stroke: point.netWorth >= 0 ? mint : red }}
+            />
+          ))}
         </svg>
         <div className="netWorthLabels">
           {markerPoints.map((point) => (
@@ -4469,52 +4506,6 @@ function NetWorthChart({
           ))}
         </div>
       </div>
-    </div>
-  );
-}
-
-function TransactionHistory({ month, privacy, formatter }: { month: MonthBudget; privacy: boolean; formatter: Intl.NumberFormat }) {
-  const rows = [
-    ...month.incomes.map((income) => ({
-      id: income.id,
-      type: "Income",
-      name: income.source,
-      category: "Input",
-      amount: income.amount,
-    })),
-    ...month.expenses.map((expense) => ({
-      id: expense.id,
-      type: "Expense",
-      name: expense.name,
-      category: expense.category || "Ungrouped",
-      amount: -expense.amount,
-    })),
-  ];
-
-  if (!rows.length) {
-    return <EmptyState icon={<ReceiptText size={18} />} title="No records yet" text="Add income and expenses in the Ledger view to populate history." />;
-  }
-
-  return (
-    <div className="historyTable">
-      <div className="historyHead">
-        <span>Source / Name</span>
-        <span>Category</span>
-        <span>Amount</span>
-      </div>
-      {rows.slice(0, 7).map((row) => (
-        <div className="historyRow" key={row.id}>
-          <div>
-            <strong>{row.name}</strong>
-            <small>{row.type}</small>
-          </div>
-          <span>{row.category}</span>
-          <b className={`${row.amount >= 0 ? "positiveText" : "negativeText"} ${privacy ? "masked" : ""}`}>
-            {row.amount >= 0 ? "+" : ""}
-            {formatter.format(row.amount)}
-          </b>
-        </div>
-      ))}
     </div>
   );
 }

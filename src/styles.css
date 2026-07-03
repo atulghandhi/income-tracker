@@ -1776,7 +1776,6 @@ textarea:focus,
 }
 
 .flowPanel,
-.ledgerPreview,
 .debtPanel,
 .accountsPanel,
 .accountEditorPanel,
@@ -2200,6 +2199,18 @@ textarea:focus,
 .netWorthAxis {
   stroke: rgba(198, 198, 203, 0.18);
   stroke-width: 2;
+}
+
+.netWorthZeroAxis {
+  stroke: rgba(198, 198, 203, 0.45);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+}
+
+.netWorthZeroLabel {
+  fill: rgba(212, 228, 250, 0.55);
+  font-size: 12px;
+  font-family: inherit;
 }
 
 .netWorthLine {
