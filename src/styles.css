@@ -1,11 +1,66 @@
+/* ─── Theme tokens ────────────────────────────────────────────────────────────
+   Light is the default theme (Copilot-Money-inspired: tinted page, white cards,
+   colourful accents). [data-theme="dark"] swaps every token; the rest of the
+   sheet only ever reads tokens, so components restyle themselves. The --*-rgb
+   triplets exist so alpha washes (rgba(var(--x-rgb), .12)) re-theme too. */
 :root {
-  color-scheme: dark;
+  color-scheme: light;
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
   font-synthesis: none;
   text-rendering: geometricPrecision;
   -webkit-font-smoothing: antialiased;
+  --bg: #eef1f8;
+  --bg-deep: #e5eaf4;
+  --nav: #fbfcfe;
+  --surface: #ffffff;
+  --surface-high: #f3f6fb;
+  --surface-higher: #e9eef7;
+  --glass: rgba(255, 255, 255, 0.82);
+  --ink: #1b2a44;
+  --muted: #5d6b84;
+  --faint: #8b97ac;
+  --line: rgba(31, 52, 85, 0.11);
+  --line-strong: rgba(31, 52, 85, 0.24);
+  --blue: #2b6ceb;
+  --blue-bright: #2059cc;
+  --blue-soft: rgba(43, 108, 235, 0.1);
+  --mint: #0b9883;
+  --mint-soft: rgba(11, 152, 131, 0.12);
+  --red: #ca3636;
+  --red-soft: rgba(202, 54, 54, 0.1);
+  --amber: #b2740a;
+  --on-ink: #ffffff;
+  --on-accent: #ffffff;
+  --ink-rgb: 27, 42, 68;
+  --line-rgb: 31, 52, 85;
+  --surface-rgb: 255, 255, 255;
+  --surface-higher-rgb: 226, 232, 242;
+  --nav-rgb: 251, 252, 254;
+  --bg-rgb: 255, 255, 255;
+  --bg-deep-rgb: 24, 42, 72;
+  --mint-rgb: 11, 152, 131;
+  --blue-rgb: 43, 108, 235;
+  --blue-bright-rgb: 32, 89, 204;
+  --red-rgb: 202, 54, 54;
+  --amber-rgb: 178, 116, 10;
+  --on-ink-rgb: 255, 255, 255;
+  --shadow-sm: 0 1px 2px rgba(24, 42, 72, 0.05), 0 2px 10px rgba(24, 42, 72, 0.05);
+  --shadow-md: 0 2px 6px rgba(24, 42, 72, 0.05), 0 14px 36px rgba(24, 42, 72, 0.09);
+  --well: rgba(24, 42, 72, 0.06);
+  --well-strong: rgba(24, 42, 72, 0.1);
+  --track: rgba(24, 42, 72, 0.12);
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --nav-width: 256px;
+  --mono:
+    "Geist Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
   --bg: #051424;
   --bg-deep: #010f1f;
   --nav: #0d1c2d;
@@ -19,18 +74,33 @@
   --line: rgba(198, 198, 203, 0.12);
   --line-strong: rgba(198, 198, 203, 0.28);
   --blue: #3291ff;
+  --blue-bright: #a7c8ff;
   --blue-soft: rgba(50, 145, 255, 0.15);
   --mint: #00dfc1;
   --mint-soft: rgba(0, 223, 193, 0.14);
   --red: #ffb4ab;
   --red-soft: rgba(255, 180, 171, 0.12);
   --amber: #f4c36a;
-  --radius-sm: 3px;
-  --radius: 4px;
-  --radius-lg: 8px;
-  --nav-width: 256px;
-  --mono:
-    "Geist Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --on-ink: #071526;
+  --on-accent: #001b3c;
+  --ink-rgb: 212, 228, 250;
+  --line-rgb: 198, 198, 203;
+  --surface-rgb: 18, 33, 49;
+  --surface-higher-rgb: 39, 54, 71;
+  --nav-rgb: 13, 28, 45;
+  --bg-rgb: 5, 20, 36;
+  --bg-deep-rgb: 1, 15, 31;
+  --mint-rgb: 0, 223, 193;
+  --blue-rgb: 50, 145, 255;
+  --blue-bright-rgb: 167, 200, 255;
+  --red-rgb: 255, 180, 171;
+  --amber-rgb: 244, 195, 106;
+  --on-ink-rgb: 7, 21, 38;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 12px 40px rgba(0, 0, 0, 0.38);
+  --well: rgba(1, 15, 31, 0.3);
+  --well-strong: rgba(1, 15, 31, 0.42);
+  --track: rgba(1, 15, 31, 0.8);
 }
 
 * {
@@ -48,9 +118,7 @@ body {
   min-width: 320px;
   min-height: 100vh;
   overflow-x: hidden;
-  background:
-    linear-gradient(180deg, rgba(5, 20, 36, 0.96), rgba(1, 15, 31, 1)),
-    var(--bg);
+  background: linear-gradient(180deg, var(--bg), var(--bg-deep));
   color: var(--ink);
 }
 
@@ -74,7 +142,7 @@ textarea {
 }
 
 ::selection {
-  background: rgba(0, 223, 193, 0.3);
+  background: rgba(var(--mint-rgb), 0.3);
   color: var(--ink);
 }
 
@@ -88,18 +156,19 @@ textarea {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(198, 198, 203, 0.18);
+  background: rgba(var(--line-rgb), 0.18);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(198, 198, 203, 0.34);
+  background: rgba(var(--line-rgb), 0.34);
 }
 
 .appShell {
   min-height: 100vh;
   background:
-    radial-gradient(1200px 600px at 70% -20%, rgba(50, 145, 255, 0.07), transparent 58%),
+    radial-gradient(1100px 520px at 78% -12%, rgba(var(--blue-rgb), 0.09), transparent 60%),
+    radial-gradient(900px 480px at -10% 32%, rgba(var(--mint-rgb), 0.06), transparent 55%),
     var(--bg);
 }
 
@@ -109,8 +178,8 @@ textarea {
   place-items: center;
   padding: 24px;
   background:
-    linear-gradient(180deg, rgba(5, 20, 36, 0.94), rgba(1, 15, 31, 1)),
-    var(--bg);
+    radial-gradient(1000px 500px at 70% -10%, rgba(var(--blue-rgb), 0.09), transparent 60%),
+    linear-gradient(180deg, var(--bg), var(--bg-deep));
 }
 
 .authPanel {
@@ -165,7 +234,7 @@ textarea {
 
 .authCopy p {
   margin: 0;
-  color: rgba(212, 228, 250, 0.78);
+  color: rgba(var(--ink-rgb), 0.78);
   font-size: 16px;
   line-height: 1.55;
 }
@@ -176,10 +245,10 @@ textarea {
   align-items: center;
   justify-content: center;
   gap: 12px;
-  border: 1px solid rgba(212, 228, 250, 0.36);
+  border: 1px solid rgba(var(--ink-rgb), 0.36);
   border-radius: var(--radius);
-  background: #d4e4fa;
-  color: #071526;
+  background: var(--ink);
+  color: var(--on-ink);
   font-weight: 760;
   transition:
     transform 150ms ease,
@@ -219,7 +288,7 @@ textarea {
   align-items: center;
   gap: 10px;
   padding: 12px 14px;
-  border: 1px solid rgba(255, 180, 171, 0.28);
+  border: 1px solid rgba(var(--red-rgb), 0.28);
   border-radius: var(--radius);
   background: var(--red-soft);
   color: var(--red);
@@ -237,7 +306,7 @@ textarea {
   gap: 24px;
   padding: 28px 16px;
   border-right: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(13, 28, 45, 0.98), rgba(13, 28, 45, 0.94));
+  background: linear-gradient(180deg, rgba(var(--nav-rgb), 0.98), rgba(var(--nav-rgb), 0.94));
 }
 
 .workspace {
@@ -309,8 +378,8 @@ textarea {
   place-items: center;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-lg);
-  background: #d4e4fa;
-  color: #111827;
+  background: var(--ink);
+  color: var(--on-ink);
 }
 
 .navCta {
@@ -318,10 +387,10 @@ textarea {
   gap: 10px;
   min-height: 44px;
   margin: 14px 4px 0;
-  border: 1px solid rgba(50, 145, 255, 0.55);
+  border: 1px solid rgba(var(--blue-rgb), 0.55);
   border-radius: var(--radius);
   background: var(--blue);
-  color: #001b3c;
+  color: var(--on-accent);
   font-weight: 720;
   transition:
     transform 150ms ease,
@@ -330,7 +399,7 @@ textarea {
 }
 
 .navCta:hover {
-  background: #58a6ff;
+  background: var(--blue);
 }
 
 .navCta:active,
@@ -359,7 +428,7 @@ textarea {
   border: 0;
   border-radius: var(--radius);
   background: transparent;
-  color: rgba(212, 228, 250, 0.86);
+  color: rgba(var(--ink-rgb), 0.86);
   font-size: 15px;
   text-align: left;
   transition:
@@ -368,13 +437,13 @@ textarea {
 }
 
 .navItem:hover {
-  background: rgba(39, 54, 71, 0.52);
+  background: rgba(var(--surface-higher-rgb), 0.52);
   color: var(--ink);
 }
 
 .navItem.active {
-  background: rgba(39, 54, 71, 0.48);
-  color: #a7c8ff;
+  background: rgba(var(--surface-higher-rgb), 0.48);
+  color: var(--blue-bright);
 }
 
 .navItem.active::after {
@@ -383,7 +452,7 @@ textarea {
   inset: 5px 0 5px auto;
   width: 2px;
   border-radius: 2px;
-  background: #a7c8ff;
+  background: var(--blue-bright);
 }
 
 .localIdentity {
@@ -416,7 +485,7 @@ textarea {
 }
 
 .profileTrigger:hover {
-  background: rgba(167, 200, 255, 0.07);
+  background: rgba(var(--blue-bright-rgb), 0.07);
 }
 
 .profilePopup {
@@ -427,7 +496,7 @@ textarea {
   z-index: 200;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-lg);
-  background: rgba(13, 28, 45, 0.97);
+  background: rgba(var(--nav-rgb), 0.97);
   backdrop-filter: blur(16px);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.38);
   overflow: hidden;
@@ -467,7 +536,7 @@ textarea {
   padding: 11px 14px;
   border: none;
   background: none;
-  color: rgba(212, 228, 250, 0.82);
+  color: rgba(var(--ink-rgb), 0.82);
   font-size: 13px;
   cursor: pointer;
   transition: background 120ms ease, color 120ms ease;
@@ -475,8 +544,8 @@ textarea {
 }
 
 .profileSignOutBtn:hover {
-  background: rgba(255, 107, 107, 0.1);
-  color: #ff9a9a;
+  background: rgba(var(--red-rgb), 0.1);
+  color: var(--red);
 }
 
 .profileSignOutBtn:disabled {
@@ -533,7 +602,7 @@ textarea {
   gap: 18px;
   padding: 10px 24px;
   border-bottom: 1px solid var(--line);
-  background: rgba(5, 20, 36, 0.82);
+  background: rgba(var(--bg-rgb), 0.82);
   backdrop-filter: blur(24px);
 }
 
@@ -552,7 +621,7 @@ textarea {
   padding: 0 14px;
   border: 1px solid transparent;
   border-radius: var(--radius-lg);
-  background: rgba(13, 28, 45, 0.92);
+  background: rgba(var(--nav-rgb), 0.92);
   color: var(--muted);
   transition:
     border-color 150ms ease,
@@ -560,8 +629,8 @@ textarea {
 }
 
 .searchShell:focus-within {
-  border-color: rgba(167, 200, 255, 0.35);
-  background: rgba(18, 33, 49, 0.96);
+  border-color: rgba(var(--blue-bright-rgb), 0.35);
+  background: rgba(var(--surface-rgb), 0.96);
 }
 
 .searchShell input {
@@ -576,7 +645,7 @@ textarea {
 .searchShell input::placeholder,
 input::placeholder,
 textarea::placeholder {
-  color: rgba(198, 198, 203, 0.56);
+  color: rgba(var(--line-rgb), 0.56);
 }
 
 .topActions {
@@ -590,7 +659,7 @@ textarea::placeholder {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   overflow: hidden;
-  background: rgba(1, 15, 31, 0.36);
+  background: var(--well);
 }
 
 .monthSwitch .iconButton {
@@ -617,8 +686,8 @@ textarea::placeholder {
   min-height: 38px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: rgba(18, 33, 49, 0.76);
-  color: rgba(212, 228, 250, 0.86);
+  background: rgba(var(--surface-rgb), 0.76);
+  color: rgba(var(--ink-rgb), 0.86);
   transition:
     transform 150ms ease,
     border-color 150ms ease,
@@ -637,8 +706,8 @@ textarea::placeholder {
 .commandButton:hover,
 .quietButton:hover,
 .checkButton:hover {
-  border-color: rgba(167, 200, 255, 0.38);
-  background: rgba(39, 54, 71, 0.88);
+  border-color: rgba(var(--blue-bright-rgb), 0.38);
+  background: rgba(var(--surface-higher-rgb), 0.88);
   color: var(--ink);
 }
 
@@ -666,7 +735,7 @@ textarea::placeholder {
   padding: 0 10px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: rgba(18, 33, 49, 0.76);
+  background: rgba(var(--surface-rgb), 0.76);
   color: var(--ink);
   font-family: var(--mono);
   font-weight: 760;
@@ -693,9 +762,9 @@ textarea::placeholder {
   gap: 8px;
   min-height: 34px;
   padding: 5px 10px;
-  border: 1px solid rgba(0, 223, 193, 0.25);
+  border: 1px solid rgba(var(--mint-rgb), 0.25);
   border-radius: 999px;
-  background: rgba(0, 223, 193, 0.05);
+  background: rgba(var(--mint-rgb), 0.05);
   color: var(--mint);
 }
 
@@ -704,14 +773,14 @@ textarea::placeholder {
   height: 8px;
   border-radius: 99px;
   background: var(--mint);
-  box-shadow: 0 0 0 5px rgba(0, 223, 193, 0.1);
+  box-shadow: 0 0 0 5px rgba(var(--mint-rgb), 0.1);
   animation: statusPulse 2.2s ease infinite;
 }
 
 .statusPill.saving > span,
 .statusPill.loading > span {
   background: var(--amber);
-  box-shadow: 0 0 0 5px rgba(244, 195, 106, 0.12);
+  box-shadow: 0 0 0 5px rgba(var(--amber-rgb), 0.12);
 }
 
 .statusPill.offline > span {
@@ -772,7 +841,7 @@ textarea::placeholder {
 .pageHeader p {
   max-width: 690px;
   margin: 14px 0 0;
-  color: rgba(212, 228, 250, 0.78);
+  color: rgba(var(--ink-rgb), 0.78);
   font-size: 16px;
   line-height: 1.55;
 }
@@ -845,6 +914,7 @@ textarea::placeholder {
   border-radius: var(--radius-lg);
   background: var(--glass);
   backdrop-filter: blur(22px);
+  box-shadow: var(--shadow-sm);
 }
 
 .metricCard {
@@ -909,11 +979,11 @@ textarea::placeholder {
 }
 
 .panel.income {
-  border-color: rgba(0, 223, 193, 0.18);
+  border-color: rgba(var(--mint-rgb), 0.18);
 }
 
 .panel.expense {
-  border-color: rgba(255, 180, 171, 0.16);
+  border-color: rgba(var(--red-rgb), 0.16);
 }
 
 .panelHeader {
@@ -922,7 +992,7 @@ textarea::placeholder {
   min-height: 74px;
   padding: 18px 24px;
   border-bottom: 1px solid var(--line);
-  background: rgba(39, 54, 71, 0.18);
+  background: rgba(var(--surface-higher-rgb), 0.18);
 }
 
 .panelHeader h2 {
@@ -965,7 +1035,7 @@ textarea::placeholder {
   min-height: 42px;
   padding: 0 24px;
   border-bottom: 1px solid var(--line);
-  background: rgba(1, 15, 31, 0.12);
+  background: rgba(var(--bg-deep-rgb), 0.12);
 }
 
 .incomeHeader {
@@ -1002,7 +1072,7 @@ textarea::placeholder {
   gap: 12px;
   min-height: 64px;
   padding: 9px 24px;
-  border-bottom: 1px solid rgba(198, 198, 203, 0.08);
+  border-bottom: 1px solid rgba(var(--line-rgb), 0.08);
   animation: rowIn 330ms cubic-bezier(0.16, 1, 0.3, 1) both;
   transition:
     background 150ms ease,
@@ -1011,7 +1081,7 @@ textarea::placeholder {
 }
 
 .financeRow:hover {
-  background: rgba(39, 54, 71, 0.26);
+  background: rgba(var(--surface-higher-rgb), 0.26);
   transform: translateX(3px);
 }
 
@@ -1021,7 +1091,7 @@ textarea::placeholder {
 }
 
 .financeRow.groupingSource {
-  background: rgba(0, 223, 193, 0.08);
+  background: rgba(var(--mint-rgb), 0.08);
   box-shadow: inset 2px 0 0 var(--mint);
 }
 
@@ -1036,8 +1106,8 @@ textarea::placeholder {
   border-radius: 99px;
   background: var(--mint);
   box-shadow:
-    0 0 0 1px rgba(1, 15, 31, 0.9),
-    0 0 18px rgba(0, 223, 193, 0.62);
+    0 0 0 1px var(--nav),
+    0 0 18px rgba(var(--mint-rgb), 0.62);
   pointer-events: none;
 }
 
@@ -1050,9 +1120,9 @@ textarea::placeholder {
 }
 
 .financeRow.dropCombine {
-  background: rgba(0, 223, 193, 0.1);
+  background: rgba(var(--mint-rgb), 0.1);
   box-shadow:
-    inset 0 0 0 1px rgba(0, 223, 193, 0.38),
+    inset 0 0 0 1px rgba(var(--mint-rgb), 0.38),
     inset 3px 0 0 var(--mint);
 }
 
@@ -1092,15 +1162,15 @@ textarea::placeholder {
 }
 
 .recurToggle:hover {
-  background: rgba(39, 54, 71, 0.4);
+  background: rgba(var(--surface-higher-rgb), 0.4);
   opacity: 1;
 }
 
 .recurToggle.active {
   color: var(--mint);
   opacity: 1;
-  background: rgba(0, 223, 193, 0.1);
-  border-color: rgba(0, 223, 193, 0.32);
+  background: rgba(var(--mint-rgb), 0.1);
+  border-color: rgba(var(--mint-rgb), 0.32);
 }
 
 .financeRow input,
@@ -1135,13 +1205,13 @@ textarea,
 textarea:focus,
 .selectField:focus-within {
   outline: none;
-  border-color: rgba(167, 200, 255, 0.42);
-  background: rgba(39, 54, 71, 0.42);
-  box-shadow: 0 0 0 3px rgba(50, 145, 255, 0.13);
+  border-color: rgba(var(--blue-bright-rgb), 0.42);
+  background: rgba(var(--surface-higher-rgb), 0.42);
+  box-shadow: 0 0 0 3px rgba(var(--blue-rgb), 0.13);
 }
 
 .dragDots {
-  color: rgba(212, 228, 250, 0.66);
+  color: rgba(var(--ink-rgb), 0.66);
   font-family: var(--mono);
   font-weight: 800;
   letter-spacing: 0;
@@ -1155,7 +1225,7 @@ textarea:focus,
   border: 0;
   border-radius: var(--radius);
   background: transparent;
-  color: rgba(212, 228, 250, 0.66);
+  color: rgba(var(--ink-rgb), 0.66);
   font-family: var(--mono);
   font-weight: 900;
 }
@@ -1163,7 +1233,7 @@ textarea:focus,
 .dragHandle:hover,
 .dragHandle:focus-visible {
   outline: none;
-  background: rgba(167, 200, 255, 0.12);
+  background: rgba(var(--blue-bright-rgb), 0.12);
   color: var(--ink);
 }
 
@@ -1188,8 +1258,8 @@ textarea:focus,
   gap: 5px;
   min-width: 0;
   padding: 0 10px;
-  border-color: rgba(198, 198, 203, 0.12);
-  background: rgba(1, 15, 31, 0.18);
+  border-color: rgba(var(--line-rgb), 0.12);
+  background: var(--well-strong);
   font-family: var(--mono);
 }
 
@@ -1212,7 +1282,7 @@ textarea:focus,
 .rowAction {
   min-height: 34px;
   width: 34px;
-  color: rgba(212, 228, 250, 0.58);
+  color: rgba(var(--ink-rgb), 0.58);
 }
 
 .rowAction:hover {
@@ -1240,7 +1310,7 @@ textarea:focus,
 .expenseGroup {
   position: relative;
   --category-color: var(--mint);
-  border-bottom: 1px solid rgba(198, 198, 203, 0.08);
+  border-bottom: 1px solid rgba(var(--line-rgb), 0.08);
   transition:
     background 150ms ease,
     box-shadow 150ms ease;
@@ -1251,12 +1321,12 @@ textarea:focus,
   overflow: hidden;
   border: 0;
   background:
-    linear-gradient(90deg, rgba(212, 228, 250, 0.035), transparent 58%),
-    rgba(1, 15, 31, 0.12);
+    linear-gradient(90deg, rgba(var(--ink-rgb), 0.035), transparent 58%),
+    var(--well);
   box-shadow:
     inset 3px 0 0 var(--category-color),
-    inset 0 1px 0 rgba(198, 198, 203, 0.09),
-    inset 0 -1px 0 rgba(198, 198, 203, 0.09);
+    inset 0 1px 0 rgba(var(--line-rgb), 0.09),
+    inset 0 -1px 0 rgba(var(--line-rgb), 0.09);
 }
 
 .expenseGroup:not(.ungrouped)::before {
@@ -1279,7 +1349,7 @@ textarea:focus,
   gap: 10px;
   min-height: 42px;
   padding: 8px 24px 8px 30px;
-  background: rgba(1, 15, 31, 0.18);
+  background: var(--well-strong);
   border-bottom: 1px solid transparent;
   transition:
     background 150ms ease,
@@ -1289,17 +1359,17 @@ textarea:focus,
 
 .expenseGroup:not(.ungrouped) .expenseGroupHeader {
   padding-left: 28px;
-  border-bottom-color: rgba(198, 198, 203, 0.08);
+  border-bottom-color: rgba(var(--line-rgb), 0.08);
   background:
-    linear-gradient(90deg, rgba(212, 228, 250, 0.052), transparent 64%),
-    rgba(1, 15, 31, 0.22);
+    linear-gradient(90deg, rgba(var(--ink-rgb), 0.052), transparent 64%),
+    var(--well-strong);
 }
 
 .expenseGroup:not(.ungrouped) .expenseRow {
   padding-left: 40px;
-  border-bottom-color: rgba(198, 198, 203, 0.055);
+  border-bottom-color: rgba(var(--line-rgb), 0.055);
   background:
-    linear-gradient(90deg, rgba(212, 228, 250, 0.018), transparent 56%),
+    linear-gradient(90deg, rgba(var(--ink-rgb), 0.018), transparent 56%),
     transparent;
 }
 
@@ -1309,20 +1379,20 @@ textarea:focus,
 
 .expenseGroup:not(.ungrouped) .expenseRow:hover {
   background:
-    linear-gradient(90deg, rgba(212, 228, 250, 0.035), transparent 56%),
-    rgba(39, 54, 71, 0.28);
+    linear-gradient(90deg, rgba(var(--ink-rgb), 0.035), transparent 56%),
+    rgba(var(--surface-higher-rgb), 0.28);
 }
 
 .expenseGroup.categoryDropTarget {
-  background: rgba(0, 223, 193, 0.07);
+  background: rgba(var(--mint-rgb), 0.07);
   box-shadow:
     inset 3px 0 0 var(--category-color),
-    inset 0 0 0 1px rgba(0, 223, 193, 0.34),
-    0 12px 34px rgba(0, 223, 193, 0.08);
+    inset 0 0 0 1px rgba(var(--mint-rgb), 0.34),
+    0 12px 34px rgba(var(--mint-rgb), 0.08);
 }
 
 .expenseGroup.categoryDropTarget .expenseGroupHeader {
-  background: rgba(0, 223, 193, 0.14);
+  background: rgba(var(--mint-rgb), 0.14);
   box-shadow: inset 3px 0 0 var(--mint);
 }
 
@@ -1338,8 +1408,8 @@ textarea:focus,
   flex: 0 0 auto;
   border: 1px solid transparent;
   border-radius: var(--radius);
-  background: rgba(212, 228, 250, 0.045);
-  color: rgba(212, 228, 250, 0.66);
+  background: rgba(var(--ink-rgb), 0.045);
+  color: rgba(var(--ink-rgb), 0.66);
   transition:
     background 150ms ease,
     color 150ms ease,
@@ -1349,7 +1419,7 @@ textarea:focus,
 .categoryCollapseButton:hover,
 .categoryCollapseButton:focus-visible {
   outline: none;
-  background: rgba(167, 200, 255, 0.13);
+  background: rgba(var(--blue-bright-rgb), 0.13);
   color: var(--ink);
 }
 
@@ -1372,8 +1442,8 @@ textarea:focus,
 
 .categoryNameInput:focus {
   outline: none;
-  border-color: rgba(167, 200, 255, 0.38);
-  background: rgba(39, 54, 71, 0.45);
+  border-color: rgba(var(--blue-bright-rgb), 0.38);
+  background: rgba(var(--surface-higher-rgb), 0.45);
 }
 
 .expenseGroupHeader em {
@@ -1396,7 +1466,7 @@ textarea:focus,
   border: 1px solid transparent;
   border-radius: var(--radius);
   background: transparent;
-  color: rgba(212, 228, 250, 0.5);
+  color: rgba(var(--ink-rgb), 0.5);
   transition:
     background 150ms ease,
     border-color 150ms ease,
@@ -1407,8 +1477,8 @@ textarea:focus,
 .categoryDeleteButton:hover,
 .categoryDeleteButton:focus-visible {
   outline: none;
-  border-color: rgba(255, 180, 171, 0.26);
-  background: rgba(255, 180, 171, 0.12);
+  border-color: rgba(var(--red-rgb), 0.26);
+  background: rgba(var(--red-rgb), 0.12);
   color: var(--red);
   transform: translateY(-1px);
 }
@@ -1418,11 +1488,11 @@ textarea:focus,
   z-index: 140;
   width: min(244px, calc(100vw - 24px));
   padding: 7px;
-  border: 1px solid rgba(198, 198, 203, 0.16);
+  border: 1px solid rgba(var(--line-rgb), 0.16);
   border-radius: var(--radius-lg);
-  background: rgba(13, 28, 45, 0.94);
+  background: rgba(var(--nav-rgb), 0.94);
   box-shadow:
-    0 18px 54px rgba(1, 15, 31, 0.46),
+    0 18px 54px rgba(var(--bg-deep-rgb), 0.46),
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
   backdrop-filter: blur(22px);
   animation: menuIn 130ms cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -1432,7 +1502,7 @@ textarea:focus,
   display: grid;
   gap: 3px;
   padding: 7px 9px 9px;
-  border-bottom: 1px solid rgba(198, 198, 203, 0.09);
+  border-bottom: 1px solid rgba(var(--line-rgb), 0.09);
 }
 
 .contextMenuTitle span {
@@ -1480,7 +1550,7 @@ textarea:focus,
 .contextMenuItem:hover,
 .contextMenuItem:focus-visible {
   outline: none;
-  background: rgba(167, 200, 255, 0.12);
+  background: rgba(var(--blue-bright-rgb), 0.12);
   transform: translateX(2px);
 }
 
@@ -1516,7 +1586,7 @@ textarea:focus,
   display: block;
   height: 1px;
   margin: 6px 4px;
-  background: rgba(198, 198, 203, 0.1);
+  background: rgba(var(--line-rgb), 0.1);
 }
 
 .contextMenuUngroup {
@@ -1535,8 +1605,8 @@ textarea:focus,
   grid-template-columns: 42px minmax(140px, 1fr) 140px 42px;
   gap: 10px;
   padding: 12px;
-  border-top: 1px dashed rgba(198, 198, 203, 0.16);
-  background: rgba(1, 15, 31, 0.6);
+  border-top: 1px dashed rgba(var(--line-rgb), 0.16);
+  background: var(--well-strong);
   backdrop-filter: blur(12px);
   position: sticky;
   bottom: 58px;
@@ -1550,8 +1620,8 @@ textarea:focus,
 .addRow input {
   min-width: 0;
   padding: 0 12px;
-  border-color: rgba(198, 198, 203, 0.12);
-  background: rgba(18, 33, 49, 0.7);
+  border-color: rgba(var(--line-rgb), 0.12);
+  background: rgba(var(--surface-rgb), 0.7);
 }
 
 .addIcon,
@@ -1563,9 +1633,9 @@ textarea:focus,
 .addIcon {
   width: 42px;
   min-height: 42px;
-  border: 1px solid rgba(0, 223, 193, 0.26);
+  border: 1px solid rgba(var(--mint-rgb), 0.26);
   border-radius: var(--radius);
-  background: rgba(0, 223, 193, 0.08);
+  background: rgba(var(--mint-rgb), 0.08);
   color: var(--mint);
   transition:
     transform 150ms ease,
@@ -1573,13 +1643,13 @@ textarea:focus,
 }
 
 .addIcon:hover {
-  background: rgba(0, 223, 193, 0.14);
+  background: rgba(var(--mint-rgb), 0.14);
   transform: translateY(-2px);
 }
 
 .addIcon.expense,
 .checkButton.expense {
-  border-color: rgba(255, 180, 171, 0.22);
+  border-color: rgba(var(--red-rgb), 0.22);
   background: var(--red-soft);
   color: var(--red);
 }
@@ -1608,7 +1678,7 @@ textarea:focus,
 
 .emptyState--clickable:hover,
 .emptyState--clickable:focus-visible {
-  background: rgba(39, 54, 71, 0.22);
+  background: rgba(var(--surface-higher-rgb), 0.22);
 }
 
 .emptyStateHint {
@@ -1630,7 +1700,7 @@ textarea:focus,
   place-items: center;
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  background: rgba(39, 54, 71, 0.36);
+  background: rgba(var(--surface-higher-rgb), 0.36);
   color: var(--blue);
 }
 
@@ -1698,14 +1768,14 @@ textarea:focus,
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: rgba(1, 15, 31, 0.28);
+  background: rgba(var(--bg-deep-rgb), 0.28);
 }
 
 .tabs button {
   min-height: 36px;
   padding: 0 14px;
   border: 0;
-  border-left: 1px solid rgba(198, 198, 203, 0.1);
+  border-left: 1px solid rgba(var(--line-rgb), 0.1);
   background: transparent;
   color: var(--muted);
   font-size: 13px;
@@ -1798,7 +1868,7 @@ textarea:focus,
 .panelSubcopy {
   max-width: 760px;
   margin: 12px 0 0;
-  color: rgba(212, 228, 250, 0.72);
+  color: rgba(var(--ink-rgb), 0.72);
   font-size: 13px;
   line-height: 1.45;
 }
@@ -1818,7 +1888,7 @@ textarea:focus,
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: rgba(18, 33, 49, 0.54);
+  background: rgba(var(--surface-rgb), 0.54);
 }
 
 .debtMiniGrid span {
@@ -1856,7 +1926,7 @@ textarea:focus,
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: rgba(18, 33, 49, 0.62);
+  background: rgba(var(--surface-rgb), 0.62);
   box-shadow: inset 3px 0 0 var(--account-color, var(--mint));
 }
 
@@ -1922,7 +1992,7 @@ textarea:focus,
   min-height: 38px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: rgba(5, 20, 36, 0.74);
+  background: rgba(var(--bg-rgb), 0.74);
   color: var(--ink);
 }
 
@@ -2057,7 +2127,7 @@ textarea:focus,
   padding: 0 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: rgba(5, 20, 36, 0.74);
+  background: rgba(var(--bg-rgb), 0.74);
   color: var(--ink);
 }
 
@@ -2081,7 +2151,7 @@ textarea:focus,
   padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: rgba(18, 33, 49, 0.54);
+  background: rgba(var(--surface-rgb), 0.54);
 }
 
 .transferRuleList li span {
@@ -2151,7 +2221,7 @@ textarea:focus,
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: rgba(18, 33, 49, 0.54);
+  background: rgba(var(--surface-rgb), 0.54);
 }
 
 .netWorthStats span,
@@ -2198,7 +2268,7 @@ textarea:focus,
 }
 
 .netWorthAxis {
-  stroke: rgba(198, 198, 203, 0.18);
+  stroke: rgba(var(--line-rgb), 0.18);
   stroke-width: 2;
 }
 
@@ -2225,17 +2295,27 @@ textarea:focus,
 
 .healthPanel {
   min-height: 340px;
+  /* Featured card: stays solidly in "ink" territory end to end so the
+     --on-ink text keeps contrast in both themes. */
   background:
-    linear-gradient(105deg, rgba(212, 228, 250, 0.92), rgba(212, 228, 250, 0.1)),
+    linear-gradient(105deg, rgba(var(--ink-rgb), 0.97), rgba(var(--ink-rgb), 0.8)),
     var(--glass);
-  color: #1a1c20;
+  color: var(--on-ink);
+}
+
+.healthPanel .ruleTrack {
+  background: rgba(var(--on-ink-rgb), 0.22);
+}
+
+.healthPanel .progressRule.neutral .ruleTrack strong {
+  background: rgba(var(--on-ink-rgb), 0.45);
 }
 
 .healthPanel .panelTitle,
 .healthPanel .progressRule span,
 .healthPanel .progressRule b,
 .healthPanel .scoreCaption {
-  color: rgba(26, 28, 32, 0.58);
+  color: rgba(var(--on-ink-rgb), 0.58);
 }
 
 .panelTitle {
@@ -2260,7 +2340,7 @@ textarea:focus,
 }
 
 .healthPanel .panelTitle h3 {
-  color: rgba(26, 28, 32, 0.72);
+  color: rgba(var(--on-ink-rgb), 0.72);
 }
 
 .infoHint {
@@ -2285,8 +2365,8 @@ textarea:focus,
   padding: 10px 12px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
-  background: rgba(5, 20, 36, 0.98);
-  color: rgba(212, 228, 250, 0.9);
+  background: rgba(var(--bg-rgb), 0.98);
+  color: rgba(var(--ink-rgb), 0.9);
   box-shadow: 0 16px 42px rgba(0, 0, 0, 0.35);
   font-family: var(--body);
   font-size: 12px;
@@ -2323,8 +2403,8 @@ textarea:focus,
   padding: 7px 10px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
-  background: rgba(5, 20, 36, 0.98);
-  color: rgba(212, 228, 250, 0.92);
+  background: rgba(var(--bg-rgb), 0.98);
+  color: rgba(var(--ink-rgb), 0.92);
   box-shadow: 0 16px 42px rgba(0, 0, 0, 0.35);
   font-family: var(--body);
   font-size: 12px;
@@ -2347,13 +2427,13 @@ textarea:focus,
 }
 
 .healthPanel .infoHint {
-  color: rgba(26, 28, 32, 0.62);
+  color: rgba(var(--on-ink-rgb), 0.62);
 }
 
 .healthPanel .infoHint > span {
-  border-color: rgba(26, 28, 32, 0.16);
-  background: rgba(235, 243, 255, 0.98);
-  color: rgba(26, 28, 32, 0.82);
+  border-color: rgba(var(--on-ink-rgb), 0.16);
+  background: rgba(var(--surface-rgb), 0.98);
+  color: rgba(var(--on-ink-rgb), 0.82);
 }
 
 .factList {
@@ -2408,7 +2488,7 @@ hr {
   border-radius: 50%;
   background:
     radial-gradient(circle at center, var(--surface) 0 58%, transparent 59%),
-    conic-gradient(var(--mint) var(--value), rgba(198, 198, 203, 0.14) 0);
+    conic-gradient(var(--mint) var(--value), rgba(var(--line-rgb), 0.14) 0);
   transition: background 520ms ease;
 }
 
@@ -2491,7 +2571,7 @@ hr {
 .bar.positive,
 .railTrack .positive {
   background: var(--mint);
-  box-shadow: 0 0 18px rgba(0, 223, 193, 0.14);
+  box-shadow: 0 0 18px rgba(var(--mint-rgb), 0.14);
 }
 
 .bar.negative,
@@ -2589,7 +2669,7 @@ hr {
   align-items: end;
   justify-content: center;
   border-radius: var(--radius);
-  background: rgba(198, 198, 203, 0.08);
+  background: rgba(var(--line-rgb), 0.08);
 }
 
 .railTrack span {
@@ -2608,7 +2688,7 @@ hr {
   resize: vertical;
   padding: 16px;
   border-color: var(--line);
-  background: rgba(39, 54, 71, 0.68);
+  background: rgba(var(--surface-higher-rgb), 0.68);
 }
 
 .goalName,
@@ -2620,7 +2700,7 @@ hr {
   min-height: 44px;
   padding: 0 12px;
   border-color: var(--line);
-  background: rgba(1, 15, 31, 0.18);
+  background: var(--well-strong);
 }
 
 .goalName input {
@@ -2653,14 +2733,14 @@ hr {
   height: 8px;
   overflow: hidden;
   border-radius: 99px;
-  background: rgba(167, 200, 255, 0.18);
+  background: rgba(var(--blue-bright-rgb), 0.18);
 }
 
 .progressLine span {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--mint), #a7c8ff);
+  background: linear-gradient(90deg, var(--mint), var(--blue-bright));
   transition: width 420ms ease;
 }
 
@@ -2699,7 +2779,7 @@ hr {
   gap: 18px;
   min-height: 48px;
   padding: 0 18px;
-  border-bottom: 1px solid rgba(198, 198, 203, 0.08);
+  border-bottom: 1px solid rgba(var(--line-rgb), 0.08);
 }
 
 .historyRow:last-child {
@@ -2725,7 +2805,7 @@ hr {
 
 .scoreNumber {
   margin-top: 26px;
-  color: rgba(26, 28, 32, 0.42);
+  color: rgba(var(--on-ink-rgb), 0.85);
   font-size: 68px;
   line-height: 1;
 }
@@ -2741,17 +2821,17 @@ hr {
   gap: 12px;
   margin-top: 22px;
   padding: 12px 14px;
-  border: 1px solid rgba(1, 15, 31, 0.12);
+  border: 1px solid rgba(var(--bg-deep-rgb), 0.12);
   border-radius: var(--radius);
   background: rgba(255, 255, 255, 0.18);
-  color: rgba(26, 28, 32, 0.62);
+  color: rgba(var(--on-ink-rgb), 0.62);
   font-family: var(--mono);
   font-size: 12px;
   font-weight: 720;
 }
 
 .creditEstimate strong {
-  color: rgba(26, 28, 32, 0.78);
+  color: rgba(var(--on-ink-rgb), 0.78);
   font-size: 18px;
 }
 
@@ -2775,7 +2855,7 @@ hr {
   height: 6px;
   overflow: hidden;
   border-radius: 99px;
-  background: rgba(1, 15, 31, 0.8);
+  background: var(--track);
 }
 
 .ruleTrack strong {
@@ -2786,7 +2866,7 @@ hr {
 }
 
 .progressRule.neutral .ruleTrack strong {
-  background: rgba(1, 15, 31, 0.58);
+  background: rgba(var(--ink-rgb), 0.4);
 }
 
 .ruleTrack i {
@@ -2794,7 +2874,7 @@ hr {
   top: -2px;
   width: 2px;
   height: 10px;
-  background: rgba(1, 15, 31, 0.82);
+  background: var(--surface);
 }
 
 .lineGraph {
@@ -2811,7 +2891,7 @@ hr {
 }
 
 .mutedLine {
-  color: #a7c8ff;
+  color: var(--blue-bright);
   opacity: 0.52;
 }
 
@@ -2833,7 +2913,7 @@ hr {
   padding: 3px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: rgba(1, 15, 31, 0.22);
+  background: rgba(var(--bg-deep-rgb), 0.22);
 }
 
 .iconToggle button {
@@ -2848,7 +2928,7 @@ hr {
 }
 
 .iconToggle button.selected {
-  background: rgba(0, 223, 193, 0.12);
+  background: rgba(var(--mint-rgb), 0.12);
   color: var(--mint);
 }
 
@@ -2890,7 +2970,7 @@ hr {
 }
 
 .flowBar.expense {
-  fill: #ffa8a0;
+  fill: var(--red);
 }
 
 .flowMonth:hover .flowBar {
@@ -2925,7 +3005,144 @@ hr {
 }
 
 .flowLegend i.expense {
-  background: #ffa8a0;
+  background: var(--red);
+}
+
+.flowLegend i.net {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--ink);
+}
+
+.flowGrid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.flowHit {
+  fill: transparent;
+}
+
+.flowMonth:hover .flowHit {
+  fill: rgba(var(--ink-rgb), 0.05);
+}
+
+.flowNetLine {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+.flowNetDot {
+  fill: var(--ink);
+  stroke: var(--surface);
+  stroke-width: 2;
+  pointer-events: none;
+}
+
+/* ─── Cash flow report (stat cards + Sankey) ───────────────────────────────── */
+
+.statCardRow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+}
+
+@media (max-width: 1100px) {
+  .statCardRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .statCardRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.cashFlowPanel {
+  padding: 22px 26px 26px;
+}
+
+.panelWhen {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 720;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sankeyShell {
+  position: relative;
+}
+
+.cashFlowPanel .sankeyShell {
+  margin-top: 20px;
+  overflow-x: auto;
+}
+
+.sankeySvg {
+  display: block;
+  width: 100%;
+  min-width: 720px;
+  height: auto;
+}
+
+.sankeyLink {
+  fill-opacity: 0.3;
+  transition: fill-opacity 150ms ease;
+}
+
+.sankeyLink:hover {
+  fill-opacity: 0.55;
+}
+
+.sankeyNode {
+  stroke: var(--surface);
+  stroke-width: 1;
+}
+
+.sankeyLabel {
+  font-size: 13px;
+}
+
+.sankeyLabel .name {
+  fill: var(--ink);
+  font-weight: 680;
+}
+
+.sankeyLabel .amt {
+  fill: var(--muted);
+  font-weight: 500;
+}
+
+.chartTip {
+  position: absolute;
+  z-index: 6;
+  display: grid;
+  gap: 3px;
+  max-width: 240px;
+  padding: 9px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: rgba(var(--bg-rgb), 0.98);
+  box-shadow: var(--shadow-md);
+  pointer-events: none;
+  font-size: 12.5px;
+}
+
+.chartTip strong {
+  color: var(--ink);
+  font-weight: 720;
+}
+
+.chartTip span {
+  color: var(--muted);
+  font-family: var(--mono);
 }
 
 .anomalyList {
@@ -2940,8 +3157,8 @@ hr {
   padding: 16px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: rgba(1, 15, 31, 0.2);
-  box-shadow: inset 3px 0 0 rgba(167, 200, 255, 0.42);
+  background: rgba(var(--bg-deep-rgb), 0.2);
+  box-shadow: inset 3px 0 0 rgba(var(--blue-bright-rgb), 0.42);
 }
 
 .signalCard:hover,
@@ -2950,17 +3167,17 @@ hr {
 }
 
 .signalCard.danger {
-  border-color: rgba(255, 168, 160, 0.32);
+  border-color: rgba(var(--red-rgb), 0.32);
   box-shadow: inset 3px 0 0 var(--red);
 }
 
 .signalCard.warning {
-  border-color: rgba(244, 195, 106, 0.28);
+  border-color: rgba(var(--amber-rgb), 0.28);
   box-shadow: inset 3px 0 0 var(--amber);
 }
 
 .signalCard.good {
-  border-color: rgba(0, 223, 193, 0.24);
+  border-color: rgba(var(--mint-rgb), 0.24);
   box-shadow: inset 3px 0 0 var(--mint);
 }
 
@@ -2978,7 +3195,7 @@ hr {
 
 .anomalyList span {
   margin-top: 10px;
-  color: rgba(212, 228, 250, 0.78);
+  color: rgba(var(--ink-rgb), 0.78);
   line-height: 1.5;
 }
 
@@ -2991,9 +3208,9 @@ hr {
   top: calc(100% + 8px);
   right: -4px;
   bottom: auto;
-  border-color: rgba(0, 223, 193, 0.35);
-  background: rgba(5, 20, 36, 0.99);
-  color: rgba(236, 246, 255, 0.96);
+  border-color: rgba(var(--mint-rgb), 0.35);
+  background: rgba(var(--bg-rgb), 0.99);
+  color: rgba(var(--ink-rgb), 0.96);
 }
 
 .settingsHeader {
@@ -3004,9 +3221,9 @@ hr {
   gap: 8px;
   align-self: center;
   padding: 9px 14px;
-  border: 1px solid rgba(0, 223, 193, 0.2);
+  border: 1px solid rgba(var(--mint-rgb), 0.2);
   border-radius: 999px;
-  background: rgba(0, 223, 193, 0.05);
+  background: rgba(var(--mint-rgb), 0.05);
   color: var(--mint);
   font-family: var(--mono);
   font-size: 12px;
@@ -3017,7 +3234,7 @@ hr {
 .architectureNote {
   gap: 18px;
   padding: 20px;
-  border-color: rgba(0, 223, 193, 0.22);
+  border-color: rgba(var(--mint-rgb), 0.22);
   color: var(--mint);
 }
 
@@ -3033,7 +3250,7 @@ hr {
 
 .architectureNote p {
   margin-top: 8px;
-  color: rgba(212, 228, 250, 0.82);
+  color: rgba(var(--ink-rgb), 0.82);
   line-height: 1.55;
 }
 
@@ -3056,7 +3273,7 @@ hr {
   padding: 24px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: rgba(39, 54, 71, 0.42);
+  background: rgba(var(--surface-higher-rgb), 0.42);
 }
 
 .dataAction svg {
@@ -3071,7 +3288,7 @@ hr {
 .dataAction p,
 .compactSetting p,
 .dangerPanel p {
-  color: rgba(212, 228, 250, 0.78);
+  color: rgba(var(--ink-rgb), 0.78);
   line-height: 1.45;
 }
 
@@ -3088,7 +3305,7 @@ hr {
   display: grid;
   place-items: center;
   padding: 28px;
-  background: rgba(1, 15, 31, 0.72);
+  background: rgba(var(--bg-deep-rgb), 0.72);
   backdrop-filter: blur(14px);
 }
 
@@ -3100,7 +3317,7 @@ hr {
   overflow: hidden;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-lg);
-  background: rgba(13, 28, 45, 0.98);
+  background: rgba(var(--nav-rgb), 0.98);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
 }
 
@@ -3150,8 +3367,8 @@ hr {
   padding: 0 10px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: rgba(18, 33, 49, 0.64);
-  color: rgba(212, 228, 250, 0.78);
+  background: rgba(var(--surface-rgb), 0.64);
+  color: rgba(var(--ink-rgb), 0.78);
   font-size: 13px;
 }
 
@@ -3184,7 +3401,7 @@ hr {
   min-height: 34px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: rgba(5, 20, 36, 0.74);
+  background: rgba(var(--bg-rgb), 0.74);
   color: var(--ink);
 }
 
@@ -3210,7 +3427,7 @@ hr {
   z-index: 1;
   padding: 10px 12px;
   border-bottom: 1px solid var(--line);
-  background: rgba(13, 28, 45, 0.98);
+  background: rgba(var(--nav-rgb), 0.98);
   color: var(--muted);
   font-family: var(--mono);
   font-size: 11px;
@@ -3220,16 +3437,16 @@ hr {
 
 .importTable td {
   padding: 11px 12px;
-  border-bottom: 1px solid rgba(198, 198, 203, 0.08);
+  border-bottom: 1px solid rgba(var(--line-rgb), 0.08);
   vertical-align: middle;
 }
 
 .importTable tr.selected {
-  background: rgba(0, 223, 193, 0.05);
+  background: rgba(var(--mint-rgb), 0.05);
 }
 
 .importTable tr.duplicate {
-  background: rgba(244, 195, 106, 0.06);
+  background: rgba(var(--amber-rgb), 0.06);
 }
 
 .importTable td:nth-child(1) {
@@ -3278,7 +3495,7 @@ hr {
   min-width: 74px;
   justify-content: center;
   padding: 4px 8px;
-  border: 1px solid rgba(0, 223, 193, 0.24);
+  border: 1px solid rgba(var(--mint-rgb), 0.24);
   border-radius: 999px;
   background: var(--mint-soft);
   color: var(--mint);
@@ -3288,23 +3505,23 @@ hr {
 }
 
 .importSignal.low {
-  border-color: rgba(244, 195, 106, 0.26);
-  background: rgba(244, 195, 106, 0.1);
+  border-color: rgba(var(--amber-rgb), 0.26);
+  background: rgba(var(--amber-rgb), 0.1);
   color: var(--amber);
 }
 
 .importSignal.duplicate {
-  border-color: rgba(244, 195, 106, 0.32);
-  background: rgba(244, 195, 106, 0.12);
+  border-color: rgba(var(--amber-rgb), 0.32);
+  background: rgba(var(--amber-rgb), 0.12);
   color: var(--amber);
 }
 
 .importErrorList {
   margin: 18px 22px;
   padding: 16px;
-  border: 1px solid rgba(255, 180, 171, 0.34);
+  border: 1px solid rgba(var(--red-rgb), 0.34);
   border-radius: var(--radius);
-  background: rgba(255, 180, 171, 0.1);
+  background: rgba(var(--red-rgb), 0.1);
   color: var(--red);
 }
 
@@ -3356,7 +3573,7 @@ hr {
   padding: 8px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: rgba(18, 33, 49, 0.54);
+  background: rgba(var(--surface-rgb), 0.54);
   font-size: 13px;
 }
 
@@ -3368,7 +3585,7 @@ hr {
 }
 
 .importHistoryRow span {
-  color: rgba(212, 228, 250, 0.76);
+  color: rgba(var(--ink-rgb), 0.76);
 }
 
 .undoImportToast {
@@ -3383,12 +3600,12 @@ hr {
   padding: 12px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-lg);
-  background: rgba(13, 28, 45, 0.96);
+  background: rgba(var(--nav-rgb), 0.96);
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.32);
 }
 
 .undoImportToast span {
-  color: rgba(212, 228, 250, 0.82);
+  color: rgba(var(--ink-rgb), 0.82);
   font-size: 13px;
 }
 
@@ -3413,7 +3630,7 @@ hr {
   margin-top: 20px;
   padding: 0 14px;
   border-color: var(--line);
-  background: rgba(39, 54, 71, 0.56);
+  background: rgba(var(--surface-higher-rgb), 0.56);
 }
 
 .selectField select {
@@ -3429,7 +3646,7 @@ hr {
   padding: 2px;
   border: 0;
   border-radius: 999px;
-  background: rgba(167, 200, 255, 0.16);
+  background: rgba(var(--blue-bright-rgb), 0.16);
 }
 
 .switch span {
@@ -3437,7 +3654,7 @@ hr {
   width: 22px;
   height: 22px;
   border-radius: 999px;
-  background: #d4e4fa;
+  background: var(--ink);
   transition: transform 160ms ease;
 }
 
@@ -3454,7 +3671,7 @@ hr {
   justify-content: space-between;
   gap: 24px;
   padding: 24px 28px;
-  border-color: rgba(255, 180, 171, 0.32);
+  border-color: rgba(var(--red-rgb), 0.32);
   border-left: 8px solid var(--red);
 }
 
@@ -3475,7 +3692,7 @@ hr {
 .dangerButton {
   align-self: center;
   padding: 0 18px;
-  border-color: rgba(255, 180, 171, 0.72);
+  border-color: rgba(var(--red-rgb), 0.72);
   background: transparent;
   color: var(--red);
   white-space: nowrap;
@@ -3492,9 +3709,9 @@ hr {
   min-height: 58px;
   padding: 0 28px;
   border-top: 1px solid var(--line);
-  background: rgba(28, 43, 60, 0.92);
+  background: rgba(var(--nav-rgb), 0.92);
   backdrop-filter: blur(18px);
-  color: rgba(212, 228, 250, 0.78);
+  color: rgba(var(--ink-rgb), 0.78);
   font-family: var(--mono);
   font-size: 13px;
 }
@@ -4099,7 +4316,7 @@ hr {
   gap: 16px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-lg);
-  background: rgba(13, 28, 45, 0.98);
+  background: rgba(var(--nav-rgb), 0.98);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
 }
 
@@ -4153,9 +4370,9 @@ hr {
 }
 
 .feedbackTypeBtn.active {
-  border-color: rgba(59, 130, 246, 0.6);
-  background: rgba(59, 130, 246, 0.12);
-  color: #60a5fa;
+  border-color: rgba(var(--blue-rgb), 0.6);
+  background: rgba(var(--blue-rgb), 0.12);
+  color: var(--blue);
 }
 
 .feedbackLabel {
@@ -4182,7 +4399,7 @@ hr {
 .feedbackModal input:focus,
 .feedbackModal textarea:focus {
   outline: none;
-  border-color: rgba(59, 130, 246, 0.6);
+  border-color: rgba(var(--blue-rgb), 0.6);
 }
 
 .feedbackOptional {
@@ -4195,7 +4412,7 @@ hr {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #f87171;
+  color: var(--red);
   font-size: 13px;
   margin: 0;
 }
@@ -4208,14 +4425,14 @@ hr {
 }
 
 .feedbackSubmit {
-  background: rgba(59, 130, 246, 0.15);
-  border-color: rgba(59, 130, 246, 0.35);
-  color: #60a5fa;
+  background: rgba(var(--blue-rgb), 0.15);
+  border-color: rgba(var(--blue-rgb), 0.35);
+  color: var(--blue);
 }
 
 .feedbackSubmit:hover:not(:disabled) {
-  background: rgba(59, 130, 246, 0.25);
-  border-color: rgba(59, 130, 246, 0.5);
+  background: rgba(var(--blue-rgb), 0.25);
+  border-color: rgba(var(--blue-rgb), 0.5);
 }
 
 .feedbackSuccess {
@@ -4290,7 +4507,7 @@ hr {
   z-index: 180;
   display: grid;
   place-items: center;
-  background: rgba(1, 15, 31, 0.65);
+  background: rgba(var(--bg-deep-rgb), 0.65);
   backdrop-filter: blur(8px);
   animation: fadeIn 200ms ease both;
 }
@@ -4335,7 +4552,7 @@ hr {
   gap: 10px;
   margin-top: 0;
   padding: 10px 10px;
-  border: 1px dashed rgba(0, 223, 193, 0.28);
+  border: 1px dashed rgba(var(--mint-rgb), 0.28);
   border-radius: var(--radius-lg);
   background: none;
   color: var(--muted);
@@ -4360,7 +4577,7 @@ hr {
   padding: 11px 14px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: rgba(18, 33, 49, 0.5);
+  background: rgba(var(--surface-rgb), 0.5);
   color: var(--ink);
   font-family: var(--mono);
   font-size: 13px;
@@ -4373,7 +4590,7 @@ hr {
 
 .sideTutorialBtn:hover {
   border-color: var(--mint);
-  background: rgba(18, 184, 134, 0.1);
+  background: rgba(var(--mint-rgb), 0.1);
 }
 
 .sideTutorialBtn > svg {
@@ -4389,7 +4606,7 @@ hr {
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(1, 10, 22, 0.72);
+  background: rgba(var(--bg-deep-rgb), 0.72);
   backdrop-filter: blur(8px);
   animation: tutorialFade 160ms ease both;
 }
@@ -4401,7 +4618,7 @@ hr {
   padding: 26px 26px 22px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-lg);
-  background: linear-gradient(180deg, rgba(18, 33, 49, 0.98), rgba(9, 22, 38, 0.98));
+  background: linear-gradient(180deg, rgba(var(--surface-rgb), 0.98), rgba(var(--surface-rgb), 0.98));
   box-shadow: 0 30px 90px rgba(0, 0, 0, 0.5);
   animation: tutorialPop 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -4413,7 +4630,7 @@ hr {
   width: fit-content;
   padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(18, 184, 134, 0.14);
+  background: rgba(var(--mint-rgb), 0.14);
   color: var(--mint);
   font-family: var(--mono);
   font-size: 11px;
@@ -4447,7 +4664,7 @@ hr {
 .tutorialBullets li {
   position: relative;
   padding-left: 22px;
-  color: rgba(212, 228, 250, 0.86);
+  color: rgba(var(--ink-rgb), 0.86);
   font-size: 14px;
   line-height: 1.45;
 }
@@ -4472,7 +4689,7 @@ hr {
   width: 7px;
   height: 7px;
   border-radius: 999px;
-  background: rgba(167, 200, 255, 0.25);
+  background: rgba(var(--blue-bright-rgb), 0.25);
   transition:
     background 150ms ease,
     width 150ms ease;
@@ -4519,10 +4736,10 @@ hr {
   justify-content: center;
   min-height: 40px;
   padding: 0 20px;
-  border: 1px solid rgba(50, 145, 255, 0.55);
+  border: 1px solid rgba(var(--blue-rgb), 0.55);
   border-radius: var(--radius);
   background: var(--blue);
-  color: #001b3c;
+  color: var(--on-accent);
   font-weight: 720;
   font-size: 14px;
   cursor: pointer;
@@ -4532,7 +4749,7 @@ hr {
 }
 
 .tutorialNext:hover {
-  background: #58a6ff;
+  background: var(--blue);
 }
 
 .tutorialNext:active {
@@ -4662,7 +4879,7 @@ hr {
 
 .goalsSurplusInput {
   display: flex; align-items: center; gap: 6px;
-  background: rgba(18,33,49,0.7); border: 1px solid var(--line);
+  background: rgba(var(--surface-rgb),0.7); border: 1px solid var(--line);
   border-radius: var(--radius); padding: 6px 12px; width: fit-content;
   color: var(--ink); font-size: 16px; font-weight: 600; font-family: var(--mono);
 }
@@ -4672,7 +4889,7 @@ hr {
   font-weight: 600; width: 100px; padding: 0;
 }
 .goalsHorizonTabs {
-  display: flex; gap: 4px; background: rgba(18,33,49,0.5);
+  display: flex; gap: 4px; background: rgba(var(--surface-rgb),0.5);
   border: 1px solid var(--line); border-radius: var(--radius); padding: 4px;
 }
 .goalsHorizonTabs button {
@@ -4681,7 +4898,7 @@ hr {
   transition: background 120ms, color 120ms;
 }
 .goalsHorizonTabs button.selected,
-.goalsHorizonTabs button:hover { background: rgba(0,223,193,0.12); color: var(--mint); }
+.goalsHorizonTabs button:hover { background: rgba(var(--mint-rgb),0.12); color: var(--mint); }
 
 /* Timeline */
 .goalsTimeline {
@@ -4705,7 +4922,7 @@ hr {
   padding: 20px; display: flex; flex-direction: column; gap: 14px;
   transition: border-color 160ms;
 }
-.goalCard--editing { border-color: rgba(0,223,193,0.3); }
+.goalCard--editing { border-color: rgba(var(--mint-rgb),0.3); }
 .goalCardHeader { display: flex; align-items: flex-start; gap: 12px; }
 .goalCardDot { width: 10px; height: 10px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
 .goalCardMeta { flex: 1; display: flex; flex-direction: column; gap: 4px; }
@@ -4718,8 +4935,8 @@ hr {
   font-size: 11px; transition: background 120ms, color 120ms;
 }
 .goalIconBtn:hover, .goalIconBtn.active {
-  background: rgba(0,223,193,0.1); color: var(--mint);
-  border-color: rgba(0,223,193,0.3);
+  background: rgba(var(--mint-rgb),0.1); color: var(--mint);
+  border-color: rgba(var(--mint-rgb),0.3);
 }
 
 /* Status badges */
@@ -4727,16 +4944,16 @@ hr {
   font-size: 11px; font-weight: 600; padding: 2px 8px;
   border-radius: 20px; width: fit-content; letter-spacing: 0.02em;
 }
-.goalStatus--complete { background: rgba(0,223,193,0.15); color: var(--mint); }
-.goalStatus--ontrack  { background: rgba(0,223,193,0.1);  color: var(--mint); }
-.goalStatus--tight    { background: rgba(251,189,35,0.15); color: var(--amber); }
-.goalStatus--risk     { background: rgba(255,118,117,0.15); color: var(--red); }
-.goalStatus--muted    { background: rgba(112,140,170,0.12); color: var(--muted); }
+.goalStatus--complete { background: rgba(var(--mint-rgb),0.15); color: var(--mint); }
+.goalStatus--ontrack  { background: rgba(var(--mint-rgb),0.1);  color: var(--mint); }
+.goalStatus--tight    { background: rgba(var(--amber-rgb),0.15); color: var(--amber); }
+.goalStatus--risk     { background: rgba(var(--red-rgb),0.15); color: var(--red); }
+.goalStatus--muted    { background: rgba(var(--line-rgb),0.12); color: var(--muted); }
 
 /* Progress bar */
 .goalCardProgress { display: flex; align-items: center; gap: 10px; }
 .goalProgressTrack {
-  flex: 1; height: 5px; background: rgba(112,140,170,0.15);
+  flex: 1; height: 5px; background: rgba(var(--line-rgb),0.15);
   border-radius: 9999px; overflow: hidden;
 }
 .goalProgressFill { height: 100%; border-radius: 9999px; transition: width 400ms ease; }
@@ -4751,7 +4968,7 @@ hr {
 /* Gap hint */
 .goalGapHint {
   font-size: 12px; color: var(--amber);
-  background: rgba(251,189,35,0.07); border: 1px solid rgba(251,189,35,0.2);
+  background: rgba(var(--amber-rgb),0.07); border: 1px solid rgba(var(--amber-rgb),0.2);
   border-radius: var(--radius); padding: 8px 12px; margin: 0;
 }
 
@@ -4761,11 +4978,11 @@ hr {
 .goalEditorRow label { font-size: 11.5px; color: var(--muted); font-weight: 500; letter-spacing: 0.02em; }
 .goalEditorRow input[type="text"],
 .goalEditorRow input[type="number"] {
-  width: 100%; padding: 8px 10px; background: rgba(18,33,49,0.7);
+  width: 100%; padding: 8px 10px; background: rgba(var(--surface-rgb),0.7);
   border: 1px solid var(--line); border-radius: var(--radius);
   color: var(--ink); font-size: 13px;
 }
-.goalEditorRow input:focus { outline: none; border-color: rgba(0,223,193,0.4); }
+.goalEditorRow input:focus { outline: none; border-color: rgba(var(--mint-rgb),0.4); }
 .goalEditorRow--2col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .goalEditorRow--2col > div { display: flex; flex-direction: column; gap: 6px; }
 
@@ -4777,11 +4994,11 @@ hr {
 }
 .goalEditorInputRow input[type="number"] {
   flex: 1; min-width: 0; padding: 7px 10px;
-  background: rgba(18,33,49,0.7); border: 1px solid var(--line);
+  background: rgba(var(--surface-rgb),0.7); border: 1px solid var(--line);
   border-radius: var(--radius); color: var(--ink); font-size: 13px;
   width: 100%;
 }
-.goalEditorInputRow input:focus { outline: none; border-color: rgba(0,223,193,0.4); }
+.goalEditorInputRow input:focus { outline: none; border-color: rgba(var(--mint-rgb),0.4); }
 
 /* Info icon + tooltip */
 .goalEditorInfoIcon {
@@ -4804,12 +5021,12 @@ hr {
 
 .goalFundingMode { display: flex; gap: 6px; }
 .goalFundingBtn {
-  flex: 1; background: rgba(18,33,49,0.5); border: 1px solid var(--line);
+  flex: 1; background: rgba(var(--surface-rgb),0.5); border: 1px solid var(--line);
   border-radius: var(--radius); color: var(--muted); font-size: 12px;
   padding: 6px; cursor: pointer; transition: background 120ms, color 120ms, border-color 120ms;
 }
 .goalFundingBtn.active {
-  background: rgba(0,223,193,0.12); border-color: rgba(0,223,193,0.35); color: var(--mint);
+  background: rgba(var(--mint-rgb),0.12); border-color: rgba(var(--mint-rgb),0.35); color: var(--mint);
 }
 
 /* Color picker */
@@ -4836,7 +5053,7 @@ hr {
 .goalDeleteBtn:hover { opacity: 1; }
 .goalDeleteConfirmBtn {
   display: inline-flex; align-items: center; gap: 5px;
-  background: rgba(255,118,117,0.15); border: 1px solid rgba(255,118,117,0.35);
+  background: rgba(var(--red-rgb),0.15); border: 1px solid rgba(var(--red-rgb),0.35);
   border-radius: var(--radius); color: var(--red); font-size: 12px;
   cursor: pointer; padding: 4px 10px;
 }
@@ -4859,7 +5076,7 @@ hr {
 .goalSwitcherRow { position: relative; display: flex; align-items: center; gap: 8px; }
 .goalSwitcherTrigger {
   display: inline-flex; align-items: center; gap: 5px;
-  background: rgba(18,33,49,0.5); border: 1px solid var(--line);
+  background: rgba(var(--surface-rgb),0.5); border: 1px solid var(--line);
   border-radius: var(--radius); color: var(--muted); font-size: 11.5px;
   padding: 4px 8px; cursor: pointer; transition: border-color 120ms, color 120ms;
 }
@@ -4882,8 +5099,8 @@ hr {
   color: var(--ink); font-size: 12.5px; padding: 7px 10px;
   cursor: pointer; transition: background 100ms; text-align: left;
 }
-.goalPickerOption:hover { background: rgba(212,228,250,0.06); }
-.goalPickerOption.selected { background: rgba(0,223,193,0.1); color: var(--mint); }
+.goalPickerOption:hover { background: rgba(var(--ink-rgb),0.06); }
+.goalPickerOption.selected { background: rgba(var(--mint-rgb),0.1); color: var(--mint); }
 .goalPickerDot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .goalEmptyNudge { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
 .goalEmptyNudge p { font-size: 12px; color: var(--muted); margin: 0; }

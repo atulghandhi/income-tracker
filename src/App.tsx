@@ -30,6 +30,7 @@ import {
   LogIn,
   LogOut,
   MessageSquarePlus,
+  Moon,
   PiggyBank,
   Plus,
   ReceiptText,
@@ -39,6 +40,7 @@ import {
   Search,
   Settings as SettingsIcon,
   ShieldCheck,
+  Sun,
   Target,
   Trash2,
   X,
@@ -113,6 +115,22 @@ import type {
 
 type ProjectionView = "overview" | "category" | "month";
 type AppView = "dashboard" | "ledger" | "accounts" | "goals" | "insights" | "settings";
+
+type ThemeMode = "light" | "dark";
+
+const THEME_KEY = "it_theme";
+
+function readStoredTheme(): ThemeMode {
+  try {
+    const stored = localStorage.getItem(THEME_KEY);
+    if (stored === "dark" || stored === "light") return stored;
+  } catch {
+    // localStorage unavailable — fall through to the system preference.
+  }
+  return typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+}
 
 type TutorialStep = { heading: string; bullets: string[] };
 type PageTutorial = { title: string; badge: string; steps: TutorialStep[] };
@@ -365,6 +383,7 @@ function App() {
   const [insightChartView, setInsightChartView] = useState<InsightChartView>("inflow-outflow");
   const [netWorthHorizon, setNetWorthHorizon] = useState<NetWorthHorizon>(24);
   const [activeView, setActiveView] = useState<AppView>("ledger");
+  const [theme, setTheme] = useState<ThemeMode>(readStoredTheme);
   const [tutorialView, setTutorialView] = useState<AppView | null>(null);
   const [animationsEnabled, setAnimationsEnabled] = useState(true);
   const [query, setQuery] = useState("");
@@ -621,6 +640,18 @@ function App() {
 
     return () => window.clearTimeout(timeout);
   }, [ledger, hydrated, authLoading, cloudHydrated, user?.id]);
+
+  // Apply the theme to <html> so every surface (landing, auth gate, modals) picks
+  // it up, persist the choice, and keep the browser chrome colour in step.
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    try {
+      localStorage.setItem(THEME_KEY, theme);
+    } catch {
+      // localStorage unavailable — the theme simply won't persist.
+    }
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#051424" : "#eef1f8");
+  }, [theme]);
 
   // Static content pages (guides, tools, privacy) link "Contact us" to /?feedback=1.
   // Pick that up on load, open the feedback modal, then strip the param from the URL
@@ -1530,14 +1561,14 @@ function App() {
           : activeView === "goals"
             ? "Goals"
             : activeView === "insights"
-              ? "Spending Intelligence"
+              ? "Reports"
               : "Management Hub";
   const insightChartTitle =
     insightChartView === "cash-flow"
       ? "Cash flow volatility"
       : insightChartView === "net-worth"
         ? "Net worth outlook"
-        : "Inflows vs outflows";
+        : "Monthly cash flow";
   const userName =
     (typeof user?.user_metadata.name === "string" && user.user_metadata.name) ||
     user?.email?.split("@")[0] ||
@@ -1694,6 +1725,15 @@ function App() {
                 ))}
               </select>
             </label>
+            <button
+              className="iconButton"
+              type="button"
+              onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
+              aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              data-tip={theme === "dark" ? "Light mode" : "Dark mode"}
+            >
+              {theme === "dark" ? <Sun size={19} /> : <Moon size={19} />}
+            </button>
             <button
               className={ledger.privacyMode ? "iconButton active" : "iconButton"}
               type="button"
@@ -2169,10 +2209,26 @@ function App() {
             <section className="viewStack" aria-label="Insights">
               <div className="pageHeader compactHeader">
                 <div>
-                  <h2>Spending Intelligence</h2>
-                  <p>A calm read on cash flow, category concentration, and unusual run rate.</p>
+                  <h2>Reports</h2>
+                  <p>Cash flow, category concentration, and run rate for {formatMonth(ledger.selectedMonth)}.</p>
                 </div>
               </div>
+
+              <section className="statCardRow" aria-label="Month summary">
+                <MetricCard label="Total income" value={projection.monthlyIncome} tone="green" privacy={ledger.privacyMode} formatter={moneyFormatter} />
+                <MetricCard label="Total expenses" value={projection.monthlyExpenses} tone="red" privacy={ledger.privacyMode} formatter={moneyFormatter} />
+                <MetricCard label="Net income" value={projection.monthlySurplus} tone={projection.monthlySurplus >= 0 ? "green" : "red"} privacy={ledger.privacyMode} formatter={moneyFormatter} />
+                <MetricCard label="Savings rate" value={projection.savingsRate} suffix="%" tone="amber" privacy={ledger.privacyMode} formatter={moneyFormatter} />
+              </section>
+
+              <section className="miniPanel cashFlowPanel" aria-label="Cash flow">
+                <PanelTitle
+                  title="Cash flow"
+                  icon={<TrendingUp size={16} />}
+                  action={<span className="panelWhen">{formatMonth(ledger.selectedMonth)}</span>}
+                />
+                <CashFlowSankey month={currentMonth} surplus={projection.monthlySurplus} privacy={ledger.privacyMode} formatter={moneyFormatter} />
+              </section>
 
               <section className="insightsGrid">
                 <article className="miniPanel healthPanel">
@@ -4272,9 +4328,224 @@ function NetWorthHorizonTabs({
   );
 }
 
+// ─── Cash flow Sankey ────────────────────────────────────────────────────────
+
+type SankeyEndpoint = { id: string; label: string; value: number; color: string };
+type ChartTip = { x: number; y: number; title: string; lines: string[] } | null;
+
+// Left column: income sources aggregated by name (top 5 + "Other income").
+// Right column: Savings first (when the month is in surplus), then expense
+// categories (top 7 + "Other"). A deficit month gets a red "Shortfall" source
+// so both sides of the diagram still conserve flow.
+function buildSankeyEndpoints(month: MonthBudget, surplus: number): { sources: SankeyEndpoint[]; targets: SankeyEndpoint[] } {
+  const bySource = new Map<string, SankeyEndpoint>();
+  month.incomes.forEach((entry, index) => {
+    const label = entry.source.trim() || "Income";
+    const key = label.toLowerCase();
+    const existing = bySource.get(key);
+    if (existing) {
+      existing.value += entry.amount;
+    } else {
+      bySource.set(key, { id: `src-${key}`, label, value: entry.amount, color: entry.color || colors[index % colors.length] });
+    }
+  });
+  let sources = [...bySource.values()].filter((node) => node.value > 0).sort((a, b) => b.value - a.value);
+  if (sources.length > 6) {
+    const rest = sources.slice(5);
+    sources = [
+      ...sources.slice(0, 5),
+      { id: "src-other", label: "Other income", value: rest.reduce((sum, node) => sum + node.value, 0), color: "var(--faint)" },
+    ];
+  }
+  if (surplus < 0) {
+    sources.push({ id: "src-shortfall", label: "Shortfall", value: -surplus, color: "var(--red)" });
+  }
+
+  let targets: SankeyEndpoint[] = buildExpenseGroups(month.expenses)
+    .map((group) => ({
+      id: `cat-${group.id}`,
+      label: group.category || group.items[0]?.name || "Outflow",
+      value: group.total,
+      color: group.color,
+    }))
+    .filter((node) => node.value > 0)
+    .sort((a, b) => b.value - a.value);
+  if (targets.length > 8) {
+    const rest = targets.slice(7);
+    targets = [
+      ...targets.slice(0, 7),
+      { id: "cat-other", label: "Other", value: rest.reduce((sum, node) => sum + node.value, 0), color: "var(--faint)" },
+    ];
+  }
+  if (surplus > 0) {
+    targets.unshift({ id: "cat-savings", label: "Savings", value: surplus, color: "var(--mint)" });
+  }
+
+  return { sources, targets };
+}
+
+function CashFlowSankey({
+  month,
+  surplus,
+  privacy,
+  formatter,
+}: {
+  month: MonthBudget;
+  surplus: number;
+  privacy: boolean;
+  formatter: Intl.NumberFormat;
+}) {
+  const shellRef = useRef<HTMLDivElement | null>(null);
+  const [tip, setTip] = useState<ChartTip>(null);
+  const { sources, targets } = useMemo(() => buildSankeyEndpoints(month, surplus), [month, surplus]);
+
+  // Both sides sum to the same figure by construction: income + shortfall on
+  // the left, expenses + savings on the right.
+  const totalFlow = targets.reduce((sum, node) => sum + node.value, 0);
+
+  if (totalFlow <= 0) {
+    return <EmptyState icon={<TrendingUp size={18} />} title="No cash flow yet" text="Add income and outflows in Ledger, or import a bank CSV, to draw this diagram." />;
+  }
+
+  const width = 1060;
+  const nodeW = 12;
+  const gap = 14;
+  const padY = 10;
+  const xLeft = 236;
+  const xRight = 812;
+  const xHub = (xLeft + xRight) / 2;
+  const rows = Math.max(sources.length, targets.length, 1);
+  const height = Math.max(320, Math.min(560, rows * 62));
+
+  const usable = (count: number) => height - padY * 2 - (count - 1) * gap;
+  const scale = Math.min(usable(sources.length), usable(targets.length), usable(1)) / totalFlow;
+
+  type PlacedNode = SankeyEndpoint & { y0: number; y1: number };
+  const place = (nodes: SankeyEndpoint[]): PlacedNode[] => {
+    const contentHeight = nodes.reduce((sum, node) => sum + node.value * scale, 0) + (nodes.length - 1) * gap;
+    let y = (height - contentHeight) / 2;
+    return nodes.map((node) => {
+      const nodeHeight = Math.max(node.value * scale, 3);
+      const placed = { ...node, y0: y, y1: y + nodeHeight };
+      y += nodeHeight + gap;
+      return placed;
+    });
+  };
+
+  const leftNodes = place(sources);
+  const rightNodes = place(targets);
+  const hubHeight = totalFlow * scale;
+  const hubY0 = (height - hubHeight) / 2;
+
+  const money = (value: number) => (privacy ? "•••" : formatter.format(value));
+  const percent = (value: number) => `${((value / totalFlow) * 100).toFixed(1)}%`;
+
+  // Ribbons: each left node flows into the hub; the hub fans out to each right
+  // node. Offsets accumulate down the hub in node order on both faces.
+  const ribbon = (x0: number, sy0: number, sy1: number, x1: number, ty0: number, ty1: number) => {
+    const mx = (x0 + x1) / 2;
+    return `M ${x0} ${sy0} C ${mx} ${sy0}, ${mx} ${ty0}, ${x1} ${ty0} L ${x1} ${ty1} C ${mx} ${ty1}, ${mx} ${sy1}, ${x0} ${sy1} Z`;
+  };
+
+  let inOffset = hubY0;
+  const inLinks = leftNodes.map((node) => {
+    const linkHeight = node.value * scale;
+    const link = { node, path: ribbon(xLeft + nodeW, node.y0, node.y1, xHub, inOffset, inOffset + linkHeight) };
+    inOffset += linkHeight;
+    return link;
+  });
+  let outOffset = hubY0;
+  const outLinks = rightNodes.map((node) => {
+    const linkHeight = node.value * scale;
+    const link = { node, path: ribbon(xHub + nodeW, outOffset, outOffset + linkHeight, xRight, node.y0, node.y1) };
+    outOffset += linkHeight;
+    return link;
+  });
+
+  const showTip = (event: ReactMouseEvent, title: string, lines: string[]) => {
+    const rect = shellRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setTip({ x: event.clientX - rect.left, y: event.clientY - rect.top, title, lines });
+  };
+
+  const labelFor = (node: SankeyEndpoint) => `${money(node.value)} (${percent(node.value)})`;
+
+  return (
+    <div className="sankeyShell" ref={shellRef} onMouseLeave={() => setTip(null)}>
+      <svg className="sankeySvg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Cash flow from income sources to savings and spending categories">
+        <defs>
+          {[...inLinks.map((link, index) => ({ link, id: `sankey-in-${index}`, from: link.node.color, to: "var(--blue)" })), ...outLinks.map((link, index) => ({ link, id: `sankey-out-${index}`, from: "var(--blue)", to: link.node.color }))].map(({ id, from, to }) => (
+            <linearGradient id={id} key={id} x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" style={{ stopColor: from }} />
+              <stop offset="1" style={{ stopColor: to }} />
+            </linearGradient>
+          ))}
+        </defs>
+        {inLinks.map((link, index) => (
+          <path
+            className="sankeyLink"
+            key={link.node.id}
+            d={link.path}
+            fill={`url(#sankey-in-${index})`}
+            onMouseMove={(event) => showTip(event, `${link.node.label} → Income`, [`${money(link.node.value)} · ${percent(link.node.value)} of flow`])}
+          />
+        ))}
+        {outLinks.map((link, index) => (
+          <path
+            className="sankeyLink"
+            key={link.node.id}
+            d={link.path}
+            fill={`url(#sankey-out-${index})`}
+            onMouseMove={(event) => showTip(event, `Income → ${link.node.label}`, [`${money(link.node.value)} · ${percent(link.node.value)} of flow`])}
+          />
+        ))}
+        {leftNodes.map((node) => (
+          <g key={node.id}>
+            <rect className="sankeyNode" x={xLeft} y={node.y0} width={nodeW} height={node.y1 - node.y0} rx={3} fill={node.color} />
+            <text className="sankeyLabel" x={xLeft - 12} y={(node.y0 + node.y1) / 2} textAnchor="end" dominantBaseline="middle">
+              <tspan className="name">{node.label}</tspan>
+              <tspan className={privacy ? "amt masked" : "amt"} dx="7">
+                {labelFor(node)}
+              </tspan>
+            </text>
+          </g>
+        ))}
+        <g>
+          <rect className="sankeyNode" x={xHub} y={hubY0} width={nodeW} height={hubHeight} rx={3} fill="var(--blue)" />
+          <text className="sankeyLabel hub" x={xHub + nodeW / 2} y={hubY0 - 10} textAnchor="middle">
+            <tspan className="name">Income</tspan>
+            <tspan className={privacy ? "amt masked" : "amt"} dx="7">
+              {money(totalFlow)}
+            </tspan>
+          </text>
+        </g>
+        {rightNodes.map((node) => (
+          <g key={node.id}>
+            <rect className="sankeyNode" x={xRight} y={node.y0} width={nodeW} height={node.y1 - node.y0} rx={3} fill={node.color} />
+            <text className="sankeyLabel" x={xRight + nodeW + 12} y={(node.y0 + node.y1) / 2} dominantBaseline="middle">
+              <tspan className="name">{node.label}</tspan>
+              <tspan className={privacy ? "amt masked" : "amt"} dx="7">
+                {labelFor(node)}
+              </tspan>
+            </text>
+          </g>
+        ))}
+      </svg>
+      {tip && (
+        <div className="chartTip" style={{ left: tip.x + 14, top: tip.y + 14 }}>
+          <strong>{tip.title}</strong>
+          {tip.lines.map((line) => (
+            <span key={line}>{line}</span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function InsightChartToggle({ value, onChange }: { value: InsightChartView; onChange: (value: InsightChartView) => void }) {
   const options: Array<{ value: InsightChartView; label: string; icon: ReactNode }> = [
-    { value: "inflow-outflow", label: "Inflows vs outflows", icon: <LineChart size={15} /> },
+    { value: "inflow-outflow", label: "Monthly cash flow", icon: <LineChart size={15} /> },
     { value: "cash-flow", label: "Cash flow volatility", icon: <BarChart3 size={15} /> },
     { value: "net-worth", label: "Net worth outlook", icon: <Gauge size={15} /> },
   ];
@@ -4347,6 +4618,8 @@ function BarChart({ bars, privacy, formatter }: { bars: ReturnType<typeof buildM
   );
 }
 
+// Monarch-style monthly cash flow: income rises from the zero line, spending
+// mirrors below it, and a net marker per month ties the two together.
 function InflowOutflowChart({
   points,
   privacy,
@@ -4356,72 +4629,121 @@ function InflowOutflowChart({
   privacy: boolean;
   formatter: Intl.NumberFormat;
 }) {
-  const width = 720;
-  const height = 260;
-  const padding = 28;
-  const plotHeight = height - padding * 2;
-  const maxValue = Math.max(...points.map((point) => Math.max(point.income, point.expenses)), 1);
-  const slot = (width - padding * 2) / Math.max(points.length, 1);
-  const barWidth = Math.max(10, Math.min(20, slot * 0.24));
+  const shellRef = useRef<HTMLDivElement | null>(null);
+  const [tip, setTip] = useState<ChartTip>(null);
   const activePoints = points.filter((point) => point.hasData);
 
   if (!activePoints.length) {
     return <EmptyState icon={<LineChart size={18} />} title="No monthly flow yet" text="Add income and outflows or import a CSV to build this chart." />;
   }
 
+  const width = 720;
+  const height = 280;
+  const padTop = 18;
+  const padBottom = 30;
+  const padX = 26;
+  const plotHeight = height - padTop - padBottom;
+  const maxUp = Math.max(...points.map((point) => point.income), 1);
+  const maxDown = Math.max(...points.map((point) => point.expenses), 1);
+  const scale = plotHeight / (maxUp + maxDown);
+  const zeroY = padTop + maxUp * scale;
+  const slot = (width - padX * 2) / Math.max(points.length, 1);
+  const barWidth = Math.max(12, Math.min(30, slot * 0.5));
+  const money = (value: number) => (privacy ? "•••" : formatter.format(value));
+
+  let netStarted = false;
+  const netPath = points
+    .map((point, index) => {
+      if (!point.hasData) return "";
+      const x = padX + index * slot + slot / 2;
+      const y = zeroY - point.surplus * scale;
+      const command = netStarted ? "L" : "M";
+      netStarted = true;
+      return `${command} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    })
+    .filter(Boolean)
+    .join(" ");
+
+  const showTip = (event: ReactMouseEvent, point: MonthlyFlowPoint) => {
+    const rect = shellRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setTip({
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+      title: point.label,
+      lines: [`Income ${money(point.income)}`, `Spending ${money(point.expenses)}`, `Net ${point.surplus >= 0 ? "+" : ""}${money(point.surplus)}`],
+    });
+  };
+
   return (
-    <div className="flowComparisonChart" aria-label="Monthly inflows and outflows chart">
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Actual monthly inflows compared with outflows">
-        <line className="netWorthAxis" x1={padding} x2={width - padding} y1={height - padding} y2={height - padding} />
+    <div className="flowComparisonChart sankeyShell" ref={shellRef} onMouseLeave={() => setTip(null)} aria-label="Monthly cash flow chart">
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Monthly income above the line, spending below, and net cash flow">
+        <line className="flowGrid" x1={padX} x2={width - padX} y1={padTop} y2={padTop} />
+        <line className="flowGrid" x1={padX} x2={width - padX} y1={height - padBottom} y2={height - padBottom} />
+        <line className="netWorthAxis" x1={padX} x2={width - padX} y1={zeroY} y2={zeroY} />
         {points.map((point, index) => {
-          const x = padding + index * slot + slot / 2;
-          const incomeHeight = (point.income / maxValue) * plotHeight;
-          const expenseHeight = (point.expenses / maxValue) * plotHeight;
-          const incomeY = height - padding - incomeHeight;
-          const expenseY = height - padding - expenseHeight;
+          const x = padX + index * slot + slot / 2;
+          const incomeHeight = point.income * scale;
+          const expenseHeight = point.expenses * scale;
 
           return (
-            <g key={point.monthKey} className={point.hasData ? "flowMonth active" : "flowMonth"}>
+            <g
+              key={point.monthKey}
+              className={point.hasData ? "flowMonth active" : "flowMonth"}
+              onMouseMove={point.hasData ? (event) => showTip(event, point) : undefined}
+            >
+              <rect className="flowHit" x={x - slot / 2} y={padTop} width={slot} height={plotHeight} />
               <rect
                 className="flowBar income"
-                x={x - barWidth - 2}
-                y={incomeY}
+                x={x - barWidth / 2}
+                y={zeroY - Math.max(point.income > 0 ? 3 : 0, incomeHeight)}
                 width={barWidth}
                 height={Math.max(point.income > 0 ? 3 : 0, incomeHeight)}
-                rx="3"
+                rx="4"
               />
               <rect
                 className="flowBar expense"
-                x={x + 2}
-                y={expenseY}
+                x={x - barWidth / 2}
+                y={zeroY + 2}
                 width={barWidth}
                 height={Math.max(point.expenses > 0 ? 3 : 0, expenseHeight)}
-                rx="3"
+                rx="4"
               />
               <text x={x} y={height - 8} textAnchor="middle">
                 {point.label}
               </text>
-              {point.hasData && (
-                <title>
-                  {point.label}: income {formatter.format(point.income)}, outflow {formatter.format(point.expenses)}, net{" "}
-                  {formatter.format(point.surplus)}
-                </title>
-              )}
             </g>
           );
+        })}
+        <path className="flowNetLine" d={netPath} />
+        {points.map((point, index) => {
+          if (!point.hasData) return null;
+          const x = padX + index * slot + slot / 2;
+          return <circle className="flowNetDot" key={point.monthKey} cx={x} cy={zeroY - point.surplus * scale} r={3.5} />;
         })}
       </svg>
       <div className="flowLegend">
         <span>
-          <i className="income" /> Inflow
+          <i className="income" /> Income
         </span>
         <span>
-          <i className="expense" /> Outflow
+          <i className="expense" /> Spending
+        </span>
+        <span>
+          <i className="net" /> Net
         </span>
         <strong className={privacy ? "masked" : ""}>
           Latest net {formatter.format(activePoints[activePoints.length - 1]?.surplus ?? 0)}
         </strong>
       </div>
+      {tip && (
+        <div className="chartTip" style={{ left: tip.x + 14, top: tip.y + 14 }}>
+          <strong>{tip.title}</strong>
+          {tip.lines.map((line) => (
+            <span key={line}>{line}</span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
