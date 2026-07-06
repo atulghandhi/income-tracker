@@ -7,7 +7,6 @@ import {
   ArrowDown,
   ArrowUp,
   BarChart3,
-  CalendarDays,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -1498,8 +1497,13 @@ function App() {
   }
 
   function focusSearch() {
-    searchInputRef.current?.focus();
-    searchInputRef.current?.select();
+    // The search field only lives on the Ledger view now — jump there first,
+    // then focus once the input has mounted.
+    setActiveView("ledger");
+    requestAnimationFrame(() => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    });
   }
 
   useEffect(() => {
@@ -1697,7 +1701,6 @@ function App() {
                   <ChevronLeft size={19} />
                 </button>
                 <div className="monthLabel">
-                  <CalendarDays size={17} />
                   <strong>{formatMonth(ledger.selectedMonth)}</strong>
                 </div>
                 <button className="iconButton" type="button" onClick={() => changeMonth(1)} aria-label="Next month" aria-keyshortcuts="Alt+ArrowRight">
@@ -1709,17 +1712,19 @@ function App() {
             )}
           </div>
 
-          <label className="searchShell">
-            <Search size={18} />
-            <input
-              ref={searchInputRef}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search transactions..."
-              aria-label="Search transactions"
-              aria-keyshortcuts="/ Meta+K Control+K"
-            />
-          </label>
+          {activeView === "ledger" && (
+            <label className="searchShell">
+              <Search size={18} />
+              <input
+                ref={searchInputRef}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search transactions..."
+                aria-label="Search transactions"
+                aria-keyshortcuts="/ Meta+K Control+K"
+              />
+            </label>
+          )}
 
           <div className="topActions">
             <label className="currencyControl">

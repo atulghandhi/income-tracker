@@ -11,18 +11,18 @@
   font-synthesis: none;
   text-rendering: geometricPrecision;
   -webkit-font-smoothing: antialiased;
-  --bg: #eef1f8;
-  --bg-deep: #e5eaf4;
-  --nav: #fbfcfe;
+  --bg: #f8f7f4;
+  --bg-deep: #f1efeb;
+  --nav: #fdfcfb;
   --surface: #ffffff;
-  --surface-high: #f3f6fb;
-  --surface-higher: #e9eef7;
-  --glass: rgba(255, 255, 255, 0.82);
-  --ink: #1b2a44;
-  --muted: #5d6b84;
-  --faint: #8b97ac;
-  --line: rgba(31, 52, 85, 0.11);
-  --line-strong: rgba(31, 52, 85, 0.24);
+  --surface-high: #f6f5f2;
+  --surface-higher: #edecf3;
+  --glass: rgba(255, 255, 255, 0.88);
+  --ink: #1c2333;
+  --muted: #5f6b7e;
+  --faint: #8e98a9;
+  --line: rgba(24, 32, 56, 0.08);
+  --line-strong: rgba(24, 32, 56, 0.18);
   --blue: #2b6ceb;
   --blue-bright: #2059cc;
   --blue-soft: rgba(43, 108, 235, 0.1);
@@ -33,30 +33,32 @@
   --amber: #b2740a;
   --on-ink: #ffffff;
   --on-accent: #ffffff;
-  --ink-rgb: 27, 42, 68;
-  --line-rgb: 31, 52, 85;
+  --ink-rgb: 28, 35, 51;
+  --line-rgb: 24, 32, 56;
   --surface-rgb: 255, 255, 255;
-  --surface-higher-rgb: 226, 232, 242;
-  --nav-rgb: 251, 252, 254;
+  --surface-higher-rgb: 237, 236, 243;
+  --nav-rgb: 253, 252, 251;
   --bg-rgb: 255, 255, 255;
-  --bg-deep-rgb: 24, 42, 72;
+  --bg-deep-rgb: 16, 24, 40;
   --mint-rgb: 11, 152, 131;
   --blue-rgb: 43, 108, 235;
   --blue-bright-rgb: 32, 89, 204;
   --red-rgb: 202, 54, 54;
   --amber-rgb: 178, 116, 10;
   --on-ink-rgb: 255, 255, 255;
-  --shadow-sm: 0 1px 2px rgba(24, 42, 72, 0.05), 0 2px 10px rgba(24, 42, 72, 0.05);
-  --shadow-md: 0 2px 6px rgba(24, 42, 72, 0.05), 0 14px 36px rgba(24, 42, 72, 0.09);
-  --well: rgba(24, 42, 72, 0.06);
-  --well-strong: rgba(24, 42, 72, 0.1);
-  --track: rgba(24, 42, 72, 0.12);
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.04), 0 2px 6px rgba(16, 24, 40, 0.04), 0 10px 24px -8px rgba(16, 24, 40, 0.07);
+  --shadow-md: 0 2px 4px rgba(16, 24, 40, 0.05), 0 10px 20px -4px rgba(16, 24, 40, 0.08), 0 24px 48px -12px rgba(16, 24, 40, 0.1);
+  --well: rgba(16, 24, 40, 0.04);
+  --well-strong: rgba(16, 24, 40, 0.07);
+  --track: rgba(16, 24, 40, 0.1);
   --radius-sm: 8px;
   --radius: 12px;
   --radius-lg: 16px;
   --nav-width: 256px;
-  --mono:
-    "Geist Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  /* Formerly a monospace stack sprayed across UI labels; now the UI sans.
+     Kept as a token so the 50+ call sites read "figures/labels" semantically.
+     Pair with tabular-nums (appended at call sites) for aligned columns. */
+  --mono: Inter, ui-sans-serif, system-ui, sans-serif;
 }
 
 [data-theme="dark"] {
@@ -217,6 +219,7 @@ textarea {
   margin: 7px 0 0;
   color: var(--muted);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 12px;
   font-weight: 760;
 }
@@ -364,6 +367,7 @@ textarea {
   margin: 6px 0 0;
   color: var(--ink);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0;
@@ -596,14 +600,27 @@ textarea {
   top: 0;
   z-index: 40;
   min-height: 64px;
-  display: grid;
-  grid-template-columns: minmax(230px, 1fr) minmax(260px, 460px) auto;
+  display: flex;
   align-items: center;
   gap: 18px;
   padding: 10px 24px;
   border-bottom: 1px solid var(--line);
-  background: rgba(var(--bg-rgb), 0.82);
+  background: rgba(var(--bg-rgb), 0.78);
   backdrop-filter: blur(24px);
+}
+
+.appBarTitle {
+  flex: 1;
+  min-width: 0;
+}
+
+.appBar .searchShell {
+  flex: 1;
+  max-width: 440px;
+}
+
+.appBar .topActions {
+  margin-left: auto;
 }
 
 .appBarTitle h2 {
@@ -618,10 +635,10 @@ textarea {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 14px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-lg);
-  background: rgba(var(--nav-rgb), 0.92);
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
   color: var(--muted);
   transition:
     border-color 150ms ease,
@@ -656,26 +673,27 @@ textarea::placeholder {
 .monthSwitch {
   width: fit-content;
   min-height: 44px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  overflow: hidden;
-  background: var(--well);
+  gap: 2px;
 }
 
 .monthSwitch .iconButton {
-  border: 0;
-  border-radius: 0;
-  background: transparent;
+  width: 34px;
+  min-height: 34px;
+  border-radius: 999px;
 }
 
 .monthLabel {
-  min-width: 210px;
   justify-content: center;
   gap: 10px;
-  align-self: stretch;
-  padding: 0 18px;
-  border-inline: 1px solid var(--line);
+  padding: 0 8px;
   color: var(--ink);
+}
+
+.monthLabel strong {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
 }
 
 .iconButton,
@@ -699,10 +717,19 @@ textarea::placeholder {
   width: 38px;
   display: inline-grid;
   place-items: center;
+  border-color: transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
 }
 
 .iconButton:hover,
-.iconButton.active,
+.iconButton.active {
+  border-color: transparent;
+  background: rgba(var(--ink-rgb), 0.07);
+  color: var(--ink);
+}
+
 .commandButton:hover,
 .quietButton:hover,
 .checkButton:hover {
@@ -722,6 +749,7 @@ textarea::placeholder {
   gap: 8px;
   padding: 0 14px;
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 12px;
   font-weight: 760;
   text-transform: uppercase;
@@ -738,6 +766,7 @@ textarea::placeholder {
   background: rgba(var(--surface-rgb), 0.76);
   color: var(--ink);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-weight: 760;
 }
 
@@ -796,6 +825,7 @@ textarea::placeholder {
 
 .statusPill strong {
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 10px;
   font-weight: 800;
   text-transform: uppercase;
@@ -876,6 +906,7 @@ textarea::placeholder {
 .graphLegend,
 .scoreCaption {
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0;
@@ -884,6 +915,7 @@ textarea::placeholder {
 
 .netBlock strong {
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 26px;
   font-weight: 700;
 }
@@ -928,28 +960,26 @@ textarea::placeholder {
   animation: cardIn 420ms ease both;
 }
 
-.metricCard::after {
-  content: "";
-  position: absolute;
-  inset: auto 0 0 0;
-  height: 2px;
-  opacity: 0.9;
+/* Toned stat cards: tinted hairline + a whisper of colour glow, replacing the
+   old accent-underline bars. */
+.metricCard.green {
+  border-color: rgba(var(--mint-rgb), 0.3);
+  box-shadow: 0 0 0 3px rgba(var(--mint-rgb), 0.05), 0 12px 28px -12px rgba(var(--mint-rgb), 0.3), var(--shadow-sm);
 }
 
-.metricCard.green::after {
-  background: var(--mint);
+.metricCard.red {
+  border-color: rgba(var(--red-rgb), 0.28);
+  box-shadow: 0 0 0 3px rgba(var(--red-rgb), 0.05), 0 12px 28px -12px rgba(var(--red-rgb), 0.28), var(--shadow-sm);
 }
 
-.metricCard.red::after {
-  background: var(--red);
-}
-
-.metricCard.amber::after {
-  background: var(--amber);
+.metricCard.amber {
+  border-color: rgba(var(--amber-rgb), 0.3);
+  box-shadow: 0 0 0 3px rgba(var(--amber-rgb), 0.05), 0 12px 28px -12px rgba(var(--amber-rgb), 0.28), var(--shadow-sm);
 }
 
 .metricCard strong {
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 30px;
   line-height: 1;
 }
@@ -979,11 +1009,13 @@ textarea::placeholder {
 }
 
 .panel.income {
-  border-color: rgba(var(--mint-rgb), 0.18);
+  border-color: rgba(var(--mint-rgb), 0.22);
+  box-shadow: 0 0 0 3px rgba(var(--mint-rgb), 0.04), var(--shadow-sm);
 }
 
 .panel.expense {
-  border-color: rgba(var(--red-rgb), 0.16);
+  border-color: rgba(var(--red-rgb), 0.2);
+  box-shadow: 0 0 0 3px rgba(var(--red-rgb), 0.04), var(--shadow-sm);
 }
 
 .panelHeader {
@@ -1017,6 +1049,7 @@ textarea::placeholder {
 
 .panelHeader strong {
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 17px;
   white-space: nowrap;
 }
@@ -1032,10 +1065,10 @@ textarea::placeholder {
 .tableHeader {
   display: grid;
   align-items: center;
-  min-height: 42px;
+  min-height: 40px;
   padding: 0 24px;
   border-bottom: 1px solid var(--line);
-  background: rgba(var(--bg-deep-rgb), 0.12);
+  background: transparent;
 }
 
 .incomeHeader {
@@ -1081,8 +1114,7 @@ textarea::placeholder {
 }
 
 .financeRow:hover {
-  background: rgba(var(--surface-higher-rgb), 0.26);
-  transform: translateX(3px);
+  background: rgba(var(--ink-rgb), 0.03);
 }
 
 .financeRow.dragging {
@@ -1121,9 +1153,7 @@ textarea::placeholder {
 
 .financeRow.dropCombine {
   background: rgba(var(--mint-rgb), 0.1);
-  box-shadow:
-    inset 0 0 0 1px rgba(var(--mint-rgb), 0.38),
-    inset 3px 0 0 var(--mint);
+  box-shadow: inset 0 0 0 1px rgba(var(--mint-rgb), 0.38);
 }
 
 .incomeRow {
@@ -1213,6 +1243,7 @@ textarea:focus,
 .dragDots {
   color: rgba(var(--ink-rgb), 0.66);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-weight: 800;
   letter-spacing: 0;
 }
@@ -1227,6 +1258,7 @@ textarea:focus,
   background: transparent;
   color: rgba(var(--ink-rgb), 0.66);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-weight: 900;
 }
 
@@ -1258,9 +1290,19 @@ textarea:focus,
   gap: 5px;
   min-width: 0;
   padding: 0 10px;
-  border-color: rgba(var(--line-rgb), 0.12);
-  background: var(--well-strong);
+  border-color: transparent;
+  background: transparent;
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Affordance appears on row hover and in the always-editable add rows. */
+.financeRow:hover .moneyInput,
+.addRow .moneyInput,
+.debtField .moneyInput,
+.goalAmounts .moneyInput {
+  border-color: var(--line);
+  background: var(--surface);
 }
 
 .moneyInput span {
@@ -1292,6 +1334,7 @@ textarea:focus,
 .rowTotal {
   color: var(--muted);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 13px;
   font-weight: 760;
   text-align: right;
@@ -1320,25 +1363,14 @@ textarea:focus,
   margin: 8px 0;
   overflow: hidden;
   border: 0;
-  background:
-    linear-gradient(90deg, rgba(var(--ink-rgb), 0.035), transparent 58%),
-    var(--well);
-  box-shadow:
-    inset 3px 0 0 var(--category-color),
-    inset 0 1px 0 rgba(var(--line-rgb), 0.09),
-    inset 0 -1px 0 rgba(var(--line-rgb), 0.09);
+  background: color-mix(in srgb, var(--category-color, var(--faint)) 2.5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--category-color, var(--faint)) 22%, transparent);
+  border-radius: var(--radius);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--category-color, var(--faint)) 4%, transparent);
 }
 
-.expenseGroup:not(.ungrouped)::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  z-index: 2;
-  width: 3px;
-  background: var(--category-color);
-  opacity: 0.78;
-  pointer-events: none;
-}
+/* Category identity is carried by the tinted ring, header wash, and swatch dot
+   — no side strip. */
 
 .expenseGroup:last-child,
 .expenseGroup.ungrouped {
@@ -1349,7 +1381,7 @@ textarea:focus,
   gap: 10px;
   min-height: 42px;
   padding: 8px 24px 8px 30px;
-  background: var(--well-strong);
+  background: transparent;
   border-bottom: 1px solid transparent;
   transition:
     background 150ms ease,
@@ -1360,9 +1392,7 @@ textarea:focus,
 .expenseGroup:not(.ungrouped) .expenseGroupHeader {
   padding-left: 28px;
   border-bottom-color: rgba(var(--line-rgb), 0.08);
-  background:
-    linear-gradient(90deg, rgba(var(--ink-rgb), 0.052), transparent 64%),
-    var(--well-strong);
+  background: color-mix(in srgb, var(--category-color, var(--faint)) 5%, transparent);
 }
 
 .expenseGroup:not(.ungrouped) .expenseRow {
@@ -1386,14 +1416,12 @@ textarea:focus,
 .expenseGroup.categoryDropTarget {
   background: rgba(var(--mint-rgb), 0.07);
   box-shadow:
-    inset 3px 0 0 var(--category-color),
-    inset 0 0 0 1px rgba(var(--mint-rgb), 0.34),
-    0 12px 34px rgba(var(--mint-rgb), 0.08);
+    0 0 0 1px rgba(var(--mint-rgb), 0.34),
+    0 12px 34px rgba(var(--mint-rgb), 0.12);
 }
 
 .expenseGroup.categoryDropTarget .expenseGroupHeader {
   background: rgba(var(--mint-rgb), 0.14);
-  box-shadow: inset 3px 0 0 var(--mint);
 }
 
 .expenseGroup.collapsed .expenseGroupHeader {
@@ -1436,6 +1464,7 @@ textarea:focus,
   background: transparent;
   color: var(--ink);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 13px;
   font-weight: 760;
 }
@@ -1454,6 +1483,7 @@ textarea:focus,
   margin-left: auto;
   color: var(--ink);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 13px;
 }
 
@@ -1577,6 +1607,7 @@ textarea:focus,
 .contextMenuMeta {
   color: var(--faint);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
   font-style: normal;
   font-weight: 720;
@@ -1605,8 +1636,8 @@ textarea:focus,
   grid-template-columns: 42px minmax(140px, 1fr) 140px 42px;
   gap: 10px;
   padding: 12px;
-  border-top: 1px dashed rgba(var(--line-rgb), 0.16);
-  background: var(--well-strong);
+  border-top: 1px dashed rgba(var(--line-rgb), 0.18);
+  background: rgba(var(--surface-rgb), 0.92);
   backdrop-filter: blur(12px);
   position: sticky;
   bottom: 58px;
@@ -1765,24 +1796,26 @@ textarea:focus,
 }
 
 .tabs {
-  overflow: hidden;
+  gap: 3px;
+  padding: 3px;
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: rgba(var(--bg-deep-rgb), 0.28);
+  border-radius: 999px;
+  background: var(--well);
 }
 
 .tabs button {
-  min-height: 36px;
+  min-height: 30px;
   padding: 0 14px;
   border: 0;
-  border-left: 1px solid rgba(var(--line-rgb), 0.1);
+  border-radius: 999px;
   background: transparent;
   color: var(--muted);
   font-size: 13px;
   font-weight: 650;
   transition:
     background 150ms ease,
-    color 150ms ease;
+    color 150ms ease,
+    box-shadow 150ms ease;
 }
 
 .tabs button:first-child {
@@ -1790,8 +1823,9 @@ textarea:focus,
 }
 
 .tabs button.selected {
-  background: var(--surface-high);
+  background: var(--surface);
   color: var(--ink);
+  box-shadow: var(--shadow-sm);
 }
 
 .compactTabs {
@@ -1893,12 +1927,14 @@ textarea:focus,
 .debtMiniGrid span {
   color: var(--muted);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 12px;
   font-weight: 720;
 }
 
 .debtMiniGrid strong {
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 18px;
 }
 
@@ -1926,7 +1962,8 @@ textarea:focus,
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: rgba(var(--surface-rgb), 0.62);
-  box-shadow: inset 3px 0 0 var(--account-color, var(--mint));
+  border-color: color-mix(in srgb, var(--account-color, var(--mint)) 32%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--account-color, var(--mint)) 5%, transparent), var(--shadow-sm);
 }
 
 .debtAccountRow .swatchButton {
@@ -1970,12 +2007,9 @@ textarea:focus,
 }
 
 /* Tint the whole row by class so assets and debts read apart at a glance. */
-.debtAccountRow.isAsset {
-  box-shadow: inset 3px 0 0 var(--account-color, var(--mint));
-}
-
+.debtAccountRow.isAsset,
 .debtAccountRow.isDebt {
-  box-shadow: inset 3px 0 0 var(--account-color, var(--red));
+  /* Tint now carried by the ring/glow above; keep the classes for colour fallbacks. */
 }
 
 .debtAccountRow .rowAction {
@@ -1991,7 +2025,7 @@ textarea:focus,
   min-height: 38px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: rgba(var(--bg-rgb), 0.74);
+  background: var(--surface);
   color: var(--ink);
 }
 
@@ -2027,6 +2061,7 @@ textarea:focus,
 .numberField > span:not(.infoHint) {
   color: var(--muted);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
   font-weight: 720;
 }
@@ -2048,6 +2083,7 @@ textarea:focus,
 .debtField > span {
   color: var(--muted);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
   font-weight: 720;
 }
@@ -2066,6 +2102,7 @@ textarea:focus,
   grid-column: 1 / -1;
   color: var(--muted);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
   font-weight: 720;
 }
@@ -2102,7 +2139,6 @@ textarea:focus,
 .accountClassSelect {
   font-weight: 720;
   color: var(--ink);
-  box-shadow: inset 3px 0 0 var(--mint);
 }
 
 .investmentSettingPanel {
@@ -2126,7 +2162,7 @@ textarea:focus,
   padding: 0 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: rgba(var(--bg-rgb), 0.74);
+  background: var(--surface);
   color: var(--ink);
 }
 
@@ -2159,6 +2195,7 @@ textarea:focus,
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 13px;
   color: var(--ink);
 }
@@ -2178,6 +2215,7 @@ textarea:focus,
 .assumedReturnField .fieldSuffix {
   color: var(--muted);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 12px;
   font-weight: 720;
   white-space: nowrap;
@@ -2227,12 +2265,14 @@ textarea:focus,
 .netWorthLabels span {
   color: var(--muted);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 12px;
   font-weight: 720;
 }
 
 .netWorthStats strong {
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 20px;
 }
 
@@ -2462,6 +2502,7 @@ textarea:focus,
 
 .fact strong {
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
@@ -2511,6 +2552,7 @@ hr {
   display: block;
   color: var(--ink);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 30px;
   line-height: 1;
 }
@@ -2543,6 +2585,7 @@ hr {
 .surplusHero strong {
   color: var(--mint);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 28px;
   line-height: 1;
 }
@@ -2622,6 +2665,7 @@ hr {
 .inlineFacts b {
   color: var(--ink);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .categoryList {
@@ -2646,12 +2690,14 @@ hr {
 .categoryRow strong {
   color: var(--ink);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 13px;
 }
 
 .categoryRow em {
   color: var(--faint);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 12px;
   font-style: normal;
   text-align: right;
@@ -2691,6 +2737,7 @@ hr {
 .monthRailItem small {
   color: var(--muted);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 10px;
 }
 
@@ -2736,6 +2783,7 @@ hr {
 .goalAmountField > span {
   color: var(--muted);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
   font-weight: 760;
 }
@@ -2760,6 +2808,7 @@ hr {
   gap: 12px;
   color: var(--muted);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 12px;
 }
 
@@ -2806,11 +2855,13 @@ hr {
   margin-top: 3px;
   color: var(--faint);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
 }
 
 .historyRow b {
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   text-align: right;
 }
 
@@ -2837,6 +2888,7 @@ hr {
   background: rgba(255, 255, 255, 0.18);
   color: rgba(var(--on-ink-rgb), 0.62);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 12px;
   font-weight: 720;
 }
@@ -2923,8 +2975,8 @@ hr {
   gap: 4px;
   padding: 3px;
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: rgba(var(--bg-deep-rgb), 0.22);
+  border-radius: 999px;
+  background: var(--well);
 }
 
 .iconToggle button {
@@ -2933,7 +2985,7 @@ hr {
   display: grid;
   place-items: center;
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: 999px;
   background: transparent;
   color: var(--muted);
 }
@@ -2963,6 +3015,7 @@ hr {
 .flowMonth text {
   fill: var(--muted);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
 }
 
@@ -2995,6 +3048,7 @@ hr {
   gap: 16px;
   color: var(--muted);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 12px;
   font-weight: 720;
 }
@@ -3081,6 +3135,7 @@ hr {
 .panelWhen {
   color: var(--muted);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 12px;
   font-weight: 720;
   letter-spacing: 0.04em;
@@ -3154,6 +3209,7 @@ hr {
 .chartTip span {
   color: var(--muted);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .anomalyList {
@@ -3168,8 +3224,9 @@ hr {
   padding: 16px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: rgba(var(--bg-deep-rgb), 0.2);
-  box-shadow: inset 3px 0 0 rgba(var(--blue-bright-rgb), 0.42);
+  background: var(--surface);
+  border-color: rgba(var(--blue-rgb), 0.24);
+  box-shadow: 0 0 0 3px rgba(var(--blue-rgb), 0.04), var(--shadow-sm);
 }
 
 .signalCard:hover,
@@ -3179,17 +3236,17 @@ hr {
 
 .signalCard.danger {
   border-color: rgba(var(--red-rgb), 0.32);
-  box-shadow: inset 3px 0 0 var(--red);
+  box-shadow: 0 0 0 3px rgba(var(--red-rgb), 0.05), var(--shadow-sm);
 }
 
 .signalCard.warning {
-  border-color: rgba(var(--amber-rgb), 0.28);
-  box-shadow: inset 3px 0 0 var(--amber);
+  border-color: rgba(var(--amber-rgb), 0.3);
+  box-shadow: 0 0 0 3px rgba(var(--amber-rgb), 0.05), var(--shadow-sm);
 }
 
 .signalCard.good {
-  border-color: rgba(var(--mint-rgb), 0.24);
-  box-shadow: inset 3px 0 0 var(--mint);
+  border-color: rgba(var(--mint-rgb), 0.28);
+  box-shadow: 0 0 0 3px rgba(var(--mint-rgb), 0.05), var(--shadow-sm);
 }
 
 .signalTitle {
@@ -3237,6 +3294,7 @@ hr {
   background: rgba(var(--mint-rgb), 0.05);
   color: var(--mint);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
@@ -3365,6 +3423,7 @@ hr {
 .eyebrow {
   color: var(--muted);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
   font-weight: 760;
   text-transform: uppercase;
@@ -3409,6 +3468,7 @@ hr {
 .bulkCategoryField span {
   color: var(--muted);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 12px;
   font-weight: 720;
 }
@@ -3419,7 +3479,7 @@ hr {
   min-height: 34px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: rgba(var(--bg-rgb), 0.74);
+  background: var(--surface);
   color: var(--ink);
 }
 
@@ -3448,6 +3508,7 @@ hr {
   background: rgba(var(--nav-rgb), 0.98);
   color: var(--muted);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
   text-align: left;
   text-transform: uppercase;
@@ -3518,6 +3579,7 @@ hr {
   background: var(--mint-soft);
   color: var(--mint);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
   font-weight: 760;
 }
@@ -3689,8 +3751,8 @@ hr {
   justify-content: space-between;
   gap: 24px;
   padding: 24px 28px;
-  border-color: rgba(var(--red-rgb), 0.32);
-  border-left: 8px solid var(--red);
+  border-color: rgba(var(--red-rgb), 0.3);
+  box-shadow: 0 0 0 3px rgba(var(--red-rgb), 0.05), var(--shadow-sm);
 }
 
 .dangerPanel h3,
@@ -3731,6 +3793,7 @@ hr {
   backdrop-filter: blur(18px);
   color: rgba(var(--ink-rgb), 0.78);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 13px;
 }
 
@@ -4312,6 +4375,7 @@ hr {
   font-size: 12px;
   color: var(--muted);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .mergeOption small {
@@ -4592,6 +4656,7 @@ hr {
   background: rgba(var(--surface-rgb), 0.5);
   color: var(--ink);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
@@ -4645,6 +4710,7 @@ hr {
   background: rgba(var(--mint-rgb), 0.14);
   color: var(--mint);
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
   font-weight: 720;
   letter-spacing: 0.02em;
@@ -4894,10 +4960,12 @@ hr {
   background: rgba(var(--surface-rgb),0.7); border: 1px solid var(--line);
   border-radius: var(--radius); padding: 6px 12px; width: fit-content;
   color: var(--ink); font-size: 16px; font-weight: 600; font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
 }
 .goalsSurplusInput input {
   background: none; border: none; outline: none;
-  color: var(--ink); font-family: var(--mono); font-size: 16px;
+  color: var(--ink); font-family: var(--mono);
+  font-variant-numeric: tabular-nums; font-size: 16px;
   font-weight: 600; width: 100px; padding: 0;
 }
 .goalsHorizonTabs {
@@ -4969,13 +5037,15 @@ hr {
   border-radius: 9999px; overflow: hidden;
 }
 .goalProgressFill { height: 100%; border-radius: 9999px; transition: width 400ms ease; }
-.goalCardProgress span { font-family: var(--mono); font-size: 11px; color: var(--muted); white-space: nowrap; }
+.goalCardProgress span { font-family: var(--mono);
+  font-variant-numeric: tabular-nums; font-size: 11px; color: var(--muted); white-space: nowrap; }
 
 /* Stat grid */
 .goalCardNumbers { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 10px; }
 .goalCardStat { display: flex; flex-direction: column; gap: 2px; }
 .goalCardStat span { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
-.goalCardStat strong { font-family: var(--mono); font-size: 13px; color: var(--ink); }
+.goalCardStat strong { font-family: var(--mono);
+  font-variant-numeric: tabular-nums; font-size: 13px; color: var(--ink); }
 
 /* Gap hint */
 .goalGapHint {
