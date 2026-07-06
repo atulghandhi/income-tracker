@@ -44,7 +44,10 @@ export function effectiveAnnualRate(account: { rate: number; promoRate: number; 
   return monthIndex <= promoMonths ? Number(account.promoRate) || 0 : Number(account.rate) || 0;
 }
 
-export const colors = ["#12b886", "#6c5ce7", "#ff6b6b", "#f59f00", "#15aabf", "#845ef7", "#51cf66", "#ff922b"];
+// Categorical palette, assigned in this fixed order. Validated (CVD separation,
+// lightness band, chroma floor) against both the light (#ffffff) and dark
+// (#122131) card surfaces, so stored entry colors read correctly in either theme.
+export const colors = ["#2f7fdd", "#1baf7a", "#c98500", "#008300", "#7a6cd6", "#e05656", "#d55181", "#e26030"];
 
 export const currencyOptions: Array<{ code: CurrencyCode; label: string; locale: string }> = [
   { code: "GBP", label: "GBP (£)", locale: "en-GB" },
