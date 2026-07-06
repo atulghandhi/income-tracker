@@ -68,6 +68,7 @@ import {
   formatMonth,
   getCurrencyFormatter,
   getCurrencySymbol,
+  getMonthKey,
   runGoalSequence,
   seedMonthFromPrevious,
   shiftMonth,
@@ -4962,13 +4963,18 @@ function normalizeState(rawState: Partial<LedgerState>): LedgerState {
     delete state.goal;
   }
 
-  const selectedMonth = typeof state.selectedMonth === "string" && state.selectedMonth ? state.selectedMonth : fallback.selectedMonth;
+  // Always open on the real current month — the stored selectedMonth is
+  // whatever month was on screen when state was last saved (often last
+  // month). When today's month doesn't exist yet, seed it from the month the
+  // user last worked in, same as navigating forward in the ledger.
+  const storedMonth = typeof state.selectedMonth === "string" && state.selectedMonth ? state.selectedMonth : fallback.selectedMonth;
+  const selectedMonth = getMonthKey();
   const months = normalizeMonths(state.months, fallback.months);
   const normalizedMonths = months[selectedMonth]
     ? months
     : {
         ...months,
-        [selectedMonth]: seedMonthFromPrevious(),
+        [selectedMonth]: seedMonthFromPrevious(months[storedMonth]),
       };
 
   return {

@@ -35,7 +35,11 @@ extension LedgerStore {
     ///     set sync.mergeConflict so the user can pick a winner.
     func hydrate(sync: SyncCoordinator) async {
         saveStatus = .loading
-        defer { saveStatus = .loaded }
+        defer {
+            // Whatever path resolved the state, open on the real current month.
+            snapToCurrentMonth()
+            saveStatus = .loaded
+        }
 
         // 1. Load local state.
         let localState = loadFromUserDefaults()
@@ -168,6 +172,7 @@ extension LedgerStore {
         // Route through update() so the import is undoable and triggers the
         // debounced local save + cloud push like any other mutation.
         update { $0 = imported }
+        snapToCurrentMonth()
     }
 
     // MARK: - Private helpers

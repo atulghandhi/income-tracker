@@ -131,6 +131,23 @@ public final class LedgerStore {
         }
     }
 
+    /// Opens the ledger on the real current month. The persisted selectedMonth
+    /// is whatever month was on screen when state was last saved — often last
+    /// month by the time the app is next opened. Seeds today's month from the
+    /// last-worked month when it doesn't exist yet, same as navigating forward.
+    ///
+    /// Mutates `state` directly rather than via `update`: this is a launch-time
+    /// normalisation, not a user edit, so it must not touch the undo stack or
+    /// bump `lastSavedAt` (which would skew cross-device conflict resolution).
+    public func snapToCurrentMonth() {
+        let today = getMonthKey()
+        guard state.selectedMonth != today else { return }
+        if state.months[today] == nil {
+            state.months[today] = FinanceEngine.seedMonth(from: state.months[state.selectedMonth])
+        }
+        state.selectedMonth = today
+    }
+
     // MARK: - Income mutations
 
     public func addIncome(_ entry: IncomeEntry) {

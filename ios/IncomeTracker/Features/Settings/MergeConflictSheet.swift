@@ -40,6 +40,7 @@ struct MergeConflictSheet: View {
                             // Keep local: save local to cloud
                             Task {
                                 store.update { $0 = conflict.local }
+                                store.snapToCurrentMonth()
                                 if let userId = sync.currentUser?.id {
                                     try? await sync.saveCloudState(conflict.local, userId: userId)
                                 }
@@ -54,6 +55,7 @@ struct MergeConflictSheet: View {
                         warning: "Local data will be cleared.",
                         action: {
                             store.update { $0 = conflict.cloud }
+                            store.snapToCurrentMonth()
                             sync.mergeConflict = nil
                         }
                     )
