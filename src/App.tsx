@@ -68,6 +68,8 @@ import {
   getCurrencyFormatter,
   getCurrencySymbol,
   getMonthKey,
+  isValidMonthKey,
+  rollForwardDebtBalances,
   runGoalSequence,
   seedMonthFromPrevious,
   shiftMonth,
@@ -408,17 +410,24 @@ function App() {
   const moneyFormatter = useMemo(() => getCurrencyFormatter(ledger.currency), [ledger.currency]);
   const currencySymbol = useMemo(() => getCurrencySymbol(ledger.currency), [ledger.currency]);
   const projection = useMemo(() => calculateProjection(currentMonth), [currentMonth]);
-  const debtSummary = useMemo(() => calculateDebtSummary(ledger.accounts), [ledger.accounts]);
-  const assetSummary = useMemo(() => calculateAssetSummary(ledger.accounts), [ledger.accounts]);
-  const netWorthSummary = useMemo(() => calculateNetWorthSummary(ledger.accounts), [ledger.accounts]);
+  // Debt balances rolled forward from their snapshot month to today — every summary, chart,
+  // and the accounts screen read these, so a card set up months ago shows what's left after
+  // the scheduled (or linked) payments, not the stale snapshot.
+  const effectiveAccounts = useMemo(
+    () => rollForwardDebtBalances({ accounts: ledger.accounts, months: ledger.months }),
+    [ledger.accounts, ledger.months],
+  );
+  const debtSummary = useMemo(() => calculateDebtSummary(effectiveAccounts), [effectiveAccounts]);
+  const assetSummary = useMemo(() => calculateAssetSummary(effectiveAccounts), [effectiveAccounts]);
+  const netWorthSummary = useMemo(() => calculateNetWorthSummary(effectiveAccounts), [effectiveAccounts]);
   const netWorthOutlook = useMemo(
     () =>
       buildNetWorthOutlook({
-        accounts: ledger.accounts,
+        accounts: effectiveAccounts,
         projection,
         months: netWorthHorizon,
       }),
-    [ledger.accounts, netWorthHorizon, projection],
+    [effectiveAccounts, netWorthHorizon, projection],
   );
   const categoryRows = useMemo(() => buildCategoryRows(currentMonth, projection), [currentMonth, projection]);
   const expenseGroups = useMemo(() => buildExpenseGroups(currentMonth.expenses), [currentMonth.expenses]);
@@ -471,12 +480,12 @@ function App() {
   const monthlyBars = useMemo(() => buildMonthlyBars(ledger, currentMonth), [ledger, currentMonth]);
   const monthlyFlowPoints = useMemo(() => buildMonthlyFlowPoints(ledger), [ledger]);
   const healthScore = useMemo(
-    () => calculateHealthScore({ projection, debtSummary, accounts: ledger.accounts, savingsTarget: ledger.savingsTarget }),
-    [debtSummary, ledger.accounts, ledger.savingsTarget, projection],
+    () => calculateHealthScore({ projection, debtSummary, accounts: effectiveAccounts, savingsTarget: ledger.savingsTarget }),
+    [debtSummary, effectiveAccounts, ledger.savingsTarget, projection],
   );
   const financialSignals = useMemo(
-    () => buildFinancialSignals({ projection, debtSummary, accounts: ledger.accounts, assetSummary, month: currentMonth, savingsTarget: ledger.savingsTarget }),
-    [currentMonth, debtSummary, assetSummary, ledger.accounts, ledger.savingsTarget, projection],
+    () => buildFinancialSignals({ projection, debtSummary, accounts: effectiveAccounts, assetSummary, month: currentMonth, savingsTarget: ledger.savingsTarget }),
+    [currentMonth, debtSummary, assetSummary, effectiveAccounts, ledger.savingsTarget, projection],
   );
   const goalPlannerSurplus = ledger.goalPlannerSurplus ?? projection.recurringMonthlySurplus;
   const goalSequence = useMemo(
@@ -488,6 +497,10 @@ function App() {
   const ledgerGoalPercent = ledgerGoal ? clampPercent((ledgerGoal.saved / Math.max(ledgerGoal.target, 1)) * 100) : 0;
   const selectedYear = ledger.selectedMonth.split("-")[0];
   const menuExpense = categoryMenu ? currentMonth.expenses.find((expense) => expense.id === categoryMenu.expenseId) : undefined;
+  const debtAccountNameById = useMemo(
+    () => new Map(ledger.accounts.filter((account) => account.accountClass === "debt").map((account) => [account.id, account.name])),
+    [ledger.accounts],
+  );
 
   useEffect(() => {
     let alive = true;
@@ -876,6 +889,7 @@ function App() {
           creditLimit: isDebt ? Math.max(0, Number(accountDraft.creditLimit) || 0) : 0,
           minimumPayment: isDebt ? Math.max(0, Number(accountDraft.minimumPayment) || 0) : 0,
           dueDay: isDebt ? clampDueDay(Number(accountDraft.dueDay) || 1) : 1,
+          balanceAsOf: getMonthKey(),
           includeInNetWorth: true,
           color: colors[current.accounts.length % colors.length],
           note: "",
@@ -887,9 +901,12 @@ function App() {
   }
 
   function updateAccount(id: string, patch: Partial<Account>) {
+    // Editing the balance is the "true up against my statement" gesture: re-anchor the
+    // snapshot to this month so the debt roll-forward restarts from the value just typed.
+    const anchored = "balance" in patch ? { ...patch, balanceAsOf: getMonthKey() } : patch;
     updateLedger((current) => ({
       ...current,
-      accounts: current.accounts.map((account) => (account.id === id ? { ...account, ...patch } : account)),
+      accounts: current.accounts.map((account) => (account.id === id ? { ...account, ...anchored } : account)),
     }));
   }
 
@@ -1083,6 +1100,13 @@ function App() {
     }));
     setCategoryMenu(null);
     setToast("Removed from category");
+  }
+
+  function linkExpenseToDebt(id: string, debtAccountId: string | undefined) {
+    const accountName = debtAccountId ? ledger.accounts.find((account) => account.id === debtAccountId)?.name : undefined;
+    updateExpense(id, { debtAccountId });
+    setCategoryMenu(null);
+    setToast(accountName ? `Counted as payment towards ${accountName}` : "Payment unlinked from debt account");
   }
 
   function clearDragState() {
@@ -1371,6 +1395,7 @@ function App() {
           recurring: false,
           date: row.date,
           imported,
+          debtAccountId: row.kind === "debt-payment" ? row.debtAccountId : undefined,
         };
         months[row.monthKey] = {
           ...month,
@@ -1992,6 +2017,7 @@ function App() {
                                   privacy={ledger.privacyMode}
                                   formatter={moneyFormatter}
                                   symbol={currencySymbol}
+                                  linkedAccountName={expense.debtAccountId ? debtAccountNameById.get(expense.debtAccountId) : undefined}
                                   dragging={draggingExpenseId === expense.id}
                                   grouping={groupingSourceId === expense.id}
                                   dropState={dropState}
@@ -2108,8 +2134,8 @@ function App() {
                 <article className="miniPanel accountsPanel">
                   <PanelTitle title="Savings, cash & investments" icon={<PiggyBank size={16} />} />
                   <div className="debtAccountList">
-                    {ledger.accounts.filter((a) => a.accountClass !== "debt").length ? (
-                      ledger.accounts
+                    {effectiveAccounts.filter((a) => a.accountClass !== "debt").length ? (
+                      effectiveAccounts
                         .filter((a) => a.accountClass !== "debt")
                         .map((account) => (
                           <AccountRow
@@ -2131,8 +2157,8 @@ function App() {
                 <article className="miniPanel accountsPanel">
                   <PanelTitle title="Debt accounts" icon={<CreditCard size={16} />} />
                   <div className="debtAccountList">
-                    {ledger.accounts.filter((a) => a.accountClass === "debt").length ? (
-                      ledger.accounts
+                    {effectiveAccounts.filter((a) => a.accountClass === "debt").length ? (
+                      effectiveAccounts
                         .filter((a) => a.accountClass === "debt")
                         .map((account) => (
                           <AccountRow
@@ -2141,6 +2167,7 @@ function App() {
                             symbol={currencySymbol}
                             formatter={moneyFormatter}
                             privacy={ledger.privacyMode}
+                            autoNote={debtAutoTrackNote(account, ledger.accounts)}
                             onChange={(patch) => updateAccount(account.id, patch)}
                             onRemove={() => removeAccount(account.id)}
                           />
@@ -2532,6 +2559,7 @@ function App() {
           <ImportReviewModal
             review={importReview}
             categoryOptions={importCategoryOptions}
+            debtAccounts={ledger.accounts.filter((account) => account.accountClass === "debt")}
             formatter={moneyFormatter}
             onClose={() => setImportReview(null)}
             onRowChange={updateImportReviewRow}
@@ -2546,12 +2574,14 @@ function App() {
           <CategoryContextMenu
             expense={menuExpense}
             options={categoryOptions}
+            debtAccounts={effectiveAccounts.filter((account) => account.accountClass === "debt")}
             formatter={moneyFormatter}
             privacy={ledger.privacyMode}
             x={categoryMenu.x}
             y={categoryMenu.y}
             onMove={(category) => moveExpenseFromMenu(menuExpense.id, category)}
             onUngroup={() => ungroupExpense(menuExpense.id)}
+            onLinkDebt={(debtAccountId) => linkExpenseToDebt(menuExpense.id, debtAccountId)}
           />
         )}
       </div>
@@ -2988,6 +3018,7 @@ function UserProfilePopup({
 function ImportReviewModal({
   review,
   categoryOptions,
+  debtAccounts,
   formatter,
   onClose,
   onRowChange,
@@ -2998,6 +3029,7 @@ function ImportReviewModal({
 }: {
   review: ImportReviewState;
   categoryOptions: string[];
+  debtAccounts: Account[];
   formatter: Intl.NumberFormat;
   onClose: () => void;
   onRowChange: (id: string, patch: Partial<CsvImportRow>) => void;
@@ -3108,6 +3140,7 @@ function ImportReviewModal({
                       row={row}
                       formatter={formatter}
                       categoryOptions={categoryOptions}
+                      debtAccounts={debtAccounts}
                       onChange={(patch) => onRowChange(row.id, patch)}
                     />
                   ))}
@@ -3134,11 +3167,13 @@ function ImportReviewTableRow({
   row,
   formatter,
   categoryOptions,
+  debtAccounts,
   onChange,
 }: {
   row: CsvImportRow;
   formatter: Intl.NumberFormat;
   categoryOptions: string[];
+  debtAccounts: Account[];
   onChange: (patch: Partial<CsvImportRow>) => void;
 }) {
   return (
@@ -3173,6 +3208,21 @@ function ImportReviewTableRow({
           aria-label={`Category for ${row.description}`}
           onChange={(event) => onChange({ category: event.target.value, note: row.suggestedCategory === event.target.value ? row.note : "Edited" })}
         />
+        {row.kind === "debt-payment" && debtAccounts.length > 0 && (
+          <select
+            className="importDebtAccountSelect"
+            value={row.debtAccountId ?? ""}
+            aria-label={`Debt account for ${row.description}`}
+            onChange={(event) => onChange({ debtAccountId: event.target.value || undefined })}
+          >
+            <option value="">Not linked to an account</option>
+            {debtAccounts.map((account) => (
+              <option key={account.id} value={account.id}>
+                Pays {account.name}
+              </option>
+            ))}
+          </select>
+        )}
       </td>
       <td>
         <span className={row.duplicate ? "importSignal duplicate" : row.confidence < 0.5 ? "importSignal low" : "importSignal"}>
@@ -3192,6 +3242,7 @@ function importKindPatch(kind: TransactionKind, row: CsvImportRow): Partial<CsvI
       category: row.category === "Unsorted" || row.category === "Transfers" || row.category === "Debt payments" ? "Income" : row.category,
       include: true,
       note: row.suggestedKind === kind ? row.note : "Edited",
+      debtAccountId: undefined,
     };
   }
 
@@ -3201,6 +3252,7 @@ function importKindPatch(kind: TransactionKind, row: CsvImportRow): Partial<CsvI
       category: "Transfers",
       include: false,
       note: "Won’t import — saved as transfer",
+      debtAccountId: undefined,
     };
   }
 
@@ -3220,6 +3272,7 @@ function importKindPatch(kind: TransactionKind, row: CsvImportRow): Partial<CsvI
     category: row.category === "Income" || row.category === "Transfers" ? "Unsorted" : row.category,
     include: true,
     note: row.suggestedKind === kind ? row.note : "Edited",
+    debtAccountId: undefined,
   };
 }
 
@@ -3273,21 +3326,25 @@ function EmptyState({ icon, title, text, onAction }: { icon: ReactNode; title: s
 function CategoryContextMenu({
   expense,
   options,
+  debtAccounts,
   formatter,
   privacy,
   x,
   y,
   onMove,
   onUngroup,
+  onLinkDebt,
 }: {
   expense: ExpenseEntry;
   options: CategoryOption[];
+  debtAccounts: Account[];
   formatter: Intl.NumberFormat;
   privacy: boolean;
   x: number;
   y: number;
   onMove: (category: string) => void;
   onUngroup: () => void;
+  onLinkDebt: (debtAccountId: string | undefined) => void;
 }) {
   return (
     <div
@@ -3336,6 +3393,34 @@ function CategoryContextMenu({
             <span />
             <span>Remove from category</span>
           </button>
+        </>
+      )}
+      {debtAccounts.length > 0 && (
+        <>
+          <span className="contextMenuDivider" />
+          <div className="contextMenuTitle">
+            <span>Count as payment towards</span>
+          </div>
+          <div className="contextMenuList">
+            {debtAccounts.map((account) => {
+              const active = account.id === expense.debtAccountId;
+              return (
+                <button
+                  className={active ? "contextMenuItem active" : "contextMenuItem"}
+                  type="button"
+                  role="menuitem"
+                  key={account.id}
+                  aria-label={active ? `Unlink from ${account.name}` : `Count as payment towards ${account.name}`}
+                  onClick={() => onLinkDebt(active ? undefined : account.id)}
+                >
+                  <span className="swatch small" style={{ background: account.color }} />
+                  <span>{account.name}</span>
+                  <em className={privacy ? "masked contextMenuMeta" : "contextMenuMeta"}>{formatter.format(account.balance)}</em>
+                  {active && <Check size={14} />}
+                </button>
+              );
+            })}
+          </div>
         </>
       )}
     </div>
@@ -3459,6 +3544,7 @@ function ExpenseRow({
   privacy,
   formatter,
   symbol,
+  linkedAccountName,
   dragging,
   grouping,
   dropState,
@@ -3475,6 +3561,7 @@ function ExpenseRow({
   privacy: boolean;
   formatter: Intl.NumberFormat;
   symbol: string;
+  linkedAccountName?: string;
   dragging: boolean;
   grouping: boolean;
   dropState?: ExpenseDropState;
@@ -3540,6 +3627,15 @@ function ExpenseRow({
       />
       <span className={privacy ? "rowTotal masked" : "rowTotal"}>{formatter.format(expense.amount)}</span>
       <div className="rowActions">
+        {linkedAccountName && (
+          <span
+            className="debtLinkBadge"
+            aria-label={`Counts as a payment towards ${linkedAccountName}`}
+            data-tip={`Counts as a payment towards ${linkedAccountName}`}
+          >
+            <CreditCard size={15} />
+          </span>
+        )}
         <RecurringToggle
           recurring={expense.recurring}
           kind="expense"
@@ -3558,6 +3654,7 @@ function AccountRow({
   symbol,
   formatter,
   privacy,
+  autoNote,
   onChange,
   onRemove,
 }: {
@@ -3565,6 +3662,7 @@ function AccountRow({
   symbol: string;
   formatter: Intl.NumberFormat;
   privacy: boolean;
+  autoNote?: string;
   onChange: (patch: Partial<Account>) => void;
   onRemove: () => void;
 }) {
@@ -3699,7 +3797,7 @@ function AccountRow({
       <div className="debtAccountMeta">
         <span>{accountTypeLabel(account)}</span>
         <strong className={privacy ? "masked" : ""}>{formatter.format(account.balance)}</strong>
-        <em>{accountMetaCaption(account, utilization)}</em>
+        <em>{autoNote ? `${accountMetaCaption(account, utilization)} · ${autoNote}` : accountMetaCaption(account, utilization)}</em>
       </div>
       <button className="iconButton rowAction" type="button" onClick={onRemove} aria-label={`Remove ${account.name}`}>
         <Trash2 size={17} />
@@ -3873,6 +3971,14 @@ function rateHelp(accountClass: AccountClass): string {
 function accountTypeLabel(account: Account): string {
   const option = ACCOUNT_TYPE_OPTIONS[account.accountClass].find((o) => o.value === account.type);
   return option?.label ?? "Account";
+}
+
+// Caption for a debt account whose displayed balance was rolled forward past its snapshot —
+// tells the user the number is auto-tracked, and that editing the balance re-anchors it.
+function debtAutoTrackNote(derived: Account, storedAccounts: Account[]): string | undefined {
+  const stored = storedAccounts.find((account) => account.id === derived.id);
+  if (!stored || stored.balance === derived.balance || !isValidMonthKey(stored.balanceAsOf)) return undefined;
+  return `auto-tracked since ${formatMonth(stored.balanceAsOf)}`;
 }
 
 function accountMetaCaption(account: Account, utilization: number): string {
@@ -5094,6 +5200,9 @@ function normalizeAccounts(state: Partial<LedgerState>): Account[] {
       creditLimit: isDebt ? finiteNumber(item?.creditLimit, 0) : 0,
       minimumPayment: isDebt ? finiteNumber(item?.minimumPayment, 0) : 0,
       dueDay: isDebt ? clampDueDay(item?.dueDay) : 1,
+      // v7 → v8: pre-existing balances anchor to the month this version first loads, so the
+      // roll-forward starts from now rather than retroactively repricing old snapshots.
+      balanceAsOf: isValidMonthKey(item?.balanceAsOf) ? item.balanceAsOf : getMonthKey(),
       includeInNetWorth: item?.includeInNetWorth !== false,
       color: item?.color || colors[index % colors.length],
       note: item?.note ?? "",
@@ -5111,6 +5220,7 @@ function normalizeCategoryRules(rules: CategoryRule[] | undefined): CategoryRule
       pattern: rule.pattern.trim().toLowerCase(),
       category: rule.category.trim(),
       kind: rule.kind ?? "expense",
+      debtAccountId: typeof rule.debtAccountId === "string" ? rule.debtAccountId : undefined,
       createdAt: rule.createdAt ?? new Date().toISOString(),
       updatedAt: rule.updatedAt ?? new Date().toISOString(),
     }));
@@ -5189,6 +5299,8 @@ function mergeCategoryRules(existingRules: CategoryRule[], importedRows: CsvImpo
       pattern,
       category,
       kind: row.kind,
+      // Remember which debt account this payee pays so future imports auto-link.
+      debtAccountId: row.kind === "debt-payment" ? row.debtAccountId ?? existing?.debtAccountId : undefined,
       createdAt: existing?.createdAt ?? timestamp,
       updatedAt: timestamp,
     });

@@ -21,6 +21,10 @@ export type ExpenseEntry = {
   recurring: boolean;
   date?: string;
   imported?: ImportedTransactionMeta;
+  // Links this payment to a debt account. For any month that has linked payments, their sum
+  // replaces that account's scheduled monthly payment in the balance roll-forward — so an
+  // imported overpayment reduces the debt by the real amount instead of the scheduled one.
+  debtAccountId?: string;
 };
 
 export type GoalFundingMode = "fixed" | "fill" | "auto";
@@ -78,6 +82,8 @@ export type CategoryRule = {
   pattern: string;
   category: string;
   kind: TransactionKind;
+  // For debt-payment rules: future imports matching this pattern auto-link to this account.
+  debtAccountId?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -113,6 +119,11 @@ export type Account = {
   creditLimit: number;
   minimumPayment: number;
   dueDay: number;
+  // Month key ("YYYY-MM") the stored balance was last set in. Debt balances are never shown
+  // raw: they are rolled forward from this anchor to the current month, paying the scheduled
+  // monthly payment (or that month's linked ledger payments) and charging interest along the
+  // way. Editing the balance re-anchors to the current month.
+  balanceAsOf: string;
   // Shared.
   includeInNetWorth: boolean;
   color: string;

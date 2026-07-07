@@ -169,6 +169,93 @@ enum FinanceEngine {
         )
     }
 
+    // MARK: - Debt balance roll-forward
+
+    /// Port of `isValidMonthKey` in finance.ts — "yyyy-MM".
+    nonisolated static func isValidMonthKey(_ value: String?) -> Bool {
+        guard let value, value.count == 7 else { return false }
+        let parts = value.split(separator: "-")
+        return parts.count == 2 && parts[0].count == 4 && parts[1].count == 2
+            && Int(parts[0]) != nil && Int(parts[1]) != nil
+    }
+
+    /// Whole calendar months from one "yyyy-MM" key to another. Port of `monthsBetween`.
+    nonisolated static func monthsBetween(_ fromMonthKey: String, _ toMonthKey: String) -> Int {
+        let from = fromMonthKey.split(separator: "-").compactMap { Int($0) }
+        let to = toMonthKey.split(separator: "-").compactMap { Int($0) }
+        guard from.count == 2, to.count == 2 else { return 0 }
+        return (to[0] - from[0]) * 12 + (to[1] - from[1])
+    }
+
+    /// Ledger payments linked to debt accounts, summed per account per month key.
+    /// Port of `collectLinkedDebtPayments`.
+    nonisolated static func collectLinkedDebtPayments(
+        _ months: [String: MonthBudget]
+    ) -> [String: [String: Double]] {
+        var byAccount: [String: [String: Double]] = [:]
+        for (monthKey, month) in months {
+            for expense in month.expenses {
+                guard let accountId = expense.debtAccountId else { continue }
+                let amount = abs(expense.amount)
+                guard amount > 0 else { continue }
+                byAccount[accountId, default: [:]][monthKey, default: 0] += amount
+            }
+        }
+        return byAccount
+    }
+
+    /// Port of `rollForwardDebtBalances` in finance.ts.
+    ///
+    /// Debt balances are stored as a snapshot anchored to the month they were entered
+    /// (`balanceAsOf`). This derives the live balance by rolling the snapshot forward one month
+    /// at a time to `currentMonthKey`: each month charges interest (promo-aware) and pays either
+    /// that month's linked ledger payments or, when none exist, the scheduled `minimumPayment`.
+    /// Linked payments REPLACE the schedule for their month, so importing the regular payment
+    /// never double-counts. Accounts with no scheduled payment and no linked payments stay
+    /// untouched. Non-debt accounts pass through unchanged.
+    nonisolated static func rollForwardDebtBalances(
+        accounts: [Account],
+        months: [String: MonthBudget],
+        currentMonthKey: String = getMonthKey()
+    ) -> [Account] {
+        let linkedPayments = collectLinkedDebtPayments(months)
+
+        return accounts.map { account in
+            guard account.accountClass == .debt else { return account }
+
+            let anchor = isValidMonthKey(account.balanceAsOf) ? account.balanceAsOf! : currentMonthKey
+            // Cap the horizon so a corrupt anchor far in the past cannot lock up the app.
+            let steps = min(600, monthsBetween(anchor, currentMonthKey))
+            guard steps > 0 else { return account }
+
+            let paymentsByMonth = linkedPayments[account.id]
+            let scheduledPayment = max(0.0, account.minimumPayment)
+            // A promo window still active now also covered the elapsed months being rolled.
+            let annualRate = account.promoMonths > 0 ? account.promoRate : account.rate
+            let monthly = monthlyRateFromAnnual(annualRate)
+
+            var balance = max(0.0, account.balance)
+            var changed = false
+
+            for step in 1...steps {
+                guard balance > 0 else { break }
+                let monthKey = shiftMonth(anchor, by: step)
+                let linkedTotal = paymentsByMonth?[monthKey] ?? 0
+                let payment = linkedTotal > 0 ? linkedTotal : scheduledPayment
+                guard payment > 0 else { continue }
+
+                let owed = balance + balance * monthly
+                balance = max(0.0, owed - payment)
+                changed = true
+            }
+
+            guard changed else { return account }
+            var rolled = account
+            rolled.balance = roundTo(balance, digits: 2)
+            return rolled
+        }
+    }
+
     // MARK: - Net worth outlook
 
     /// Projects net worth forward month by month.

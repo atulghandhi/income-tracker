@@ -221,18 +221,50 @@ public final class LedgerStore {
         }
     }
 
+    // MARK: - Derived accounts
+
+    /// Accounts with debt balances rolled forward from their `balanceAsOf` snapshot to today —
+    /// every screen and summary should read these instead of `state.accounts` so a card set up
+    /// months ago shows what's left after the scheduled (or linked) payments.
+    public var effectiveAccounts: [Account] {
+        FinanceEngine.rollForwardDebtBalances(accounts: state.accounts, months: state.months)
+    }
+
     // MARK: - Account mutations
 
     public func addAccount(_ account: Account) {
         update { s in
-            s.accounts.append(account)
+            var next = account
+            if next.balanceAsOf == nil {
+                next.balanceAsOf = getMonthKey()
+            }
+            s.accounts.append(next)
         }
     }
 
     public func updateAccount(_ account: Account) {
         update { s in
             guard let idx = s.accounts.firstIndex(where: { $0.id == account.id }) else { return }
-            s.accounts[idx] = account
+            let existing = s.accounts[idx]
+            var next = account
+            if next.accountClass == .debt {
+                // The editor is populated from the rolled-forward balance. A different number
+                // means the user manually trued it up — re-anchor the snapshot to this month.
+                // An unchanged number keeps the stored snapshot + anchor so the derivation
+                // stays live (future linked payments can still refine the elapsed months).
+                let derived = FinanceEngine.rollForwardDebtBalances(
+                    accounts: [existing], months: s.months
+                ).first?.balance ?? existing.balance
+                if abs(next.balance - derived) > 0.005 || existing.accountClass != .debt {
+                    next.balanceAsOf = getMonthKey()
+                } else {
+                    next.balance = existing.balance
+                    next.balanceAsOf = existing.balanceAsOf ?? getMonthKey()
+                }
+            } else if next.balanceAsOf == nil {
+                next.balanceAsOf = existing.balanceAsOf
+            }
+            s.accounts[idx] = next
         }
     }
 

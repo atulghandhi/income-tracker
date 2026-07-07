@@ -19,6 +19,9 @@ export type CsvImportRow = {
   confidence: number;
   note: string;
   hash: string;
+  // For debt-payment rows: which debt account this payment reduces. Optional — unlinked
+  // debt payments still import as expenses, they just don't feed the balance roll-forward.
+  debtAccountId?: string;
 };
 
 export type CsvImportResult = {
@@ -56,6 +59,7 @@ type CategorySuggestion = {
   category: string;
   confidence: number;
   note: string;
+  debtAccountId?: string;
 };
 
 const DATE_HEADERS = ["date", "transaction date", "posted date", "booking date", "completed date", "value date"];
@@ -141,6 +145,7 @@ export function parseBankCsv({ text, fileName, state, fallbackMonthKey }: ParseB
         confidence: suggestion.confidence,
         note: duplicate ? "Possible duplicate" : suggestion.note,
         hash,
+        debtAccountId: suggestion.debtAccountId,
       },
     ];
   });
@@ -413,6 +418,7 @@ function suggestCategory(description: string, amount: number, rules: CategoryRul
       category: learnedRule.category,
       confidence: 0.96,
       note: "Matched your saved rule",
+      debtAccountId: learnedRule.kind === "debt-payment" ? learnedRule.debtAccountId : undefined,
     };
   }
 

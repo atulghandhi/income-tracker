@@ -58,9 +58,11 @@ public enum WidgetDataProvider {
 public func buildWidgetSnapshot(from state: LedgerState) -> WidgetSnapshot {
     let budget = state.months[state.selectedMonth] ?? .empty
     let proj = FinanceEngine.projection(for: budget)
-    let nwSummary = FinanceEngine.netWorthSummary(state.accounts)
+    // Debt balances rolled forward to today so the widget matches the app's derived figures.
+    let accounts = FinanceEngine.rollForwardDebtBalances(accounts: state.accounts, months: state.months)
+    let nwSummary = FinanceEngine.netWorthSummary(accounts)
     let outlook = FinanceEngine.netWorthOutlook(
-        accounts: state.accounts,
+        accounts: accounts,
         recurringMonthlySurplus: proj.recurringMonthlySurplus,
         horizonMonths: 12,
         assumedInvestmentReturn: state.assumedInvestmentReturn
@@ -68,7 +70,7 @@ public func buildWidgetSnapshot(from state: LedgerState) -> WidgetSnapshot {
     let sparkline = outlook.map { $0.netWorth }
 
     let today = Calendar.current.component(.day, from: .now)
-    let nextBillAccount = state.accounts
+    let nextBillAccount = accounts
         .filter { $0.accountClass == .debt && $0.dueDay > 0 && $0.minimumPayment > 0 }
         .sorted { lhs, rhs in
             let lDue = lhs.dueDay >= today ? lhs.dueDay : lhs.dueDay + 31

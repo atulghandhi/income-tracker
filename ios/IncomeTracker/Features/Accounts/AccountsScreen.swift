@@ -46,8 +46,10 @@ struct AccountsScreen: View {
     @State private var editingAccount: Account? = nil
 
     var filteredAccounts: [Account] {
-        guard let f = filter else { return store.state.accounts }
-        return store.state.accounts.filter { $0.accountClass == f }
+        // Rolled-forward balances: debt accounts show what's left after the scheduled
+        // (or linked) payments since their snapshot month, not the raw stored figure.
+        guard let f = filter else { return store.effectiveAccounts }
+        return store.effectiveAccounts.filter { $0.accountClass == f }
     }
 
     var accountsByClass: [(AccountClass, [Account])] {
@@ -174,8 +176,8 @@ private struct FilterChip: View {
 struct NetWorthSummaryCard: View {
     @Environment(LedgerStore.self) var store
 
-    private var summary: NetWorthSummary { FinanceEngine.netWorthSummary(store.state.accounts) }
-    private var debt: DebtSummary { FinanceEngine.debtSummary(store.state.accounts) }
+    private var summary: NetWorthSummary { FinanceEngine.netWorthSummary(store.effectiveAccounts) }
+    private var debt: DebtSummary { FinanceEngine.debtSummary(store.effectiveAccounts) }
 
     var body: some View {
         Card {
@@ -348,6 +350,11 @@ struct AccountRow: View {
                             .font(.caption2)
                             .foregroundStyle(Color.muted)
                     }
+                    if let note = autoTrackNote {
+                        Text(note)
+                            .font(.caption2)
+                            .foregroundStyle(Color.faint)
+                    }
                     if !account.includeInNetWorth {
                         Text("Excluded")
                             .font(.caption2)
@@ -356,6 +363,16 @@ struct AccountRow: View {
                 }
             }
         }
+    }
+
+    /// Shown when the displayed balance was rolled forward past its snapshot month, so the
+    /// user knows the figure is auto-tracked (editing the balance re-anchors it).
+    private var autoTrackNote: String? {
+        guard account.accountClass == .debt,
+              let stored = store.state.accounts.first(where: { $0.id == account.id }),
+              stored.balance != account.balance,
+              let anchor = stored.balanceAsOf else { return nil }
+        return "Auto-tracked since \(formatMonth(anchor))"
     }
 
     private var secondaryLabel: String {

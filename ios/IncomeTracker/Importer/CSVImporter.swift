@@ -29,6 +29,9 @@ public struct CsvImportRow: Codable, Sendable, Identifiable {
     public var confidence: Double
     public var note: String
     public var hash: String
+    /// For debt-payment rows: which debt account this payment reduces. Optional — unlinked
+    /// debt payments still import as expenses, they just don't feed the balance roll-forward.
+    public var debtAccountId: String?
 }
 
 public struct CsvImportResult: Codable, Sendable {
@@ -199,7 +202,8 @@ public func parseBankCsv(
             duplicateOf: sameDayMatch,
             confidence: suggestion.confidence,
             note: note,
-            hash: h
+            hash: h,
+            debtAccountId: suggestion.debtAccountId
         ))
     }
 
@@ -299,7 +303,8 @@ public func commitImport(
                 color: row.color,
                 recurring: false,
                 date: row.date,
-                imported: meta
+                imported: meta,
+                debtAccountId: row.kind == .debtPayment ? row.debtAccountId : nil
             )
             state.months[monthKey]!.expenses.append(entry)
             refs.append(ImportedTransactionRef(monthKey: monthKey, entryId: row.id, kind: .expense))
@@ -317,6 +322,8 @@ public func commitImport(
                     pattern: patternStr,
                     category: row.category,
                     kind: row.kind,
+                    // Remember which debt account this payee pays so future imports auto-link.
+                    debtAccountId: row.kind == .debtPayment ? row.debtAccountId : nil,
                     createdAt: importedAt,
                     updatedAt: importedAt
                 )
@@ -627,6 +634,15 @@ public struct CategorySuggestion: Sendable {
     public let category: String
     public let confidence: Double
     public let note: String
+    public var debtAccountId: String?
+
+    public init(kind: TransactionKind, category: String, confidence: Double, note: String, debtAccountId: String? = nil) {
+        self.kind = kind
+        self.category = category
+        self.confidence = confidence
+        self.note = note
+        self.debtAccountId = debtAccountId
+    }
 }
 
 /// Suggests a category/kind for a manually typed entry name using the same
@@ -652,7 +668,8 @@ private func suggestCategory(description: String, amount: Double,
     // Saved (learned) rule — highest priority
     if let learned = rules.first(where: { descriptionMatchesPattern(normalized, pattern: $0.pattern) }) {
         return CategorySuggestion(kind: learned.kind, category: learned.category,
-                                   confidence: 0.96, note: "Matched your saved rule")
+                                   confidence: 0.96, note: "Matched your saved rule",
+                                   debtAccountId: learned.kind == .debtPayment ? learned.debtAccountId : nil)
     }
 
     // System rules
