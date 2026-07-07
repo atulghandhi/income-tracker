@@ -13,6 +13,8 @@ struct ImportReviewSheet: View {
     var rows: [CsvImportRow]
     /// Original file name (shown in the header).
     var fileName: String
+    /// Debt accounts available for linking debt-payment rows (may be empty).
+    var debtAccounts: [Account] = []
     /// Called with the final (possibly user-edited) rows when the user taps "Import".
     var onConfirm: ([CsvImportRow]) -> Void
     /// Called when the user taps "Cancel".
@@ -61,7 +63,7 @@ struct ImportReviewSheet: View {
                 } else {
                     List {
                         ForEach($editableRows) { $row in
-                            ImportRowCell(row: $row, availableCategories: availableCategories)
+                            ImportRowCell(row: $row, availableCategories: availableCategories, debtAccounts: debtAccounts)
                         }
                     }
                     .listStyle(.plain)
@@ -226,6 +228,7 @@ private struct ImportRowCell: View {
     @Binding var row: CsvImportRow
 
     var availableCategories: [String]
+    var debtAccounts: [Account]
 
     // All TransactionKind cases presented to the user (excluding internal kinds
     // the CSV importer may produce).
@@ -287,6 +290,12 @@ private struct ImportRowCell: View {
                 .pickerStyle(.menu)
                 .labelsHidden()
                 .controlSize(.mini)
+                .onChange(of: row.kind) { _, newKind in
+                    // The account link only means something on debt-payment rows.
+                    if newKind != .debtPayment {
+                        row.debtAccountId = nil
+                    }
+                }
 
                 // Category picker
                 Picker("Category", selection: $row.category) {
@@ -301,6 +310,20 @@ private struct ImportRowCell: View {
                 .pickerStyle(.menu)
                 .labelsHidden()
                 .controlSize(.mini)
+
+                // Debt account link (debt-payment rows only). Linked payments replace the
+                // account's scheduled monthly payment in the balance roll-forward.
+                if row.kind == .debtPayment && !debtAccounts.isEmpty {
+                    Picker("Pays account", selection: $row.debtAccountId) {
+                        Text("Not linked").tag(String?.none)
+                        ForEach(debtAccounts) { account in
+                            Text("Pays \(account.name)").tag(String?.some(account.id))
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .controlSize(.mini)
+                }
             }
             .frame(minWidth: 110, alignment: .trailing)
         }

@@ -487,6 +487,153 @@ final class FinanceEngineTests: XCTestCase {
     }
 }
 
+// MARK: - Debt roll-forward tests (hand-written; mirrors tests/finance.spec.ts)
+
+final class DebtRollForwardTests: XCTestCase {
+
+    private func debtAccount(
+        balance: Double = 1000,
+        rate: Double = 0,
+        promoRate: Double = 0,
+        promoMonths: Int = 0,
+        minimumPayment: Double = 100,
+        balanceAsOf: String? = "2026-01"
+    ) -> Account {
+        Account(
+            id: "debt-1",
+            name: "Card",
+            accountClass: .debt,
+            type: .creditCard,
+            balance: balance,
+            rate: rate,
+            promoRate: promoRate,
+            promoMonths: promoMonths,
+            monthlyContribution: 0,
+            creditLimit: 2000,
+            minimumPayment: minimumPayment,
+            dueDay: 1,
+            balanceAsOf: balanceAsOf,
+            includeInNetWorth: true,
+            color: "#12b886",
+            note: ""
+        )
+    }
+
+    private func linkedPayment(_ amount: Double, accountId: String, id: String = "expense-1") -> ExpenseEntry {
+        ExpenseEntry(
+            id: id,
+            name: "Card payment",
+            category: "Debt payments",
+            amount: amount,
+            color: "#6c5ce7",
+            recurring: false,
+            debtAccountId: accountId
+        )
+    }
+
+    func testReducesBalanceByScheduledPaymentEachElapsedMonth() {
+        let card = debtAccount()
+        let rolled = FinanceEngine.rollForwardDebtBalances(
+            accounts: [card], months: [:], currentMonthKey: "2026-04"
+        )
+        XCTAssertEqual(rolled[0].balance, 700, accuracy: 0.001)
+    }
+
+    func testChargesInterestBeforeEachPayment() {
+        let card = debtAccount(rate: 12)
+        let rolled = FinanceEngine.rollForwardDebtBalances(
+            accounts: [card], months: [:], currentMonthKey: "2026-03"
+        )
+        let monthly = FinanceEngine.monthlyRate(fromAnnual: 12)
+        let afterFeb = 1000 * (1 + monthly) - 100
+        let afterMar = afterFeb * (1 + monthly) - 100
+        XCTAssertEqual(rolled[0].balance, (afterMar * 100).rounded() / 100, accuracy: 0.005)
+    }
+
+    func testUsesPromoRateWhileIntroWindowActive() {
+        let card = debtAccount(rate: 24.9, promoRate: 0, promoMonths: 12)
+        let rolled = FinanceEngine.rollForwardDebtBalances(
+            accounts: [card], months: [:], currentMonthKey: "2026-03"
+        )
+        XCTAssertEqual(rolled[0].balance, 800, accuracy: 0.001)
+    }
+
+    func testLinkedPaymentsReplaceScheduledPaymentForTheirMonth() {
+        let card = debtAccount()
+        let months: [String: MonthBudget] = [
+            "2026-02": MonthBudget(expenses: [linkedPayment(300, accountId: card.id)]),
+        ]
+        let rolled = FinanceEngine.rollForwardDebtBalances(
+            accounts: [card], months: months, currentMonthKey: "2026-04"
+        )
+        // Feb: 1000 - 300 = 700, Mar + Apr scheduled: 700 - 100 - 100 = 500.
+        XCTAssertEqual(rolled[0].balance, 500, accuracy: 0.001)
+    }
+
+    func testRegularImportedPaymentDoesNotDoubleCount() {
+        let card = debtAccount()
+        let months: [String: MonthBudget] = [
+            "2026-02": MonthBudget(expenses: [linkedPayment(100, accountId: card.id)]),
+        ]
+        let rolled = FinanceEngine.rollForwardDebtBalances(
+            accounts: [card], months: months, currentMonthKey: "2026-02"
+        )
+        XCTAssertEqual(rolled[0].balance, 900, accuracy: 0.001)
+    }
+
+    func testSumsMultipleLinkedPaymentsAndIgnoresOtherAccounts() {
+        let card = debtAccount()
+        let months: [String: MonthBudget] = [
+            "2026-02": MonthBudget(expenses: [
+                linkedPayment(150, accountId: card.id, id: "expense-1"),
+                linkedPayment(50, accountId: card.id, id: "expense-2"),
+                linkedPayment(400, accountId: "some-other-account", id: "expense-3"),
+            ]),
+        ]
+        let rolled = FinanceEngine.rollForwardDebtBalances(
+            accounts: [card], months: months, currentMonthKey: "2026-02"
+        )
+        XCTAssertEqual(rolled[0].balance, 800, accuracy: 0.001)
+    }
+
+    func testLeavesAccountsWithoutPaymentsUntouched() {
+        let card = debtAccount(rate: 24.9, minimumPayment: 0, balanceAsOf: "2025-01")
+        let rolled = FinanceEngine.rollForwardDebtBalances(
+            accounts: [card], months: [:], currentMonthKey: "2026-04"
+        )
+        // No payment set up: the balance stays a static snapshot instead of silently growing.
+        XCTAssertEqual(rolled[0].balance, 1000, accuracy: 0.001)
+    }
+
+    func testFloorsBalanceAtZero() {
+        let card = debtAccount(balance: 250)
+        let rolled = FinanceEngine.rollForwardDebtBalances(
+            accounts: [card], months: [:], currentMonthKey: "2026-08"
+        )
+        XCTAssertEqual(rolled[0].balance, 0, accuracy: 0.001)
+    }
+
+    func testDoesNotRollCurrentMonthAnchorOrAssets() {
+        let card = debtAccount(balanceAsOf: "2026-04")
+        var savings = debtAccount(balance: 5000, balanceAsOf: "2025-01")
+        savings.accountClass = .savings
+        savings.type = .isa
+        let rolled = FinanceEngine.rollForwardDebtBalances(
+            accounts: [card, savings], months: [:], currentMonthKey: "2026-04"
+        )
+        XCTAssertEqual(rolled[0].balance, 1000, accuracy: 0.001)
+        XCTAssertEqual(rolled[1].balance, 5000, accuracy: 0.001)
+    }
+
+    func testNilAnchorTreatedAsCurrentMonth() {
+        let card = debtAccount(balanceAsOf: nil)
+        let rolled = FinanceEngine.rollForwardDebtBalances(
+            accounts: [card], months: [:], currentMonthKey: "2026-04"
+        )
+        XCTAssertEqual(rolled[0].balance, 1000, accuracy: 0.001)
+    }
+}
+
 // MARK: - GoalSequenceResult Decodable
 
 // The Swift GoalMonthPoint uses `perGoal: [String: GoalMonthPointPerGoal]` which matches

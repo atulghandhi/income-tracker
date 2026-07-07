@@ -29,6 +29,10 @@ struct LedgerScreen: View {
         }
     }
 
+    private var debtAccounts: [Account] {
+        store.state.accounts.filter { $0.accountClass == .debt }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             MonthOverviewHeader(projection: projection)
@@ -210,6 +214,25 @@ struct LedgerScreen: View {
                                                         updated.category = cat
                                                         store.updateExpense(updated)
                                                         Haptics.selection()
+                                                    }
+                                                }
+                                            }
+                                            if !debtAccounts.isEmpty {
+                                                Menu("Count as payment towards") {
+                                                    ForEach(debtAccounts) { account in
+                                                        Button {
+                                                            var updated = entry
+                                                            updated.debtAccountId =
+                                                                entry.debtAccountId == account.id ? nil : account.id
+                                                            store.updateExpense(updated)
+                                                            Haptics.selection()
+                                                        } label: {
+                                                            if entry.debtAccountId == account.id {
+                                                                Label(account.name, systemImage: "checkmark")
+                                                            } else {
+                                                                Text(account.name)
+                                                            }
+                                                        }
                                                     }
                                                 }
                                             }
@@ -555,6 +578,13 @@ struct ExpenseRow: View {
             }
 
             Spacer()
+
+            if entry.debtAccountId != nil {
+                Image(systemName: "creditcard")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.brandMint)
+                    .accessibilityLabel("Counts as a debt payment")
+            }
 
             if entry.recurring {
                 Image(systemName: "arrow.triangle.2.circlepath")
@@ -1042,6 +1072,7 @@ struct EditExpenseSheet: View {
     @State private var recurring: Bool
     @State private var selectedColor: String
     @State private var category: String
+    @State private var debtAccountId: String?
     @State private var newCategoryText: String = ""
     @State private var isAddingCategory = false
     @State private var showValidationError = false
@@ -1054,6 +1085,11 @@ struct EditExpenseSheet: View {
         _recurring = State(initialValue: entry.recurring)
         _selectedColor = State(initialValue: entry.color)
         _category = State(initialValue: entry.category)
+        _debtAccountId = State(initialValue: entry.debtAccountId)
+    }
+
+    private var debtAccounts: [Account] {
+        store.state.accounts.filter { $0.accountClass == .debt }
     }
 
     private var amount: Double { Double(amountText) ?? 0 }
@@ -1131,6 +1167,21 @@ struct EditExpenseSheet: View {
                         .tint(.brandMint)
                 }
 
+                if !debtAccounts.isEmpty {
+                    Section {
+                        Picker("Counts towards", selection: $debtAccountId) {
+                            Text("Not linked").tag(String?.none)
+                            ForEach(debtAccounts) { account in
+                                Text(account.name).tag(String?.some(account.id))
+                            }
+                        }
+                    } header: {
+                        Text("Debt payment")
+                    } footer: {
+                        Text("Linked payments replace the account's scheduled monthly payment for this month, so overpayments reduce the balance by the real amount.")
+                    }
+                }
+
                 if showValidationError {
                     Section {
                         Text("Please enter a name and a valid amount.")
@@ -1172,6 +1223,7 @@ struct EditExpenseSheet: View {
         updated.recurring = recurring
         updated.color = selectedColor
         updated.category = resolvedCategory
+        updated.debtAccountId = debtAccountId
         store.updateExpense(updated)
         Haptics.confirmSave()
         dismiss()

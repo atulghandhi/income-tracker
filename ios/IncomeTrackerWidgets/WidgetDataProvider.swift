@@ -89,13 +89,15 @@ public func buildWidgetSnapshot(from state: LedgerState) -> WidgetSnapshot {
     // Core income/expense projection for the selected month.
     let proj = FinanceEngine.projection(for: budget)
 
-    // Net-worth point from all accounts.
-    let nwSummary = FinanceEngine.netWorthSummary(state.accounts)
+    // Net-worth point from all accounts, with debt balances rolled forward to today
+    // so the widget matches the app's derived figures.
+    let accounts = FinanceEngine.rollForwardDebtBalances(accounts: state.accounts, months: state.months)
+    let nwSummary = FinanceEngine.netWorthSummary(accounts)
 
     // 12-month net-worth outlook for the sparkline.
     // We use recurringMonthlySurplus so the sparkline is stable month-to-month.
     let outlook = FinanceEngine.netWorthOutlook(
-        accounts: state.accounts,
+        accounts: accounts,
         recurringMonthlySurplus: proj.recurringMonthlySurplus,
         horizonMonths: 12,
         assumedInvestmentReturn: state.assumedInvestmentReturn
@@ -105,7 +107,7 @@ public func buildWidgetSnapshot(from state: LedgerState) -> WidgetSnapshot {
     // Find the soonest upcoming debt bill with a configured due day.
     // Sort by dueDay ascending, skip accounts with no due day or no minimum.
     let today = Calendar.current.component(.day, from: .now)
-    let nextBillAccount = state.accounts
+    let nextBillAccount = accounts
         .filter { $0.accountClass == .debt && $0.dueDay > 0 && $0.minimumPayment > 0 }
         .sorted { lhs, rhs in
             // Bills due later this month come before bills already passed (next month).

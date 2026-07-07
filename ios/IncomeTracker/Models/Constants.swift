@@ -5,7 +5,7 @@ import Foundation
 
 // MARK: - Schema / defaults
 
-public let CURRENT_SCHEMA_VERSION = 7
+public let CURRENT_SCHEMA_VERSION = 8
 public let DEFAULT_INVESTMENT_RETURN = 6.0
 
 /// Asset account classes (excludes "debt").

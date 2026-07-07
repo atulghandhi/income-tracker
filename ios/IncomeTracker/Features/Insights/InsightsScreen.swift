@@ -92,22 +92,23 @@ struct InsightsScreen: View {
         let month = store.currentMonthBudget
 
         let result = await Task.detached(priority: .userInitiated) {
+            let accounts = FinanceEngine.rollForwardDebtBalances(accounts: state.accounts, months: state.months)
             let proj = FinanceEngine.projection(for: month)
             let h = FinanceEngine.healthScore(
                 month: month,
-                accounts: state.accounts,
+                accounts: accounts,
                 savingsTarget: state.savingsTarget
             )
             let allMonths = Array(state.months.values)
             let sigs = FinanceEngine.financialSignals(
                 month: month,
-                accounts: state.accounts,
+                accounts: accounts,
                 allMonths: allMonths,
                 savingsTarget: state.savingsTarget
             )
             let flows = FinanceEngine.monthlyFlowPoints(state)
             let nwPoints = FinanceEngine.netWorthOutlook(
-                accounts: state.accounts,
+                accounts: accounts,
                 recurringMonthlySurplus: proj.recurringMonthlySurplus,
                 horizonMonths: min(state.goalsHorizonMonths, 60),
                 assumedInvestmentReturn: state.assumedInvestmentReturn

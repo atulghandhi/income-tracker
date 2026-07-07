@@ -93,6 +93,7 @@ struct SettingsSheet: View {
                 ImportReviewSheet(
                     rows: csvImportRows,
                     fileName: csvFileName,
+                    debtAccounts: store.state.accounts.filter { $0.accountClass == .debt },
                     onConfirm: { confirmedRows in
                         commitCSVImport(rows: confirmedRows, fileName: csvFileName)
                         showCSVReview = false

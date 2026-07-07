@@ -80,6 +80,9 @@ public struct ExpenseEntry: Codable, Identifiable, Hashable, Sendable {
     public var recurring: Bool
     public var date: String?
     public var imported: ImportedTransactionMeta?
+    /// Links this payment to a debt account. For any month that has linked payments, their sum
+    /// replaces that account's scheduled monthly payment in the balance roll-forward.
+    public var debtAccountId: String?
 
     public init(
         id: String,
@@ -89,7 +92,8 @@ public struct ExpenseEntry: Codable, Identifiable, Hashable, Sendable {
         color: String,
         recurring: Bool,
         date: String? = nil,
-        imported: ImportedTransactionMeta? = nil
+        imported: ImportedTransactionMeta? = nil,
+        debtAccountId: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -99,6 +103,7 @@ public struct ExpenseEntry: Codable, Identifiable, Hashable, Sendable {
         self.recurring = recurring
         self.date = date
         self.imported = imported
+        self.debtAccountId = debtAccountId
     }
 }
 
@@ -227,6 +232,8 @@ public struct CategoryRule: Codable, Identifiable, Hashable, Sendable {
     public var pattern: String
     public var category: String
     public var kind: TransactionKind
+    /// For debt-payment rules: future imports matching this pattern auto-link to this account.
+    public var debtAccountId: String?
     public var createdAt: String
     public var updatedAt: String
 
@@ -235,6 +242,7 @@ public struct CategoryRule: Codable, Identifiable, Hashable, Sendable {
         pattern: String,
         category: String,
         kind: TransactionKind,
+        debtAccountId: String? = nil,
         createdAt: String,
         updatedAt: String
     ) {
@@ -242,6 +250,7 @@ public struct CategoryRule: Codable, Identifiable, Hashable, Sendable {
         self.pattern = pattern
         self.category = category
         self.kind = kind
+        self.debtAccountId = debtAccountId
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -288,6 +297,10 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
     public var creditLimit: Double
     public var minimumPayment: Double
     public var dueDay: Int
+    /// Month key ("yyyy-MM") the stored balance was last set in. Debt balances are rolled
+    /// forward from this anchor to the current month by `FinanceEngine.rollForwardDebtBalances`.
+    /// nil is treated as "anchored to the current month" (no roll-forward).
+    public var balanceAsOf: String?
     public var includeInNetWorth: Bool
     public var color: String
     public var note: String
@@ -305,6 +318,7 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
         creditLimit: Double,
         minimumPayment: Double,
         dueDay: Int,
+        balanceAsOf: String? = nil,
         includeInNetWorth: Bool,
         color: String,
         note: String
@@ -321,6 +335,7 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
         self.creditLimit = creditLimit
         self.minimumPayment = minimumPayment
         self.dueDay = dueDay
+        self.balanceAsOf = balanceAsOf
         self.includeInNetWorth = includeInNetWorth
         self.color = color
         self.note = note

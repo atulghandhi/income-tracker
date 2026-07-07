@@ -13,6 +13,10 @@ import Foundation
 // MARK: - Constants
 
 private let kStateKey = "ledgerState_v\(CURRENT_SCHEMA_VERSION)"
+/// Keys written by earlier schema versions. Read as a fallback on first launch after an
+/// upgrade so local data isn't orphaned; the next persistLocally() writes the current key.
+/// (v8 only adds optional fields, so v7 blobs decode as-is.)
+private let kLegacyStateKeys = ["ledgerState_v7"]
 private let kAppGroupID = "group.com.incometracker"
 
 // MARK: - LedgerStore + Persistence
@@ -114,8 +118,10 @@ extension LedgerStore {
         // MARK: - Bill notification reschedule hook
         // Re-derive the bill reminders from the current account list every time
         // the state is persisted. This handles additions, deletions, and changes
-        // to due days or minimum payments without any extra call sites.
-        Task { await NotificationScheduler.scheduleBillReminders(accounts: state.accounts) }
+        // to due days or minimum payments without any extra call sites. Uses the
+        // rolled-forward balances so a debt the schedule has paid off stops reminding.
+        let reminderAccounts = FinanceEngine.rollForwardDebtBalances(accounts: state.accounts, months: state.months)
+        Task { await NotificationScheduler.scheduleBillReminders(accounts: reminderAccounts) }
     }
 
     // MARK: - Cloud sync
@@ -177,13 +183,17 @@ extension LedgerStore {
 
     // MARK: - Private helpers
 
-    /// Reads the JSON blob from the shared UserDefaults suite and decodes it.
+    /// Reads the JSON blob from the shared UserDefaults suite and decodes it,
+    /// falling back to keys written by earlier schema versions.
     private func loadFromUserDefaults() -> LedgerState? {
-        guard
-            let defaults = UserDefaults(suiteName: kAppGroupID),
-            let data = defaults.data(forKey: kStateKey)
-        else { return nil }
-        return try? JSONDecoder.ledger.decode(LedgerState.self, from: data)
+        guard let defaults = UserDefaults(suiteName: kAppGroupID) else { return nil }
+        for key in [kStateKey] + kLegacyStateKeys {
+            if let data = defaults.data(forKey: key),
+               let decoded = try? JSONDecoder.ledger.decode(LedgerState.self, from: data) {
+                return decoded
+            }
+        }
+        return nil
     }
 
     /// Picks between local and cloud state using timestamp comparison.

@@ -78,7 +78,7 @@ struct DashboardScreen: View {
         let horizon = selectedHorizon
         let points = await Task.detached(priority: .userInitiated) {
             FinanceEngine.netWorthOutlook(
-                accounts: state.accounts,
+                accounts: FinanceEngine.rollForwardDebtBalances(accounts: state.accounts, months: state.months),
                 recurringMonthlySurplus: FinanceEngine.projection(
                     for: state.months[state.selectedMonth] ?? .empty
                 ).recurringMonthlySurplus,
@@ -424,9 +424,9 @@ struct RecentTransactionsCard: View {
 struct AccountsSummaryStrip: View {
     @Environment(LedgerStore.self) var store
 
-    private var assetSummary: AssetSummary { FinanceEngine.assetSummary(store.state.accounts) }
-    private var debtSummary: DebtSummary   { FinanceEngine.debtSummary(store.state.accounts) }
-    private var netSummary: NetWorthSummary { FinanceEngine.netWorthSummary(store.state.accounts) }
+    private var assetSummary: AssetSummary { FinanceEngine.assetSummary(store.effectiveAccounts) }
+    private var debtSummary: DebtSummary   { FinanceEngine.debtSummary(store.effectiveAccounts) }
+    private var netSummary: NetWorthSummary { FinanceEngine.netWorthSummary(store.effectiveAccounts) }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -508,6 +508,7 @@ struct QuickActionsRow: View {
             ImportReviewSheet(
                 rows: csvImportRows,
                 fileName: csvFileName,
+                debtAccounts: store.state.accounts.filter { $0.accountClass == .debt },
                 onConfirm: { confirmedRows in
                     store.commitCSVImport(rows: confirmedRows, fileName: csvFileName)
                     Haptics.confirmSave()
