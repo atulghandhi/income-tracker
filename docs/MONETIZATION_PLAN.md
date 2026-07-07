@@ -4,6 +4,9 @@
 > **Scope:** How the app makes money, in what order to build it, revenue goals over
 > time, and the features/infrastructure that must exist *before* charging anyone.
 > **Audience:** Whoever builds the next 12–24 months of this product (human or agent).
+> **Companion:** `docs/AUTOMATION_PLAN.md` — the detailed plan for automating
+> transaction entry. Automation is the core Pro value proposition; its Stages A–E
+> map onto the phases below (A–B pre-launch, C with Pro launch, D with iOS, E = Phase 4).
 
 ---
 
@@ -218,6 +221,14 @@ The iOS spec (`docs/IOS_APP_SPEC.md`) is written; this phase funds and justifies
 4. Pro-only iOS candy: full widget set, alternate app icons, watch complications
    later. Widgets are the highest-retention surface on iOS — the basic widget is
    free (retention), the rich ones are Pro (conversion).
+   4b. **Apple FinanceKit feed (headline Pro feature for this phase).** FinanceKit
+   now supports UK bank accounts connected to Apple Wallet (iOS 18.4+; Barclays,
+   HSBC, Lloyds, Monzo, Nationwide, NatWest, Santander and others) with **no
+   per-user aggregator fee**. Requirements: Finance category App Store listing +
+   Apple-granted entitlement (apply early — approval has lead time). This delivers
+   automatic transaction feeds for Wallet users a full phase before (and far
+   cheaper than) open banking, and de-risks Phase 4. Details:
+   `AUTOMATION_PLAN.md` Stage D1.
 5. App Store Optimization: "income tracker", "budget planner UK", "net worth"
    keywords; screenshots led by the forecast + goals views.
 
@@ -229,11 +240,17 @@ contributing ≥ 30% of new trials.
 Automatic bank feeds are the single feature that moves this category from
 "tried it" to "pays for years" — and they're expensive, which is *why* they're Pro-only.
 
-1. Integrate a UK open-banking aggregator — **TrueLayer** or **GoCardless Bank
-   Account Data** (both FCA-regulated AISPs; using them means the app itself does
-   not need FCA authorization for account information, but confirm the agency
-   model with them before build). Budget roughly £0.20–£0.60 per connected user
-   per month at small volume.
+1. Integrate a UK open-banking aggregator. **Updated (Jul 2026): GoCardless Bank
+   Account Data has closed to new customers — remove it from consideration.**
+   Shortlist **TrueLayer** and **Yapily** (Tink / Enable Banking as fallbacks);
+   all are FCA-regulated AISPs, so integrating under their agency model means the
+   app itself does not need FCA authorization for account information — confirm
+   scope in writing before build. Pricing is sales-gated everywhere; budget
+   roughly £0.20–£0.60 per connected user per month at small volume until quoted.
+   Selection spike and provider-abstraction requirements: `AUTOMATION_PLAN.md`
+   Stage E1. Note: FinanceKit (Phase 3) already covers Wallet-connected UK banks
+   at zero cost, so the aggregator only needs to cover the remainder — this may
+   shrink Phase 4's cost base materially.
 2. Feed transactions into the **existing import pipeline** (`importer.ts` hash
    dedupe + category rules + debt-payment linking) — the CSV machinery becomes the
    normalization layer, which is a large head start.
