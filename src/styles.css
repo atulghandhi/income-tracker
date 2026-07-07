@@ -1172,6 +1172,23 @@ textarea::placeholder {
   justify-self: end;
 }
 
+.debtLinkBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: var(--mint);
+  opacity: 0.8;
+}
+
+.importDebtAccountSelect {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
 .recurToggle {
   display: inline-flex;
   align-items: center;

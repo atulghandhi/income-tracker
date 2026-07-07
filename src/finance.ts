@@ -22,7 +22,7 @@ import type {
   SavingsGoal,
 } from "./types";
 
-export const CURRENT_SCHEMA_VERSION = 7;
+export const CURRENT_SCHEMA_VERSION = 8;
 
 export const DEFAULT_INVESTMENT_RETURN = 6;
 
@@ -245,6 +245,91 @@ export function calculateNetWorthSummary(accounts: Account[]): NetWorthSummary {
     .filter((a) => a.includeInNetWorth !== false)
     .reduce((sum, a) => sum + Math.max(0, Number(a.balance || 0)), 0);
   return { netWorth: totalAssets - totalDebt, totalAssets, totalDebt };
+}
+
+// ─── Debt balance roll-forward ───────────────────────────────────────────────
+//
+// Debt balances are stored as a snapshot anchored to the month they were entered
+// (`balanceAsOf`). The balance the app shows and computes with is derived: the snapshot is
+// rolled forward one month at a time to the current month. Each month the account is charged
+// interest and pays either that month's linked ledger payments (expenses tagged with the
+// account's id) or, when none exist, its scheduled `minimumPayment`. Linked payments REPLACE
+// the schedule for their month rather than stack on it, so importing the regular payment via
+// CSV never double-counts, while importing an overpayment reduces the debt by the real amount.
+//
+// Accounts with no scheduled payment and no linked payments stay untouched — the balance
+// behaves like the static snapshot it always was, rather than silently growing with interest.
+
+const MONTH_KEY_PATTERN = /^\d{4}-\d{2}$/;
+
+export function isValidMonthKey(value: unknown): value is string {
+  return typeof value === "string" && MONTH_KEY_PATTERN.test(value);
+}
+
+export function monthsBetween(fromMonthKey: string, toMonthKey: string): number {
+  const [fromYear, fromMonth] = fromMonthKey.split("-").map(Number);
+  const [toYear, toMonth] = toMonthKey.split("-").map(Number);
+  return (toYear - fromYear) * 12 + (toMonth - fromMonth);
+}
+
+// Ledger payments linked to debt accounts, summed per account per month key.
+export function collectLinkedDebtPayments(months: Record<string, MonthBudget>): Map<string, Map<string, number>> {
+  const byAccount = new Map<string, Map<string, number>>();
+  Object.entries(months).forEach(([monthKey, month]) => {
+    month.expenses.forEach((expense) => {
+      if (!expense.debtAccountId) return;
+      const amount = Math.abs(Number(expense.amount) || 0);
+      if (amount <= 0) return;
+      const byMonth = byAccount.get(expense.debtAccountId) ?? new Map<string, number>();
+      byMonth.set(monthKey, (byMonth.get(monthKey) ?? 0) + amount);
+      byAccount.set(expense.debtAccountId, byMonth);
+    });
+  });
+  return byAccount;
+}
+
+export function rollForwardDebtBalances({
+  accounts,
+  months,
+  currentMonthKey = getMonthKey(),
+}: {
+  accounts: Account[];
+  months: Record<string, MonthBudget>;
+  currentMonthKey?: string;
+}): Account[] {
+  const linkedPayments = collectLinkedDebtPayments(months);
+
+  return accounts.map((account) => {
+    if (account.accountClass !== "debt") return account;
+
+    const anchor = isValidMonthKey(account.balanceAsOf) ? account.balanceAsOf : currentMonthKey;
+    // Cap the horizon so a corrupt anchor far in the past cannot lock up the app.
+    const steps = Math.min(600, monthsBetween(anchor, currentMonthKey));
+    if (steps <= 0) return account;
+
+    const paymentsByMonth = linkedPayments.get(account.id);
+    const scheduledPayment = Math.max(0, Number(account.minimumPayment) || 0);
+    // The promo window counts down from today, so any promo still active now also covered the
+    // elapsed months being rolled. Without one, the standard rate applies.
+    const annualRate = account.promoMonths > 0 ? Number(account.promoRate) || 0 : Number(account.rate) || 0;
+    const monthlyRate = monthlyRateFromAnnual(annualRate);
+
+    let balance = Math.max(0, Number(account.balance) || 0);
+    let changed = false;
+
+    for (let step = 1; step <= steps && balance > 0; step += 1) {
+      const monthKey = shiftMonth(anchor, step);
+      const linkedTotal = paymentsByMonth?.get(monthKey) ?? 0;
+      const payment = linkedTotal > 0 ? linkedTotal : scheduledPayment;
+      if (payment <= 0) continue;
+
+      const owed = balance + balance * monthlyRate;
+      balance = Math.max(0, owed - payment);
+      changed = true;
+    }
+
+    return changed ? { ...account, balance: roundTo(balance, 2) } : account;
+  });
 }
 
 // Projects net worth forward by routing each month's surplus into the user's accounts,
