@@ -1,3 +1,15 @@
+// Which layer decided an entry's category. "user" is sacred — no automation
+// (rules, AI, feeds) may ever overwrite a category the user set by hand.
+export type CategorySource = "user" | "rule" | "system" | "bank" | "ai" | "heuristic";
+
+// Set on entries that were auto-copied into a new month because their source
+// entry was recurring. Lets the UI badge them and lets a delete offer
+// "stop repeating" back at the origin entry.
+export type SeededFromRef = {
+  monthKey: string;
+  entryId: string;
+};
+
 export type IncomeEntry = {
   id: string;
   source: string;
@@ -9,6 +21,8 @@ export type IncomeEntry = {
   recurring: boolean;
   date?: string;
   imported?: ImportedTransactionMeta;
+  seededFrom?: SeededFromRef;
+  categorySource?: CategorySource;
 };
 
 export type ExpenseEntry = {
@@ -25,6 +39,8 @@ export type ExpenseEntry = {
   // replaces that account's scheduled monthly payment in the balance roll-forward — so an
   // imported overpayment reduces the debt by the real amount instead of the scheduled one.
   debtAccountId?: string;
+  seededFrom?: SeededFromRef;
+  categorySource?: CategorySource;
 };
 
 export type GoalFundingMode = "fixed" | "fill" | "auto";
@@ -152,6 +168,9 @@ export type LedgerState = {
   categoryRules: CategoryRule[];
   importBatches: ImportBatch[];
   privacyMode: boolean;
+  // Stage C opt-in: allow sending transaction descriptions (never amounts or
+  // identity) to the categorize-batch edge function for AI suggestions.
+  aiCategorizationEnabled?: boolean;
   lastSavedAt: string;
 };
 
