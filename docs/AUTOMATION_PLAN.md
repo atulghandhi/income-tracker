@@ -1,7 +1,14 @@
 # Transaction Automation Plan — driving user effort toward zero
 
-> **Status:** Planning document. Companion to `docs/MONETIZATION_PLAN.md` — automation
-> *is* the Pro value proposition, so every stage here maps to a monetization phase.
+> **Status:** Stages A–E implemented (Jul 2026). A+B live in the web app with unit
+> and e2e tests; C (AI categorization) is code-complete and dormant until the
+> `categorize-batch` function is deployed with an `ANTHROPIC_API_KEY`; D ships as
+> uncompiled Swift services awaiting the FinanceKit entitlement + an Xcode build;
+> E (open banking) is code-complete and dormant until TrueLayer credentials are
+> set and the migrations/functions are deployed. Remaining external prerequisites
+> are listed per stage below and in the commit messages.
+> Companion to `docs/MONETIZATION_PLAN.md` — automation *is* the Pro value
+> proposition, so every stage here maps to a monetization phase.
 > **Goal:** A user should spend seconds per month keeping their ledger true, not minutes
 > per transaction. This document is the step-by-step plan to get there, ordered from
 > zero-cost wins to full bank feeds.

@@ -575,7 +575,7 @@ function tokenSetSimilarity(description: string, pattern: string): number {
   return unionSize > 0 ? overlap / unionSize : 0;
 }
 
-function collectExistingTransactionHashes(state: LedgerState): Set<string> {
+export function collectExistingTransactionHashes(state: LedgerState): Set<string> {
   const hashes = new Set<string>();
   Object.values(state.months).forEach((month) => {
     month.incomes.forEach((income) => {
