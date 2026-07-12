@@ -23,3 +23,7 @@ skills-lock.json
 # OS
 .DS_Store
 .vercel
+
+# Playwright artifacts
+test-results/
+playwright-report/
