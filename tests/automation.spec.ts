@@ -359,3 +359,56 @@ test.describe("reconcileSeededEntries", () => {
     expect(reconciled.expenses).toHaveLength(2);
   });
 });
+
+// ─── E4: transfer-pair detection ─────────────────────────────────────────────
+
+test.describe("markTransferPairs", () => {
+  test("opposite equal amounts within two days become transfer legs", async () => {
+    const { markTransferPairs } = await import("../src/importer");
+    const state = createInitialState();
+    const result = parseBankText({
+      text: [
+        "Date,Description,Amount",
+        "10/06/2026,TO SAVINGS POT,-500.00",
+        "11/06/2026,FROM CURRENT ACCOUNT,500.00",
+        "12/06/2026,COSTA COFFEE,-4.35",
+      ].join("\n"),
+      fileName: "bank.csv",
+      state,
+    });
+    const outLeg = result.rows.find((row) => row.description.includes("SAVINGS POT"));
+    const inLeg = result.rows.find((row) => row.description.includes("CURRENT ACCOUNT"));
+    const coffee = result.rows.find((row) => row.description.includes("COSTA"));
+    expect(outLeg!.kind).toBe("transfer");
+    expect(inLeg!.kind).toBe("transfer");
+    expect(outLeg!.include).toBe(false);
+    expect(coffee!.kind).toBe("expense");
+    void markTransferPairs; // direct API also exported for the feeds path
+  });
+
+  test("same-merchant opposite amounts (refund shape) are left alone", async () => {
+    const { markTransferPairs, parseBankCsv } = await import("../src/importer");
+    const state = createInitialState();
+    const parsed = parseBankCsv({
+      text: ["Date,Description,Amount", "10/06/2026,CURRYS ONLINE,-299.00", "11/06/2026,CURRYS ONLINE,299.00"].join("\n"),
+      fileName: "bank.csv",
+      state,
+    });
+    const rows = markTransferPairs(parsed.rows);
+    expect(rows.every((row) => row.kind !== "transfer")).toBe(true);
+  });
+
+  test("amounts more than two days apart do not pair", async () => {
+    const { markTransferPairs, parseBankCsv } = await import("../src/importer");
+    const state = createInitialState();
+    const parsed = parseBankCsv({
+      // Descriptions dodge the transfer-wording system rule, so any transfer
+      // classification could only come from pairing.
+      text: ["Date,Description,Amount", "01/06/2026,POT MOVE OUT,-500.00", "10/06/2026,POT TOP UP IN,500.00"].join("\n"),
+      fileName: "bank.csv",
+      state,
+    });
+    const rows = markTransferPairs(parsed.rows);
+    expect(rows.every((row) => row.kind !== "transfer")).toBe(true);
+  });
+});

@@ -912,14 +912,56 @@ enum FinanceEngine {
 
     // MARK: - Seed month
 
-    /// Port of seedMonthFromPrevious.
-    /// Returns an empty month if `previous` is nil; otherwise carries the note forward.
-    nonisolated static func seedMonth(from previous: MonthBudget?) -> MonthBudget {
+    /// Port of seedMonthFromPrevious (src/finance.ts). Recurring entries carry
+    /// forward into the new month with fresh ids, clamped dates, and seededFrom
+    /// provenance; one-offs stay behind. Seeding only happens moving forward in
+    /// time — opening an older empty month stays empty. Without keys the result
+    /// is empty apart from the carried note (legacy behavior).
+    nonisolated static func seedMonth(
+        from previous: MonthBudget?,
+        fromKey: String? = nil,
+        toKey: String? = nil
+    ) -> MonthBudget {
         guard let prev = previous else {
             return MonthBudget(incomes: [], expenses: [], note: "")
         }
-        // TS seedMonthFromPrevious: incomes/expenses reset to [], note carries forward.
-        return MonthBudget(incomes: [], expenses: [], note: prev.note)
+        guard let fromKey, let toKey, toKey > fromKey else {
+            return MonthBudget(incomes: [], expenses: [], note: prev.note)
+        }
+
+        let incomes: [IncomeEntry] = prev.incomes.filter { $0.recurring }.map { income in
+            var seeded = income
+            seeded.id = createId(prefix: "income")
+            seeded.date = seedEntryDate(income.date, toKey: toKey)
+            seeded.imported = nil
+            seeded.seededFrom = SeededFromRef(monthKey: fromKey, entryId: income.id)
+            return seeded
+        }
+        let expenses: [ExpenseEntry] = prev.expenses.filter { $0.recurring }.map { expense in
+            var seeded = expense
+            seeded.id = createId(prefix: "expense")
+            seeded.date = seedEntryDate(expense.date, toKey: toKey)
+            seeded.imported = nil
+            seeded.seededFrom = SeededFromRef(monthKey: fromKey, entryId: expense.id)
+            return seeded
+        }
+        return MonthBudget(incomes: incomes, expenses: expenses, note: prev.note)
+    }
+
+    /// Same day-of-month in the target month, clamped to its length (31st -> 30th in June).
+    nonisolated static func seedEntryDate(_ sourceDate: String?, toKey: String) -> String? {
+        guard let sourceDate, sourceDate.count >= 10,
+              let day = Int(sourceDate.suffix(2)), day >= 1 else { return nil }
+        let parts = toKey.split(separator: "-").compactMap { Int($0) }
+        guard parts.count == 2 else { return nil }
+        var components = DateComponents()
+        components.year = parts[0]
+        components.month = parts[1] + 1
+        components.day = 0 // day 0 of next month = last day of target month
+        let calendar = Calendar(identifier: .gregorian)
+        let lastDay = calendar.date(from: components).map { calendar.component(.day, from: $0) } ?? 28
+        let clamped = min(day, lastDay)
+        return String(format: "%@-%02d", toKey, clamped)
     }
 
     // MARK: - CSV export
