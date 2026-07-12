@@ -81,6 +81,7 @@ import { buildMerchantMemory } from "./merchantMemory";
 import { parseQuickAdd } from "./quickAdd";
 import { applyRecurringFlag, detectSubscriptions, findMissedRecurring, reconcileSeededEntries, suggestRecurringFlags, type RecurrenceCandidate } from "./recurrence";
 import { aiCategorizeRows, applyAiSuggestions, isAiCategorizationAvailable } from "./aiCategorize";
+import { bucketCount, identifyAnalytics, track } from "./analytics";
 import {
   BANK_FEED_SOURCE_NAME,
   completeBankConnection,
@@ -420,6 +421,9 @@ function App() {
   const [lastImportAction, setLastImportAction] = useState<LastImportAction | null>(null);
   const [quickAddInput, setQuickAddInput] = useState("");
   const [seededBannerDismissed, setSeededBannerDismissed] = useState<Set<string>>(() => new Set());
+  const [toastVisible, setToastVisible] = useState(false);
+  const toastTimerRef = useRef<number | null>(null);
+  const toastFirstRenderRef = useRef(true);
   const [bankConnections, setBankConnections] = useState<BankConnection[]>([]);
   const [stagedFeedCount, setStagedFeedCount] = useState(0);
   const [feedsReady, setFeedsReady] = useState(false);
@@ -550,6 +554,19 @@ function App() {
     () => findMissedRecurring(ledger, new Date().toISOString().slice(0, 10)).slice(0, 4),
     [ledger],
   );
+  // Learned (non-transfer) rules with live match counts, for the hygiene panel.
+  const learnedRules = useMemo(() => {
+    const rules = ledger.categoryRules.filter((rule) => rule.kind !== "transfer");
+    if (!rules.length) return [];
+    const canonicals: string[] = [];
+    for (const month of Object.values(ledger.months)) {
+      for (const income of month.incomes) canonicals.push(canonicalizeMerchant(income.imported?.originalDescription || income.source));
+      for (const expense of month.expenses) canonicals.push(canonicalizeMerchant(expense.imported?.originalDescription || expense.name));
+    }
+    return rules
+      .map((rule) => ({ rule, matches: canonicals.filter((canonical) => descriptionMatchesPattern(canonical, rule.pattern)).length }))
+      .sort((a, b) => b.matches - a.matches || a.rule.pattern.localeCompare(b.rule.pattern));
+  }, [ledger.categoryRules, ledger.months]);
 
   useEffect(() => {
     let alive = true;
@@ -594,6 +611,7 @@ function App() {
         const currentSession = await getCurrentSession();
         if (alive) {
           authUserIdRef.current = currentSession?.user?.id ?? null;
+          identifyAnalytics(authUserIdRef.current);
           setSession(currentSession);
         }
       } catch {
@@ -612,6 +630,8 @@ function App() {
       if (authUserIdRef.current !== nextUserId) {
         authUserIdRef.current = nextUserId;
         setCloudHydrated(false);
+        identifyAnalytics(nextUserId);
+        if (nextUserId) track("signed_in");
       }
     }).data.subscription;
 
@@ -761,6 +781,20 @@ function App() {
     });
   }
 
+  // The status toast has always been *set* throughout the app but never shown.
+  // Render it briefly on every change — it's how rule-saved / seeded / import
+  // feedback reaches the user. The initial "Loading…" value is skipped.
+  useEffect(() => {
+    if (toastFirstRenderRef.current) {
+      toastFirstRenderRef.current = false;
+      return;
+    }
+    if (!toast) return;
+    setToastVisible(true);
+    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = window.setTimeout(() => setToastVisible(false), 3200);
+  }, [toast]);
+
   useEffect(() => {
     if (!categoryMenu) return;
 
@@ -797,6 +831,12 @@ function App() {
   }
 
   function changeMonth(offset: number) {
+    if (offset > 0 && !ledger.months[shiftMonth(ledger.selectedMonth, offset)]) {
+      const seedCount =
+        currentMonth.incomes.filter((income) => income.recurring).length +
+        currentMonth.expenses.filter((expense) => expense.recurring).length;
+      if (seedCount > 0) track("month_seeded", { count: seedCount });
+    }
     updateLedger((current) => {
       const nextKey = shiftMonth(current.selectedMonth, offset);
       const months = current.months[nextKey]
@@ -849,6 +889,7 @@ function App() {
     }));
     setIncomeDraft(initialIncomeDraft);
     setToast("Income added");
+    track("entry_added", { method: "manual", kind: "income" });
     focusNextFrame(incomeSourceInputRef);
   }
 
@@ -886,6 +927,7 @@ function App() {
     }));
     setExpenseDraft(initialExpenseDraft);
     setToast(remembered?.category ? `Expense added to ${remembered.category}` : "Expense added");
+    track("entry_added", { method: "manual", kind: "expense", category_prefilled: Boolean(remembered?.category) });
     focusNextFrame(expenseNameInputRef);
   }
 
@@ -933,6 +975,7 @@ function App() {
     });
     setQuickAddInput("");
     setToast(draft.kind === "income" ? "Income added" : draft.category && draft.category !== "Unsorted" ? `Added to ${draft.category}` : "Expense added");
+    track("entry_added", { method: "quick_add", kind: draft.kind, category_prefilled: Boolean(draft.category && draft.category !== "Unsorted") });
   }
 
   function updateIncome(id: string, patch: Partial<IncomeEntry>) {
@@ -972,6 +1015,7 @@ function App() {
   function markCandidateRecurring(candidate: RecurrenceCandidate) {
     updateLedger((current) => applyRecurringFlag(current, candidate));
     setToast(`${candidate.label} marked recurring — it now feeds the forecast`);
+    track("recurring_marked", { cadence: candidate.cadence });
   }
 
   function addAccount() {
@@ -1142,6 +1186,7 @@ function App() {
       // render time, not call time) — same pattern as addTransferRule.
       const preview = learnCategoryRule(ledger, description, category, "expense", sourceId);
       updateLedger((current) => learnCategoryRule(current, description, category, "expense", sourceId).state);
+      track("rule_learned", { retro_applied: preview.retroactivelyApplied });
       setToast(
         preview.retroactivelyApplied > 0
           ? `Rule saved — also sorted ${preview.retroactivelyApplied} matching`
@@ -1388,7 +1433,10 @@ function App() {
       const callbackCode = consumeFeedCallbackCode();
       if (callbackCode) {
         const connection = await completeBankConnection(callbackCode);
-        if (connection && alive) setToast(`${connection.display_name} connected`);
+        if (connection && alive) {
+          setToast(`${connection.display_name} connected`);
+          track("feed_connected");
+        }
       }
 
       const configured = await isFeedBackendConfigured();
@@ -1441,6 +1489,13 @@ function App() {
       return;
     }
     feedRowMapRef.current = review.feedIdByRowId;
+    track("import_reviewed", {
+      source: "feed",
+      rows: bucketCount(review.rows.length),
+      auto: review.rows.filter((row) => !row.duplicate && row.confidence >= 0.9).length,
+      check: review.rows.filter((row) => !row.duplicate && row.confidence >= 0.6 && row.confidence < 0.9).length,
+      needs: review.rows.filter((row) => row.duplicate || row.confidence < 0.6).length,
+    });
     setImportReview({
       fileName: BANK_FEED_SOURCE_NAME,
       rows: review.rows,
@@ -1491,6 +1546,15 @@ function App() {
       totalRows: result.totalRows,
     });
     setToast(result.rows.length ? "Transactions ready for review" : "Nothing recognisable to import");
+    if (result.rows.length) {
+      track("import_reviewed", {
+        source: importSourceOf(sourceName),
+        rows: bucketCount(result.rows.length),
+        auto: result.rows.filter((row) => !row.duplicate && row.confidence >= 0.9).length,
+        check: result.rows.filter((row) => !row.duplicate && row.confidence >= 0.6 && row.confidence < 0.9).length,
+        needs: result.rows.filter((row) => row.duplicate || row.confidence < 0.6).length,
+      });
+    }
 
     if (result.rows.length && isAiCategorizationAvailable(Boolean(user), Boolean(ledger.aiCategorizationEnabled))) {
       const categories = Array.from(
@@ -1499,6 +1563,7 @@ function App() {
       void aiCategorizeRows(result.rows, categories)
         .then((suggestions) => {
           if (!suggestions.length) return;
+          track("ai_suggestions_applied", { count: suggestions.length });
           setImportReview((current) =>
             current && current.fileName === sourceName
               ? { ...current, rows: applyAiSuggestions(current.rows, suggestions) }
@@ -1512,6 +1577,9 @@ function App() {
   }
 
   function updateImportReviewRow(id: string, patch: Partial<CsvImportRow>) {
+    if (patch.category || patch.kind) {
+      track("import_row_corrected", { source: importReview ? importSourceOf(importReview.fileName) : "unknown" });
+    }
     setImportReview((current) => {
       if (!current) return current;
       return {
@@ -1600,6 +1668,14 @@ function App() {
       categoryRules: current.categoryRules.filter((rule) => rule.id !== id),
     }));
     setToast("Transfer rule removed");
+  }
+
+  function removeCategoryRule(id: string) {
+    updateLedger((current) => ({
+      ...current,
+      categoryRules: current.categoryRules.filter((rule) => rule.id !== id),
+    }));
+    setToast("Rule removed — correct a matching transaction to re-learn it");
   }
 
   function confirmCsvImport() {
@@ -1736,6 +1812,12 @@ function App() {
       setLastImportAction({ batchId, fileName: importReview.fileName, importedRows: rowsToImport.length });
     }
     setActiveView("ledger");
+
+    track("import_committed", {
+      source: importSourceOf(importReview.fileName),
+      imported: rowsToImport.length,
+      transfers: transferRows.length,
+    });
 
     const parts: string[] = [];
     if (rowsToImport.length) parts.push(`Imported ${rowsToImport.length} transaction${rowsToImport.length === 1 ? "" : "s"}`);
@@ -3054,6 +3136,40 @@ function App() {
                 )}
               </article>
 
+              <article className="settingsPanel learnedRulesPanel">
+                <PanelTitle title="Learned category rules" icon={<GraduationCap size={17} />} />
+                <p className="panelSubcopy">
+                  Created automatically when you correct an imported transaction — future imports matching the pattern get the
+                  category instantly. Delete any rule that misfires; the next correction re-learns it.
+                </p>
+                {learnedRules.length ? (
+                  <ul className="transferRuleList">
+                    {learnedRules.map(({ rule, matches }) => (
+                      <li key={rule.id}>
+                        <code>{rule.pattern}</code>
+                        <span className="learnedRuleTarget">
+                          → {rule.category}
+                          {rule.kind === "debt-payment" ? " (debt payment)" : rule.kind === "income" ? " (income)" : ""}
+                        </span>
+                        <em className="learnedRuleMatches">
+                          {matches} match{matches === 1 ? "" : "es"}
+                        </em>
+                        <button
+                          className="iconButton"
+                          type="button"
+                          aria-label={`Remove rule ${rule.pattern}`}
+                          onClick={() => removeCategoryRule(rule.id)}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="transferRuleEmpty">No learned rules yet — correct a category on an imported transaction to create one.</p>
+                )}
+              </article>
+
               <article className="dangerPanel">
                 <div>
                   <h3>Danger Zone</h3>
@@ -3101,6 +3217,12 @@ function App() {
         )}
 
         {tutorialView && <TutorialOverlay tutorial={TUTORIALS[tutorialView]} onClose={closeTutorial} />}
+
+        {toastVisible && (
+          <div className="statusToast" role="status" aria-live="polite">
+            {toast}
+          </div>
+        )}
 
         {importReview && (
           <ImportReviewModal
@@ -5724,6 +5846,16 @@ function normalizeState(rawState: Partial<LedgerState>): LedgerState {
     aiCategorizationEnabled: Boolean(state.aiCategorizationEnabled),
     lastSavedAt: state.lastSavedAt ?? new Date().toISOString(),
   };
+}
+
+// Analytics label for an import inlet, derived from the review's source name.
+function importSourceOf(fileName: string): string {
+  if (fileName === BANK_FEED_SOURCE_NAME) return "feed";
+  if (fileName === "Pasted transactions") return "paste";
+  const lower = fileName.toLowerCase();
+  if (lower.endsWith(".ofx")) return "ofx";
+  if (lower.endsWith(".qif")) return "qif";
+  return "csv";
 }
 
 // Deleting an auto-seeded entry is the user saying "this doesn't repeat" — flip

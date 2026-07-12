@@ -1,4 +1,4 @@
-import { buildImportRow, collectExistingTransactionHashes, type CsvImportRow } from "./importer";
+import { buildImportRow, collectExistingTransactionHashes, markTransferPairs, type CsvImportRow } from "./importer";
 import { supabase } from "./supabase";
 import type { LedgerState } from "./types";
 
@@ -137,7 +137,7 @@ export async function fetchStagedFeedReview(state: LedgerState): Promise<StagedF
 
   const existingHashes = collectExistingTransactionHashes(state);
   const feedIdByRowId = new Map<string, string>();
-  const rows = (data as StagedFeedRow[]).map((staged, index) => {
+  const builtRows = (data as StagedFeedRow[]).map((staged, index) => {
     const description = staged.merchant_name?.trim() || staged.description;
     const row = buildImportRow({
       rowNumber: index + 1,
@@ -152,6 +152,8 @@ export async function fetchStagedFeedReview(state: LedgerState): Promise<StagedF
     feedIdByRowId.set(row.id, staged.id);
     return row;
   });
+  // Opposite legs of a move between two connected accounts classify as transfers.
+  const rows = markTransferPairs(builtRows);
 
   return { rows, feedIdByRowId, total: rows.length };
 }

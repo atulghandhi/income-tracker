@@ -640,19 +640,71 @@ export function parseBankText({
   const lowerName = fileName.toLowerCase();
 
   if (/^ofxheader/i.test(trimmed) || /<OFX>/i.test(trimmed) || lowerName.endsWith(".ofx")) {
-    return parseOfx({ text, fileName, state, fallbackMonthKey });
+    return withTransferPairs(parseOfx({ text, fileName, state, fallbackMonthKey }));
   }
   if (/^!type:/i.test(trimmed) || lowerName.endsWith(".qif")) {
-    return parseQif({ text, fileName, state, fallbackMonthKey });
+    return withTransferPairs(parseQif({ text, fileName, state, fallbackMonthKey }));
   }
 
   const csvResult = parseBankCsv({ text, fileName, state, fallbackMonthKey });
-  if (csvResult.rows.length) return csvResult;
+  if (csvResult.rows.length) return withTransferPairs(csvResult);
 
   // No recognizable header row — pasted blocks from bank apps and spreadsheets
   // usually aren't CSV. Fall back to per-line parsing before giving up.
   const looseResult = parseLooseLines({ text, fileName, state, fallbackMonthKey });
-  return looseResult.rows.length ? looseResult : csvResult;
+  return looseResult.rows.length ? withTransferPairs(looseResult) : csvResult;
+}
+
+function withTransferPairs(result: CsvImportResult): CsvImportResult {
+  return { ...result, rows: markTransferPairs(result.rows) };
+}
+
+// Two rows with opposite equal amounts a couple of days apart are almost always
+// the two legs of a transfer between the user's own accounts — money that is
+// neither income nor spending. Both legs get re-classified as transfers (still
+// visible in review, one tap to override). Same-merchant pairs are skipped:
+// a charge followed by an equal credit from the same merchant is a refund.
+export function markTransferPairs(rows: CsvImportRow[]): CsvImportRow[] {
+  const byAmount = new Map<string, number[]>();
+  rows.forEach((row, index) => {
+    const key = Math.abs(row.amount).toFixed(2);
+    byAmount.set(key, [...(byAmount.get(key) ?? []), index]);
+  });
+
+  const pairedIndexes = new Set<number>();
+  for (const indexes of byAmount.values()) {
+    if (indexes.length < 2) continue;
+    for (const outIndex of indexes) {
+      if (pairedIndexes.has(outIndex) || rows[outIndex].amount >= 0) continue;
+      for (const inIndex of indexes) {
+        if (inIndex === outIndex || pairedIndexes.has(inIndex)) continue;
+        const candidate = rows[inIndex];
+        if (candidate.amount <= 0) continue;
+        const dayGap = Math.abs(Date.parse(rows[outIndex].date) - Date.parse(candidate.date)) / 86_400_000;
+        if (dayGap > 2) continue;
+        if (canonicalizeMerchant(rows[outIndex].description) === canonicalizeMerchant(candidate.description)) continue; // refund shape
+        pairedIndexes.add(outIndex);
+        pairedIndexes.add(inIndex);
+        break;
+      }
+    }
+  }
+
+  if (!pairedIndexes.size) return rows;
+  // A leg the transfer wording rule already classified stays as-is; its
+  // counterpart is what pairing adds. User-edited rows are never touched.
+  return rows.map((row, index) =>
+    pairedIndexes.has(index) && row.categorySource !== "user" && row.kind !== "transfer"
+      ? {
+          ...row,
+          kind: "transfer" as const,
+          category: "Transfers",
+          include: false,
+          confidence: Math.max(row.confidence, 0.8),
+          note: "Opposite amounts days apart — looks like a transfer between your accounts",
+        }
+      : row,
+  );
 }
 
 // ─── OFX (Open Financial Exchange 1.x SGML and 2.x XML) ─────────────────────

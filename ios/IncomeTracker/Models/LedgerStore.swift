@@ -124,10 +124,16 @@ public final class LedgerStore {
 
     public func selectMonth(_ key: String) {
         update { s in
-            s.selectedMonth = key
             if s.months[key] == nil {
-                s.months[key] = .empty
+                // Forward navigation auto-seeds the recurring entries (web parity);
+                // backward navigation to an untouched past month stays empty.
+                s.months[key] = FinanceEngine.seedMonth(
+                    from: s.months[s.selectedMonth],
+                    fromKey: s.selectedMonth,
+                    toKey: key
+                )
             }
+            s.selectedMonth = key
         }
     }
 
@@ -143,7 +149,11 @@ public final class LedgerStore {
         let today = getMonthKey()
         guard state.selectedMonth != today else { return }
         if state.months[today] == nil {
-            state.months[today] = FinanceEngine.seedMonth(from: state.months[state.selectedMonth])
+            state.months[today] = FinanceEngine.seedMonth(
+                from: state.months[state.selectedMonth],
+                fromKey: state.selectedMonth,
+                toKey: today
+            )
         }
         state.selectedMonth = today
     }
@@ -165,6 +175,12 @@ public final class LedgerStore {
 
     public func removeIncome(id: String) {
         update { s in
+            // Deleting an auto-seeded copy means "this doesn't repeat": flip the
+            // origin entry to one-off so future months stop seeding it (web parity).
+            if let seededFrom = s.months[s.selectedMonth]?.incomes.first(where: { $0.id == id })?.seededFrom,
+               let originIndex = s.months[seededFrom.monthKey]?.incomes.firstIndex(where: { $0.id == seededFrom.entryId }) {
+                s.months[seededFrom.monthKey]?.incomes[originIndex].recurring = false
+            }
             s.months[s.selectedMonth]?.incomes.removeAll { $0.id == id }
         }
     }
@@ -186,6 +202,11 @@ public final class LedgerStore {
 
     public func removeExpense(id: String) {
         update { s in
+            // See removeIncome — deleting a seeded copy stops the repeat at the origin.
+            if let seededFrom = s.months[s.selectedMonth]?.expenses.first(where: { $0.id == id })?.seededFrom,
+               let originIndex = s.months[seededFrom.monthKey]?.expenses.firstIndex(where: { $0.id == seededFrom.entryId }) {
+                s.months[seededFrom.monthKey]?.expenses[originIndex].recurring = false
+            }
             s.months[s.selectedMonth]?.expenses.removeAll { $0.id == id }
         }
     }

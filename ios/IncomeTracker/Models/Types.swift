@@ -43,6 +43,19 @@ public struct ImportedTransactionMeta: Codable, Hashable, Sendable {
     }
 }
 
+/// Set on entries auto-copied into a new month because their source entry was
+/// recurring (mirrors SeededFromRef in src/types.ts). Must round-trip through
+/// Codable so cloud sync never strips web-created provenance.
+public struct SeededFromRef: Codable, Hashable, Sendable {
+    public var monthKey: String
+    public var entryId: String
+
+    public init(monthKey: String, entryId: String) {
+        self.monthKey = monthKey
+        self.entryId = entryId
+    }
+}
+
 public struct IncomeEntry: Codable, Identifiable, Hashable, Sendable {
     public var id: String
     public var source: String
@@ -51,6 +64,10 @@ public struct IncomeEntry: Codable, Identifiable, Hashable, Sendable {
     public var recurring: Bool
     public var date: String?
     public var imported: ImportedTransactionMeta?
+    public var seededFrom: SeededFromRef?
+    /// Which layer decided the category ("user" is never overridden by automation).
+    /// Mirrors CategorySource in src/types.ts; kept as a raw string for forward compatibility.
+    public var categorySource: String?
 
     public init(
         id: String,
@@ -59,7 +76,9 @@ public struct IncomeEntry: Codable, Identifiable, Hashable, Sendable {
         color: String,
         recurring: Bool,
         date: String? = nil,
-        imported: ImportedTransactionMeta? = nil
+        imported: ImportedTransactionMeta? = nil,
+        seededFrom: SeededFromRef? = nil,
+        categorySource: String? = nil
     ) {
         self.id = id
         self.source = source
@@ -68,6 +87,8 @@ public struct IncomeEntry: Codable, Identifiable, Hashable, Sendable {
         self.recurring = recurring
         self.date = date
         self.imported = imported
+        self.seededFrom = seededFrom
+        self.categorySource = categorySource
     }
 }
 
@@ -83,6 +104,9 @@ public struct ExpenseEntry: Codable, Identifiable, Hashable, Sendable {
     /// Links this payment to a debt account. For any month that has linked payments, their sum
     /// replaces that account's scheduled monthly payment in the balance roll-forward.
     public var debtAccountId: String?
+    public var seededFrom: SeededFromRef?
+    /// See IncomeEntry.categorySource.
+    public var categorySource: String?
 
     public init(
         id: String,
@@ -93,7 +117,9 @@ public struct ExpenseEntry: Codable, Identifiable, Hashable, Sendable {
         recurring: Bool,
         date: String? = nil,
         imported: ImportedTransactionMeta? = nil,
-        debtAccountId: String? = nil
+        debtAccountId: String? = nil,
+        seededFrom: SeededFromRef? = nil,
+        categorySource: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -104,6 +130,8 @@ public struct ExpenseEntry: Codable, Identifiable, Hashable, Sendable {
         self.date = date
         self.imported = imported
         self.debtAccountId = debtAccountId
+        self.seededFrom = seededFrom
+        self.categorySource = categorySource
     }
 }
 
@@ -365,6 +393,8 @@ public struct LedgerState: Codable, Hashable, Sendable {
     public var categoryRules: [CategoryRule]
     public var importBatches: [ImportBatch]
     public var privacyMode: Bool
+    /// Stage C opt-in (web-controlled today); optional so Codable round-trips it.
+    public var aiCategorizationEnabled: Bool?
     public var lastSavedAt: String
 
     public init(
@@ -382,6 +412,7 @@ public struct LedgerState: Codable, Hashable, Sendable {
         categoryRules: [CategoryRule],
         importBatches: [ImportBatch],
         privacyMode: Bool,
+        aiCategorizationEnabled: Bool? = nil,
         lastSavedAt: String
     ) {
         self.schemaVersion = schemaVersion
@@ -398,6 +429,7 @@ public struct LedgerState: Codable, Hashable, Sendable {
         self.categoryRules = categoryRules
         self.importBatches = importBatches
         self.privacyMode = privacyMode
+        self.aiCategorizationEnabled = aiCategorizationEnabled
         self.lastSavedAt = lastSavedAt
     }
 

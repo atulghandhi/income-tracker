@@ -5303,3 +5303,28 @@ hr {
   padding: 8px 10px;
 }
 .bankConnectionRow .commandButton { flex-shrink: 0; font-size: 11.5px; padding: 4px 9px; }
+
+/* ─── Status toast (finally rendered) + learned-rules panel ──────────────── */
+
+.statusToast {
+  position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+  background: var(--ink); color: var(--on-ink);
+  border-radius: 999px; box-shadow: var(--shadow-md);
+  font-size: 12.5px; padding: 9px 18px; z-index: 300;
+  max-width: min(560px, calc(100vw - 32px));
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  animation: toastIn 160ms ease-out;
+  pointer-events: none;
+}
+@keyframes toastIn {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+.motion-off .statusToast { animation: none; }
+
+.learnedRulesPanel code {
+  background: var(--well); border-radius: 6px; padding: 2px 7px;
+  font-size: 12px;
+}
+.learnedRuleTarget { flex: 1; font-size: 12.5px; color: var(--ink); }
+.learnedRuleMatches { color: var(--faint); font-size: 11.5px; font-style: normal; }
