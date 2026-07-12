@@ -1,5 +1,5 @@
 import { colors, getMonthKey } from "./finance";
-import type { CategoryRule, LedgerState, TransactionKind } from "./types";
+import type { CategoryRule, CategorySource, LedgerState, TransactionKind } from "./types";
 
 export type CsvImportRow = {
   id: string;
@@ -19,6 +19,9 @@ export type CsvImportRow = {
   confidence: number;
   note: string;
   hash: string;
+  // Which layer produced the current category — flips to "user" on manual edit so
+  // downstream automation (retroactive rules, AI upgrades) never overrides it.
+  categorySource: CategorySource;
   // For debt-payment rows: which debt account this payment reduces. Optional — unlinked
   // debt payments still import as expenses, they just don't feed the balance roll-forward.
   debtAccountId?: string;
@@ -59,6 +62,7 @@ type CategorySuggestion = {
   category: string;
   confidence: number;
   note: string;
+  source: CategorySource;
   debtAccountId?: string;
 };
 
@@ -121,33 +125,7 @@ export function parseBankCsv({ text, fileName, state, fallbackMonthKey }: ParseB
     if (!description || parsedAmount === null) return [];
 
     const bankCategory = columns.category === undefined ? "" : getCell(cells, columns.category).trim();
-    const suggestion = suggestCategory(description, parsedAmount, state.categoryRules, bankCategory);
-    const hash = createTransactionHash(isoDate, description, parsedAmount);
-    const duplicate = existingHashes.has(hash);
-    const kind = suggestion.kind;
-
-    return [
-      {
-        id: `draft-${rowNumber}-${hash}`,
-        rowNumber,
-        date: isoDate,
-        monthKey: isoDate.slice(0, 7),
-        description,
-        amount: parsedAmount,
-        rawAmount: parsedAmount.toFixed(2),
-        kind,
-        suggestedKind: kind,
-        category: suggestion.category,
-        suggestedCategory: suggestion.category,
-        color: categoryColor(suggestion.category),
-        include: !duplicate && kind !== "transfer",
-        duplicate,
-        confidence: suggestion.confidence,
-        note: duplicate ? "Possible duplicate" : suggestion.note,
-        hash,
-        debtAccountId: suggestion.debtAccountId,
-      },
-    ];
+    return [buildImportRow({ rowNumber, date: isoDate, description, amount: parsedAmount, bankCategory, state, existingHashes })];
   });
 
   return {
@@ -155,6 +133,62 @@ export function parseBankCsv({ text, fileName, state, fallbackMonthKey }: ParseB
     errors: rows.length ? [] : ["No importable transactions were found in this CSV."],
     detectedColumns: buildDetectedColumns(headerRow, columns),
     totalRows: Math.max(0, nonEmptyRows.length - 1),
+  };
+}
+
+type BuildImportRowOptions = {
+  rowNumber: number;
+  date: string;
+  description: string;
+  amount: number;
+  bankCategory: string;
+  state: LedgerState;
+  existingHashes: Set<string>;
+  // Stable provider transaction ID (OFX FITID, FinanceKit/feed transaction ID). When
+  // present it becomes the dedupe key — stronger than date|description|amount.
+  externalId?: string;
+  noteOverride?: string;
+};
+
+// Single point every capture path funnels through — CSV rows, pasted lines, OFX/QIF
+// records, and staged bank-feed transactions all become the same reviewable row.
+export function buildImportRow({
+  rowNumber,
+  date,
+  description,
+  amount,
+  bankCategory,
+  state,
+  existingHashes,
+  externalId,
+  noteOverride,
+}: BuildImportRowOptions): CsvImportRow {
+  const suggestion = suggestCategory(description, amount, state.categoryRules, bankCategory);
+  const hash = externalId ? `ext-${externalId.replace(/[^a-zA-Z0-9_-]/g, "")}` : createTransactionHash(date, description, amount);
+  const fallbackHash = createTransactionHash(date, description, amount);
+  const duplicate = existingHashes.has(hash) || existingHashes.has(fallbackHash);
+  const kind = suggestion.kind;
+
+  return {
+    id: `draft-${rowNumber}-${hash}`,
+    rowNumber,
+    date,
+    monthKey: date.slice(0, 7),
+    description,
+    amount,
+    rawAmount: amount.toFixed(2),
+    kind,
+    suggestedKind: kind,
+    category: suggestion.category,
+    suggestedCategory: suggestion.category,
+    color: categoryColor(suggestion.category),
+    include: !duplicate && kind !== "transfer",
+    duplicate,
+    confidence: suggestion.confidence,
+    note: duplicate ? "Possible duplicate" : noteOverride ?? suggestion.note,
+    hash,
+    categorySource: suggestion.source,
+    debtAccountId: suggestion.debtAccountId,
   };
 }
 
@@ -409,26 +443,47 @@ function monthStartDate(monthKey: string): string {
   return `${monthKey}-01`;
 }
 
-function suggestCategory(description: string, amount: number, rules: CategoryRule[], bankCategory: string): CategorySuggestion {
-  const normalized = normalizeMerchant(description);
-  const learnedRule = rules.find((rule) => descriptionMatchesPattern(normalized, rule.pattern));
+export function suggestCategory(description: string, amount: number, rules: CategoryRule[], bankCategory: string): CategorySuggestion {
+  const canonical = canonicalizeMerchant(description);
+  const learnedRule = rules.find((rule) => descriptionMatchesPattern(canonical, rule.pattern));
   if (learnedRule) {
     return {
       kind: learnedRule.kind,
       category: learnedRule.category,
       confidence: 0.96,
       note: "Matched your saved rule",
+      source: "rule",
       debtAccountId: learnedRule.kind === "debt-payment" ? learnedRule.debtAccountId : undefined,
     };
   }
 
-  const systemRule = SYSTEM_RULES.find((rule) => rule.pattern.test(description));
+  // Near-miss recovery: "AMZN MKTP GB" should still hit an "amazon" rule. Token-set
+  // similarity is a weaker signal than an exact token match, so it scores below the
+  // exact tier and the fired rule is named so a wrong hit is one correction away.
+  const fuzzyRule = rules
+    .filter((rule) => rule.kind !== "transfer")
+    .map((rule) => ({ rule, score: tokenSetSimilarity(canonical, rule.pattern) }))
+    .filter((match) => match.score >= 0.6)
+    .sort((a, b) => b.score - a.score)[0];
+  if (fuzzyRule) {
+    return {
+      kind: fuzzyRule.rule.kind,
+      category: fuzzyRule.rule.category,
+      confidence: 0.85,
+      note: `Close match to your rule “${fuzzyRule.rule.pattern}”`,
+      source: "rule",
+      debtAccountId: fuzzyRule.rule.kind === "debt-payment" ? fuzzyRule.rule.debtAccountId : undefined,
+    };
+  }
+
+  const systemRule = SYSTEM_RULES.find((rule) => rule.pattern.test(description) || rule.pattern.test(canonical));
   if (systemRule) {
     return {
       kind: systemRule.kind ?? (amount >= 0 ? "income" : "expense"),
       category: systemRule.category,
       confidence: systemRule.confidence,
       note: systemRule.note,
+      source: "system",
     };
   }
 
@@ -438,6 +493,7 @@ function suggestCategory(description: string, amount: number, rules: CategoryRul
       category: toTitleCase(bankCategory),
       confidence: 0.72,
       note: "Used category from bank export",
+      source: "bank",
     };
   }
 
@@ -447,6 +503,7 @@ function suggestCategory(description: string, amount: number, rules: CategoryRul
       category: "Income",
       confidence: 0.48,
       note: "Positive amount treated as income",
+      source: "heuristic",
     };
   }
 
@@ -455,10 +512,70 @@ function suggestCategory(description: string, amount: number, rules: CategoryRul
     category: "Unsorted",
     confidence: 0.32,
     note: "Needs review",
+    source: "heuristic",
   };
 }
 
-function collectExistingTransactionHashes(state: LedgerState): Set<string> {
+// UK bank descriptors abbreviate merchants in predictable ways. Expanding the common
+// variants before rule matching lets one saved rule cover them all. Applied only to
+// matching (never to the dedupe hash, which must stay stable across app versions).
+const MERCHANT_ALIASES: Array<[RegExp, string]> = [
+  [/\bamzn(?:\s+mktp)?\b/g, "amazon"],
+  [/\bamz\b/g, "amazon"],
+  [/\bsbux\b/g, "starbucks"],
+  [/\bmcd(?:onalds)?\b/g, "mcdonalds"],
+  [/\btfl(?:\s+travel(?:\s+ch(?:arge)?)?)?\b/g, "tfl"],
+  [/\bsainsburys?\s*s\/?mkts?\b/g, "sainsburys"],
+  [/\bm\s*&\s*s\b/g, "marks and spencer"],
+  [/\bwm\s+morrisons?\b/g, "morrisons"],
+  [/\bb\s*&\s*q\b/g, "b and q"],
+  [/\bpaypal\s*\*/g, "paypal "],
+  [/\bsumup\s*\*/g, "sumup "],
+  [/\bzettle\b[_ ]*/g, "zettle "],
+  [/\bsq\s*\*/g, "square "],
+  [/\bcrv\b/g, ""],
+  [/\bgoogle\s*\*/g, "google "],
+  [/\bapple\.com\/bill\b/g, "apple"],
+  [/\bamznprime\b/g, "amazon prime"],
+];
+
+export function canonicalizeMerchant(description: string): string {
+  let canonical = normalizeMerchant(description);
+  for (const [pattern, replacement] of MERCHANT_ALIASES) {
+    canonical = canonical.replace(pattern, replacement);
+  }
+  // Domain suffixes survive normalization as bare tokens ("NETFLIX.COM" → "netflix com");
+  // stripping them lets web and card descriptors of the same merchant group together.
+  canonical = canonical.replace(/\b(?:www|com|net|org|co uk|couk)\b/g, " ");
+  return canonical.replace(/\s+/g, " ").trim();
+}
+
+// Jaccard similarity over token sets, with substring token credit so "sainsbury"
+// still counts against "sainsburys".
+function tokenSetSimilarity(description: string, pattern: string): number {
+  const descTokens = new Set(description.split(" ").filter((token) => token.length > 1));
+  const patternTokens = new Set(
+    pattern
+      .toLowerCase()
+      .split(" ")
+      .filter((token) => token.length > 1),
+  );
+  if (!descTokens.size || !patternTokens.size) return 0;
+
+  let overlap = 0;
+  for (const patternToken of patternTokens) {
+    for (const descToken of descTokens) {
+      if (descToken === patternToken || descToken.includes(patternToken) || patternToken.includes(descToken)) {
+        overlap += 1;
+        break;
+      }
+    }
+  }
+  const unionSize = descTokens.size + patternTokens.size - overlap;
+  return unionSize > 0 ? overlap / unionSize : 0;
+}
+
+export function collectExistingTransactionHashes(state: LedgerState): Set<string> {
   const hashes = new Set<string>();
   Object.values(state.months).forEach((month) => {
     month.incomes.forEach((income) => {
@@ -484,7 +601,7 @@ function buildDetectedColumns(headers: string[], columns: Partial<ColumnMap>): C
   };
 }
 
-function normalizeMerchant(description: string): string {
+export function normalizeMerchant(description: string): string {
   return description
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, " ")
@@ -506,4 +623,234 @@ function categoryColor(category: string): string {
   const normalized = category.trim().toLowerCase();
   const categoryIndex = ["home", "food", "bills", "travel", "health", "personal", "work", "subscriptions", "income", "debt payments", "transfers", "unsorted"].indexOf(normalized);
   return colors[(categoryIndex >= 0 ? categoryIndex : normalized.length) % colors.length];
+}
+
+// ─── Multi-format entry point ────────────────────────────────────────────────
+// Every text-shaped capture path (file upload, clipboard paste) lands here. The
+// format is sniffed from content first, extension second, so a pasted OFX block
+// or a renamed export still parses.
+
+export function parseBankText({
+  text,
+  fileName,
+  state,
+  fallbackMonthKey,
+}: ParseBankCsvOptions): CsvImportResult {
+  const trimmed = text.trimStart();
+  const lowerName = fileName.toLowerCase();
+
+  if (/^ofxheader/i.test(trimmed) || /<OFX>/i.test(trimmed) || lowerName.endsWith(".ofx")) {
+    return parseOfx({ text, fileName, state, fallbackMonthKey });
+  }
+  if (/^!type:/i.test(trimmed) || lowerName.endsWith(".qif")) {
+    return parseQif({ text, fileName, state, fallbackMonthKey });
+  }
+
+  const csvResult = parseBankCsv({ text, fileName, state, fallbackMonthKey });
+  if (csvResult.rows.length) return csvResult;
+
+  // No recognizable header row — pasted blocks from bank apps and spreadsheets
+  // usually aren't CSV. Fall back to per-line parsing before giving up.
+  const looseResult = parseLooseLines({ text, fileName, state, fallbackMonthKey });
+  return looseResult.rows.length ? looseResult : csvResult;
+}
+
+// ─── OFX (Open Financial Exchange 1.x SGML and 2.x XML) ─────────────────────
+
+export function parseOfx({ text, state, fallbackMonthKey }: ParseBankCsvOptions): CsvImportResult {
+  const existingHashes = collectExistingTransactionHashes(state);
+  const fallbackMonth = fallbackMonthKey ?? state.selectedMonth ?? getMonthKey();
+  const blocks = text.split(/<STMTTRN>/i).slice(1);
+  const rows: CsvImportRow[] = [];
+
+  blocks.forEach((block, index) => {
+    const body = block.split(/<\/STMTTRN>/i)[0];
+    const amountText = readOfxTag(body, "TRNAMT");
+    const name = readOfxTag(body, "NAME") || readOfxTag(body, "MEMO");
+    const memo = readOfxTag(body, "MEMO");
+    const posted = readOfxTag(body, "DTPOSTED");
+    const fitId = readOfxTag(body, "FITID");
+
+    const amount = amountText ? Number(amountText.replace(/[^0-9.-]/g, "")) : NaN;
+    const description = (name && memo && memo !== name ? `${name} ${memo}` : name || memo).trim();
+    if (!description || !Number.isFinite(amount)) return;
+
+    const isoDate = parseOfxDate(posted) ?? monthStartDate(fallbackMonth);
+    rows.push(
+      buildImportRow({
+        rowNumber: index + 1,
+        date: isoDate,
+        description,
+        amount: Number(amount.toFixed(2)),
+        bankCategory: "",
+        state,
+        existingHashes,
+        externalId: fitId || undefined,
+      }),
+    );
+  });
+
+  return {
+    rows: sortImportRows(rows),
+    errors: rows.length ? [] : ["No transactions were found in this OFX file."],
+    detectedColumns: {},
+    totalRows: blocks.length,
+  };
+}
+
+// OFX 1.x is SGML: values often run to end-of-line with no closing tag.
+function readOfxTag(block: string, tag: string): string {
+  const match = block.match(new RegExp(`<${tag}>([^<\\r\\n]*)`, "i"));
+  return match ? match[1].trim() : "";
+}
+
+function parseOfxDate(value: string): string | null {
+  const match = value.match(/^(\d{4})(\d{2})(\d{2})/);
+  if (!match) return null;
+  return formatDateParts(Number(match[1]), Number(match[2]), Number(match[3]));
+}
+
+// ─── QIF (Quicken Interchange Format) ────────────────────────────────────────
+
+export function parseQif({ text, state, fallbackMonthKey }: ParseBankCsvOptions): CsvImportResult {
+  const existingHashes = collectExistingTransactionHashes(state);
+  const fallbackMonth = fallbackMonthKey ?? state.selectedMonth ?? getMonthKey();
+  const rows: CsvImportRow[] = [];
+  let record: { date?: string; amount?: number; payee?: string; memo?: string; category?: string } = {};
+  let recordCount = 0;
+
+  const flush = () => {
+    recordCount += 1;
+    const description = (record.payee || record.memo || "").trim();
+    if (description && record.amount !== undefined && Number.isFinite(record.amount)) {
+      rows.push(
+        buildImportRow({
+          rowNumber: recordCount,
+          date: record.date ?? monthStartDate(fallbackMonth),
+          description,
+          amount: Number(record.amount.toFixed(2)),
+          bankCategory: record.category ?? "",
+          state,
+          existingHashes,
+        }),
+      );
+    }
+    record = {};
+  };
+
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("!")) continue;
+    const code = line[0];
+    const value = line.slice(1).trim();
+    if (code === "^") flush();
+    else if (code === "D") record.date = parseDateValue(value) ?? record.date;
+    else if (code === "T" || code === "U") record.amount = parseAmount(value) ?? record.amount;
+    else if (code === "P") record.payee = value;
+    else if (code === "M") record.memo = value;
+    else if (code === "L") record.category = value.replace(/[[\]]/g, "");
+  }
+  if (record.date || record.amount !== undefined || record.payee) flush();
+
+  return {
+    rows: sortImportRows(rows),
+    errors: rows.length ? [] : ["No transactions were found in this QIF file."],
+    detectedColumns: {},
+    totalRows: recordCount,
+  };
+}
+
+// ─── Loose lines (clipboard paste from bank apps / spreadsheets) ─────────────
+// No header row to detect, so each line is parsed independently: a date anywhere,
+// a trailing signed amount, everything else is the description. Unsigned amounts
+// default to spending — the common case when copying a transaction list — and the
+// rule/category pipeline can still flip a row to income (salary wording etc.).
+
+export function parseLooseLines({ text, state, fallbackMonthKey }: ParseBankCsvOptions): CsvImportResult {
+  const existingHashes = collectExistingTransactionHashes(state);
+  const fallbackMonth = fallbackMonthKey ?? state.selectedMonth ?? getMonthKey();
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const rows: CsvImportRow[] = [];
+
+  lines.forEach((line, index) => {
+    const parsed = parseLooseLine(line, fallbackMonth);
+    if (!parsed) return;
+    rows.push(
+      buildImportRow({
+        rowNumber: index + 1,
+        date: parsed.date,
+        description: parsed.description,
+        amount: parsed.amount,
+        bankCategory: "",
+        state,
+        existingHashes,
+        noteOverride: parsed.signed ? undefined : "Assumed spending — flip to income if wrong",
+      }),
+    );
+  });
+
+  return {
+    rows: sortImportRows(rows),
+    errors: rows.length ? [] : ["Couldn’t find lines that look like transactions. Each line needs a description and an amount."],
+    detectedColumns: {},
+    totalRows: lines.length,
+  };
+}
+
+function parseLooseLine(line: string, fallbackMonth: string): { date: string; description: string; amount: number; signed: boolean } | null {
+  // Cells first: tab, 2+ spaces, or comma separated (spreadsheet / bank web page copies).
+  // Thousands separators are collapsed before the comma split so "1,234.56" stays whole.
+  const collapsed = line.replace(/(\d),(\d{3})/g, "$1$2");
+  const cells = collapsed.split(/\t|\s{2,}|,/).map((cell) => cell.trim()).filter(Boolean);
+  const tokens = cells.length >= 2 ? cells : collapsed.split(/\s+/);
+  if (tokens.length < 2) return null;
+
+  let amount: number | null = null;
+  let amountIndex = -1;
+  let signed = false;
+  // Prefer the last amount-looking token — descriptions can contain digits.
+  for (let index = tokens.length - 1; index >= 0; index -= 1) {
+    const token = tokens[index];
+    if (!/^[-+(]?[£$€]?\d[\d,]*(?:\.\d{1,2})?\)?$/.test(token)) continue;
+    const parsed = parseAmount(token);
+    if (parsed === null) continue;
+    amount = parsed;
+    amountIndex = index;
+    signed = /^[-+(]/.test(token) || /\)$/.test(token);
+    break;
+  }
+  if (amount === null) return null;
+
+  let date: string | null = null;
+  let dateIndex = -1;
+  for (let index = 0; index < tokens.length; index += 1) {
+    if (index === amountIndex) continue;
+    const candidate = parseDateValue(tokens[index]);
+    if (candidate) {
+      date = candidate;
+      dateIndex = index;
+      break;
+    }
+    // "13 Jun" / "Jun 13" style two-token dates.
+    if (index + 1 < tokens.length && index + 1 !== amountIndex) {
+      const pair = parseDateValue(`${tokens[index]} ${tokens[index + 1]}`);
+      if (pair) {
+        date = pair;
+        dateIndex = index;
+        tokens.splice(index + 1, 1);
+        if (amountIndex > index + 1) amountIndex -= 1;
+        break;
+      }
+    }
+  }
+
+  const description = tokens
+    .filter((_, index) => index !== amountIndex && index !== dateIndex)
+    .join(" ")
+    .trim();
+  if (!description || /^\d+$/.test(description)) return null;
+
+  // Unsigned amounts read as money out; signed tokens keep their sign.
+  const finalAmount = signed ? amount : -Math.abs(amount);
+  return { date: date ?? monthStartDate(fallbackMonth), description, amount: finalAmount, signed };
 }

@@ -49,6 +49,8 @@ targets:
           - UIInterfaceOrientationLandscapeRight
           - UIInterfaceOrientationLandscapeLeft
         NSFaceIDUsageDescription: "Used to protect your financial data"
+        # Stage D1 (FinanceKit / Apple Wallet feed). Shown in Apple's consent UI.
+        NSFinancialDataDescription: "Used to import transactions from accounts you choose to share via Apple Wallet, so you don't have to type them."
         SUPABASE_URL: "https://hgzacqveqrccnvjwumkz.supabase.co"
         SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhnemFjcXZlcXJjY252and1bWt6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwMDAzNDUsImV4cCI6MjA4ODU3NjM0NX0.ymfxr4YzbspKit3BoVTWICgDiz-DMnCvJb6CZWBQ0wE"
     entitlements:
@@ -58,6 +60,11 @@ targets:
           - group.com.incometracker
         com.apple.developer.applesignin:
           - Default
+        # Stage D1: uncomment once Apple grants the FinanceKit entitlement
+        # (request at developer.apple.com; also requires a Finance-category
+        # App Store listing). Building with it un-granted fails code signing.
+        # com.apple.developer.financekit:
+        #   - financial-data
     settings:
       base:
         CODE_SIGN_ENTITLEMENTS: IncomeTracker/Resources/IncomeTracker.entitlements

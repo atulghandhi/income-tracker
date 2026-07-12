@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleHelp,
+  ClipboardPaste,
   Cloud,
   CreditCard,
   Database,
@@ -38,6 +39,7 @@ import {
   Search,
   Settings as SettingsIcon,
   ShieldCheck,
+  Sparkles,
   Sun,
   Target,
   Trash2,
@@ -74,7 +76,28 @@ import {
   seedMonthFromPrevious,
   shiftMonth,
 } from "./finance";
-import { buildRulePattern, isTransferDescription, parseBankCsv, sortImportRows, type CsvImportRow } from "./importer";
+import { buildRulePattern, canonicalizeMerchant, descriptionMatchesPattern, isTransferDescription, normalizeMerchant, parseBankText, sortImportRows, type CsvImportRow } from "./importer";
+import { buildMerchantMemory } from "./merchantMemory";
+import { parseQuickAdd } from "./quickAdd";
+import { applyRecurringFlag, detectSubscriptions, findMissedRecurring, reconcileSeededEntries, suggestRecurringFlags, type RecurrenceCandidate } from "./recurrence";
+import { aiCategorizeRows, applyAiSuggestions, isAiCategorizationAvailable } from "./aiCategorize";
+import {
+  BANK_FEED_SOURCE_NAME,
+  completeBankConnection,
+  consumeFeedCallbackCode,
+  countStagedFeedRows,
+  daysUntilConsentExpiry,
+  disconnectBankConnection,
+  fetchStagedFeedReview,
+  isFeedBackendConfigured,
+  isFeedsEnabled,
+  listBankConnections,
+  reconfirmBankConnection,
+  resolveFeedRows,
+  startBankConnection,
+  syncFeedsNow,
+  type BankConnection,
+} from "./feeds";
 import { GoalsView } from "./GoalsView";
 import { loadLedgerState, saveLedgerState } from "./storage";
 import {
@@ -395,6 +418,14 @@ function App() {
   const [categoryMenu, setCategoryMenu] = useState<CategoryMenuState | null>(null);
   const [importReview, setImportReview] = useState<ImportReviewState | null>(null);
   const [lastImportAction, setLastImportAction] = useState<LastImportAction | null>(null);
+  const [quickAddInput, setQuickAddInput] = useState("");
+  const [seededBannerDismissed, setSeededBannerDismissed] = useState<Set<string>>(() => new Set());
+  const [bankConnections, setBankConnections] = useState<BankConnection[]>([]);
+  const [stagedFeedCount, setStagedFeedCount] = useState(0);
+  const [feedsReady, setFeedsReady] = useState(false);
+  const [feedsBusy, setFeedsBusy] = useState(false);
+  // review-row id → feed_transactions.id for the currently open bank-feed review.
+  const feedRowMapRef = useRef<Map<string, string> | null>(null);
   const [transferRuleInput, setTransferRuleInput] = useState("");
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(() => new Set());
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -501,6 +532,24 @@ function App() {
     () => new Map(ledger.accounts.filter((account) => account.accountClass === "debt").map((account) => [account.id, account.name])),
     [ledger.accounts],
   );
+  const merchantMemory = useMemo(() => buildMerchantMemory(ledger), [ledger]);
+  const quickAddPreview = useMemo(() => {
+    if (!quickAddInput.trim()) return null;
+    return parseQuickAdd(quickAddInput, { state: ledger, memory: merchantMemory, monthKey: ledger.selectedMonth });
+  }, [quickAddInput, ledger, merchantMemory]);
+  const seededEntryCount = useMemo(
+    () =>
+      currentMonth.incomes.filter((income) => income.seededFrom).length +
+      currentMonth.expenses.filter((expense) => expense.seededFrom).length,
+    [currentMonth],
+  );
+  const showSeededBanner = seededEntryCount > 0 && !seededBannerDismissed.has(ledger.selectedMonth);
+  const detectedSubscriptions = useMemo(() => detectSubscriptions(ledger), [ledger]);
+  const recurringSuggestions = useMemo(() => suggestRecurringFlags(ledger).slice(0, 5), [ledger]);
+  const missedRecurring = useMemo(
+    () => findMissedRecurring(ledger, new Date().toISOString().slice(0, 10)).slice(0, 4),
+    [ledger],
+  );
 
   useEffect(() => {
     let alive = true;
@@ -574,12 +623,14 @@ function App() {
 
   useEffect(() => {
     if (!hydrated || !user) return;
+    // Narrowed copy: `user` from the closure is nullable again inside the async body.
+    const activeUser = user;
     let alive = true;
 
     async function hydrateCloudLedger() {
       setSaveState("loading");
       try {
-        await upsertUserProfile(user);
+        await upsertUserProfile(activeUser);
         const cloudState = await loadCloudLedgerState();
         if (!alive) return;
 
@@ -600,7 +651,7 @@ function App() {
             setToast("Cloud data restored");
           }
         } else {
-          await saveCloudLedgerState(user.id, ledger);
+          await saveCloudLedgerState(activeUser.id, ledger);
           if (!alive) return;
           setToast("Data backed up to cloud");
         }
@@ -752,7 +803,12 @@ function App() {
         ? current.months
         : {
             ...current.months,
-            [nextKey]: seedMonthFromPrevious(current.months[current.selectedMonth]),
+            // Moving forward auto-seeds the new month with the recurring entries;
+            // moving back to an untouched past month stays empty.
+            [nextKey]: seedMonthFromPrevious(current.months[current.selectedMonth], {
+              fromMonthKey: current.selectedMonth,
+              toMonthKey: nextKey,
+            }),
           };
 
       return {
@@ -810,6 +866,9 @@ function App() {
       return;
     }
 
+    // Merchant memory auto-fills what the user already taught us: a repeat
+    // merchant lands pre-categorised with its usual color and recurring flag.
+    const remembered = merchantMemory.find("expense", expenseDraft.name);
     updateCurrentMonth((month) => ({
       ...month,
       expenses: [
@@ -818,15 +877,62 @@ function App() {
           id: createId("expense"),
           name: expenseDraft.name.trim(),
           amount,
-          category: "",
-          color: colors[(month.expenses.length + 2) % colors.length],
-          recurring: true,
+          category: remembered?.category ?? "",
+          color: remembered?.category ? remembered.color : colors[(month.expenses.length + 2) % colors.length],
+          recurring: remembered?.recurring ?? true,
+          categorySource: remembered?.category ? ("rule" as const) : undefined,
         },
       ],
     }));
     setExpenseDraft(initialExpenseDraft);
-    setToast("Expense added");
+    setToast(remembered?.category ? `Expense added to ${remembered.category}` : "Expense added");
     focusNextFrame(expenseNameInputRef);
+  }
+
+  function addQuickEntry() {
+    if (!quickAddPreview) return;
+    if (!quickAddPreview.ok) {
+      setToast(quickAddPreview.error);
+      return;
+    }
+
+    const draft = quickAddPreview.draft;
+    updateCurrentMonth((month) => {
+      if (draft.kind === "income") {
+        return {
+          ...month,
+          incomes: [
+            ...month.incomes,
+            {
+              id: createId("income"),
+              source: capitalizeFirst(draft.description),
+              amount: draft.amount,
+              color: draft.color ?? colors[month.incomes.length % colors.length],
+              recurring: draft.recurring,
+              date: draft.date,
+            },
+          ],
+        };
+      }
+      return {
+        ...month,
+        expenses: [
+          ...month.expenses,
+          {
+            id: createId("expense"),
+            name: capitalizeFirst(draft.description),
+            amount: draft.amount,
+            category: draft.category === "Unsorted" ? "" : draft.category,
+            color: draft.color ?? colors[(month.expenses.length + 2) % colors.length],
+            recurring: draft.recurring,
+            date: draft.date,
+            categorySource: draft.category && draft.category !== "Unsorted" ? draft.categorySource : undefined,
+          },
+        ],
+      };
+    });
+    setQuickAddInput("");
+    setToast(draft.kind === "income" ? "Income added" : draft.category && draft.category !== "Unsorted" ? `Added to ${draft.category}` : "Expense added");
   }
 
   function updateIncome(id: string, patch: Partial<IncomeEntry>) {
@@ -844,19 +950,28 @@ function App() {
   }
 
   function removeIncome(id: string) {
+    const entry = currentMonth.incomes.find((income) => income.id === id);
+    updateLedger((current) => stopSeededRepeat(current, entry?.seededFrom, "income"));
     updateCurrentMonth((month) => ({
       ...month,
       incomes: month.incomes.filter((income) => income.id !== id),
     }));
-    setToast("Income removed");
+    setToast(entry?.seededFrom ? "Removed — won’t auto-add next month" : "Income removed");
   }
 
   function removeExpense(id: string) {
+    const entry = currentMonth.expenses.find((expense) => expense.id === id);
+    updateLedger((current) => stopSeededRepeat(current, entry?.seededFrom, "expense"));
     updateCurrentMonth((month) => ({
       ...month,
       expenses: month.expenses.filter((expense) => expense.id !== id),
     }));
-    setToast("Expense removed");
+    setToast(entry?.seededFrom ? "Removed — won’t auto-add next month" : "Expense removed");
+  }
+
+  function markCandidateRecurring(candidate: RecurrenceCandidate) {
+    updateLedger((current) => applyRecurringFlag(current, candidate));
+    setToast(`${candidate.label} marked recurring — it now feeds the forecast`);
   }
 
   function addAccount() {
@@ -1000,13 +1115,15 @@ function App() {
   }
 
   function assignExpenseToCategory(sourceId: string, category: string) {
+    const correctedExpense = currentMonth.expenses.find((expense) => expense.id === sourceId);
+
     updateCurrentMonth((month) => {
       const source = month.expenses.find((expense) => expense.id === sourceId);
       const remaining = month.expenses.filter((expense) => expense.id !== sourceId);
       const categoryAnchor = remaining.find((expense) => expense.category === category) ?? (source?.category === category ? source : undefined);
       if (!source || !categoryAnchor) return month;
 
-      const movedExpense = { ...source, category, color: categoryAnchor.color };
+      const movedExpense = { ...source, category, color: categoryAnchor.color, categorySource: "user" as const };
       const lastCategoryIndex = findLastExpenseIndex(remaining, (expense) => expense.category === category);
       const insertIndex = lastCategoryIndex >= 0 ? lastCategoryIndex + 1 : remaining.length;
       return {
@@ -1014,7 +1131,25 @@ function App() {
         expenses: [...remaining.slice(0, insertIndex), movedExpense, ...remaining.slice(insertIndex)],
       };
     });
-    setToast("Moved into category");
+
+    // A correction on an imported row is consent to learn: save the rule silently
+    // and sweep other not-yet-user-sorted matches into the same category, so the
+    // same fix is never needed twice. Manual (typed) entries don't create rules —
+    // their names are too free-form to generalize from.
+    if (correctedExpense?.imported && category.trim() && category !== "Unsorted" && correctedExpense.category !== category) {
+      const description = correctedExpense.imported.originalDescription || correctedExpense.name;
+      // Preview against the current snapshot for the toast (state updaters run at
+      // render time, not call time) — same pattern as addTransferRule.
+      const preview = learnCategoryRule(ledger, description, category, "expense", sourceId);
+      updateLedger((current) => learnCategoryRule(current, description, category, "expense", sourceId).state);
+      setToast(
+        preview.retroactivelyApplied > 0
+          ? `Rule saved — also sorted ${preview.retroactivelyApplied} matching`
+          : "Moved into category · rule saved",
+      );
+    } else {
+      setToast("Moved into category");
+    }
     setGroupingSourceId(null);
   }
 
@@ -1232,20 +1367,147 @@ function App() {
   async function importCsv(file: File) {
     try {
       const text = await file.text();
-      const result = parseBankCsv({ text, fileName: file.name, state: ledger, fallbackMonthKey: ledger.selectedMonth });
-      setImportReview({
-        fileName: file.name,
-        rows: result.rows,
-        errors: result.errors,
-        totalRows: result.totalRows,
-      });
-      setToast(result.rows.length ? "CSV ready for review" : "CSV needs review");
+      openImportReview(text, file.name);
     } catch {
-      setToast("CSV import failed");
+      setToast("Import failed");
     } finally {
       if (csvInputRef.current) {
         csvInputRef.current.value = "";
       }
+    }
+  }
+
+  // ── Stage E: bank feeds ──────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!isFeedsEnabled() || !user) return;
+    let alive = true;
+
+    async function bootstrapFeeds() {
+      // Returning from the provider's hosted auth? Finish the connection first.
+      const callbackCode = consumeFeedCallbackCode();
+      if (callbackCode) {
+        const connection = await completeBankConnection(callbackCode);
+        if (connection && alive) setToast(`${connection.display_name} connected`);
+      }
+
+      const configured = await isFeedBackendConfigured();
+      if (!alive || !configured) return;
+      setFeedsReady(true);
+      const [connections, staged] = await Promise.all([listBankConnections(), countStagedFeedRows()]);
+      if (!alive) return;
+      setBankConnections(connections);
+      setStagedFeedCount(staged);
+    }
+
+    void bootstrapFeeds();
+    return () => {
+      alive = false;
+    };
+  }, [user]);
+
+  async function connectBank() {
+    setFeedsBusy(true);
+    const url = await startBankConnection();
+    if (url) {
+      window.location.href = url;
+      return;
+    }
+    setFeedsBusy(false);
+    setToast("Couldn’t start the bank connection");
+  }
+
+  async function refreshFeedState() {
+    const [connections, staged] = await Promise.all([listBankConnections(), countStagedFeedRows()]);
+    setBankConnections(connections);
+    setStagedFeedCount(staged);
+  }
+
+  async function syncBankFeeds() {
+    setFeedsBusy(true);
+    const summary = await syncFeedsNow();
+    await refreshFeedState();
+    setFeedsBusy(false);
+    setToast(summary ? `Synced — ${summary.staged} new transaction${summary.staged === 1 ? "" : "s"}` : "Sync failed");
+  }
+
+  async function reviewBankFeed() {
+    setFeedsBusy(true);
+    const review = await fetchStagedFeedReview(ledger);
+    setFeedsBusy(false);
+    if (!review.rows.length) {
+      setToast("No new bank transactions to review");
+      setStagedFeedCount(0);
+      return;
+    }
+    feedRowMapRef.current = review.feedIdByRowId;
+    setImportReview({
+      fileName: BANK_FEED_SOURCE_NAME,
+      rows: review.rows,
+      errors: [],
+      totalRows: review.total,
+    });
+  }
+
+  async function reconfirmBank(connectionId: string) {
+    const connection = await reconfirmBankConnection(connectionId);
+    if (connection) {
+      setBankConnections((current) => current.map((item) => (item.id === connection.id ? connection : item)));
+      setToast("Connection kept for another 90 days");
+    }
+  }
+
+  async function disconnectBank(connectionId: string) {
+    const ok = await disconnectBankConnection(connectionId);
+    if (ok) {
+      setBankConnections((current) => current.filter((item) => item.id !== connectionId));
+      setToast("Bank disconnected — staged data deleted, your ledger is untouched");
+      void countStagedFeedRows().then(setStagedFeedCount);
+    }
+  }
+
+  async function importFromClipboard() {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text.trim()) {
+        setToast("Clipboard is empty");
+        return;
+      }
+      openImportReview(text, "Pasted transactions");
+    } catch {
+      setToast("Couldn’t read the clipboard — check browser permissions");
+    }
+  }
+
+  // Shared inlet for every text capture path (file upload, paste). Parses whatever
+  // format arrives, opens the review, and — when the user opted in — asks the AI
+  // backstop to upgrade the low-confidence rows in the background.
+  function openImportReview(text: string, sourceName: string) {
+    const result = parseBankText({ text, fileName: sourceName, state: ledger, fallbackMonthKey: ledger.selectedMonth });
+    setImportReview({
+      fileName: sourceName,
+      rows: result.rows,
+      errors: result.errors,
+      totalRows: result.totalRows,
+    });
+    setToast(result.rows.length ? "Transactions ready for review" : "Nothing recognisable to import");
+
+    if (result.rows.length && isAiCategorizationAvailable(Boolean(user), Boolean(ledger.aiCategorizationEnabled))) {
+      const categories = Array.from(
+        new Set(["Home", "Food", "Bills", "Travel", "Subscriptions", "Health", "Personal", "Work", ...categoryOptions.map((option) => option.name)]),
+      );
+      void aiCategorizeRows(result.rows, categories)
+        .then((suggestions) => {
+          if (!suggestions.length) return;
+          setImportReview((current) =>
+            current && current.fileName === sourceName
+              ? { ...current, rows: applyAiSuggestions(current.rows, suggestions) }
+              : current,
+          );
+        })
+        .catch(() => {
+          // AI upgrades are best-effort; local suggestions already rendered.
+        });
     }
   }
 
@@ -1260,6 +1522,9 @@ function App() {
                 ...row,
                 ...patch,
                 color: patch.category ? categoryColor(patch.category, index) : row.color,
+                // A manual category/type edit locks the row against later automation
+                // (AI upgrades, retroactive rules never touch "user" rows).
+                categorySource: patch.category || patch.kind ? ("user" as const) : patch.categorySource ?? row.categorySource,
               }
             : row,
         ),
@@ -1376,6 +1641,7 @@ function App() {
             recurring: false,
             date: row.date,
             imported,
+            categorySource: row.categorySource,
           };
           months[row.monthKey] = {
             ...month,
@@ -1396,6 +1662,7 @@ function App() {
           date: row.date,
           imported,
           debtAccountId: row.kind === "debt-payment" ? row.debtAccountId : undefined,
+          categorySource: row.categorySource,
         };
         months[row.monthKey] = {
           ...month,
@@ -1403,6 +1670,16 @@ function App() {
         };
         transactionRefs.push({ monthKey: row.monthKey, entryId: entry.id, kind: "expense" });
       });
+
+      // Auto-seeded recurring rows fold into the imported actuals for the same
+      // merchant instead of doubling — the import wins, and inherits the
+      // recurring role (and category) from the seeded template.
+      const touchedMonthKeys = new Set(rowsToImport.map((row) => row.monthKey));
+      for (const monthKey of touchedMonthKeys) {
+        if (months[monthKey]) {
+          months[monthKey] = reconcileSeededEntries(months[monthKey]).month;
+        }
+      }
 
       // Learn rules from both imported rows and transfer rows, then sweep any existing ledger
       // entries (from earlier imports) that match the now-known transfer payees.
@@ -1437,6 +1714,22 @@ function App() {
     // entries the new transfer rules swept out.
     const learnedRules = mergeCategoryRules(ledger.categoryRules, [...rowsToImport, ...transferRows], importedAt);
     const removed = sweepTransferEntries(ledger.months, learnedRules).removed;
+
+    // Bank-feed reviews resolve their staged rows: included → imported,
+    // reviewed-but-excluded → dismissed. Cancelling leaves everything staged.
+    if (importReview.fileName === BANK_FEED_SOURCE_NAME && feedRowMapRef.current) {
+      const map = feedRowMapRef.current;
+      const importedIds = importReview.rows.filter((row) => row.include).map((row) => map.get(row.id)).filter((id): id is string => Boolean(id));
+      const dismissedIds = importReview.rows.filter((row) => !row.include).map((row) => map.get(row.id)).filter((id): id is string => Boolean(id));
+      void resolveFeedRows(importedIds, "imported")
+        .then(() => resolveFeedRows(dismissedIds, "dismissed"))
+        .then(() => countStagedFeedRows())
+        .then(setStagedFeedCount)
+        .catch(() => {
+          // Staged rows simply reappear next review — no data loss.
+        });
+      feedRowMapRef.current = null;
+    }
 
     setImportReview(null);
     if (rowsToImport.length) {
@@ -1649,7 +1942,7 @@ function App() {
         ref={csvInputRef}
         className="hiddenFile"
         type="file"
-        accept="text/csv,.csv"
+        accept="text/csv,.csv,.ofx,.qif,.txt"
         onChange={(event) => {
           const file = event.currentTarget.files?.[0];
           if (file) void importCsv(file);
@@ -1843,7 +2136,11 @@ function App() {
                     </button>
                     <button className="commandButton" type="button" onClick={() => csvInputRef.current?.click()}>
                       <FileSpreadsheet size={16} />
-                      Import CSV
+                      Import file
+                    </button>
+                    <button className="commandButton" type="button" onClick={() => void importFromClipboard()}>
+                      <ClipboardPaste size={16} />
+                      Paste transactions
                     </button>
                   </div>
                 </article>
@@ -1865,6 +2162,70 @@ function App() {
                     <AnimatedCurrency value={Math.abs(projection.monthlySurplus)} formatter={moneyFormatter} />
                   </strong>
                 </div>
+              </div>
+
+              {stagedFeedCount > 0 && (
+                <div className="seededBanner feedBanner" role="status">
+                  <CreditCard size={15} />
+                  <span>
+                    {stagedFeedCount} new bank transaction{stagedFeedCount === 1 ? "" : "s"} arrived from your connected accounts.
+                  </span>
+                  <button className="commandButton" type="button" disabled={feedsBusy} onClick={() => void reviewBankFeed()}>
+                    Review
+                  </button>
+                </div>
+              )}
+
+              {showSeededBanner && (
+                <div className="seededBanner" role="status">
+                  <Repeat size={15} />
+                  <span>
+                    {seededEntryCount} recurring {seededEntryCount === 1 ? "item" : "items"} added automatically from last month — deleting one stops it repeating.
+                  </span>
+                  <button
+                    className="iconButton"
+                    type="button"
+                    aria-label="Dismiss recurring items notice"
+                    onClick={() => setSeededBannerDismissed((current) => new Set(current).add(ledger.selectedMonth))}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+
+              <div className="quickAddBar">
+                <Sparkles size={16} aria-hidden="true" />
+                <input
+                  value={quickAddInput}
+                  placeholder="Quick add — try “costa 4.35”, “salary 2400 recurring”, or “tesco 42.61 yesterday”"
+                  aria-label="Quick add transaction"
+                  onChange={(event) => setQuickAddInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      addQuickEntry();
+                    }
+                    if (event.key === "Escape") setQuickAddInput("");
+                  }}
+                />
+                {quickAddPreview && (
+                  quickAddPreview.ok ? (
+                    <button className="quickAddPreview" type="button" onClick={addQuickEntry}>
+                      <span className={quickAddPreview.draft.kind === "income" ? "positiveText" : "negativeText"}>
+                        {quickAddPreview.draft.kind === "income" ? "+" : "−"}
+                        {moneyFormatter.format(quickAddPreview.draft.amount)}
+                      </span>
+                      <strong>{capitalizeFirst(quickAddPreview.draft.description)}</strong>
+                      {quickAddPreview.draft.kind === "expense" && quickAddPreview.draft.category && quickAddPreview.draft.category !== "Unsorted" && (
+                        <em>{quickAddPreview.draft.category}</em>
+                      )}
+                      {quickAddPreview.draft.recurring && <Repeat size={12} aria-label="Recurring" />}
+                      <Check size={14} />
+                    </button>
+                  ) : (
+                    <span className="quickAddHint">{quickAddPreview.error}</span>
+                  )
+                )}
               </div>
 
               <section className="monthlyGrid" aria-label="Monthly inputs and outputs">
@@ -1912,10 +2273,24 @@ function App() {
                       id="add-income-source"
                       ref={incomeSourceInputRef}
                       value={incomeDraft.source}
+                      list="income-source-suggestions"
                       placeholder="Income source, e.g. Salary"
-                      onChange={(event) => setIncomeDraft((draft) => ({ ...draft, source: capitalizeFirst(event.target.value) }))}
+                      onChange={(event) => {
+                        const source = capitalizeFirst(event.target.value);
+                        // Picking a remembered merchant prefills its usual amount.
+                        const remembered = merchantMemory.find("income", source);
+                        setIncomeDraft((draft) => ({
+                          source,
+                          amount: draft.amount === "" && remembered?.stableAmount ? String(remembered.stableAmount) : draft.amount,
+                        }));
+                      }}
                       onKeyDown={(event) => handleDraftEnter(event, addIncome)}
                     />
+                    <datalist id="income-source-suggestions">
+                      {merchantMemory.suggest("income", incomeDraft.source).map((suggestion) => (
+                        <option value={suggestion.label} key={suggestion.key} />
+                      ))}
+                    </datalist>
                     <MoneyInput
                       ariaLabel="Income amount"
                       inputRef={incomeAmountInputRef}
@@ -2060,10 +2435,27 @@ function App() {
                     <input
                       ref={expenseNameInputRef}
                       value={expenseDraft.name}
+                      list="expense-name-suggestions"
                       placeholder="What did you spend on?"
-                      onChange={(event) => setExpenseDraft((draft) => ({ ...draft, name: capitalizeFirst(event.target.value) }))}
+                      onChange={(event) => {
+                        const name = capitalizeFirst(event.target.value);
+                        // Picking a remembered merchant prefills its usual amount;
+                        // addExpense fills category/color/recurring from memory too.
+                        const remembered = merchantMemory.find("expense", name);
+                        setExpenseDraft((draft) => ({
+                          name,
+                          amount: draft.amount === "" && remembered?.stableAmount ? String(remembered.stableAmount) : draft.amount,
+                        }));
+                      }}
                       onKeyDown={(event) => handleDraftEnter(event, addExpense)}
                     />
+                    <datalist id="expense-name-suggestions">
+                      {merchantMemory.suggest("expense", expenseDraft.name).map((suggestion) => (
+                        <option value={suggestion.label} key={suggestion.key}>
+                          {suggestion.category || undefined}
+                        </option>
+                      ))}
+                    </datalist>
                     <MoneyInput
                       ariaLabel="Expense amount"
                       inputRef={expenseAmountInputRef}
@@ -2329,6 +2721,73 @@ function App() {
                 </article>
               </section>
 
+              <section className="miniPanel subscriptionsPanel" aria-label="Recurring payments">
+                <PanelTitle
+                  title="Recurring payments detected"
+                  icon={<Repeat size={16} />}
+                  action={
+                    <InfoHint
+                      label="How recurring payments are detected"
+                      text="Detected locally from your own ledger: the same merchant on a steady cadence with a steady amount. Nothing leaves this device."
+                    />
+                  }
+                />
+                {detectedSubscriptions.length ? (
+                  <>
+                    <div className="subscriptionSummary">
+                      <span>
+                        {detectedSubscriptions.length} recurring {detectedSubscriptions.length === 1 ? "payment" : "payments"} ·{" "}
+                        <strong className={ledger.privacyMode ? "masked" : ""}>
+                          {moneyFormatter.format(detectedSubscriptions.reduce((sum, candidate) => sum + candidate.monthlyEquivalent, 0))}
+                        </strong>{" "}
+                        / month
+                      </span>
+                    </div>
+                    <div className="subscriptionList">
+                      {detectedSubscriptions.slice(0, 8).map((candidate) => (
+                        <div className="subscriptionRow" key={`${candidate.kind}:${candidate.key}`}>
+                          <span className="swatch small" style={{ background: candidate.color }} />
+                          <div className="subscriptionName">
+                            <strong>{candidate.label}</strong>
+                            <em>
+                              {candidate.cadence} · seen {candidate.occurrences}×{candidate.category ? ` · ${candidate.category}` : ""}
+                            </em>
+                          </div>
+                          <strong className={ledger.privacyMode ? "masked" : ""}>{moneyFormatter.format(candidate.typicalAmount)}</strong>
+                          {!candidate.alreadyRecurring && (
+                            <button className="commandButton" type="button" onClick={() => markCandidateRecurring(candidate)}>
+                              <Repeat size={13} />
+                              Mark recurring
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <EmptyState
+                    icon={<Repeat size={18} />}
+                    title="No repeating payments detected yet"
+                    text="Import a few months of transactions and repeating merchants show up here automatically."
+                  />
+                )}
+                {missedRecurring.length > 0 && (
+                  <div className="missedRecurring" role="status">
+                    {missedRecurring.map((candidate) => (
+                      <p key={`missed-${candidate.kind}:${candidate.key}`}>
+                        <AlertCircle size={13} />
+                        {candidate.label} usually lands around {formatShortDate(candidate.nextExpected ?? candidate.lastSeen)} — not seen yet this cycle.
+                      </p>
+                    ))}
+                  </div>
+                )}
+                {recurringSuggestions.length > 0 && detectedSubscriptions.length === 0 && (
+                  <p className="panelSubcopy">
+                    {recurringSuggestions.length} repeating {recurringSuggestions.length === 1 ? "pattern" : "patterns"} found — mark them recurring above to feed the forecast.
+                  </p>
+                )}
+              </section>
+
               <section className="projectionPanel" aria-label="Annual calculation">
                 <div className="sectionHeading">
                   <div>
@@ -2403,7 +2862,11 @@ function App() {
                       <div className="buttonRow">
                         <button className="commandButton" type="button" onClick={() => csvInputRef.current?.click()}>
                           <FileSpreadsheet size={16} />
-                          Import CSV
+                          Import CSV / OFX / QIF
+                        </button>
+                        <button className="commandButton" type="button" onClick={() => void importFromClipboard()}>
+                          <ClipboardPaste size={16} />
+                          Paste
                         </button>
                         <button className="commandButton" type="button" onClick={() => fileInputRef.current?.click()}>
                           <Upload size={16} />
@@ -2460,8 +2923,92 @@ function App() {
                       <span />
                     </button>
                   </article>
+
+                  {isSupabaseConfigured() && (
+                    <article className="settingsPanel compactSetting">
+                      <PanelTitle title="AI categorisation" icon={<Sparkles size={17} />} />
+                      <p>
+                        Let AI suggest categories for import rows nothing else matched. Only transaction descriptions leave this
+                        device — never amounts, dates, or balances. Your own rules always win.
+                        {!user && " Sign in to enable."}
+                      </p>
+                      <button
+                        className={ledger.aiCategorizationEnabled && user ? "switch on" : "switch"}
+                        type="button"
+                        aria-label="Toggle AI categorisation"
+                        disabled={!user}
+                        onClick={() => {
+                          updateLedger((current) => ({ ...current, aiCategorizationEnabled: !current.aiCategorizationEnabled }));
+                          setToast(ledger.aiCategorizationEnabled ? "AI categorisation off" : "AI categorisation on");
+                        }}
+                      >
+                        <span />
+                      </button>
+                    </article>
+                  )}
                 </aside>
               </section>
+
+              {isFeedsEnabled() && feedsReady && (
+                <article className="settingsPanel bankFeedsPanel">
+                  <PanelTitle title="Bank connections" icon={<CreditCard size={17} />} />
+                  <p className="panelSubcopy">
+                    Connect a bank through our regulated open-banking partner and new transactions arrive here automatically —
+                    no credentials ever touch this app. UK rules ask you to reconfirm consent every 90 days, right here, one tap.
+                  </p>
+                  {bankConnections.length > 0 && (
+                    <div className="bankConnectionList">
+                      {bankConnections.map((connection) => {
+                        const daysLeft = daysUntilConsentExpiry(connection);
+                        const needsReconfirm = connection.status === "expired" || (daysLeft !== null && daysLeft <= 10);
+                        return (
+                          <div className="bankConnectionRow" key={connection.id}>
+                            <div className="subscriptionName">
+                              <strong>{connection.display_name}</strong>
+                              <em>
+                                {connection.status === "active"
+                                  ? connection.last_synced_at
+                                    ? `Synced ${new Intl.DateTimeFormat("en", { day: "2-digit", month: "short" }).format(new Date(connection.last_synced_at))}`
+                                    : "Waiting for first sync"
+                                  : connection.status}
+                                {daysLeft !== null && daysLeft > 0 ? ` · consent ${daysLeft}d left` : ""}
+                              </em>
+                            </div>
+                            {needsReconfirm && (
+                              <button className="commandButton" type="button" onClick={() => void reconfirmBank(connection.id)}>
+                                Keep connected
+                              </button>
+                            )}
+                            <button className="commandButton" type="button" onClick={() => void disconnectBank(connection.id)}>
+                              Disconnect
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div className="buttonRow">
+                    <button className="commandButton" type="button" disabled={feedsBusy || !user} onClick={() => void connectBank()}>
+                      <Plus size={15} />
+                      Connect a bank
+                    </button>
+                    {bankConnections.length > 0 && (
+                      <>
+                        <button className="commandButton" type="button" disabled={feedsBusy} onClick={() => void syncBankFeeds()}>
+                          <RotateCcw size={15} />
+                          Sync now
+                        </button>
+                        {stagedFeedCount > 0 && (
+                          <button className="commandButton" type="button" disabled={feedsBusy} onClick={() => void reviewBankFeed()}>
+                            Review {stagedFeedCount} new
+                          </button>
+                        )}
+                      </>
+                    )}
+                    {!user && <span className="quickAddHint">Sign in to connect a bank.</span>}
+                  </div>
+                </article>
+              )}
 
               <article className="settingsPanel transferRulesPanel">
                 <PanelTitle title="Transfer rules" icon={<Repeat size={17} />} />
@@ -2561,7 +3108,10 @@ function App() {
             categoryOptions={importCategoryOptions}
             debtAccounts={ledger.accounts.filter((account) => account.accountClass === "debt")}
             formatter={moneyFormatter}
-            onClose={() => setImportReview(null)}
+            onClose={() => {
+              feedRowMapRef.current = null; // cancelled feed reviews stay staged
+              setImportReview(null);
+            }}
             onRowChange={updateImportReviewRow}
             onToggleAll={setAllImportRowsIncluded}
             onSkipDuplicates={skipDuplicateImportRows}
@@ -3039,10 +3589,18 @@ function ImportReviewModal({
   onConfirm: () => void;
 }) {
   const [bulkCategory, setBulkCategory] = useState("");
+  const [showAutoRows, setShowAutoRows] = useState(false);
   const selectedCount = review.rows.filter((row) => row.include).length;
   const duplicateCount = review.rows.filter((row) => row.duplicate).length;
   const totalAmount = review.rows.filter((row) => row.include).reduce((sum, row) => sum + row.amount, 0);
   const hasErrors = review.errors.length > 0 && review.rows.length === 0;
+
+  // Confidence triage: rows the pipeline is sure about stay out of the way; the
+  // user's attention goes only where the system is unsure.
+  const autoRows = review.rows.filter((row) => !row.duplicate && row.confidence >= 0.9);
+  const checkRows = review.rows.filter((row) => !row.duplicate && row.confidence >= 0.6 && row.confidence < 0.9);
+  const needsYouRows = review.rows.filter((row) => row.duplicate || row.confidence < 0.6);
+  const reviewCount = checkRows.length + needsYouRows.length;
 
   function applyBulkCategory() {
     onBulkCategory(bulkCategory);
@@ -3121,31 +3679,44 @@ function ImportReviewModal({
             </datalist>
 
             <div className="importTableShell">
-              <table className="importTable">
-                <thead>
-                  <tr>
-                    <th>Import</th>
-                    <th>Date</th>
-                    <th>Transaction</th>
-                    <th>Amount</th>
-                    <th>Type</th>
-                    <th>Category</th>
-                    <th>Signal</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {review.rows.map((row) => (
-                    <ImportReviewTableRow
-                      key={row.id}
-                      row={row}
-                      formatter={formatter}
-                      categoryOptions={categoryOptions}
-                      debtAccounts={debtAccounts}
-                      onChange={(patch) => onRowChange(row.id, patch)}
-                    />
-                  ))}
-                </tbody>
-              </table>
+              {autoRows.length > 0 && (
+                <div className="importBucket auto">
+                  <button className="importBucketHeader" type="button" onClick={() => setShowAutoRows((show) => !show)} aria-expanded={showAutoRows}>
+                    <Check size={15} />
+                    <span>
+                      <b>{autoRows.length}</b> matched your rules — imported as-is
+                    </span>
+                    {showAutoRows ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                  </button>
+                  {showAutoRows && (
+                    <ImportBucketTable rows={autoRows} formatter={formatter} categoryOptions={categoryOptions} debtAccounts={debtAccounts} onRowChange={onRowChange} />
+                  )}
+                </div>
+              )}
+
+              {checkRows.length > 0 && (
+                <div className="importBucket check">
+                  <div className="importBucketHeader static">
+                    <Info size={15} />
+                    <span>
+                      <b>{checkRows.length}</b> probably right — worth a glance
+                    </span>
+                  </div>
+                  <ImportBucketTable rows={checkRows} formatter={formatter} categoryOptions={categoryOptions} debtAccounts={debtAccounts} onRowChange={onRowChange} />
+                </div>
+              )}
+
+              {needsYouRows.length > 0 && (
+                <div className="importBucket needs">
+                  <div className="importBucketHeader static">
+                    <AlertCircle size={15} />
+                    <span>
+                      <b>{needsYouRows.length}</b> need you — duplicates and unknowns
+                    </span>
+                  </div>
+                  <ImportBucketTable rows={needsYouRows} formatter={formatter} categoryOptions={categoryOptions} debtAccounts={debtAccounts} onRowChange={onRowChange} />
+                </div>
+              )}
             </div>
           </>
         )}
@@ -3155,11 +3726,53 @@ function ImportReviewModal({
             Cancel
           </button>
           <button className="navCta inlineCta" type="button" disabled={selectedCount === 0 || hasErrors} onClick={onConfirm}>
-            Import selected
+            {reviewCount > 0 ? `Import ${selectedCount} (review ${reviewCount})` : `Import ${selectedCount}`}
           </button>
         </footer>
       </section>
     </div>
+  );
+}
+
+function ImportBucketTable({
+  rows,
+  formatter,
+  categoryOptions,
+  debtAccounts,
+  onRowChange,
+}: {
+  rows: CsvImportRow[];
+  formatter: Intl.NumberFormat;
+  categoryOptions: string[];
+  debtAccounts: Account[];
+  onRowChange: (id: string, patch: Partial<CsvImportRow>) => void;
+}) {
+  return (
+    <table className="importTable">
+      <thead>
+        <tr>
+          <th>Import</th>
+          <th>Date</th>
+          <th>Transaction</th>
+          <th>Amount</th>
+          <th>Type</th>
+          <th>Category</th>
+          <th>Signal</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <ImportReviewTableRow
+            key={row.id}
+            row={row}
+            formatter={formatter}
+            categoryOptions={categoryOptions}
+            debtAccounts={debtAccounts}
+            onChange={(patch) => onRowChange(row.id, patch)}
+          />
+        ))}
+      </tbody>
+    </table>
   );
 }
 
@@ -5085,7 +5698,10 @@ function normalizeState(rawState: Partial<LedgerState>): LedgerState {
     ? months
     : {
         ...months,
-        [selectedMonth]: seedMonthFromPrevious(months[storedMonth]),
+        [selectedMonth]: seedMonthFromPrevious(months[storedMonth], {
+          fromMonthKey: storedMonth,
+          toMonthKey: selectedMonth,
+        }),
       };
 
   return {
@@ -5105,7 +5721,89 @@ function normalizeState(rawState: Partial<LedgerState>): LedgerState {
     categoryRules: normalizeCategoryRules(state.categoryRules),
     importBatches: normalizeImportBatches(state.importBatches),
     privacyMode: Boolean(state.privacyMode),
+    aiCategorizationEnabled: Boolean(state.aiCategorizationEnabled),
     lastSavedAt: state.lastSavedAt ?? new Date().toISOString(),
+  };
+}
+
+// Deleting an auto-seeded entry is the user saying "this doesn't repeat" — flip
+// the recurring flag off on the origin entry so future months stop seeding it.
+function stopSeededRepeat(state: LedgerState, seededFrom: { monthKey: string; entryId: string } | undefined, kind: "income" | "expense"): LedgerState {
+  if (!seededFrom) return state;
+  const sourceMonth = state.months[seededFrom.monthKey];
+  if (!sourceMonth) return state;
+
+  const patched: MonthBudget =
+    kind === "income"
+      ? {
+          ...sourceMonth,
+          incomes: sourceMonth.incomes.map((income) => (income.id === seededFrom.entryId ? { ...income, recurring: false } : income)),
+        }
+      : {
+          ...sourceMonth,
+          expenses: sourceMonth.expenses.map((expense) => (expense.id === seededFrom.entryId ? { ...expense, recurring: false } : expense)),
+        };
+
+  return {
+    ...state,
+    months: { ...state.months, [seededFrom.monthKey]: patched },
+  };
+}
+
+// A category correction on an imported entry becomes a saved rule, and the rule is
+// swept backwards over entries that no human has sorted yet (Unsorted, or an
+// automated guess) — never over a category the user set by hand.
+function learnCategoryRule(
+  state: LedgerState,
+  description: string,
+  category: string,
+  kind: TransactionKind,
+  excludeEntryId?: string,
+): { state: LedgerState; retroactivelyApplied: number } {
+  const pattern = buildRulePattern(description);
+  if (!pattern) return { state, retroactivelyApplied: 0 };
+
+  const timestamp = new Date().toISOString();
+  const rules = new Map(state.categoryRules.map((rule) => [rule.pattern, rule]));
+  const existing = rules.get(pattern);
+  rules.set(pattern, {
+    id: existing?.id ?? createId("rule"),
+    pattern,
+    category,
+    kind,
+    debtAccountId: existing?.debtAccountId,
+    createdAt: existing?.createdAt ?? timestamp,
+    updatedAt: timestamp,
+  });
+
+  let retroactivelyApplied = 0;
+  const anchorColor =
+    Object.values(state.months)
+      .flatMap((month) => month.expenses)
+      .find((expense) => expense.category === category)?.color ?? colors[category.length % colors.length];
+
+  const months = Object.fromEntries(
+    Object.entries(state.months).map(([monthKey, month]) => [
+      monthKey,
+      {
+        ...month,
+        expenses: month.expenses.map((expense) => {
+          if (expense.id === excludeEntryId) return expense;
+          if (expense.categorySource === "user" || expense.category === category) return expense;
+          const humanSorted = !expense.imported && expense.category && expense.category !== "Unsorted" && !expense.categorySource;
+          if (humanSorted) return expense;
+          const matchText = expense.imported?.originalDescription || expense.name;
+          if (!descriptionMatchesPattern(canonicalizeMerchant(matchText), pattern)) return expense;
+          retroactivelyApplied += 1;
+          return { ...expense, category, color: anchorColor, categorySource: "rule" as const };
+        }),
+      },
+    ]),
+  );
+
+  return {
+    state: { ...state, categoryRules: Array.from(rules.values()).slice(-120), months },
+    retroactivelyApplied,
   };
 }
 

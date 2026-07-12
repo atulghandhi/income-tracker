@@ -121,7 +121,31 @@ export function createInitialState(): LedgerState {
   };
 }
 
-export function seedMonthFromPrevious(previous?: MonthBudget): MonthBudget {
+export type SeedMonthContext = {
+  fromMonthKey: string;
+  toMonthKey: string;
+};
+
+function daysInMonth(monthKey: string): number {
+  const [year, month] = monthKey.split("-").map(Number);
+  return new Date(year, month, 0).getDate();
+}
+
+// Same day-of-month in the target month, clamped to its length (31st → 30th in June).
+function seedEntryDate(sourceDate: string | undefined, toMonthKey: string): string | undefined {
+  if (!sourceDate) return undefined;
+  const day = Number(sourceDate.slice(8, 10));
+  if (!Number.isFinite(day) || day < 1) return undefined;
+  const clamped = Math.min(day, daysInMonth(toMonthKey));
+  return `${toMonthKey}-${String(clamped).padStart(2, "0")}`;
+}
+
+// Recurring entries carry forward into the new month automatically — the user's salary,
+// rent, and direct debits should never need re-typing. Copies are tagged with seededFrom
+// so the UI can badge them and a delete can offer "stop repeating" at the origin. Seeding
+// only happens moving forward in time: opening an older empty month stays empty so
+// history charts aren't polluted retroactively.
+export function seedMonthFromPrevious(previous?: MonthBudget, context?: SeedMonthContext): MonthBudget {
   if (!previous) {
     return {
       incomes: [],
@@ -130,9 +154,32 @@ export function seedMonthFromPrevious(previous?: MonthBudget): MonthBudget {
     };
   }
 
+  const seedForward = Boolean(context && context.toMonthKey > context.fromMonthKey);
+  if (!seedForward || !context) {
+    return {
+      incomes: [],
+      expenses: [],
+      note: previous.note,
+    };
+  }
+
   return {
-    incomes: [],
-    expenses: [],
+    incomes: previous.incomes.filter(isRecurring).map((income) => ({
+      ...income,
+      id: createId("income"),
+      recurring: true,
+      date: seedEntryDate(income.date, context.toMonthKey),
+      imported: undefined,
+      seededFrom: { monthKey: context.fromMonthKey, entryId: income.id },
+    })),
+    expenses: previous.expenses.filter(isRecurring).map((expense) => ({
+      ...expense,
+      id: createId("expense"),
+      recurring: true,
+      date: seedEntryDate(expense.date, context.toMonthKey),
+      imported: undefined,
+      seededFrom: { monthKey: context.fromMonthKey, entryId: expense.id },
+    })),
     note: previous.note,
   };
 }
