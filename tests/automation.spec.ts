@@ -412,3 +412,65 @@ test.describe("markTransferPairs", () => {
     expect(rows.every((row) => row.kind !== "transfer")).toBe(true);
   });
 });
+
+// ─── Credit-card statement sign inversion ────────────────────────────────────
+
+test.describe("credit-card sign inversion", () => {
+  const CARD_CSV = [
+    "Date,Description,Amount",
+    "05/06/2026,TESCO EXTRA 4261,42.61",
+    "06/06/2026,COSTA COFFEE,4.35",
+    "07/06/2026,NETFLIX.COM,10.99",
+    "08/06/2026,TESCO REFUND,-12.00",
+  ].join("\n");
+
+  test("auto-detects card convention: purchases become spending, refunds money in", () => {
+    const state = createInitialState();
+    const result = parseBankText({ text: CARD_CSV, fileName: "amex.csv", state });
+
+    expect(result.signInverted).toBe(true);
+    const tesco = result.rows.find((row) => row.description.includes("EXTRA"));
+    expect(tesco!.amount).toBe(-42.61);
+    expect(tesco!.kind).toBe("expense");
+    expect(tesco!.category).toBe("Food");
+    const refund = result.rows.find((row) => row.description.includes("REFUND"));
+    expect(refund!.amount).toBe(12);
+    expect(refund!.kind).toBe("income");
+  });
+
+  test("explicit flipSigns=false overrides auto-detection (the Undo path)", () => {
+    const state = createInitialState();
+    const result = parseBankText({ text: CARD_CSV, fileName: "amex.csv", state, flipSigns: false });
+    expect(result.signInverted).toBe(false);
+    expect(result.rows.find((row) => row.description.includes("EXTRA"))!.amount).toBe(42.61);
+  });
+
+  test("bank CSVs with mostly-negative amounts are not flipped", () => {
+    const state = createInitialState();
+    const result = parseBankText({
+      text: [
+        "Date,Description,Amount",
+        "05/06/2026,TESCO EXTRA,-42.61",
+        "06/06/2026,COSTA COFFEE,-4.35",
+        "07/06/2026,NETFLIX.COM,-10.99",
+        "08/06/2026,ACME PAYROLL,2500.00",
+      ].join("\n"),
+      fileName: "bank.csv",
+      state,
+    });
+    expect(result.signInverted ?? false).toBe(false);
+    expect(result.rows.find((row) => row.description.includes("PAYROLL"))!.kind).toBe("income");
+  });
+
+  test("debit/credit column files never flip even when forced", () => {
+    const state = createInitialState();
+    const result = parseBankText({
+      text: ["Date,Description,Debit,Credit", "05/06/2026,TESCO EXTRA,42.61,"].join("\n"),
+      fileName: "bank.csv",
+      state,
+      flipSigns: true,
+    });
+    expect(result.signInverted).toBe(false);
+    expect(result.rows[0].amount).toBe(-42.61);
+  });
+});

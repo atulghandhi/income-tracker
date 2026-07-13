@@ -39,6 +39,9 @@ export type CsvImportResult = {
     category?: string;
   };
   totalRows: number;
+  // True when amounts were negated because the file follows the credit-card
+  // statement convention (charges positive, refunds/payments negative).
+  signInverted?: boolean;
 };
 
 type ParseBankCsvOptions = {
@@ -46,6 +49,9 @@ type ParseBankCsvOptions = {
   fileName: string;
   state: LedgerState;
   fallbackMonthKey?: string;
+  // Negate single-amount-column values (credit-card statements). Ignored for
+  // files with separate debit/credit columns — those are already unambiguous.
+  flipSigns?: boolean;
 };
 
 type ColumnMap = {
@@ -87,7 +93,7 @@ const SYSTEM_RULES: Array<{ pattern: RegExp; category: string; kind?: Transactio
   { pattern: /\b(transfer|internal|savings?|standing order to self)\b/i, category: "Transfers", kind: "transfer", confidence: 0.78, note: "Matched transfer wording" },
 ];
 
-export function parseBankCsv({ text, fileName, state, fallbackMonthKey }: ParseBankCsvOptions): CsvImportResult {
+export function parseBankCsv({ text, fileName, state, fallbackMonthKey, flipSigns }: ParseBankCsvOptions): CsvImportResult {
   const table = parseCsvTable(text);
   const nonEmptyRows = table.filter((row) => row.some((cell) => cell.trim()));
   const fallbackMonth = fallbackMonthKey ?? state.selectedMonth ?? getMonthKey();
@@ -116,6 +122,10 @@ export function parseBankCsv({ text, fileName, state, fallbackMonthKey }: ParseB
     };
   }
 
+  // Sign flipping only applies to single-amount files; debit/credit columns
+  // already carry unambiguous direction.
+  const applyFlip = Boolean(flipSigns) && columns.amount !== undefined && columns.debit === undefined && columns.credit === undefined;
+
   const rows = nonEmptyRows.slice(1).flatMap((cells, index) => {
     const rowNumber = index + 2;
     const description = getCell(cells, columns.description).trim();
@@ -124,8 +134,9 @@ export function parseBankCsv({ text, fileName, state, fallbackMonthKey }: ParseB
 
     if (!description || parsedAmount === null) return [];
 
+    const amount = applyFlip ? Number((-parsedAmount).toFixed(2)) : parsedAmount;
     const bankCategory = columns.category === undefined ? "" : getCell(cells, columns.category).trim();
-    return [buildImportRow({ rowNumber, date: isoDate, description, amount: parsedAmount, bankCategory, state, existingHashes })];
+    return [buildImportRow({ rowNumber, date: isoDate, description, amount, bankCategory, state, existingHashes })];
   });
 
   return {
@@ -133,7 +144,28 @@ export function parseBankCsv({ text, fileName, state, fallbackMonthKey }: ParseB
     errors: rows.length ? [] : ["No importable transactions were found in this CSV."],
     detectedColumns: buildDetectedColumns(headerRow, columns),
     totalRows: Math.max(0, nonEmptyRows.length - 1),
+    signInverted: applyFlip,
   };
+}
+
+// Credit-card statements invert the sign convention: charges are positive,
+// refunds/payments negative. The tell: "positive" rows whose descriptions match
+// spending merchants (groceries, coffee, travel…) — real income never looks
+// like that. Only single-amount files qualify; debit/credit files are explicit.
+const SPENDING_CATEGORIES = new Set(["Home", "Bills", "Food", "Travel", "Subscriptions", "Health"]);
+
+export function detectLikelySignInversion(result: CsvImportResult): boolean {
+  if (!result.detectedColumns.amount || result.detectedColumns.debit || result.detectedColumns.credit) return false;
+  const rows = result.rows.filter((row) => row.amount !== 0);
+  if (rows.length < 3) return false;
+
+  const positiveRows = rows.filter((row) => row.amount > 0);
+  if (positiveRows.length / rows.length < 0.6) return false;
+
+  const spendingShapedIncome = positiveRows.filter(
+    (row) => row.kind === "income" && SPENDING_CATEGORIES.has(row.category),
+  ).length;
+  return spendingShapedIncome >= 2;
 }
 
 type BuildImportRowOptions = {
@@ -635,6 +667,7 @@ export function parseBankText({
   fileName,
   state,
   fallbackMonthKey,
+  flipSigns,
 }: ParseBankCsvOptions): CsvImportResult {
   const trimmed = text.trimStart();
   const lowerName = fileName.toLowerCase();
@@ -646,7 +679,12 @@ export function parseBankText({
     return withTransferPairs(parseQif({ text, fileName, state, fallbackMonthKey }));
   }
 
-  const csvResult = parseBankCsv({ text, fileName, state, fallbackMonthKey });
+  let csvResult = parseBankCsv({ text, fileName, state, fallbackMonthKey, flipSigns });
+  // Auto-flip credit-card statements — unless the caller chose explicitly
+  // (the review modal's "flip in/out" toggle passes flipSigns either way).
+  if (flipSigns === undefined && detectLikelySignInversion(csvResult)) {
+    csvResult = parseBankCsv({ text, fileName, state, fallbackMonthKey, flipSigns: true });
+  }
   if (csvResult.rows.length) return withTransferPairs(csvResult);
 
   // No recognizable header row — pasted blocks from bank apps and spreadsheets
