@@ -23,6 +23,27 @@ export function isAiCategorizationAvailable(signedIn: boolean, optedIn: boolean)
   return Boolean(supabase && signedIn && optedIn);
 }
 
+export type AiConnectionStatus = "ok" | "not-deployed" | "no-api-key" | "unauthenticated" | "unreachable";
+
+// Fired when the user switches the toggle on, so a broken backend is reported
+// immediately instead of failing silently at the next import. An empty batch
+// exercises the whole chain (function exists -> key configured -> auth valid)
+// without spending a model call.
+export async function testAiConnection(): Promise<AiConnectionStatus> {
+  if (!supabase) return "unreachable";
+  try {
+    const { error } = await supabase.functions.invoke("categorize-batch", { body: { rows: [], categories: [] } });
+    if (!error) return "ok";
+    const status = (error as { context?: { status?: number } }).context?.status;
+    if (status === 503) return "no-api-key";
+    if (status === 401) return "unauthenticated";
+    if (status === 404) return "not-deployed";
+    return "unreachable";
+  } catch {
+    return "unreachable";
+  }
+}
+
 export async function aiCategorizeRows(rows: CsvImportRow[], userCategories: string[]): Promise<AiSuggestion[]> {
   if (!supabase) return [];
 

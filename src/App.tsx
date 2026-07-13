@@ -80,7 +80,7 @@ import { buildRulePattern, canonicalizeMerchant, descriptionMatchesPattern, isTr
 import { buildMerchantMemory } from "./merchantMemory";
 import { parseQuickAdd } from "./quickAdd";
 import { applyRecurringFlag, detectSubscriptions, findMissedRecurring, reconcileSeededEntries, suggestRecurringFlags, type RecurrenceCandidate } from "./recurrence";
-import { aiCategorizeRows, applyAiSuggestions, isAiCategorizationAvailable } from "./aiCategorize";
+import { aiCategorizeRows, applyAiSuggestions, isAiCategorizationAvailable, testAiConnection } from "./aiCategorize";
 import { bucketCount, identifyAnalytics, track } from "./analytics";
 import {
   BANK_FEED_SOURCE_NAME,
@@ -299,6 +299,10 @@ type ImportReviewState = {
   rows: CsvImportRow[];
   errors: string[];
   totalRows: number;
+  // Credit-card statements: amounts were auto-negated so charges count as
+  // spending. canFlip is false for sources that can't re-parse (bank feeds).
+  signInverted: boolean;
+  canFlip: boolean;
 };
 type LastImportAction = {
   batchId: string;
@@ -430,6 +434,8 @@ function App() {
   const [feedsBusy, setFeedsBusy] = useState(false);
   // review-row id → feed_transactions.id for the currently open bank-feed review.
   const feedRowMapRef = useRef<Map<string, string> | null>(null);
+  // Raw text of the last file/paste import, so the "flip in/out" toggle can re-parse.
+  const lastImportTextRef = useRef<{ text: string; sourceName: string } | null>(null);
   const [transferRuleInput, setTransferRuleInput] = useState("");
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(() => new Set());
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -1501,6 +1507,8 @@ function App() {
       rows: review.rows,
       errors: [],
       totalRows: review.total,
+      signInverted: false,
+      canFlip: false,
     });
   }
 
@@ -1537,15 +1545,30 @@ function App() {
   // Shared inlet for every text capture path (file upload, paste). Parses whatever
   // format arrives, opens the review, and — when the user opted in — asks the AI
   // backstop to upgrade the low-confidence rows in the background.
-  function openImportReview(text: string, sourceName: string) {
-    const result = parseBankText({ text, fileName: sourceName, state: ledger, fallbackMonthKey: ledger.selectedMonth });
+  function openImportReview(text: string, sourceName: string, flipOverride?: boolean) {
+    lastImportTextRef.current = { text, sourceName };
+    const result = parseBankText({
+      text,
+      fileName: sourceName,
+      state: ledger,
+      fallbackMonthKey: ledger.selectedMonth,
+      flipSigns: flipOverride,
+    });
     setImportReview({
       fileName: sourceName,
       rows: result.rows,
       errors: result.errors,
       totalRows: result.totalRows,
+      signInverted: Boolean(result.signInverted),
+      canFlip: true,
     });
-    setToast(result.rows.length ? "Transactions ready for review" : "Nothing recognisable to import");
+    setToast(
+      !result.rows.length
+        ? "Nothing recognisable to import"
+        : result.signInverted
+          ? "Credit-card statement detected — amounts flipped"
+          : "Transactions ready for review",
+    );
     if (result.rows.length) {
       track("import_reviewed", {
         source: importSourceOf(sourceName),
@@ -1564,6 +1587,7 @@ function App() {
         .then((suggestions) => {
           if (!suggestions.length) return;
           track("ai_suggestions_applied", { count: suggestions.length });
+          setToast(`AI suggested categories for ${suggestions.length} transaction${suggestions.length === 1 ? "" : "s"}`);
           setImportReview((current) =>
             current && current.fileName === sourceName
               ? { ...current, rows: applyAiSuggestions(current.rows, suggestions) }
@@ -1574,6 +1598,14 @@ function App() {
           // AI upgrades are best-effort; local suggestions already rendered.
         });
     }
+  }
+
+  // "This is a card statement" toggle in the review — re-parses the original
+  // text with the opposite sign convention (user edits reset by design).
+  function toggleImportSignFlip() {
+    const source = lastImportTextRef.current;
+    if (!source || !importReview) return;
+    openImportReview(source.text, source.sourceName, !importReview.signInverted);
   }
 
   function updateImportReviewRow(id: string, patch: Partial<CsvImportRow>) {
@@ -3020,8 +3052,27 @@ function App() {
                         aria-label="Toggle AI categorisation"
                         disabled={!user}
                         onClick={() => {
+                          const turningOn = !ledger.aiCategorizationEnabled;
                           updateLedger((current) => ({ ...current, aiCategorizationEnabled: !current.aiCategorizationEnabled }));
-                          setToast(ledger.aiCategorizationEnabled ? "AI categorisation off" : "AI categorisation on");
+                          if (!turningOn) {
+                            setToast("AI categorisation off");
+                            return;
+                          }
+                          // Verify the whole chain now, not silently at the next import.
+                          setToast("AI categorisation on — checking the connection…");
+                          void testAiConnection().then((status) => {
+                            setToast(
+                              status === "ok"
+                                ? "AI connected ✓ — low-confidence import rows will get suggestions"
+                                : status === "no-api-key"
+                                  ? "AI backend reachable but ANTHROPIC_API_KEY isn’t set in Supabase secrets"
+                                  : status === "not-deployed"
+                                    ? "The categorize-batch function isn’t deployed to Supabase yet"
+                                    : status === "unauthenticated"
+                                      ? "Sign in again — the AI backend rejected the session"
+                                      : "Couldn’t reach the AI backend — check the Supabase function logs",
+                            );
+                          });
                         }}
                       >
                         <span />
@@ -3234,6 +3285,7 @@ function App() {
               feedRowMapRef.current = null; // cancelled feed reviews stay staged
               setImportReview(null);
             }}
+            onToggleFlip={toggleImportSignFlip}
             onRowChange={updateImportReviewRow}
             onToggleAll={setAllImportRowsIncluded}
             onSkipDuplicates={skipDuplicateImportRows}
@@ -3693,6 +3745,7 @@ function ImportReviewModal({
   debtAccounts,
   formatter,
   onClose,
+  onToggleFlip,
   onRowChange,
   onToggleAll,
   onSkipDuplicates,
@@ -3704,6 +3757,7 @@ function ImportReviewModal({
   debtAccounts: Account[];
   formatter: Intl.NumberFormat;
   onClose: () => void;
+  onToggleFlip: () => void;
   onRowChange: (id: string, patch: Partial<CsvImportRow>) => void;
   onToggleAll: (include: boolean) => void;
   onSkipDuplicates: () => void;
@@ -3757,6 +3811,18 @@ function ImportReviewModal({
           </span>
         </div>
 
+        {review.canFlip && review.signInverted && (
+          <div className="signFlipBanner" role="status">
+            <CreditCard size={15} />
+            <span>
+              Credit-card statement detected — amounts were flipped so purchases count as spending and refunds as money in.
+            </span>
+            <button className="commandButton" type="button" onClick={onToggleFlip}>
+              Undo flip
+            </button>
+          </div>
+        )}
+
         {hasErrors ? (
           <div className="importErrorList" role="alert">
             {review.errors.map((error) => (
@@ -3776,6 +3842,17 @@ function ImportReviewModal({
                 <button className="commandButton" type="button" onClick={onSkipDuplicates}>
                   Skip duplicates
                 </button>
+                {review.canFlip && !review.signInverted && (
+                  <button
+                    className="commandButton"
+                    type="button"
+                    title="Credit-card statements list purchases as positive amounts — flip so they count as spending"
+                    onClick={onToggleFlip}
+                  >
+                    <CreditCard size={15} />
+                    Card statement? Flip in/out
+                  </button>
+                )}
               </div>
               <label className="bulkCategoryField">
                 <span>Bulk category</span>
