@@ -7,12 +7,15 @@ import { expect, test, type Page } from "@playwright/test";
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem("hasSeenLanding", "1");
+    localStorage.setItem("onboardingComplete", "1");
     localStorage.setItem("tutorialSeenPages", JSON.stringify(["ledger", "dashboard", "accounts", "goals", "insights", "settings"]));
   });
 });
 
 async function openLedger(page: Page) {
   await page.goto("/");
+  // The app opens on the dashboard now; the ledger is one nav click away.
+  await page.getByRole("button", { name: "Ledger" }).click();
   await expect(page.getByRole("heading", { name: "Ledger", exact: true })).toBeVisible({ timeout: 10_000 });
 }
 

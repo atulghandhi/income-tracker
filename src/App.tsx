@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Analytics } from "@vercel/analytics/react";
 import LandingPage from "./LandingPage";
+import Onboarding, { type OnboardingResult } from "./Onboarding";
 import type { CSSProperties, Dispatch, DragEvent, FormEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode, Ref, SetStateAction } from "react";
 import {
   AlertCircle,
@@ -164,8 +165,9 @@ function capitalizeFirst(s: string) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 }
 
-// Short, skimmable per-page walkthroughs. Auto-shown the first time each page is
-// opened (ledger first), and replayable anytime from the sidebar "Tutorial" button.
+// Short, skimmable per-page walkthroughs, replayable anytime from the sidebar
+// "Tutorial" button. They no longer auto-open on first visit — the setup wizard
+// and the dashboard getting-started checklist cover first-run guidance instead.
 const TUTORIALS: Record<AppView, PageTutorial> = {
   ledger: {
     title: "Track a month in seconds",
@@ -272,6 +274,24 @@ const TUTORIALS: Record<AppView, PageTutorial> = {
 };
 
 const TUTORIAL_SEEN_KEY = "tutorialSeenPages";
+const ONBOARDING_KEY = "onboardingComplete";
+const GETTING_STARTED_KEY = "gettingStartedDismissed";
+
+function readFlag(key: string): boolean {
+  try {
+    return Boolean(localStorage.getItem(key));
+  } catch {
+    return false;
+  }
+}
+
+function writeFlag(key: string) {
+  try {
+    localStorage.setItem(key, "1");
+  } catch {
+    // localStorage unavailable — the flag simply won't persist.
+  }
+}
 
 function readSeenTutorials(): Set<AppView> {
   try {
@@ -411,12 +431,17 @@ function App() {
   const [projectionView, setProjectionView] = useState<ProjectionView>("overview");
   const [insightChartView, setInsightChartView] = useState<InsightChartView>("inflow-outflow");
   const [netWorthHorizon, setNetWorthHorizon] = useState<NetWorthHorizon>(24);
-  const [activeView, setActiveView] = useState<AppView>("ledger");
+  // Dashboard first: it matches the nav order and hosts the getting-started
+  // checklist, so new users land on an overview instead of a data-entry screen.
+  const [activeView, setActiveView] = useState<AppView>("dashboard");
   const [theme, setTheme] = useState<ThemeMode>(readStoredTheme);
   const [tutorialView, setTutorialView] = useState<AppView | null>(null);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [checklistDismissed, setChecklistDismissed] = useState(() => readFlag(GETTING_STARTED_KEY));
   const [animationsEnabled, setAnimationsEnabled] = useState(true);
   const [query, setQuery] = useState("");
-  const [toast, setToast] = useState("Loading secure vault");
+  // Starts empty so nothing flashes on load — the toast effect ignores empty values.
+  const [toast, setToast] = useState("");
   const [draggingExpenseId, setDraggingExpenseId] = useState<string | null>(null);
   const [groupingSourceId, setGroupingSourceId] = useState<string | null>(null);
   const [dropPreview, setDropPreview] = useState<ExpenseDropPreview>(null);
@@ -574,6 +599,19 @@ function App() {
       .sort((a, b) => b.matches - a.matches || a.rule.pattern.localeCompare(b.rule.pattern));
   }, [ledger.categoryRules, ledger.months]);
 
+  // Getting-started checklist: derived from real data, so items tick themselves
+  // off as the user (or the setup wizard) fills things in.
+  const setupProgress = useMemo(() => {
+    const monthsList = Object.values(ledger.months);
+    return {
+      income: monthsList.some((month) => month.incomes.length > 0),
+      expenses: monthsList.some((month) => month.expenses.length > 0),
+      account: ledger.accounts.length > 0,
+      goal: ledger.goals.length > 0,
+      imported: ledger.importBatches.length > 0,
+    };
+  }, [ledger.months, ledger.accounts, ledger.goals, ledger.importBatches]);
+
   useEffect(() => {
     let alive = true;
 
@@ -581,14 +619,12 @@ function App() {
       try {
         const stored = await loadLedgerState();
         if (!alive) return;
+        // Successful loads are silent — startup toasts were noise.
         if (stored) {
           setLedger(normalizeState(stored));
-          setToast("Local cache ready");
-        } else {
-          setToast("Secure vault ready");
         }
       } catch {
-        setToast("Using this browser only");
+        setToast("Storage unavailable — changes won't survive a refresh");
         setSaveState("offline");
       } finally {
         if (alive) {
@@ -699,12 +735,13 @@ function App() {
     };
   }, [hydrated, user?.id]);
 
-  // Nudge unsigned-in users after 60 s
+  // Nudge unsigned-in users to back up — but not in their first minutes.
+  // Interrupting a brand-new user mid-setup cost more than the nudge earned.
   useEffect(() => {
     if (user || !hydrated) return;
     const timer = window.setTimeout(() => {
       if (!nudgeDismissedRef.current) setShowSyncNudge(true);
-    }, 60_000);
+    }, 300_000);
     return () => clearTimeout(timer);
   }, [user, hydrated]);
 
@@ -719,11 +756,10 @@ function App() {
             await saveCloudLedgerState(user.id, ledger);
           }
           setSaveState("saved");
-          setToast(user ? "Saved to Supabase" : "Saved locally");
         })
         .catch(() => {
           setSaveState("offline");
-          setToast(user ? "Cloud sync paused" : "Browser storage fallback active");
+          setToast(user ? "Cloud sync paused — changes kept on this device" : "Saved in this browser only");
         });
     }, 240);
 
@@ -764,13 +800,118 @@ function App() {
     return () => window.clearTimeout(timer);
   }, [lastImportAction]);
 
-  // Auto-show a page's tutorial the first time it's opened (ledger first, since it's
-  // the default view). Once dismissed it won't reappear; the sidebar button replays it.
+  // First-run setup: once everything has hydrated (local and, when signed in,
+  // cloud), open the wizard for anyone who has never completed it and has no
+  // data yet. Tutorials no longer auto-pop on every page — the wizard plus the
+  // dashboard checklist replace that; tutorials stay replayable from the sidebar.
   useEffect(() => {
-    if (showLanding || !hydrated) return;
-    if (readSeenTutorials().has(activeView)) return;
-    setTutorialView((current) => current ?? activeView);
-  }, [activeView, showLanding, hydrated]);
+    if (showLanding || !hydrated || authLoading) return;
+    if (user && !cloudHydrated) return;
+    if (readFlag(ONBOARDING_KEY)) return;
+    if (hasLocalData(ledger)) {
+      // Existing user from before the wizard existed — never interrupt them.
+      writeFlag(ONBOARDING_KEY);
+      return;
+    }
+    setOnboardingOpen(true);
+    // Deliberately not keyed on `ledger`: the gate should only re-evaluate when
+    // hydration/auth state settles, not on every keystroke afterwards.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showLanding, hydrated, authLoading, user?.id, cloudHydrated]);
+
+  function finishOnboarding(result: OnboardingResult, meta: { completed: boolean; skippedSteps: number }) {
+    writeFlag(ONBOARDING_KEY);
+    setOnboardingOpen(false);
+    const added = result.incomes.length + result.expenses.length + result.accounts.length + (result.goal ? 1 : 0);
+
+    if (added > 0) {
+      const now = new Date().toISOString();
+      updateLedger((current) => {
+        const monthKey = current.selectedMonth;
+        const month = current.months[monthKey] ?? { incomes: [], expenses: [], note: "" };
+        const incomes = [
+          ...month.incomes,
+          ...result.incomes.map((row, index) => ({
+            id: createId("income"),
+            source: row.source,
+            amount: row.amount,
+            color: colors[(month.incomes.length + index) % colors.length],
+            recurring: true,
+            categorySource: "user" as const,
+          })),
+        ];
+        const expenses = [
+          ...month.expenses,
+          ...result.expenses.map((row, index) => ({
+            id: createId("expense"),
+            name: row.name,
+            category: row.category,
+            amount: row.amount,
+            color: colors[(month.expenses.length + index) % colors.length],
+            recurring: true,
+            categorySource: "user" as const,
+          })),
+        ];
+        const accounts = [
+          ...current.accounts,
+          ...result.accounts.map((row, index) => ({
+            id: createId("account"),
+            name: row.name,
+            accountClass: row.accountClass,
+            type: row.type,
+            balance: row.balance,
+            rate: row.accountClass === "investment" ? current.assumedInvestmentReturn : 0,
+            promoRate: 0,
+            promoMonths: 0,
+            monthlyContribution: 0,
+            creditLimit: 0,
+            minimumPayment: 0,
+            dueDay: 1,
+            balanceAsOf: getMonthKey(),
+            includeInNetWorth: true,
+            color: colors[(current.accounts.length + index) % colors.length],
+            note: "",
+          })),
+        ];
+        const goals = result.goal
+          ? [
+              ...current.goals,
+              {
+                id: createId("goal"),
+                name: result.goal.name,
+                target: result.goal.target,
+                saved: result.goal.saved,
+                color: colors[current.goals.length % colors.length],
+                priority: current.goals.length + 1,
+                // "fill" needs no further configuration: the goal absorbs spare
+                // monthly surplus, so the planner can forecast a finish date.
+                fundingMode: "fill" as const,
+                monthlyAmount: 0,
+                deadlineMonths: 0,
+                interestRate: 0,
+                note: "",
+                createdAt: now,
+              },
+            ]
+          : current.goals;
+
+        return {
+          ...current,
+          currency: result.currency,
+          months: { ...current.months, [monthKey]: { ...month, incomes, expenses } },
+          accounts,
+          goals,
+        };
+      });
+      setToast("Setup saved — your dashboard is live");
+    }
+
+    setActiveView("dashboard");
+    track(meta.completed ? "onboarding_completed" : "onboarding_skipped", {
+      added: bucketCount(added),
+      skipped_steps: meta.skippedSteps,
+    });
+  }
 
   function closeTutorial() {
     setTutorialView((current) => {
@@ -2005,8 +2146,8 @@ function App() {
           : activeView === "goals"
             ? "Goals"
             : activeView === "insights"
-              ? "Reports"
-              : "Management Hub";
+              ? "Insights"
+              : "Settings";
   const insightChartTitle =
     insightChartView === "cash-flow"
       ? "Cash flow volatility"
@@ -2087,6 +2228,19 @@ function App() {
             </button>
           ))}
         </nav>
+
+        <div className={`saveStatusChip ${saveState}`} role="status" aria-live="off">
+          <span className="saveDot" aria-hidden="true" />
+          {saveState === "saved"
+            ? user
+              ? "Synced to cloud"
+              : "Saved on this device"
+            : saveState === "saving"
+              ? "Saving…"
+              : saveState === "loading"
+                ? "Loading…"
+                : "Offline — saved here only"}
+        </div>
 
         <button
           className="sideTutorialBtn"
@@ -2196,19 +2350,72 @@ function App() {
               <div className="pageHeader compactHeader">
                 <div>
                   <h2>Dashboard</h2>
-                  <p>Monthly flow, annual run rate, and local vault health.</p>
+                  <p>Your money at a glance — this month and where it&rsquo;s heading.</p>
                 </div>
                 <div className="netBlock">
-                  <span>Net Flow</span>
+                  <span>Left this month</span>
                   <strong className={projection.monthlySurplus >= 0 ? "positiveText sensitive" : "negativeText sensitive"}>
                     <AnimatedCurrency value={projection.monthlySurplus} formatter={moneyFormatter} />
                   </strong>
                 </div>
               </div>
 
+              {!checklistDismissed && (
+                <GettingStartedCard
+                  items={[
+                    {
+                      id: "income",
+                      label: "Add your income",
+                      hint: "Salary or anything else coming in",
+                      done: setupProgress.income,
+                      action: () => {
+                        setActiveView("ledger");
+                        focusNextFrame(incomeSourceInputRef);
+                      },
+                    },
+                    {
+                      id: "expenses",
+                      label: "Add regular spending",
+                      hint: "Rent, bills, groceries — rough is fine",
+                      done: setupProgress.expenses,
+                      action: () => {
+                        setActiveView("ledger");
+                        focusNextFrame(expenseNameInputRef);
+                      },
+                    },
+                    {
+                      id: "account",
+                      label: "Add an account",
+                      hint: "Savings, cards and loans build your net worth",
+                      done: setupProgress.account,
+                      action: () => setActiveView("accounts"),
+                    },
+                    {
+                      id: "goal",
+                      label: "Set a savings goal",
+                      hint: "See when you'll reach it",
+                      done: setupProgress.goal,
+                      action: () => setActiveView("goals"),
+                    },
+                    {
+                      id: "import",
+                      label: "Import a bank statement",
+                      hint: "Fill a whole month from a CSV in seconds",
+                      done: setupProgress.imported,
+                      action: () => csvInputRef.current?.click(),
+                    },
+                  ]}
+                  onRestartSetup={() => setOnboardingOpen(true)}
+                  onDismiss={() => {
+                    writeFlag(GETTING_STARTED_KEY);
+                    setChecklistDismissed(true);
+                  }}
+                />
+              )}
+
               <section className="summaryStrip" aria-label="Monthly snapshot">
                 <MetricCard label="Income" value={projection.monthlyIncome} tone="green" privacy={ledger.privacyMode} formatter={moneyFormatter} />
-                <MetricCard label="Outputs" value={projection.monthlyExpenses} tone="red" privacy={ledger.privacyMode} formatter={moneyFormatter} />
+                <MetricCard label="Spending" value={projection.monthlyExpenses} tone="red" privacy={ledger.privacyMode} formatter={moneyFormatter} />
                 <MetricCard label="Surplus" value={projection.monthlySurplus} tone={projection.monthlySurplus >= 0 ? "green" : "red"} privacy={ledger.privacyMode} formatter={moneyFormatter} />
                 <MetricCard label="Savings rate" value={projection.savingsRate} suffix="%" tone={projection.savingsRate >= ledger.savingsTarget ? "green" : "amber"} />
               </section>
@@ -2267,10 +2474,10 @@ function App() {
               <div className="pageHeader">
                 <div>
                   <h2>Ledger</h2>
-                  <p>Reconcile inputs and outputs for the current period.</p>
+                  <p>Money in and money out this month. Rough numbers are fine.</p>
                 </div>
                 <div className="netBlock">
-                  <span>Net Flow</span>
+                  <span>Left this month</span>
                   <strong className={projection.monthlySurplus >= 0 ? "positiveText sensitive" : "negativeText sensitive"}>
                     {projection.monthlySurplus >= 0 ? "+ " : "- "}
                     <AnimatedCurrency value={Math.abs(projection.monthlySurplus)} formatter={moneyFormatter} />
@@ -2618,8 +2825,8 @@ function App() {
             <section className="viewStack" aria-label="Accounts">
               <div className="pageHeader compactHeader">
                 <div>
-                  <h2>Net Worth</h2>
-                  <p>Track savings, current accounts, and investments alongside debt to see your whole financial picture.</p>
+                  <h2>Accounts</h2>
+                  <p>Savings, current accounts, and investments alongside debt — together they make your net worth.</p>
                 </div>
                 <div className="netBlock">
                   <span>Net Worth</span>
@@ -2738,8 +2945,8 @@ function App() {
             <section className="viewStack" aria-label="Insights">
               <div className="pageHeader compactHeader">
                 <div>
-                  <h2>Reports</h2>
-                  <p>Cash flow, category concentration, and run rate for {formatMonth(ledger.selectedMonth)}.</p>
+                  <h2>Insights</h2>
+                  <p>Cash flow, top categories, and trends for {formatMonth(ledger.selectedMonth)}.</p>
                 </div>
               </div>
 
@@ -2933,8 +3140,8 @@ function App() {
             <section className="viewStack" aria-label="Settings">
               <div className="pageHeader settingsHeader">
                 <div>
-                  <h2>Management Hub</h2>
-                  <p>Configure your cloud vault, exports, and interface preferences.</p>
+                  <h2>Settings</h2>
+                  <p>Your data, imports, rules, and preferences.</p>
                 </div>
                 <button className="privacyBadge" type="button" onClick={() => setShowFeedbackModal(true)}>
                   <CircleHelp size={15} />
@@ -2945,9 +3152,16 @@ function App() {
               <article className="architectureNote">
                 <Cloud size={21} />
                 <div>
-                  <h3>Cloud vault architecture</h3>
-                  <p>Your ledger syncs to a private Supabase row tied to your Google account. This browser keeps an IndexedDB cache for resilience.</p>
+                  <h3>Where your data lives</h3>
+                  <p>
+                    Everything is saved in this browser. Sign in and it also backs up privately to the cloud, so you can pick up on
+                    another device. Export a full copy below any time.
+                  </p>
                 </div>
+                <button className="commandButton" type="button" onClick={() => setOnboardingOpen(true)}>
+                  <Sparkles size={15} />
+                  Run quick setup
+                </button>
               </article>
 
               <section className="settingsGrid">
@@ -3235,15 +3449,15 @@ function App() {
         </main>
 
         <footer className="bottomRail" aria-label="Annual summary">
-          <span>Annual Summary {selectedYear}</span>
+          <span>{selectedYear} projection</span>
           <span>
-            Total Balance <b className={ledger.privacyMode ? "masked" : ""}>{moneyFormatter.format(projection.annualSurplus)}</b>
+            Yearly income <b className={ledger.privacyMode ? "masked" : ""}>{moneyFormatter.format(projection.annualIncome)}</b>
           </span>
           <span>
-            Monthly Average <b className={ledger.privacyMode ? "masked" : ""}>{moneyFormatter.format(projection.monthlySurplus)}</b>
+            Yearly spending <b className={ledger.privacyMode ? "masked" : ""}>{moneyFormatter.format(projection.annualExpenses)}</b>
           </span>
           <span>
-            Projected Savings <b className={projection.annualSurplus >= 0 ? "positiveText sensitive" : "negativeText sensitive"}>{moneyFormatter.format(projection.annualSurplus)}</b>
+            Left over <b className={projection.annualSurplus >= 0 ? "positiveText sensitive" : "negativeText sensitive"}>{moneyFormatter.format(projection.annualSurplus)}</b>
           </span>
         </footer>
 
@@ -3266,6 +3480,8 @@ function App() {
             </button>
           </div>
         )}
+
+        {onboardingOpen && <Onboarding initialCurrency={ledger.currency} onFinish={finishOnboarding} />}
 
         {tutorialView && <TutorialOverlay tutorial={TUTORIALS[tutorialView]} onClose={closeTutorial} />}
 
@@ -4114,6 +4330,72 @@ function MetricCard({
       <strong className={privacy && !suffix ? "masked" : ""}>
         {suffix ? `${formatDecimal(value)}${suffix}` : <AnimatedCurrency value={value} formatter={formatter ?? getCurrencyFormatter("GBP")} />}
       </strong>
+    </article>
+  );
+}
+
+type GettingStartedItem = {
+  id: string;
+  label: string;
+  hint: string;
+  done: boolean;
+  action: () => void;
+};
+
+function GettingStartedCard({
+  items,
+  onRestartSetup,
+  onDismiss,
+}: {
+  items: GettingStartedItem[];
+  onRestartSetup: () => void;
+  onDismiss: () => void;
+}) {
+  const doneCount = items.filter((item) => item.done).length;
+  const allDone = doneCount === items.length;
+
+  return (
+    <article className="gettingStarted" aria-label="Getting started checklist">
+      <div className="gettingStartedHead">
+        <div className="gettingStartedTitle">
+          <h3>{allDone ? "You're fully set up" : "Getting started"}</h3>
+          <span>
+            {doneCount} of {items.length} done
+          </span>
+        </div>
+        <div className="gettingStartedMeter" aria-hidden="true">
+          <span style={{ width: `${Math.round((doneCount / items.length) * 100)}%` }} />
+        </div>
+        {!allDone && (
+          <button className="quietButton gettingStartedRestart" type="button" onClick={onRestartSetup}>
+            <Sparkles size={13} />
+            Quick setup
+          </button>
+        )}
+        <button className="iconButton" type="button" onClick={onDismiss} aria-label="Hide getting started checklist" data-tip="Hide checklist">
+          <X size={15} />
+        </button>
+      </div>
+      <div className="gettingStartedItems">
+        {items.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className={item.done ? "gsItem done" : "gsItem"}
+            onClick={item.action}
+            disabled={item.done}
+          >
+            <span className="gsCheck" aria-hidden="true">
+              {item.done ? <Check size={13} /> : null}
+            </span>
+            <span className="gsLabel">
+              <strong>{item.label}</strong>
+              <em>{item.hint}</em>
+            </span>
+            {!item.done && <ChevronRight size={15} aria-hidden="true" />}
+          </button>
+        ))}
+      </div>
     </article>
   );
 }

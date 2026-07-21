@@ -3959,7 +3959,7 @@ hr {
   }
 
   .navStack {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 
   .navItem {
@@ -5342,3 +5342,624 @@ hr {
 .signFlipBanner svg { color: var(--amber); flex-shrink: 0; }
 .signFlipBanner span { flex: 1; }
 .signFlipBanner .commandButton { flex-shrink: 0; }
+
+/* ─── First-run setup wizard ─────────────────────────────────────────────── */
+
+.onboardingBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(var(--bg-deep-rgb), 0.72);
+  backdrop-filter: blur(8px);
+  animation: tutorialFade 160ms ease both;
+}
+
+.onboardingCard {
+  width: min(600px, 100%);
+  max-height: min(92vh, 780px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 22px 28px 26px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+  animation: tutorialPop 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.motion-off .onboardingBackdrop,
+.motion-off .onboardingCard {
+  animation: none;
+}
+
+.obTopBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.obClose {
+  width: 34px;
+  height: 34px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.obClose:hover {
+  border-color: var(--line);
+  background: var(--well);
+  color: var(--ink);
+}
+
+.obProgress {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.obProgress span {
+  padding: 4px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: 11.5px;
+  font-weight: 640;
+  color: var(--faint);
+  letter-spacing: 0.02em;
+}
+
+.obProgress span.active {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.obProgress span.done {
+  border-color: rgba(var(--mint-rgb), 0.4);
+  background: var(--mint-soft);
+  color: var(--mint);
+}
+
+.obWelcome {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 8px 4px 4px;
+  text-align: center;
+  align-items: center;
+}
+
+.obWelcome h2 {
+  margin: 0;
+  font-size: 25px;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+.obWelcome > p {
+  margin: 0;
+  max-width: 430px;
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: var(--muted);
+}
+
+.obBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--blue-rgb), 0.32);
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.obBadgeDone {
+  border-color: rgba(var(--mint-rgb), 0.4);
+  background: var(--mint-soft);
+  color: var(--mint);
+}
+
+.obWelcomeList {
+  display: grid;
+  gap: 9px;
+  margin: 4px 0 6px;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.obWelcomeList li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+
+.obWelcomeList svg {
+  color: var(--blue);
+  flex-shrink: 0;
+}
+
+.obStep {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.obStep h2 {
+  margin: 0;
+  font-size: 21px;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+
+.obLede {
+  margin: -6px 0 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.obField {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.obField select {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-high);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.obChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.obChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-high);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 560;
+  cursor: pointer;
+  transition: border-color 130ms ease, background 130ms ease, color 130ms ease;
+}
+
+.obChip:hover {
+  border-color: var(--line-strong);
+}
+
+.obChip.selected {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.obRows {
+  display: grid;
+  gap: 8px;
+}
+
+.obRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.obRow > input {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-high);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13.5px;
+}
+
+.obRow > input:focus-visible,
+.obAmount input:focus-visible {
+  outline: 2px solid rgba(var(--blue-rgb), 0.55);
+  outline-offset: 1px;
+}
+
+.obRowLabel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.obRowLabel strong {
+  font-size: 13.5px;
+  color: var(--ink);
+}
+
+.obRowLabel em {
+  font-style: normal;
+  font-size: 11.5px;
+  color: var(--faint);
+}
+
+.obRowSub .obRowNote {
+  flex: 1;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.obAmount {
+  flex: 0 0 132px;
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-high);
+  overflow: hidden;
+}
+
+.obAmount span {
+  padding: 0 4px 0 10px;
+  color: var(--faint);
+  font-size: 13px;
+}
+
+.obAmount input {
+  width: 100%;
+  min-width: 0;
+  border: none;
+  background: none;
+  padding: 0 10px 0 2px;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.obRemove {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--faint);
+  cursor: pointer;
+}
+
+.obRemove:hover {
+  border-color: rgba(var(--red-rgb), 0.35);
+  color: var(--red);
+  background: var(--red-soft);
+}
+
+.obAddAnother {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  padding: 6px 4px;
+  border: none;
+  background: none;
+  color: var(--blue);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 620;
+  cursor: pointer;
+}
+
+.obAddAnother:hover {
+  text-decoration: underline;
+}
+
+.obActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.obActionsCenter {
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.obActionsRight {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.obPrimary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 22px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--blue);
+  color: var(--on-accent);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 130ms ease, transform 130ms ease;
+}
+
+.obPrimary:hover {
+  background: var(--blue-bright);
+  transform: translateY(-1px);
+}
+
+.obGhost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 6px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 560;
+  cursor: pointer;
+}
+
+.obGhost:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+@media (max-width: 560px) {
+  .onboardingCard {
+    padding: 18px 16px 20px;
+  }
+
+  .obAmount {
+    flex-basis: 108px;
+  }
+
+  .obActions {
+    flex-wrap: wrap;
+  }
+}
+
+/* ─── Getting-started checklist (dashboard) ──────────────────────────────── */
+
+.gettingStarted {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.gettingStartedHead {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.gettingStartedTitle {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.gettingStartedTitle h3 {
+  margin: 0;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.gettingStartedTitle span {
+  font-size: 11.5px;
+  color: var(--faint);
+}
+
+.gettingStartedMeter {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--track);
+  overflow: hidden;
+}
+
+.gettingStartedMeter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--mint);
+  transition: width 300ms ease;
+}
+
+.gettingStartedRestart {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.gettingStartedItems {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+}
+
+.gsItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-high);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 130ms ease, background 130ms ease;
+}
+
+.gsItem:hover:not(:disabled) {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+}
+
+.gsItem:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.gsItem.done {
+  background: var(--mint-soft);
+  border-color: rgba(var(--mint-rgb), 0.25);
+}
+
+.gsCheck {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 50%;
+  color: var(--on-accent);
+}
+
+.gsItem.done .gsCheck {
+  border-color: var(--mint);
+  background: var(--mint);
+}
+
+.gsLabel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.gsLabel strong {
+  font-size: 13px;
+  font-weight: 640;
+}
+
+.gsItem.done .gsLabel strong {
+  text-decoration: line-through;
+  text-decoration-color: rgba(var(--ink-rgb), 0.4);
+}
+
+.gsLabel em {
+  font-style: normal;
+  font-size: 11.5px;
+  color: var(--faint);
+}
+
+.gsItem > svg {
+  color: var(--faint);
+  flex-shrink: 0;
+}
+
+@media (max-width: 700px) {
+  .gettingStartedMeter {
+    display: none;
+  }
+}
+
+/* ─── Sidebar save-status chip ───────────────────────────────────────────── */
+
+.saveStatusChip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 4px;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 11.5px;
+  color: var(--faint);
+}
+
+.saveDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--faint);
+  flex-shrink: 0;
+}
+
+.saveStatusChip.saved .saveDot {
+  background: var(--mint);
+}
+
+.saveStatusChip.saving .saveDot,
+.saveStatusChip.loading .saveDot {
+  background: var(--amber);
+}
+
+.saveStatusChip.offline .saveDot {
+  background: var(--red);
+}
+
+/* Pin the save chip + tutorial + sign-in cluster to the sidebar bottom. */
+.saveStatusChip {
+  margin-top: auto;
+}
+
+.sideTutorialBtn {
+  margin-top: 0;
+}
+
+@media (max-width: 900px) {
+  .saveStatusChip {
+    margin-top: 0;
+  }
+}
