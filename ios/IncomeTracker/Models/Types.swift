@@ -1,6 +1,11 @@
 // Types.swift
 // Mirror of src/types.ts — Codable JSON must stay wire-compatible with the web app.
 // camelCase keys and identical enum raw string values are required for Supabase sync.
+//
+// Decoding is deliberately tolerant (see LenientDecoding.swift): the same JSON blob
+// is written by the web app, by earlier iOS builds and by hand-edited backups, so a
+// missing or malformed field falls back to the web's `normalizeState()` default
+// instead of failing the whole load. Encoding stays synthesized and strict.
 
 import Foundation
 
@@ -14,6 +19,12 @@ public enum CurrencyCode: String, Codable, Hashable, CaseIterable, Sendable {
     case aud = "AUD"
     case inr = "INR"
     case jpy = "JPY"
+
+    /// Unknown currency codes fall back to GBP, like the web's currencyOptions guard.
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = CurrencyCode(rawValue: raw.uppercased()) ?? .gbp
+    }
 }
 
 // MARK: - Transaction / entry primitives
@@ -41,6 +52,20 @@ public struct ImportedTransactionMeta: Codable, Hashable, Sendable {
         self.originalDescription = originalDescription
         self.importedAt = importedAt
     }
+
+    enum CodingKeys: String, CodingKey {
+        case batchId, fileName, rowNumber, hash, originalDescription, importedAt
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        batchId = c.lenientString(.batchId, default: "")
+        fileName = c.lenientString(.fileName, default: "Imported CSV")
+        rowNumber = c.lenientInt(.rowNumber, default: 0)
+        hash = c.lenientString(.hash, default: "")
+        originalDescription = c.lenientString(.originalDescription, default: "")
+        importedAt = c.lenientNonEmptyString(.importedAt) ?? isoTimestampNow()
+    }
 }
 
 /// Set on entries auto-copied into a new month because their source entry was
@@ -51,6 +76,22 @@ public struct SeededFromRef: Codable, Hashable, Sendable {
     public var entryId: String
 
     public init(monthKey: String, entryId: String) {
+        self.monthKey = monthKey
+        self.entryId = entryId
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case monthKey, entryId
+    }
+
+    /// A reference missing either half is meaningless — fail so the parent drops it.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        guard let monthKey = c.lenientNonEmptyString(.monthKey),
+              let entryId = c.lenientNonEmptyString(.entryId) else {
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath,
+                                                   debugDescription: "Incomplete seededFrom reference"))
+        }
         self.monthKey = monthKey
         self.entryId = entryId
     }
@@ -89,6 +130,26 @@ public struct IncomeEntry: Codable, Identifiable, Hashable, Sendable {
         self.imported = imported
         self.seededFrom = seededFrom
         self.categorySource = categorySource
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, source, amount, color, recurring, date, imported, seededFrom, categorySource
+    }
+
+    /// Mirrors `normalizeMonths` in App.tsx. An empty colour is filled in by the
+    /// owning MonthBudget (the palette index depends on the entry's position).
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.lenientNonEmptyString(.id) ?? createId(prefix: "income")
+        source = c.lenientString(.source) ?? "Imported income"
+        amount = c.lenientDouble(.amount, default: 0)
+        color = c.lenientString(.color) ?? ""
+        date = c.lenientNonEmptyString(.date)
+        imported = c.lenientValue(ImportedTransactionMeta.self, .imported)
+        seededFrom = c.lenientValue(SeededFromRef.self, .seededFrom)
+        categorySource = c.lenientNonEmptyString(.categorySource)
+        // Migration: untagged manual entries become recurring, imported rows become one-off.
+        recurring = c.lenientOptionalBool(.recurring) ?? (imported == nil)
     }
 }
 
@@ -133,6 +194,25 @@ public struct ExpenseEntry: Codable, Identifiable, Hashable, Sendable {
         self.seededFrom = seededFrom
         self.categorySource = categorySource
     }
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, category, amount, color, recurring, date, imported, debtAccountId, seededFrom, categorySource
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.lenientNonEmptyString(.id) ?? createId(prefix: "expense")
+        name = c.lenientString(.name) ?? "Imported expense"
+        category = c.lenientString(.category) ?? ""
+        amount = c.lenientDouble(.amount, default: 0)
+        color = c.lenientString(.color) ?? ""
+        date = c.lenientNonEmptyString(.date)
+        imported = c.lenientValue(ImportedTransactionMeta.self, .imported)
+        debtAccountId = c.lenientNonEmptyString(.debtAccountId)
+        seededFrom = c.lenientValue(SeededFromRef.self, .seededFrom)
+        categorySource = c.lenientNonEmptyString(.categorySource)
+        recurring = c.lenientOptionalBool(.recurring) ?? (imported == nil)
+    }
 }
 
 // MARK: - Goals
@@ -141,6 +221,11 @@ public enum GoalFundingMode: String, Codable, Hashable, Sendable {
     case fixed = "fixed"
     case fill = "fill"
     case auto = "auto"
+
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = GoalFundingMode(rawValue: raw) ?? .fixed
+    }
 }
 
 public struct SavingsGoal: Codable, Identifiable, Hashable, Sendable {
@@ -184,6 +269,29 @@ public struct SavingsGoal: Codable, Identifiable, Hashable, Sendable {
         self.note = note
         self.createdAt = createdAt
     }
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, target, saved, color, priority, fundingMode, monthlyAmount,
+             deadlineMonths, interestRate, note, createdAt
+    }
+
+    /// Mirrors `normalizeGoals`. Colour "" and priority 0 mean "not stored" and are
+    /// filled by position in LedgerState's decoder.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.lenientNonEmptyString(.id) ?? createId(prefix: "goal")
+        name = c.lenientString(.name) ?? "Goal"
+        target = c.lenientDouble(.target, default: 0)
+        saved = c.lenientDouble(.saved, default: 0)
+        color = c.lenientString(.color) ?? ""
+        priority = c.lenientOptionalInt(.priority) ?? 0
+        fundingMode = c.lenientValue(GoalFundingMode.self, .fundingMode) ?? .fixed
+        monthlyAmount = c.lenientDouble(.monthlyAmount, default: 0)
+        deadlineMonths = c.lenientInt(.deadlineMonths, default: 0)
+        interestRate = c.lenientDouble(.interestRate, default: 0)
+        note = c.lenientString(.note) ?? ""
+        createdAt = c.lenientNonEmptyString(.createdAt) ?? isoTimestampNow()
+    }
 }
 
 // MARK: - Budget month
@@ -200,6 +308,26 @@ public struct MonthBudget: Codable, Hashable, Sendable {
     }
 
     public static let empty = MonthBudget(incomes: [], expenses: [], note: "")
+
+    enum CodingKeys: String, CodingKey {
+        case incomes, expenses, note
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        var incomes = c.lenientArray(IncomeEntry.self, .incomes)
+        var expenses = c.lenientArray(ExpenseEntry.self, .expenses)
+        // Same palette fallback as the web: incomes start at index 0, expenses at 2.
+        for index in incomes.indices where incomes[index].color.isEmpty {
+            incomes[index].color = paletteColor(at: index)
+        }
+        for index in expenses.indices where expenses[index].color.isEmpty {
+            expenses[index].color = paletteColor(at: index + 2)
+        }
+        self.incomes = incomes
+        self.expenses = expenses
+        note = c.lenientString(.note) ?? ""
+    }
 }
 
 // MARK: - Import
@@ -213,6 +341,22 @@ public struct ImportedTransactionRef: Codable, Hashable, Sendable {
         self.monthKey = monthKey
         self.entryId = entryId
         self.kind = kind
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case monthKey, entryId, kind
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        guard let monthKey = c.lenientNonEmptyString(.monthKey),
+              let entryId = c.lenientNonEmptyString(.entryId) else {
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath,
+                                                   debugDescription: "Incomplete transaction reference"))
+        }
+        self.monthKey = monthKey
+        self.entryId = entryId
+        kind = c.lenientValue(TransactionKind.self, .kind) ?? .expense
     }
 }
 
@@ -242,6 +386,22 @@ public struct ImportBatch: Codable, Identifiable, Hashable, Sendable {
         self.skippedRows = skippedRows
         self.transactionRefs = transactionRefs
     }
+
+    enum CodingKeys: String, CodingKey {
+        case id, fileName, importedAt, totalRows, importedRows, skippedRows, transactionRefs
+    }
+
+    /// Mirrors `normalizeImportBatches`.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.lenientNonEmptyString(.id) ?? createId(prefix: "batch")
+        fileName = c.lenientNonEmptyString(.fileName) ?? "Imported CSV"
+        importedAt = c.lenientNonEmptyString(.importedAt) ?? isoTimestampNow()
+        totalRows = c.lenientInt(.totalRows, default: 0)
+        importedRows = c.lenientInt(.importedRows, default: 0)
+        skippedRows = c.lenientInt(.skippedRows, default: 0)
+        transactionRefs = c.lenientArray(ImportedTransactionRef.self, .transactionRefs)
+    }
 }
 
 // MARK: - Transaction kind
@@ -251,6 +411,11 @@ public enum TransactionKind: String, Codable, Hashable, Sendable {
     case expense = "expense"
     case debtPayment = "debt-payment"
     case transfer = "transfer"
+
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = TransactionKind(rawValue: raw) ?? .expense
+    }
 }
 
 // MARK: - Category rules
@@ -282,6 +447,30 @@ public struct CategoryRule: Codable, Identifiable, Hashable, Sendable {
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
+
+    enum CodingKeys: String, CodingKey {
+        case id, pattern, category, kind, debtAccountId, createdAt, updatedAt
+    }
+
+    /// Mirrors `normalizeCategoryRules`: rules without a pattern or category are dropped
+    /// (the decode fails, and the owning array skips the element).
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let pattern = (c.lenientString(.pattern) ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let category = (c.lenientString(.category) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !pattern.isEmpty, !category.isEmpty else {
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath,
+                                                   debugDescription: "Category rule without pattern or category"))
+        }
+        id = c.lenientNonEmptyString(.id) ?? createId(prefix: "rule")
+        self.pattern = pattern
+        self.category = category
+        kind = c.lenientValue(TransactionKind.self, .kind) ?? .expense
+        debtAccountId = c.lenientNonEmptyString(.debtAccountId)
+        let now = isoTimestampNow()
+        createdAt = c.lenientNonEmptyString(.createdAt) ?? now
+        updatedAt = c.lenientNonEmptyString(.updatedAt) ?? now
+    }
 }
 
 // MARK: - Account types
@@ -292,6 +481,11 @@ public enum AccountClass: String, Codable, Hashable, Sendable {
     case savings = "savings"
     case investment = "investment"
     case debt = "debt"
+
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = AccountClass(rawValue: raw) ?? .debt
+    }
 }
 
 /// Union of DebtAccountType | AssetAccountType — raw values must match TypeScript strings.
@@ -308,6 +502,12 @@ public enum AccountType: String, Codable, Hashable, Sendable {
     case investment = "investment"
     case pension = "pension"
     case otherAsset = "other-asset"
+
+    /// Unknown sub-types decode as `.other`; `Account` then re-resolves against the class.
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = AccountType(rawValue: raw) ?? .other
+    }
 }
 
 public struct Account: Codable, Identifiable, Hashable, Sendable {
@@ -367,6 +567,48 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
         self.includeInNetWorth = includeInNetWorth
         self.color = color
         self.note = note
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, accountClass, type, balance, rate, promoRate, promoMonths,
+             monthlyContribution, creditLimit, minimumPayment, dueDay, balanceAsOf,
+             includeInNetWorth, color, note
+    }
+
+    /// Keys written by schema < 5 (`debts[]` entries) that still need to load.
+    private enum LegacyCodingKeys: String, CodingKey {
+        case apr, interestFreeMonths
+    }
+
+    /// Mirrors `normalizeAccounts`, including the legacy `apr` → `rate` and
+    /// `interestFreeMonths` → `promoMonths` migration. Colour "" is filled by position
+    /// in LedgerState's decoder.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let legacy = try decoder.container(keyedBy: LegacyCodingKeys.self)
+        let accountClass = c.lenientValue(AccountClass.self, .accountClass) ?? .debt
+        let isDebt = accountClass == .debt
+
+        id = c.lenientNonEmptyString(.id) ?? createId(prefix: "account")
+        name = c.lenientNonEmptyString(.name) ?? (isDebt ? "Debt account" : "Account")
+        self.accountClass = accountClass
+        type = resolveAccountType(c.lenientValue(AccountType.self, .type), for: accountClass)
+        balance = c.lenientDouble(.balance, default: 0)
+        rate = c.lenientOptionalDouble(.rate) ?? legacy.lenientDouble(.apr, default: 0)
+        promoRate = max(0, c.lenientDouble(.promoRate, default: 0))
+        let rawPromoMonths = c.lenientOptionalDouble(.promoMonths)
+            ?? legacy.lenientDouble(.interestFreeMonths, default: 0)
+        promoMonths = clampWholeNumber(rawPromoMonths, max: 120)
+        monthlyContribution = isDebt ? 0 : max(0, c.lenientDouble(.monthlyContribution, default: 0))
+        creditLimit = isDebt ? c.lenientDouble(.creditLimit, default: 0) : 0
+        minimumPayment = isDebt ? c.lenientDouble(.minimumPayment, default: 0) : 0
+        dueDay = isDebt ? clampDueDay(c.lenientDouble(.dueDay, default: 1)) : 1
+        // v7 → v8: pre-existing balances anchor to the month this version first loads.
+        let storedAsOf = c.lenientString(.balanceAsOf)
+        balanceAsOf = isValidMonthKey(storedAsOf) ? storedAsOf : getMonthKey()
+        includeInNetWorth = c.lenientOptionalBool(.includeInNetWorth) ?? true
+        color = c.lenientString(.color) ?? ""
+        note = c.lenientString(.note) ?? ""
     }
 }
 
@@ -450,8 +692,147 @@ public struct LedgerState: Codable, Hashable, Sendable {
             categoryRules: [],
             importBatches: [],
             privacyMode: false,
-            lastSavedAt: ISO8601DateFormatter().string(from: .now)
+            aiCategorizationEnabled: false,
+            lastSavedAt: isoTimestampNow()
         )
+    }
+
+    /// True once the user has put transactions or accounts into the ledger (mirrors
+    /// `hasLocalData` in App.tsx). Used at hydration to decide whether cloud data can
+    /// simply replace an untouched local state.
+    public var hasLocalData: Bool {
+        months.values.contains { !$0.incomes.isEmpty || !$0.expenses.isEmpty } || !accounts.isEmpty
+    }
+
+    /// Exact structural equality that ignores bookkeeping fields (`lastSavedAt`,
+    /// `selectedMonth`, `schemaVersion`). Used to tell "the user opened another month"
+    /// apart from "ledger data changed".
+    public func isEquivalent(to other: LedgerState) -> Bool {
+        var a = self
+        var b = other
+        a.lastSavedAt = ""; b.lastSavedAt = ""
+        a.selectedMonth = ""; b.selectedMonth = ""
+        a.schemaVersion = 0; b.schemaVersion = 0
+        return a == b
+    }
+
+    /// The web's `statesAreEquivalent`: same month keys, same entry counts and the same
+    /// amount totals per month. Coarse on purpose — it exists to avoid a spurious
+    /// conflict prompt when the same ledger is opened again after a sync.
+    public func isRoughlyEquivalent(to other: LedgerState) -> Bool {
+        let keysA = months.keys.sorted()
+        let keysB = other.months.keys.sorted()
+        guard keysA == keysB else { return false }
+        for key in keysA {
+            guard let a = months[key], let b = other.months[key] else { return false }
+            if a.incomes.count != b.incomes.count || a.expenses.count != b.expenses.count { return false }
+            let sumA = a.incomes.reduce(0) { $0 + $1.amount } + a.expenses.reduce(0) { $0 + $1.amount }
+            let sumB = b.incomes.reduce(0) { $0 + $1.amount } + b.expenses.reduce(0) { $0 + $1.amount }
+            if abs(sumA - sumB) >= 0.01 { return false }
+        }
+        return true
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case schemaVersion, currency, selectedMonth, months, goals, goalPlannerSurplus,
+             goalsHorizonMonths, ledgerGoalId, savingsTarget, accounts, assumedInvestmentReturn,
+             categoryRules, importBatches, privacyMode, aiCategorizationEnabled, lastSavedAt
+    }
+
+    /// Keys written by schema < 7 (`goal`) and < 5 (`debts`).
+    private enum LegacyCodingKeys: String, CodingKey {
+        case goal, debts
+    }
+
+    /// The v6 single-goal shape, migrated into `goals[]` on load.
+    private struct LegacyGoal: Decodable {
+        var id: String?
+        var name: String
+        var target: Double
+        var saved: Double
+
+        enum CodingKeys: String, CodingKey { case id, name, target, saved }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            id = c.lenientNonEmptyString(.id)
+            name = c.lenientString(.name) ?? ""
+            target = c.lenientDouble(.target, default: 0)
+            saved = c.lenientDouble(.saved, default: 0)
+        }
+    }
+
+    /// Mirrors `normalizeState` in App.tsx. Never throws for a JSON object: every
+    /// field has a default. (Non-object JSON still fails, as it should.)
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let legacy = try decoder.container(keyedBy: LegacyCodingKeys.self)
+        let currentMonth = getMonthKey()
+
+        schemaVersion = CURRENT_SCHEMA_VERSION
+        currency = c.lenientValue(CurrencyCode.self, .currency) ?? .gbp
+
+        var months = c.lenientDictionary(MonthBudget.self, .months)
+        if months.isEmpty { months = [currentMonth: .empty] }
+        self.months = months
+        // Keep the stored month so the store's launch-time snap can seed today's
+        // month from it (the web seeds from the last-worked month the same way).
+        let storedMonth = c.lenientString(.selectedMonth)
+        selectedMonth = isValidMonthKey(storedMonth) ? storedMonth! : currentMonth
+
+        // v6 → v7: single `goal` → `goals[]`.
+        var goals: [SavingsGoal]
+        if (try? c.nestedUnkeyedContainer(forKey: .goals)) != nil {
+            goals = c.lenientArray(SavingsGoal.self, .goals)
+        } else if let old = legacy.lenientValue(LegacyGoal.self, .goal), !old.name.isEmpty || old.target > 0 {
+            goals = [SavingsGoal(
+                id: old.id ?? createId(prefix: "goal"),
+                name: old.name.isEmpty ? "Savings goal" : old.name,
+                target: old.target,
+                saved: old.saved,
+                color: paletteColor(at: 0),
+                priority: 1,
+                fundingMode: .fixed,
+                monthlyAmount: 0,
+                deadlineMonths: 0,
+                interestRate: 0,
+                note: "",
+                createdAt: isoTimestampNow()
+            )]
+        } else {
+            goals = []
+        }
+        for index in goals.indices {
+            if goals[index].color.isEmpty { goals[index].color = paletteColor(at: index) }
+            if goals[index].priority <= 0 { goals[index].priority = index + 1 }
+        }
+        self.goals = goals
+
+        goalPlannerSurplus = c.lenientOptionalDouble(.goalPlannerSurplus)
+        let horizon = c.lenientOptionalInt(.goalsHorizonMonths) ?? 0
+        goalsHorizonMonths = horizon > 0 ? horizon : 60
+        ledgerGoalId = c.lenientNonEmptyString(.ledgerGoalId)
+        savingsTarget = c.lenientDouble(.savingsTarget, default: 20)
+
+        // Schema < 5 stored debts[]; the Account decoder handles the field renames.
+        var accounts: [Account]
+        if (try? c.nestedUnkeyedContainer(forKey: .accounts)) != nil {
+            accounts = c.lenientArray(Account.self, .accounts)
+        } else {
+            accounts = legacy.lenientArray(Account.self, .debts)
+        }
+        for index in accounts.indices where accounts[index].color.isEmpty {
+            accounts[index].color = paletteColor(at: index)
+        }
+        self.accounts = accounts
+
+        assumedInvestmentReturn = c.lenientOptionalDouble(.assumedInvestmentReturn)
+            .map { max(-50, min(50, $0)) } ?? DEFAULT_INVESTMENT_RETURN
+        categoryRules = c.lenientArray(CategoryRule.self, .categoryRules)
+        importBatches = c.lenientArray(ImportBatch.self, .importBatches)
+        privacyMode = c.lenientBool(.privacyMode, default: false)
+        aiCategorizationEnabled = c.lenientOptionalBool(.aiCategorizationEnabled) ?? false
+        lastSavedAt = c.lenientNonEmptyString(.lastSavedAt) ?? isoTimestampNow()
     }
 }
 
@@ -775,51 +1156,122 @@ public struct GoalSequenceResult: Codable, Hashable, Sendable {
     }
 }
 
+
 // MARK: - Helpers (mirrored from finance.ts)
+
+/// Calendar for every month-key and date computation. Month keys are Gregorian
+/// "yyyy-MM" strings shared with the web, whatever calendar the device prefers
+/// (a Buddhist or Japanese system calendar must never produce "2569-09").
+public let ledgerCalendar: Calendar = {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = .current
+    return calendar
+}()
 
 /// Returns the current month as a "yyyy-MM" string.
 public func getMonthKey(date: Date = .now) -> String {
-    let cal = Calendar.current
-    let year = cal.component(.year, from: date)
-    let month = cal.component(.month, from: date)
+    let year = ledgerCalendar.component(.year, from: date)
+    let month = ledgerCalendar.component(.month, from: date)
     return String(format: "%04d-%02d", year, month)
 }
 
-/// Shifts a "yyyy-MM" key by `offset` months.
-public func shiftMonth(_ key: String, by offset: Int) -> String {
+/// Splits a "yyyy-MM" key into its parts; nil when malformed.
+public func parseMonthKey(_ key: String) -> (year: Int, month: Int)? {
     let parts = key.split(separator: "-")
-    guard parts.count == 2,
-          let year = Int(parts[0]),
-          let month = Int(parts[1]) else { return key }
-    // Use DateComponents arithmetic to handle wrap-around correctly.
-    var comps = DateComponents()
-    comps.year = year
-    comps.month = month
-    comps.day = 1
-    guard let base = Calendar.current.date(from: comps),
-          let shifted = Calendar.current.date(byAdding: .month, value: offset, to: base) else { return key }
-    return getMonthKey(date: shifted)
+    guard parts.count == 2, parts[0].count == 4, parts[1].count == 2,
+          let year = Int(parts[0]), let month = Int(parts[1]),
+          (1...12).contains(month) else { return nil }
+    return (year, month)
+}
+
+/// Mirrors `isValidMonthKey` in finance.ts ("yyyy-MM").
+public func isValidMonthKey(_ value: String?) -> Bool {
+    guard let value else { return false }
+    return parseMonthKey(value) != nil
+}
+
+/// Shifts a "yyyy-MM" key by `offset` months. Pure arithmetic — no calendar or
+/// time zone can shift it by a day and land in the wrong month.
+public func shiftMonth(_ key: String, by offset: Int) -> String {
+    guard let (year, month) = parseMonthKey(key) else { return key }
+    let index = year * 12 + (month - 1) + offset
+    let shiftedYear = index >= 0 ? index / 12 : (index - 11) / 12
+    let shiftedMonth = index - shiftedYear * 12 + 1
+    return String(format: "%04d-%02d", shiftedYear, shiftedMonth)
+}
+
+/// Number of days in the month of a "yyyy-MM" key (28 for a malformed key).
+public func daysInMonth(monthKey: String) -> Int {
+    guard let (year, month) = parseMonthKey(monthKey) else { return 28 }
+    var components = DateComponents()
+    components.year = year
+    components.month = month
+    components.day = 1
+    guard let date = ledgerCalendar.date(from: components),
+          let range = ledgerCalendar.range(of: .day, in: .month, for: date) else { return 28 }
+    return range.count
+}
+
+/// Whole months from `fromMonthKey` to `toMonthKey` (negative when going back).
+public func monthsBetween(_ fromMonthKey: String, _ toMonthKey: String) -> Int {
+    guard let from = parseMonthKey(fromMonthKey), let to = parseMonthKey(toMonthKey) else { return 0 }
+    return (to.year - from.year) * 12 + (to.month - from.month)
 }
 
 /// Returns a human-readable string like "June 2025" from a "yyyy-MM" key.
 public func formatMonth(_ key: String) -> String {
-    let parts = key.split(separator: "-")
-    guard parts.count == 2,
-          let year = Int(parts[0]),
-          let month = Int(parts[1]) else { return key }
+    guard let (year, month) = parseMonthKey(key) else { return key }
     var comps = DateComponents()
     comps.year = year
     comps.month = month
     comps.day = 1
-    guard let date = Calendar.current.date(from: comps) else { return key }
+    guard let date = ledgerCalendar.date(from: comps) else { return key }
     let fmt = DateFormatter()
+    fmt.calendar = ledgerCalendar
     fmt.dateFormat = "MMMM yyyy"
     fmt.locale = Locale(identifier: "en")
     return fmt.string(from: date)
 }
 
-/// Creates a prefixed ID using a UUID, e.g. `"inc_A1B2C3D4"`.
+/// Mirrors `clampDueDay`: 1...31, rounded; 1 for non-finite input.
+public func clampDueDay(_ value: Double) -> Int {
+    guard value.isFinite else { return 1 }
+    return max(1, min(31, Int(value.rounded())))
+}
+
+/// Mirrors `clampWholeNumber`: 0...max, rounded; 0 for non-finite input.
+public func clampWholeNumber(_ value: Double, max upper: Int = 600) -> Int {
+    guard value.isFinite else { return 0 }
+    return max(0, min(upper, Int(value.rounded())))
+}
+
+/// Creates a prefixed ID in the web's `createId` format, e.g. `"expense-1b4e28ba-…"`.
+/// Both clients write into the same ledger, so the shape must match.
 public func createId(prefix: String) -> String {
-    let short = UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(8)
-    return "\(prefix)_\(short)"
+    "\(prefix)-\(UUID().uuidString.lowercased())"
+}
+
+// MARK: - Timestamps
+
+/// ISO-8601 with millisecond precision — the same shape the web's
+/// `new Date().toISOString()` writes, so `lastSavedAt` compares like-for-like.
+public func isoTimestamp(_ date: Date) -> String {
+    let fmt = ISO8601DateFormatter()
+    fmt.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return fmt.string(from: date)
+}
+
+public func isoTimestampNow() -> String {
+    isoTimestamp(.now)
+}
+
+/// Parses a timestamp written by either client: with fractional seconds (web, current
+/// iOS) or without (earlier iOS builds). nil when unparseable.
+public func parseIsoTimestamp(_ value: String) -> Date? {
+    let withFraction = ISO8601DateFormatter()
+    withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    if let date = withFraction.date(from: value) { return date }
+    let plain = ISO8601DateFormatter()
+    plain.formatOptions = [.withInternetDateTime]
+    return plain.date(from: value)
 }

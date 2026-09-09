@@ -23,21 +23,16 @@ struct IncomeTrackerEntry: TimelineEntry {
 // MARK: - Timeline Provider
 
 struct IncomeTrackerTimelineProvider: TimelineProvider {
-    // Shown while WidgetKit is loading real data — must never be nil.
     func placeholder(in context: Context) -> IncomeTrackerEntry {
         IncomeTrackerEntry(date: .now, snapshot: .placeholder)
     }
 
-    // Fast path for the widget gallery and Today View.
     func getSnapshot(in context: Context, completion: @escaping (IncomeTrackerEntry) -> Void) {
         let snapshot = context.isPreview ? .placeholder : WidgetDataProvider.read()
         completion(IncomeTrackerEntry(date: .now, snapshot: snapshot ?? .placeholder))
     }
 
-    // Called by WidgetKit to build the timeline of entries to display.
-    // We emit a single entry and ask to be refreshed in one hour so the
-    // widget stays in sync after the user makes changes in the main app
-    // (the main app also triggers reloadAllTimelines immediately on save).
+    // One entry, refreshed hourly; the app also reloads timelines on every save.
     func getTimeline(in context: Context, completion: @escaping (Timeline<IncomeTrackerEntry>) -> Void) {
         let entry = IncomeTrackerEntry(date: .now, snapshot: WidgetDataProvider.read())
         let nextRefresh = Calendar.current.date(byAdding: .hour, value: 1, to: .now) ?? .now
@@ -68,105 +63,184 @@ extension WidgetSnapshot {
     )
 }
 
-// MARK: - Small Widget View (systemSmall / systemMedium)
+// MARK: - Palette (mirrors the app's Colors.swift; this target cannot import it)
 
-/// Displays the selected month's surplus in large numerals and the savings
-/// rate beneath it. When privacy mode is on, values are replaced with bullets.
-struct SmallWidgetView: View {
-    var entry: IncomeTrackerEntry
+enum WidgetPalette {
+    static let mint = Color(light: "#00B89E", dark: "#00DFC1")
+    static let red = Color(light: "#D6453B", dark: "#FFB4AB")
+    static let blue = Color(light: "#0A6CEC", dark: "#3291FF")
+}
 
-    var body: some View {
-        let snap = entry.snapshot
-        let isPrivate = snap?.privacyMode ?? false
+private extension Color {
+    init(light: String, dark: String) {
+        self.init(uiColor: UIColor { traits in
+            UIColor(Color(hexString: traits.userInterfaceStyle == .dark ? dark : light))
+        })
+    }
 
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Monthly surplus")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-
-            Text(isPrivate
-                 ? "•••••"
-                 : formatMoney(snap?.monthlySurplus ?? 0, currency: snap?.currency ?? "GBP"))
-                .font(.system(.title2, design: .rounded, weight: .bold).monospacedDigit())
-                .foregroundStyle(surplusColor(snap?.monthlySurplus ?? 0))
-                .contentTransition(.numericText())
-
-            Spacer()
-
-            Text(isPrivate
-                 ? "•• % saved"
-                 : String(format: "%.1f%% saved", snap?.savingsRate ?? 0))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .padding(16)
-        .containerBackground(.fill.tertiary, for: .widget)
-        .widgetURL(URL(string: "incometracker://dashboard"))
+    init(hexString: String) {
+        var raw = hexString
+        if raw.hasPrefix("#") { raw.removeFirst() }
+        var value: UInt64 = 0
+        Scanner(string: raw).scanHexInt64(&value)
+        let r = Double((value & 0xFF0000) >> 16) / 255
+        let g = Double((value & 0x00FF00) >> 8) / 255
+        let b = Double(value & 0x0000FF) / 255
+        self.init(.sRGB, red: r, green: g, blue: b, opacity: 1)
     }
 }
 
-// MARK: - Medium Widget View (systemMedium)
+// MARK: - Empty state
 
-/// Left column: net worth + next upcoming bill.
-/// Right column: 12-point sparkline drawn with Canvas.
-struct MediumWidgetView: View {
+/// Shown when the app has never written a snapshot (fresh install, or the app was
+/// deleted and reinstalled) instead of a misleading £0.00.
+struct NoDataWidgetView: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Image(systemName: "list.bullet.rectangle")
+                .font(.title3)
+                .foregroundStyle(WidgetPalette.blue)
+            Text("Open Income Tracker")
+                .font(.headline)
+            Text("Log a spend and this fills in.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .containerBackground(.fill.tertiary, for: .widget)
+        .widgetURL(URL(string: "incometracker://log"))
+    }
+}
+
+// MARK: - Surplus widget views
+
+/// Small: surplus + savings rate. Medium: adds income vs outgoings.
+struct SurplusWidgetView: View {
+    var entry: IncomeTrackerEntry
+    @Environment(\.widgetFamily) private var family
+
+    var body: some View {
+        if let snap = entry.snapshot {
+            let isPrivate = snap.privacyMode
+            HStack(alignment: .top, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Left this month")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+
+                    Text(isPrivate ? "•••••" : formatMoney(snap.monthlySurplus, currency: snap.currency))
+                        .font(.system(.title2, design: .rounded, weight: .bold).monospacedDigit())
+                        .foregroundStyle(surplusColor(snap.monthlySurplus))
+                        .minimumScaleFactor(0.6)
+                        .lineLimit(1)
+                        .contentTransition(.numericText())
+
+                    Spacer(minLength: 0)
+
+                    Text(isPrivate ? "•• % saved" : String(format: "%.0f%% saved", snap.savingsRate))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                if family == .systemMedium {
+                    VStack(alignment: .leading, spacing: 8) {
+                        pair(label: "In", amount: snap.monthlyIncome, currency: snap.currency, color: WidgetPalette.mint, isPrivate: isPrivate)
+                        pair(label: "Out", amount: snap.monthlyExpenses, currency: snap.currency, color: WidgetPalette.red, isPrivate: isPrivate)
+                        Spacer(minLength: 0)
+                        Link(destination: URL(string: "incometracker://log")!) {
+                            Label("Log a spend", systemImage: "plus.circle.fill")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(WidgetPalette.blue)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .containerBackground(.fill.tertiary, for: .widget)
+            .widgetURL(URL(string: "incometracker://dashboard"))
+        } else {
+            NoDataWidgetView()
+        }
+    }
+
+    @ViewBuilder
+    private func pair(label: String, amount: Double, currency: String, color: Color, isPrivate: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text(isPrivate ? "•••••" : formatMoney(amount, currency: currency))
+                .font(.system(.footnote, design: .rounded, weight: .semibold).monospacedDigit())
+                .foregroundStyle(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+    }
+}
+
+// MARK: - Net worth widget view (systemMedium)
+
+struct NetWorthWidgetView: View {
     var entry: IncomeTrackerEntry
 
     var body: some View {
-        let snap = entry.snapshot
-        let isPrivate = snap?.privacyMode ?? false
+        if let snap = entry.snapshot {
+            let isPrivate = snap.privacyMode
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Net worth")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
 
-        HStack(spacing: 16) {
-            // Left column
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Net worth")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    Text(isPrivate ? "•••••" : formatMoney(snap.netWorth, currency: snap.currency))
+                        .font(.system(.title3, design: .rounded, weight: .bold).monospacedDigit())
+                        .foregroundStyle(netWorthColor(snap.netWorth))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
 
-                Text(isPrivate
-                     ? "•••••"
-                     : formatMoney(snap?.netWorth ?? 0, currency: snap?.currency ?? "GBP"))
-                    .font(.system(.title3, design: .rounded, weight: .bold).monospacedDigit())
-                    .foregroundStyle(netWorthColor(snap?.netWorth ?? 0))
-
-                // Next bill block — only shown when data is available.
-                if let billName = snap?.nextBillName,
-                   let billAmt = snap?.nextBillAmount,
-                   let dueDay = snap?.nextBillDueDay {
-                    Spacer()
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Next bill")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                        Text(billName)
-                            .font(.caption.weight(.medium))
-                            .lineLimit(1)
-                        Text(isPrivate
-                             ? "•••• · day \(dueDay)"
-                             : "\(formatMoney(billAmt, currency: snap?.currency ?? "GBP")) · day \(dueDay)")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                    if let billName = snap.nextBillName,
+                       let billAmt = snap.nextBillAmount,
+                       let dueDay = snap.nextBillDueDay {
+                        Spacer(minLength: 0)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Next bill")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            Text(billName)
+                                .font(.caption.weight(.medium))
+                                .lineLimit(1)
+                            Text(isPrivate
+                                 ? "•••• · day \(dueDay)"
+                                 : "\(formatMoney(billAmt, currency: snap.currency)) · day \(dueDay)")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-            // Right column — sparkline
-            SparklineWidgetView(
-                values: snap?.netWorthSparkline ?? [],
-                color: netWorthColor(snap?.netWorth ?? 0)
-            )
-            .frame(width: 80, height: 50)
+                VStack(alignment: .trailing, spacing: 4) {
+                    SparklineWidgetView(
+                        values: isPrivate ? [] : snap.netWorthSparkline,
+                        color: netWorthColor(snap.netWorth)
+                    )
+                    .frame(width: 84, height: 44)
+                    Text("12-month outlook")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .containerBackground(.fill.tertiary, for: .widget)
+            .widgetURL(URL(string: "incometracker://accounts"))
+        } else {
+            NoDataWidgetView()
         }
-        .padding(16)
-        .containerBackground(.fill.tertiary, for: .widget)
-        .widgetURL(URL(string: "incometracker://dashboard"))
     }
 }
 
 // MARK: - Lock Screen — Inline (accessoryInline)
 
-/// Single line shown on the Lock Screen: an icon + the monthly surplus figure.
 struct LockScreenInlineView: View {
     var entry: IncomeTrackerEntry
 
@@ -175,17 +249,17 @@ struct LockScreenInlineView: View {
         let isPrivate = snap?.privacyMode ?? false
 
         Label(
-            isPrivate
+            snap == nil || isPrivate
                 ? "Income Tracker"
-                : "Surplus \(formatMoney(snap?.monthlySurplus ?? 0, currency: snap?.currency ?? "GBP"))",
+                : "Left \(formatMoney(snap?.monthlySurplus ?? 0, currency: snap?.currency ?? "GBP"))",
             systemImage: "chart.line.uptrend.xyaxis"
         )
+        .widgetURL(URL(string: "incometracker://ledger"))
     }
 }
 
 // MARK: - Lock Screen — Rectangular (accessoryRectangular)
 
-/// Two-line rectangular Lock Screen widget: app name + surplus figure.
 struct LockScreenRectangularView: View {
     var entry: IncomeTrackerEntry
 
@@ -194,23 +268,20 @@ struct LockScreenRectangularView: View {
         let isPrivate = snap?.privacyMode ?? false
 
         VStack(alignment: .leading, spacing: 2) {
-            Text("Income Tracker")
+            Text("Left this month")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
-            Text(isPrivate
-                 ? "•••••"
-                 : formatMoney(snap?.monthlySurplus ?? 0, currency: snap?.currency ?? "GBP"))
+            Text(snap == nil ? "Open the app" : (isPrivate ? "•••••" : formatMoney(snap?.monthlySurplus ?? 0, currency: snap?.currency ?? "GBP")))
                 .font(.system(.body, design: .rounded).monospacedDigit().bold())
                 .foregroundStyle(surplusColor(snap?.monthlySurplus ?? 0))
         }
         .containerBackground(.fill.tertiary, for: .widget)
+        .widgetURL(URL(string: "incometracker://ledger"))
     }
 }
 
 // MARK: - Sparkline (Canvas)
 
-/// Minimal polyline chart sized to whatever frame it is given.
-/// Draws a single stroke through all data points; safe with empty or single-point input.
 struct SparklineWidgetView: View {
     var values: [Double]
     var color: Color
@@ -227,7 +298,6 @@ struct SparklineWidgetView: View {
             var path = Path()
             for (i, value) in values.enumerated() {
                 let x = Double(i) * step
-                // When all values are equal range == 0; centre the line vertically.
                 let y = range > 0
                     ? size.height * (1.0 - (value - minVal) / range)
                     : size.height / 2.0
@@ -253,53 +323,48 @@ struct IncomeTrackerWidgetBundle: WidgetBundle {
     }
 }
 
-/// Shows monthly surplus and savings rate.
-/// Supports `.systemSmall` and `.systemMedium`.
+/// Shows what is left this month and the savings rate.
 struct SurplusWidget: Widget {
     let kind = "SurplusWidget"
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: IncomeTrackerTimelineProvider()) { entry in
-            SmallWidgetView(entry: entry)
+            SurplusWidgetView(entry: entry)
         }
-        .configurationDisplayName("Monthly Surplus")
-        .description("See this month's income vs expenses at a glance.")
+        .configurationDisplayName("Left this month")
+        .description("This month's surplus at a glance, with a one-tap way to log a spend.")
         .supportedFamilies([.systemSmall, .systemMedium])
     }
 }
 
 /// Shows net worth, sparkline, and next bill date.
-/// Supports `.systemMedium`.
 struct NetWorthWidget: Widget {
     let kind = "NetWorthWidget"
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: IncomeTrackerTimelineProvider()) { entry in
-            MediumWidgetView(entry: entry)
+            NetWorthWidgetView(entry: entry)
         }
         .configurationDisplayName("Net Worth")
-        .description("Your net worth forecast and next bill due date.")
+        .description("Your net worth outlook and next bill due date.")
         .supportedFamilies([.systemMedium])
     }
 }
 
 /// Shows surplus on the Lock Screen.
-/// Supports `.accessoryInline` and `.accessoryRectangular`.
 struct LockScreenWidget: Widget {
     let kind = "LockScreenWidget"
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: IncomeTrackerTimelineProvider()) { entry in
-            // SwiftUI picks the correct view based on the widget family at render time.
             LockScreenFamilyView(entry: entry)
         }
         .configurationDisplayName("Income Tracker")
-        .description("Surplus on your Lock Screen.")
+        .description("What's left this month, on your Lock Screen.")
         .supportedFamilies([.accessoryInline, .accessoryRectangular])
     }
 }
 
-/// Dispatches to the correct Lock Screen layout based on the active widget family.
 private struct LockScreenFamilyView: View {
     @Environment(\.widgetFamily) private var family
     var entry: IncomeTrackerEntry
@@ -309,7 +374,6 @@ private struct LockScreenFamilyView: View {
         case .accessoryRectangular:
             LockScreenRectangularView(entry: entry)
         default:
-            // .accessoryInline (and any future compact families)
             LockScreenInlineView(entry: entry)
         }
     }
@@ -317,8 +381,8 @@ private struct LockScreenFamilyView: View {
 
 // MARK: - Shared Helpers
 
-/// Formats a monetary amount using the iOS NumberFormatter with the given
-/// ISO 4217 currency code. JPY uses 0 fraction digits; all others use 2.
+/// Formats a monetary amount with the given ISO 4217 currency code.
+/// JPY uses 0 fraction digits; all others use 2.
 private func formatMoney(_ amount: Double, currency: String) -> String {
     let formatter = NumberFormatter()
     formatter.numberStyle = .currency
@@ -328,12 +392,10 @@ private func formatMoney(_ amount: Double, currency: String) -> String {
     return formatter.string(from: NSNumber(value: amount)) ?? "\(amount)"
 }
 
-/// Green for non-negative surplus, red for negative.
 private func surplusColor(_ surplus: Double) -> Color {
-    surplus >= 0 ? .mint : .red
+    surplus >= 0 ? WidgetPalette.mint : WidgetPalette.red
 }
 
-/// Green for non-negative net worth, red for net debt position.
 private func netWorthColor(_ netWorth: Double) -> Color {
-    netWorth >= 0 ? .mint : .red
+    netWorth >= 0 ? WidgetPalette.mint : WidgetPalette.red
 }

@@ -14,10 +14,12 @@ public struct CardModifier: ViewModifier {
     public var cornerRadius: CGFloat
     public var shadowOpacity: Double
 
+    @Environment(\.colorScheme) private var colorScheme
+
     public init(
-        padding: CGFloat = 16,
-        cornerRadius: CGFloat = 16,
-        shadowOpacity: Double = 0.06
+        padding: CGFloat = Spacing.lg,
+        cornerRadius: CGFloat = Radius.lg,
+        shadowOpacity: Double = Elevation.cardShadowOpacity
     ) {
         self.padding = padding
         self.cornerRadius = cornerRadius
@@ -31,18 +33,24 @@ public struct CardModifier: ViewModifier {
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(Color.lineStrong, lineWidth: 0.5)
+                    .strokeBorder(Color.line, lineWidth: 0.5)
             )
-            .shadow(color: Color.black.opacity(shadowOpacity), radius: 8, x: 0, y: 2)
+            // Shadows read as mud on a dark ground; the hairline carries the edge there.
+            .shadow(
+                color: Color.ink.opacity(colorScheme == .dark ? 0 : shadowOpacity),
+                radius: Elevation.cardShadowRadius,
+                x: 0,
+                y: Elevation.cardShadowY
+            )
     }
 }
 
 public extension View {
     /// Applies the standard Income Tracker card style with optional padding override.
     func cardStyle(
-        padding: CGFloat = 16,
-        cornerRadius: CGFloat = 16,
-        shadowOpacity: Double = 0.06
+        padding: CGFloat = Spacing.lg,
+        cornerRadius: CGFloat = Radius.lg,
+        shadowOpacity: Double = Elevation.cardShadowOpacity
     ) -> some View {
         modifier(CardModifier(padding: padding, cornerRadius: cornerRadius, shadowOpacity: shadowOpacity))
     }
@@ -68,10 +76,10 @@ public struct ShimmerModifier: ViewModifier {
                     GeometryReader { proxy in
                         LinearGradient(
                             gradient: Gradient(stops: [
-                                .init(color: .clear,                    location: 0.0),
-                                .init(color: Color.white.opacity(0.55), location: 0.4),
-                                .init(color: Color.white.opacity(0.55), location: 0.6),
-                                .init(color: .clear,                    location: 1.0),
+                                .init(color: .clear,                          location: 0.0),
+                                .init(color: Color.surfaceHigher.opacity(0.9), location: 0.4),
+                                .init(color: Color.surfaceHigher.opacity(0.9), location: 0.6),
+                                .init(color: .clear,                          location: 1.0),
                             ]),
                             startPoint: .leading,
                             endPoint: .trailing

@@ -306,7 +306,9 @@ enum FinanceEngine {
         startComps.day = 1
         let startDate = calendar.date(from: startComps) ?? now
 
-        return (0...horizonMonths).map { monthIndex in
+        // A negative horizon would crash the closed range; treat it as "today only".
+        let horizon = max(0, horizonMonths)
+        return (0...horizon).map { monthIndex in
             var interestCharged = 0.0
             var growthEarned = 0.0
 
@@ -949,18 +951,14 @@ enum FinanceEngine {
     }
 
     /// Same day-of-month in the target month, clamped to its length (31st -> 30th in June).
+    /// Reads characters 8..<10 of the ISO date like the web's `slice(8, 10)`, so a
+    /// date that carries a time suffix still yields the right day.
     nonisolated static func seedEntryDate(_ sourceDate: String?, toKey: String) -> String? {
-        guard let sourceDate, sourceDate.count >= 10,
-              let day = Int(sourceDate.suffix(2)), day >= 1 else { return nil }
-        let parts = toKey.split(separator: "-").compactMap { Int($0) }
-        guard parts.count == 2 else { return nil }
-        var components = DateComponents()
-        components.year = parts[0]
-        components.month = parts[1] + 1
-        components.day = 0 // day 0 of next month = last day of target month
-        let calendar = Calendar(identifier: .gregorian)
-        let lastDay = calendar.date(from: components).map { calendar.component(.day, from: $0) } ?? 28
-        let clamped = min(day, lastDay)
+        guard let sourceDate, sourceDate.count >= 10 else { return nil }
+        let dayStart = sourceDate.index(sourceDate.startIndex, offsetBy: 8)
+        let dayEnd = sourceDate.index(dayStart, offsetBy: 2)
+        guard let day = Int(sourceDate[dayStart..<dayEnd]), day >= 1 else { return nil }
+        let clamped = min(day, daysInMonth(monthKey: toKey))
         return String(format: "%@-%02d", toKey, clamped)
     }
 
@@ -1036,14 +1034,6 @@ enum FinanceEngine {
     nonisolated static func currencySymbol(for currency: CurrencyCode) -> String {
         let fmt = currencyFormatter(for: currency)
         return fmt.currencySymbol ?? currency.rawValue
-    }
-
-    // MARK: - ID helper
-
-    /// Matches TS `createId` — prefix + 8 hex characters from a UUID.
-    nonisolated static func createId(prefix: String) -> String {
-        let short = UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(8).lowercased()
-        return "\(prefix)_\(short)"
     }
 }
 

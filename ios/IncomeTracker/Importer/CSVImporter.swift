@@ -2,7 +2,10 @@
 // Ported from src/importer.ts — Swift 6, Foundation only.
 //
 // All domain types are defined in Types.swift / Constants.swift.
-// This file adds only parsing helpers and the public importer functions.
+// This file holds CSV parsing, column detection, amount/date parsing, category
+// suggestion, merchant canonicalisation, duplicate hashing and the import
+// commit. OFX, QIF and pasted-text parsing live in TextImporters.swift and
+// share the helpers here.
 
 import Foundation
 
@@ -32,6 +35,9 @@ public struct CsvImportRow: Codable, Sendable, Identifiable {
     /// For debt-payment rows: which debt account this payment reduces. Optional — unlinked
     /// debt payments still import as expenses, they just don't feed the balance roll-forward.
     public var debtAccountId: String?
+    /// Which layer decided the category: "rule", "system", "bank", "heuristic" or "user"
+    /// once the reviewer edits the row. Mirrors CategorySource in src/types.ts.
+    public var categorySource: String? = nil
 }
 
 public struct CsvImportResult: Codable, Sendable {
@@ -54,13 +60,20 @@ public struct CsvImportResult: Codable, Sendable {
             self.debit = debit; self.credit = credit; self.category = category
         }
     }
+
+    public init(rows: [CsvImportRow], errors: [String], detectedColumns: DetectedColumns, totalRows: Int) {
+        self.rows = rows
+        self.errors = errors
+        self.detectedColumns = detectedColumns
+        self.totalRows = totalRows
+    }
 }
 
 // MARK: - Column header constants (mirrors importer.ts)
 
 private let dateHeaders        = ["date", "transaction date", "posted date", "booking date", "completed date", "value date"]
 private let descriptionHeaders = ["description", "details", "narrative", "merchant", "name", "transaction", "reference", "payee", "memo"]
-private let amountHeaders      = ["amount", "value", "transaction amount", "net amount"]
+private let amountHeaders      = ["amount", "value", "transaction amount", "net amount", "money in/out", "in/out", "paid in/out"]
 private let debitHeaders       = ["debit", "withdrawal", "withdrawals", "paid out", "money out", "out", "debits"]
 private let creditHeaders      = ["credit", "deposit", "deposits", "paid in", "money in", "in", "credits"]
 private let categoryHeaders    = ["category", "type", "classification"]
@@ -113,11 +126,14 @@ private struct ColumnMap {
 
 /// Parse a raw CSV string from a bank export, detect columns, apply category rules, and
 /// flag duplicates against the existing ledger.  Mirrors `parseBankCsv` in importer.ts.
+/// `flipSigns` inverts every amount — used for credit-card statements that list
+/// purchases as positive numbers (see `detectLikelySignInversion`).
 public func parseBankCsv(
     text: String,
     fileName: String,
     state: LedgerState,
-    fallbackMonthKey: String? = nil
+    fallbackMonthKey: String? = nil,
+    flipSigns: Bool = false
 ) -> CsvImportResult {
     let table = parseCsvTable(text)
     let nonEmptyRows = table.filter { row in
@@ -155,56 +171,36 @@ public func parseBankCsv(
     for (index, cells) in nonEmptyRows.dropFirst().enumerated() {
         let rowNumber = index + 2
         let desc = getCell(cells, columns.description).trimmingCharacters(in: .whitespaces)
-        guard let parsedAmount = readAmount(cells: cells, columns: columns), !desc.isEmpty else {
+        guard let rawAmount = readAmount(cells: cells, columns: columns), !desc.isEmpty else {
             continue
         }
-        let isoDate = parseDateValue(getCell(cells, columns.date)) ?? monthStartDate(fallbackMonth)
+        let parsedAmount = flipSigns ? -rawAmount : rawAmount
+        let isoDate = parseDateValue(getCell(cells, columns.date), fallbackMonth: fallbackMonth) ?? monthStartDate(fallbackMonth)
         let bankCategory = columns.category == nil
             ? ""
             : getCell(cells, columns.category).trimmingCharacters(in: .whitespaces)
-        let suggestion = suggestCategory(description: desc, amount: parsedAmount,
-                                          rules: state.categoryRules, bankCategory: bankCategory)
-        let h = createTransactionHash(date: isoDate, description: desc, amount: parsedAmount)
-        let exactDuplicate = existingHashes.contains(h)
+
+        var row = buildImportRow(
+            rowNumber: rowNumber,
+            date: isoDate,
+            description: desc,
+            amount: parsedAmount,
+            bankCategory: bankCategory,
+            state: state,
+            existingHashes: existingHashes
+        )
+
         // Fuzzy check: an existing entry (typically added by hand) with the
         // same amount on the same day is very likely the same transaction,
         // even when the typed name doesn't match the bank's description.
-        let sameDayMatch = exactDuplicate
-            ? nil
-            : existingByDateAmount[dateAmountKey(date: isoDate, amount: parsedAmount)]
-        let isDuplicate = exactDuplicate || sameDayMatch != nil
-        let kind = suggestion.kind
-
-        let note: String
-        if exactDuplicate {
-            note = "Possible duplicate"
-        } else if let sameDayMatch {
-            note = "Same amount on the same day as “\(sameDayMatch)”"
-        } else {
-            note = suggestion.note
+        if !row.duplicate,
+           let sameDayMatch = existingByDateAmount[dateAmountKey(date: isoDate, amount: parsedAmount)] {
+            row.duplicate = true
+            row.duplicateOf = sameDayMatch
+            row.include = false
+            row.note = "Same amount on the same day as “\(sameDayMatch)”"
         }
-
-        rows.append(CsvImportRow(
-            id: "draft-\(rowNumber)-\(h)",
-            rowNumber: rowNumber,
-            date: isoDate,
-            monthKey: String(isoDate.prefix(7)),
-            description: desc,
-            amount: parsedAmount,
-            rawAmount: String(format: "%.2f", parsedAmount),
-            kind: kind,
-            suggestedKind: kind,
-            category: suggestion.category,
-            suggestedCategory: suggestion.category,
-            color: csvCategoryColor(suggestion.category),
-            include: !isDuplicate && kind != .transfer,
-            duplicate: isDuplicate,
-            duplicateOf: sameDayMatch,
-            confidence: suggestion.confidence,
-            note: note,
-            hash: h,
-            debtAccountId: suggestion.debtAccountId
-        ))
+        rows.append(row)
     }
 
     let sorted = sortImportRows(rows)
@@ -213,6 +209,58 @@ public func parseBankCsv(
         errors: sorted.isEmpty ? ["No importable transactions were found in this CSV."] : [],
         detectedColumns: buildDetectedColumns(headers: headerRow, columns: columns),
         totalRows: max(0, nonEmptyRows.count - 1)
+    )
+}
+
+/// Single point every capture path funnels through — CSV rows, pasted lines, OFX/QIF
+/// records and staged bank-feed transactions all become the same reviewable row.
+/// Mirrors `buildImportRow` in importer.ts. `externalId` (an OFX FITID or a feed
+/// transaction id) becomes the dedupe key when present.
+public func buildImportRow(
+    rowNumber: Int,
+    date: String,
+    description: String,
+    amount: Double,
+    bankCategory: String,
+    state: LedgerState,
+    existingHashes: Set<String>,
+    externalId: String? = nil,
+    noteOverride: String? = nil
+) -> CsvImportRow {
+    let suggestion = suggestCategory(description: description, amount: amount,
+                                     rules: state.categoryRules, bankCategory: bankCategory)
+    let fallbackHash = createTransactionHash(date: date, description: description, amount: amount)
+    let hash: String
+    if let externalId {
+        let cleaned = externalId.replacingOccurrences(of: "[^a-zA-Z0-9_-]", with: "", options: .regularExpression)
+        hash = "ext-\(cleaned)"
+    } else {
+        hash = fallbackHash
+    }
+    let duplicate = existingHashes.contains(hash) || existingHashes.contains(fallbackHash)
+    let kind = suggestion.kind
+
+    return CsvImportRow(
+        id: "draft-\(rowNumber)-\(hash)",
+        rowNumber: rowNumber,
+        date: date,
+        monthKey: String(date.prefix(7)),
+        description: description,
+        amount: amount,
+        rawAmount: String(format: "%.2f", amount),
+        kind: kind,
+        suggestedKind: kind,
+        category: suggestion.category,
+        suggestedCategory: suggestion.category,
+        color: csvCategoryColor(suggestion.category),
+        include: !duplicate && kind != .transfer,
+        duplicate: duplicate,
+        duplicateOf: nil,
+        confidence: suggestion.confidence,
+        note: duplicate ? "Possible duplicate" : (noteOverride ?? suggestion.note),
+        hash: hash,
+        debtAccountId: suggestion.debtAccountId,
+        categorySource: suggestion.source
     )
 }
 
@@ -250,27 +298,50 @@ public func sortImportRows(_ rows: [CsvImportRow]) -> [CsvImportRow] {
     }
 }
 
-/// Add included rows to the appropriate month buckets, create CategoryRules for new
-/// categories, and return a new ImportBatch.
-/// Mirrors `commitImport` in importer.ts.
+/// Outcome of committing a reviewed import — what the confirmation toast reports.
+public struct ImportCommitResult: Sendable, Hashable {
+    /// nil when nothing was imported (only transfer patterns were learned, or no rows).
+    public var batch: ImportBatch?
+    public var importedRows: Int
+    /// Rows marked as transfers: not imported, but their payee patterns were saved.
+    public var learnedTransferPatterns: Int
+    /// Existing ledger entries removed because they now match a transfer rule.
+    public var sweptEntries: Int
+    /// Auto-seeded recurring entries folded into imported actuals for the same merchant.
+    public var mergedSeededEntries: Int
+
+    public var didChangeLedger: Bool {
+        importedRows > 0 || learnedTransferPatterns > 0 || sweptEntries > 0 || mergedSeededEntries > 0
+    }
+}
+
+/// Adds the included rows to their month buckets with fresh ids, folds auto-seeded
+/// recurring copies into the imported actuals, learns category rules from every reviewed
+/// row (transfer rows included), sweeps existing entries that match the now-known transfer
+/// payees, and records the batch (newest first, capped at 25).
+/// Mirrors `confirmCsvImport` in App.tsx.
 @discardableResult
 public func commitImport(
     rows: [CsvImportRow],
     into state: inout LedgerState,
-    fileName: String
-) -> ImportBatch {
-    let batchId = "batch-\(UUID().uuidString)"
-    let importedAt = ISO8601DateFormatter().string(from: Date())
+    fileName: String,
+    totalRows: Int? = nil
+) -> ImportCommitResult {
+    let rowsToImport = rows.filter { $0.include && $0.kind != .transfer }
+    // Transfers between the user's own accounts are never imported, but their payee
+    // patterns are saved so future imports auto-skip them and existing matches are swept.
+    let transferRows = rows.filter { $0.kind == .transfer }
+    guard !rowsToImport.isEmpty || !transferRows.isEmpty else {
+        return ImportCommitResult(batch: nil, importedRows: 0, learnedTransferPatterns: 0,
+                                  sweptEntries: 0, mergedSeededEntries: 0)
+    }
+
+    let batchId = createId(prefix: "batch")
+    let importedAt = isoTimestampNow()
     var refs: [ImportedTransactionRef] = []
 
-    let includedRows = rows.filter(\.include)
-
-    for row in includedRows {
-        let monthKey = row.monthKey
-        if state.months[monthKey] == nil {
-            state.months[monthKey] = MonthBudget()
-        }
-
+    for (index, row) in rowsToImport.enumerated() {
+        var month = state.months[row.monthKey] ?? .empty
         let meta = ImportedTransactionMeta(
             batchId: batchId,
             fileName: fileName,
@@ -280,83 +351,271 @@ public func commitImport(
             importedAt: importedAt
         )
 
-        switch row.kind {
-        case .income:
+        if row.kind == .income {
             let entry = IncomeEntry(
-                id: row.id,
+                id: createId(prefix: "income"),
                 source: row.description,
-                amount: row.amount,
-                color: row.color,
-                recurring: false,
-                date: row.date,
-                imported: meta
-            )
-            state.months[monthKey]!.incomes.append(entry)
-            refs.append(ImportedTransactionRef(monthKey: monthKey, entryId: row.id, kind: .income))
-
-        case .expense, .debtPayment, .transfer:
-            let entry = ExpenseEntry(
-                id: row.id,
-                name: row.description,
-                category: row.category,
                 amount: abs(row.amount),
-                color: row.color,
+                color: row.color.isEmpty ? paletteColor(at: index) : row.color,
+                // Imported bank rows are historical actuals — one-off by default, not run-rate.
                 recurring: false,
                 date: row.date,
                 imported: meta,
-                debtAccountId: row.kind == .debtPayment ? row.debtAccountId : nil
+                categorySource: row.categorySource
             )
-            state.months[monthKey]!.expenses.append(entry)
-            refs.append(ImportedTransactionRef(monthKey: monthKey, entryId: row.id, kind: .expense))
+            month.incomes.append(entry)
+            refs.append(ImportedTransactionRef(monthKey: row.monthKey, entryId: entry.id, kind: .income))
+        } else {
+            let trimmedCategory = row.category.trimmingCharacters(in: .whitespaces)
+            let entry = ExpenseEntry(
+                id: createId(prefix: "expense"),
+                name: row.description,
+                category: trimmedCategory.isEmpty
+                    ? (row.kind == .debtPayment ? "Debt payments" : "Unsorted")
+                    : trimmedCategory,
+                amount: abs(row.amount),
+                color: row.color.isEmpty ? paletteColor(at: index + 2) : row.color,
+                recurring: false,
+                date: row.date,
+                imported: meta,
+                debtAccountId: row.kind == .debtPayment ? row.debtAccountId : nil,
+                categorySource: row.categorySource
+            )
+            month.expenses.append(entry)
+            refs.append(ImportedTransactionRef(monthKey: row.monthKey, entryId: entry.id, kind: .expense))
         }
-
-        // Create a CategoryRule for new categories when no existing rule covers the description.
-        let patternStr = buildRulePattern(from: row.description)
-        if !patternStr.isEmpty {
-            let alreadyCovered = state.categoryRules.contains { r in
-                descriptionMatchesPattern(normalizeMerchant(row.description), pattern: r.pattern)
-            }
-            if !alreadyCovered {
-                let newRule = CategoryRule(
-                    id: "rule-\(UUID().uuidString)",
-                    pattern: patternStr,
-                    category: row.category,
-                    kind: row.kind,
-                    // Remember which debt account this payee pays so future imports auto-link.
-                    debtAccountId: row.kind == .debtPayment ? row.debtAccountId : nil,
-                    createdAt: importedAt,
-                    updatedAt: importedAt
-                )
-                state.categoryRules.append(newRule)
-            }
-        }
+        state.months[row.monthKey] = month
     }
 
-    let batch = ImportBatch(
-        id: batchId,
-        fileName: fileName,
-        importedAt: importedAt,
-        totalRows: rows.count,
-        importedRows: includedRows.count,
-        skippedRows: rows.count - includedRows.count,
-        transactionRefs: refs
+    // Auto-seeded recurring rows fold into the imported actuals for the same merchant
+    // instead of doubling — the import wins and inherits the recurring role.
+    var mergedSeeded = 0
+    for monthKey in Set(rowsToImport.map(\.monthKey)) {
+        guard let month = state.months[monthKey] else { continue }
+        let reconciled = Recurrence.reconcileSeededEntries(month)
+        state.months[monthKey] = reconciled.month
+        mergedSeeded += reconciled.merged
+    }
+
+    state.categoryRules = mergeCategoryRules(state.categoryRules, rows: rowsToImport + transferRows, timestamp: importedAt)
+    let swept = sweepTransferEntries(months: state.months, rules: state.categoryRules)
+    state.months = swept.months
+
+    var batch: ImportBatch?
+    if !refs.isEmpty {
+        let total = totalRows ?? rows.count
+        let record = ImportBatch(
+            id: batchId,
+            fileName: fileName,
+            importedAt: importedAt,
+            totalRows: total,
+            importedRows: refs.count,
+            skippedRows: max(0, total - refs.count),
+            transactionRefs: refs
+        )
+        state.importBatches.insert(record, at: 0)
+        if state.importBatches.count > 25 {
+            state.importBatches = Array(state.importBatches.prefix(25))
+        }
+        batch = record
+    }
+
+    return ImportCommitResult(
+        batch: batch,
+        importedRows: refs.count,
+        learnedTransferPatterns: transferRows.count,
+        sweptEntries: swept.removed,
+        mergedSeededEntries: mergedSeeded
     )
-    state.importBatches.append(batch)
-    return batch
+}
+
+/// Upserts one rule per reviewed row, keyed by payee pattern — an existing rule keeps
+/// its id, creation time and position; the newest 120 survive.
+/// Mirrors `mergeCategoryRules` in App.tsx (rows with no category, or "Unsorted", teach nothing).
+public func mergeCategoryRules(_ existing: [CategoryRule], rows: [CsvImportRow], timestamp: String) -> [CategoryRule] {
+    var order: [String] = []
+    var byPattern: [String: CategoryRule] = [:]
+    for rule in existing {
+        if byPattern[rule.pattern] == nil { order.append(rule.pattern) }
+        byPattern[rule.pattern] = rule
+    }
+
+    for row in rows {
+        let pattern = buildRulePattern(from: row.description)
+        let category = row.category.trimmingCharacters(in: .whitespaces)
+        guard !pattern.isEmpty, !category.isEmpty, category != "Unsorted" else { continue }
+        let previous = byPattern[pattern]
+        if previous == nil { order.append(pattern) }
+        byPattern[pattern] = CategoryRule(
+            id: previous?.id ?? createId(prefix: "rule"),
+            pattern: pattern,
+            category: category,
+            kind: row.kind,
+            // Remember which debt account this payee pays so future imports auto-link.
+            debtAccountId: row.kind == .debtPayment ? (row.debtAccountId ?? previous?.debtAccountId) : nil,
+            createdAt: previous?.createdAt ?? timestamp,
+            updatedAt: timestamp
+        )
+    }
+
+    return Array(order.compactMap { byPattern[$0] }.suffix(120))
+}
+
+/// Adds or refreshes a "transfer between my accounts" rule for a payee pattern.
+/// Mirrors `upsertTransferRule` in App.tsx.
+public func upsertTransferRule(_ rules: [CategoryRule], pattern: String, timestamp: String) -> [CategoryRule] {
+    var next = rules
+    if let index = next.firstIndex(where: { $0.pattern == pattern }) {
+        next[index].category = "Transfers"
+        next[index].kind = .transfer
+        next[index].updatedAt = timestamp
+    } else {
+        next.append(CategoryRule(
+            id: createId(prefix: "rule"),
+            pattern: pattern,
+            category: "Transfers",
+            kind: .transfer,
+            createdAt: timestamp,
+            updatedAt: timestamp
+        ))
+    }
+    return next
+}
+
+/// Removes every ledger entry whose description matches a saved transfer rule and
+/// reports how many went, so callers can say so. Mirrors `sweepTransferEntries`.
+public func sweepTransferEntries(months: [String: MonthBudget], rules: [CategoryRule]) -> (months: [String: MonthBudget], removed: Int) {
+    let transferRules = rules.filter { $0.kind == .transfer }
+    guard !transferRules.isEmpty else { return (months, 0) }
+
+    var removed = 0
+    var next = months
+    for (monthKey, month) in months {
+        let incomes = month.incomes.filter { income in
+            let hit = isTransferDescription(income.source, rules: transferRules)
+            if hit { removed += 1 }
+            return !hit
+        }
+        let expenses = month.expenses.filter { expense in
+            let hit = isTransferDescription(expense.name, rules: transferRules)
+            if hit { removed += 1 }
+            return !hit
+        }
+        if incomes.count != month.incomes.count || expenses.count != month.expenses.count {
+            next[monthKey] = MonthBudget(incomes: incomes, expenses: expenses, note: month.note)
+        }
+    }
+    return (next, removed)
+}
+
+/// A category correction on an imported entry becomes a saved rule, and the rule is
+/// swept backwards over entries no human has sorted yet (Unsorted, or an automated
+/// guess) — never over a category the user set by hand. Returns how many entries were
+/// re-categorised. Mirrors `learnCategoryRule` in App.tsx.
+@discardableResult
+public func learnCategoryRule(
+    in state: inout LedgerState,
+    description: String,
+    category: String,
+    kind: TransactionKind,
+    excludeEntryId: String? = nil
+) -> Int {
+    let pattern = buildRulePattern(from: description)
+    let category = category.trimmingCharacters(in: .whitespaces)
+    guard !pattern.isEmpty, !category.isEmpty else { return 0 }
+
+    let timestamp = isoTimestampNow()
+    var rules = state.categoryRules
+    if let index = rules.firstIndex(where: { $0.pattern == pattern }) {
+        rules[index].category = category
+        rules[index].kind = kind
+        rules[index].updatedAt = timestamp
+    } else {
+        rules.append(CategoryRule(
+            id: createId(prefix: "rule"),
+            pattern: pattern,
+            category: category,
+            kind: kind,
+            createdAt: timestamp,
+            updatedAt: timestamp
+        ))
+    }
+    state.categoryRules = Array(rules.suffix(120))
+
+    let anchorColor = state.months.keys.sorted()
+        .flatMap { state.months[$0]?.expenses ?? [] }
+        .first { $0.category == category }?.color
+        ?? paletteColor(at: category.count)
+
+    var applied = 0
+    for monthKey in state.months.keys.sorted() {
+        guard var month = state.months[monthKey] else { continue }
+        var changed = false
+        for index in month.expenses.indices {
+            let expense = month.expenses[index]
+            if expense.id == excludeEntryId { continue }
+            if expense.categorySource == "user" || expense.category == category { continue }
+            let humanSorted = expense.imported == nil
+                && !expense.category.isEmpty
+                && expense.category != "Unsorted"
+                && expense.categorySource == nil
+            if humanSorted { continue }
+            let original = expense.imported?.originalDescription ?? ""
+            let matchText = original.isEmpty ? expense.name : original
+            guard descriptionMatchesPattern(canonicalizeMerchant(matchText), pattern: pattern) else { continue }
+            month.expenses[index].category = category
+            month.expenses[index].color = anchorColor
+            month.expenses[index].categorySource = "rule"
+            applied += 1
+            changed = true
+        }
+        if changed { state.months[monthKey] = month }
+    }
+    return applied
+}
+
+/// Removes a batch and every entry it imported. Mirrors `removeImportBatchFromState`.
+public func removeImportBatch(from state: inout LedgerState, batchId: String) {
+    guard let batch = state.importBatches.first(where: { $0.id == batchId }) else { return }
+    let refKeys = Set(batch.transactionRefs.map { "\($0.monthKey):\($0.entryId):\($0.kind.rawValue)" })
+    for (monthKey, month) in state.months {
+        var next = month
+        next.incomes.removeAll { income in
+            income.imported?.batchId == batchId || refKeys.contains("\(monthKey):\(income.id):income")
+        }
+        next.expenses.removeAll { expense in
+            expense.imported?.batchId == batchId || refKeys.contains("\(monthKey):\(expense.id):expense")
+        }
+        if next != month { state.months[monthKey] = next }
+    }
+    state.importBatches.removeAll { $0.id == batchId }
 }
 
 // MARK: - Hash
 
+/// `Number.prototype.toFixed(2)` semantics: sign from the original value (so
+/// -0.001 prints "-0.00" but -0 prints "0.00"), halves rounded away from zero.
+/// printf's %.2f rounds half-to-even, which would put 0.125 on the wrong side and
+/// give the two clients different duplicate hashes for the same transaction.
+func jsToFixed2(_ value: Double) -> String {
+    guard value.isFinite else { return String(format: "%.2f", value) }
+    let scaled = (value * 100).rounded(.toNearestOrAwayFromZero)
+    guard abs(scaled) < 1e15 else { return String(format: "%.2f", value) }
+    let pence = Int(abs(scaled))
+    let sign = value < 0 ? "-" : ""
+    return "\(sign)\(pence / 100).\(String(format: "%02d", pence % 100))"
+}
+
 /// Deterministic, JS-compatible 32-bit integer hash.
-/// Mirrors `createTransactionHash` in importer.ts, including Math.imul and the |0 truncation.
+/// Mirrors `createTransactionHash` in importer.ts: Math.imul(31, hash) + charCode,
+/// truncated to Int32 each step, then `Math.abs(hash).toString(36)`.
 public func createTransactionHash(date: String, description: String, amount: Double) -> String {
-    let key = "\(date)|\(normalizeMerchant(description))|\(String(format: "%.2f", amount))"
+    let key = "\(date)|\(normalizeMerchant(description))|\(jsToFixed2(amount))"
     var hash: Int32 = 0
-    for scalar in key.unicodeScalars {
-        // Math.imul(31, hash) + charCodeAt; then truncate to Int32 (|= 0 in JS)
-        hash = 31 &* hash &+ Int32(bitPattern: scalar.value)
+    for unit in key.utf16 {
+        hash = 31 &* hash &+ Int32(unit)
     }
-    return String(UInt32(bitPattern: hash), radix: 36)
+    return String(hash.magnitude, radix: 36)
 }
 
 // MARK: - Pattern matching
@@ -371,9 +630,11 @@ public func descriptionMatchesPattern(_ normalizedDescription: String, pattern: 
     return patternTokens.allSatisfy { pt in descTokens.contains { dt in dt.contains(pt) } }
 }
 
-// MARK: - Private helpers
+// MARK: - Merchant normalisation
 
-func normalizeMerchant(_ description: String) -> String {
+/// Mirrors `normalizeMerchant` in importer.ts. Used for the dedupe hash, so it
+/// must never change without a matching change on the web.
+public func normalizeMerchant(_ description: String) -> String {
     var result = description.lowercased()
     result = result.replacingOccurrences(of: "[^a-z0-9\\s]", with: " ", options: .regularExpression)
     result = result.replacingOccurrences(
@@ -382,6 +643,57 @@ func normalizeMerchant(_ description: String) -> String {
     )
     result = result.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
     return result.trimmingCharacters(in: .whitespaces)
+}
+
+/// UK bank descriptors abbreviate merchants in predictable ways. Expanding the common
+/// variants before rule matching lets one saved rule cover them all. Applied only to
+/// matching and grouping (never to the dedupe hash). Mirrors `canonicalizeMerchant`.
+private let merchantAliases: [(pattern: String, replacement: String)] = [
+    (#"\bamzn(?:\s+mktp)?\b"#, "amazon"),
+    (#"\bamz\b"#, "amazon"),
+    (#"\bsbux\b"#, "starbucks"),
+    (#"\bmcd(?:onalds)?\b"#, "mcdonalds"),
+    (#"\btfl(?:\s+travel(?:\s+ch(?:arge)?)?)?\b"#, "tfl"),
+    (#"\bsainsburys?\s*s\/?mkts?\b"#, "sainsburys"),
+    (#"\bm\s*&\s*s\b"#, "marks and spencer"),
+    (#"\bwm\s+morrisons?\b"#, "morrisons"),
+    (#"\bb\s*&\s*q\b"#, "b and q"),
+    (#"\bpaypal\s*\*"#, "paypal "),
+    (#"\bsumup\s*\*"#, "sumup "),
+    (#"\bzettle\b[_ ]*"#, "zettle "),
+    (#"\bsq\s*\*"#, "square "),
+    (#"\bcrv\b"#, ""),
+    (#"\bgoogle\s*\*"#, "google "),
+    (#"\bapple\.com\/bill\b"#, "apple"),
+    (#"\bamznprime\b"#, "amazon prime"),
+]
+
+public func canonicalizeMerchant(_ description: String) -> String {
+    var canonical = normalizeMerchant(description)
+    for alias in merchantAliases {
+        canonical = canonical.replacingOccurrences(of: alias.pattern, with: alias.replacement, options: .regularExpression)
+    }
+    // Domain suffixes survive normalization as bare tokens ("NETFLIX.COM" → "netflix com");
+    // stripping them lets web and card descriptors of the same merchant group together.
+    canonical = canonical.replacingOccurrences(of: #"\b(?:www|com|net|org|co uk|couk)\b"#, with: " ", options: .regularExpression)
+    canonical = canonical.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+    return canonical.trimmingCharacters(in: .whitespaces)
+}
+
+/// Jaccard similarity over token sets, with substring token credit so "sainsbury"
+/// still counts against "sainsburys". Mirrors `tokenSetSimilarity`.
+private func tokenSetSimilarity(_ description: String, _ pattern: String) -> Double {
+    let descTokens = Set(description.split(separator: " ").map(String.init).filter { $0.count > 1 })
+    let patternTokens = Set(pattern.lowercased().split(separator: " ").map(String.init).filter { $0.count > 1 })
+    guard !descTokens.isEmpty, !patternTokens.isEmpty else { return 0 }
+    var overlap = 0
+    for patternToken in patternTokens {
+        if descTokens.contains(where: { $0 == patternToken || $0.contains(patternToken) || patternToken.contains($0) }) {
+            overlap += 1
+        }
+    }
+    let unionSize = descTokens.count + patternTokens.count - overlap
+    return unionSize > 0 ? Double(overlap) / Double(unionSize) : 0
 }
 
 private func toTitleCase(_ value: String) -> String {
@@ -396,7 +708,7 @@ private func toTitleCase(_ value: String) -> String {
 }
 
 /// Maps a category name to a color from the shared palette.
-/// Mirrors `categoryColor` in importer.ts.
+/// Mirrors `categoryColor` in importer.ts (fallback index = name length).
 private func csvCategoryColor(_ category: String) -> String {
     let normalized = category.trimmingCharacters(in: .whitespaces).lowercased()
     let knownCategories = [
@@ -404,20 +716,15 @@ private func csvCategoryColor(_ category: String) -> String {
         "personal", "work", "subscriptions", "income",
         "debt payments", "transfers", "unsorted"
     ]
-    let idx: Int
-    if let found = knownCategories.firstIndex(of: normalized) {
-        idx = found
-    } else {
-        // Stable fallback: use character-value sum modulo palette length
-        idx = normalized.unicodeScalars.reduce(0) { $0 + Int($1.value) }
-    }
+    let idx = knownCategories.firstIndex(of: normalized) ?? normalized.count
     return CATEGORY_COLORS[idx % CATEGORY_COLORS.count]
 }
 
 // MARK: - CSV parsing
 
 private func detectDelimiter(_ text: String) -> Character {
-    let sample = text.split(separator: "\n", maxSplits: 5).map(String.init).joined(separator: "\n")
+    let sample = text.split(separator: "\n", maxSplits: 5, omittingEmptySubsequences: true)
+        .prefix(5).map(String.init).joined(separator: "\n")
     let candidates: [Character] = [",", ";", "\t"]
     return candidates
         .map { delim -> (Character, Int) in
@@ -427,8 +734,17 @@ private func detectDelimiter(_ text: String) -> Character {
         .max(by: { $0.1 < $1.1 })?.0 ?? ","
 }
 
+/// Swift treats "\r\n" as a single grapheme, so a character-level scanner
+/// looking for "\n" never sees a line break in a Windows-formatted export and the
+/// whole file collapses into one row. Normalise before tokenising.
+private func normalizeLineEndings(_ text: String) -> String {
+    text.replacingOccurrences(of: "\r\n", with: "\n")
+        .replacingOccurrences(of: "\r", with: "\n")
+}
+
 private func parseCsvTable(_ text: String) -> [[String]] {
-    parseCsvTableWithDelimiter(text, delimiter: detectDelimiter(text))
+    let normalized = normalizeLineEndings(text)
+    return parseCsvTableWithDelimiter(normalized, delimiter: detectDelimiter(normalized))
 }
 
 private func parseCsvTableWithDelimiter(_ text: String, delimiter: Character) -> [[String]] {
@@ -478,15 +794,39 @@ private func parseCsvTableWithDelimiter(_ text: String, delimiter: Character) ->
 // MARK: - Column detection
 
 private func normalizeHeader(_ header: String) -> String {
-    header.trimmingCharacters(in: .whitespaces)
+    header.trimmingCharacters(in: .whitespacesAndNewlines)
+        .replacingOccurrences(of: "\u{FEFF}", with: "")
         .lowercased()
         .replacingOccurrences(of: "_", with: " ")
         .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
 }
 
+/// Whole-word containment, so "in" does not match "booking date" and "out" does
+/// not match "checkout". "/" and "_" count as separators.
+private func headerWords(_ value: String) -> [String] {
+    value.lowercased()
+        .split(whereSeparator: { ch in !(ch.isLetter || ch.isNumber || ch == "%" || ch == "£" || ch == "$") })
+        .map(String.init)
+}
+
+private func containsAliasWords(_ header: String, _ alias: String) -> Bool {
+    let words = headerWords(header)
+    let needle = headerWords(alias)
+    guard !needle.isEmpty, words.count >= needle.count else { return false }
+    for start in 0...(words.count - needle.count) {
+        var matched = true
+        for offset in 0..<needle.count where words[start + offset] != needle[offset] {
+            matched = false
+            break
+        }
+        if matched { return true }
+    }
+    return false
+}
+
 private func findColumn(_ headers: [String], aliases: [String]) -> Int {
     if let idx = headers.firstIndex(where: { aliases.contains($0) }) { return idx }
-    if let idx = headers.firstIndex(where: { h in aliases.contains { h.contains($0) } }) { return idx }
+    if let idx = headers.firstIndex(where: { h in aliases.contains { containsAliasWords(h, $0) } }) { return idx }
     return -1
 }
 
@@ -496,12 +836,25 @@ private func optionalColumn(_ headers: [String], aliases: [String]) -> Int? {
 }
 
 private func detectColumns(_ headers: [String]) -> ColumnMap {
-    ColumnMap(
+    var amount = optionalColumn(headers, aliases: amountHeaders)
+    var debit  = optionalColumn(headers, aliases: debitHeaders)
+    var credit = optionalColumn(headers, aliases: creditHeaders)
+    // One column matched both "money in" and "money out": it is a signed amount.
+    if let d = debit, d == credit {
+        amount = amount ?? d
+        debit = nil
+        credit = nil
+    }
+    // "Debit Amount" + "Credit Amount": keep the pair, not one of them as the amount.
+    if let d = debit, let c = credit, amount == d || amount == c {
+        amount = nil
+    }
+    return ColumnMap(
         date:        findColumn(headers, aliases: dateHeaders),
         description: findColumn(headers, aliases: descriptionHeaders),
-        amount:      optionalColumn(headers, aliases: amountHeaders),
-        debit:       optionalColumn(headers, aliases: debitHeaders),
-        credit:      optionalColumn(headers, aliases: creditHeaders),
+        amount:      amount,
+        debit:       debit,
+        credit:      credit,
         category:    optionalColumn(headers, aliases: categoryHeaders)
     )
 }
@@ -530,10 +883,16 @@ private func readAmount(cells: [String], columns: ColumnMap) -> Double? {
     let debit  = abs(parseAmount(getCell(cells, columns.debit))  ?? 0.0)
     let credit = abs(parseAmount(getCell(cells, columns.credit)) ?? 0.0)
     if debit == 0.0 && credit == 0.0 { return nil }
-    return Double(String(format: "%.2f", credit - debit))
+    return roundToPence(credit - debit)
 }
 
-private func parseAmount(_ value: String) -> Double? {
+func roundToPence(_ value: Double) -> Double {
+    (value * 100).rounded() / 100
+}
+
+/// Mirrors `parseAmount` in importer.ts: parentheses negatives, currency symbols,
+/// thousands separators and comma decimals.
+func parseAmount(_ value: String) -> Double? {
     let trimmed = value.trimmingCharacters(in: .whitespaces)
     guard !trimmed.isEmpty else { return nil }
 
@@ -547,49 +906,92 @@ private func parseAmount(_ value: String) -> Double? {
 
     if normalized.contains(".") && normalized.contains(",") {
         normalized = normalized.replacingOccurrences(of: ",", with: "")
-    } else if normalized.contains(",") {
-        let commaDecimalPattern = try? NSRegularExpression(pattern: ",\\d{1,2}$")
-        let range = NSRange(normalized.startIndex..., in: normalized)
-        if commaDecimalPattern?.firstMatch(in: normalized, range: range) != nil {
-            normalized = normalized.replacingOccurrences(of: ",", with: ".")
-        } else {
-            normalized = normalized.replacingOccurrences(of: ",", with: "")
-        }
+    } else if normalized.contains(","), normalized.range(of: ",\\d{1,2}$", options: .regularExpression) != nil {
+        normalized = normalized.replacingOccurrences(of: ",", with: ".")
+    } else {
+        normalized = normalized.replacingOccurrences(of: ",", with: "")
     }
 
     guard let parsed = Double(normalized), parsed.isFinite else { return nil }
     let result = negativeByParentheses ? -abs(parsed) : parsed
-    return Double(String(format: "%.2f", result))
+    return roundToPence(result)
 }
 
 // MARK: - Date parsing
 
-private func parseDateValue(_ value: String) -> String? {
+private let monthNames = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
+
+func monthFromName(_ name: String) -> Int? {
+    let key = String(name.lowercased().prefix(3))
+    guard let idx = monthNames.firstIndex(of: key) else { return nil }
+    return idx + 1
+}
+
+/// "13 Jun" / "Jun 13" with no year. Returns day and month so the caller can supply the year.
+func parseDayMonth(_ first: String, _ second: String) -> (day: Int, month: Int)? {
+    let a = first.trimmingCharacters(in: CharacterSet(charactersIn: ".,"))
+    let b = second.trimmingCharacters(in: CharacterSet(charactersIn: ".,"))
+    if let day = Int(a), a.count <= 2, b.range(of: "^[A-Za-z]{3,9}$", options: .regularExpression) != nil,
+       let month = monthFromName(b) {
+        return (day, month)
+    }
+    if let day = Int(b), b.count <= 2, a.range(of: "^[A-Za-z]{3,9}$", options: .regularExpression) != nil,
+       let month = monthFromName(a) {
+        return (day, month)
+    }
+    return nil
+}
+
+/// Pick the year for a day-month date: the month being imported into, unless that
+/// would put the transaction more than a month into the future (a December statement
+/// pasted in January), in which case the previous year.
+func yearForDayMonth(month: Int, fallbackMonth: String) -> Int {
+    let year = Int(fallbackMonth.prefix(4)) ?? Calendar.current.component(.year, from: Date())
+    let fallbackMonthNumber = Int(fallbackMonth.dropFirst(5).prefix(2)) ?? month
+    return month > fallbackMonthNumber + 1 ? year - 1 : year
+}
+
+/// Parses the date formats UK banks actually emit. Mirrors `parseDateValue` in importer.ts.
+func parseDateValue(_ value: String, fallbackMonth: String? = nil) -> String? {
     let trimmed = value.trimmingCharacters(in: .whitespaces)
     guard !trimmed.isEmpty else { return nil }
 
-    // ISO: YYYY-MM-DD or YYYY/MM/DD
-    let isoPattern = try? NSRegularExpression(pattern: #"^(\d{4})[-/](\d{1,2})[-/](\d{1,2})"#)
-    if let match = isoPattern?.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)) {
-        let y = intFrom(trimmed, match: match, group: 1)
-        let m = intFrom(trimmed, match: match, group: 2)
-        let d = intFrom(trimmed, match: match, group: 3)
-        return formatDateParts(year: y, month: m, day: d)
+    // Day-month with no year ("13 Jun", "Jun 13"): the year comes from the month being imported into.
+    let dayMonthTokens = trimmed.split(whereSeparator: { $0 == " " || $0 == "-" || $0 == "/" }).map(String.init)
+    if dayMonthTokens.count == 2, let dayMonth = parseDayMonth(dayMonthTokens[0], dayMonthTokens[1]) {
+        let year = fallbackMonth.map { yearForDayMonth(month: dayMonth.month, fallbackMonth: $0) }
+            ?? Calendar.current.component(.year, from: Date())
+        return formatDateParts(year: year, month: dayMonth.month, day: dayMonth.day)
     }
 
-    // Slash / dash ambiguous: DD/MM/YY(YY) or MM/DD/YY(YY)
-    let slashPattern = try? NSRegularExpression(pattern: #"^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$"#)
-    if let match = slashPattern?.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)) {
-        let first   = intFrom(trimmed, match: match, group: 1)
-        let second  = intFrom(trimmed, match: match, group: 2)
-        let rawYear = intFrom(trimmed, match: match, group: 3)
-        let year    = normalizeYear(rawYear)
+    // ISO: YYYY-MM-DD or YYYY/MM/DD (optionally followed by a time)
+    if let match = trimmed.firstMatchGroups(of: #"^(\d{4})[-/](\d{1,2})[-/](\d{1,2})"#) {
+        return formatDateParts(year: Int(match[1]) ?? 0, month: Int(match[2]) ?? 0, day: Int(match[3]) ?? 0)
+    }
+
+    // Slash / dash ambiguous: DD/MM/YY(YY) or MM/DD/YY(YY), optionally followed by a time
+    if let match = trimmed.firstMatchGroups(of: #"^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})(?:[ T].*)?$"#) {
+        let first   = Int(match[1]) ?? 0
+        let second  = Int(match[2]) ?? 0
+        let year    = normalizeYear(Int(match[3]) ?? 0)
         let day     = first > 12 ? first  : (second > 12 ? second : first)
         let month   = first > 12 ? second : (second > 12 ? first  : second)
         return formatDateParts(year: year, month: month, day: day)
     }
 
-    // Fallback — try ISO-8601 full-date parser
+    // Month-name dates: "12-Sep-26", "12 Sep 2026", "12/Sep/2026"
+    if let match = trimmed.firstMatchGroups(of: #"^(\d{1,2})[ \-/]([A-Za-z]{3,9})\.?[ \-/,]+(\d{2,4})$"#),
+       let month = monthFromName(match[2]) {
+        return formatDateParts(year: normalizeYear(Int(match[3]) ?? 0), month: month, day: Int(match[1]) ?? 0)
+    }
+
+    // "Sep 12 2026" / "September 12, 2026"
+    if let match = trimmed.firstMatchGroups(of: #"^([A-Za-z]{3,9})\.?[ ]+(\d{1,2}),?[ ]+(\d{2,4})$"#),
+       let month = monthFromName(match[1]) {
+        return formatDateParts(year: normalizeYear(Int(match[3]) ?? 0), month: month, day: Int(match[2]) ?? 0)
+    }
+
+    // Fallback — ISO-8601 full-date parser
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withFullDate]
     if let date = formatter.date(from: trimmed) {
@@ -606,7 +1008,7 @@ private func normalizeYear(_ year: Int) -> Int {
     year < 100 ? 2000 + year : year
 }
 
-private func formatDateParts(year: Int, month: Int, day: Int) -> String? {
+func formatDateParts(year: Int, month: Int, day: Int) -> String? {
     guard month >= 1, month <= 12, day >= 1, day <= 31 else { return nil }
     var comps = DateComponents()
     comps.year = year; comps.month = month; comps.day = day
@@ -618,13 +1020,21 @@ private func formatDateParts(year: Int, month: Int, day: Int) -> String? {
     return String(format: "%04d-%02d-%02d", year, month, day)
 }
 
-private func intFrom(_ string: String, match: NSTextCheckingResult, group: Int) -> Int {
-    guard let range = Range(match.range(at: group), in: string) else { return 0 }
-    return Int(string[range]) ?? 0
+func monthStartDate(_ monthKey: String) -> String {
+    "\(monthKey)-01"
 }
 
-private func monthStartDate(_ monthKey: String) -> String {
-    "\(monthKey)-01"
+extension String {
+    /// First regex match as an array of capture-group strings (index 0 = whole match).
+    func firstMatchGroups(of pattern: String, options: NSRegularExpression.Options = []) -> [String]? {
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: options) else { return nil }
+        let range = NSRange(startIndex..., in: self)
+        guard let match = regex.firstMatch(in: self, range: range) else { return nil }
+        return (0..<match.numberOfRanges).map { group in
+            guard let r = Range(match.range(at: group), in: self) else { return "" }
+            return String(self[r])
+        }
+    }
 }
 
 // MARK: - Category suggestion
@@ -635,13 +1045,17 @@ public struct CategorySuggestion: Sendable {
     public let confidence: Double
     public let note: String
     public var debtAccountId: String?
+    /// "rule" | "system" | "bank" | "heuristic" — mirrors CategorySource on the web.
+    public var source: String
 
-    public init(kind: TransactionKind, category: String, confidence: Double, note: String, debtAccountId: String? = nil) {
+    public init(kind: TransactionKind, category: String, confidence: Double, note: String,
+                debtAccountId: String? = nil, source: String = "system") {
         self.kind = kind
         self.category = category
         self.confidence = confidence
         self.note = note
         self.debtAccountId = debtAccountId
+        self.source = source
     }
 }
 
@@ -661,24 +1075,46 @@ public func categoryColor(for category: String) -> String {
     csvCategoryColor(category)
 }
 
-private func suggestCategory(description: String, amount: Double,
-                               rules: [CategoryRule], bankCategory: String) -> CategorySuggestion {
+/// Mirrors `suggestCategory` in importer.ts: saved rules, then near-miss rule
+/// matches, then system rules, then the bank's own category, then sign heuristics.
+func suggestCategory(description: String, amount: Double,
+                     rules: [CategoryRule], bankCategory: String) -> CategorySuggestion {
     let normalized = normalizeMerchant(description)
+    let canonical = canonicalizeMerchant(description)
 
-    // Saved (learned) rule — highest priority
-    if let learned = rules.first(where: { descriptionMatchesPattern(normalized, pattern: $0.pattern) }) {
+    // Saved (learned) rule — highest priority. Matched against the raw
+    // normalisation and the alias-expanded form.
+    if let learned = rules.first(where: {
+        descriptionMatchesPattern(normalized, pattern: $0.pattern) || descriptionMatchesPattern(canonical, pattern: $0.pattern)
+    }) {
         return CategorySuggestion(kind: learned.kind, category: learned.category,
-                                   confidence: 0.96, note: "Matched your saved rule",
-                                   debtAccountId: learned.kind == .debtPayment ? learned.debtAccountId : nil)
+                                  confidence: 0.96, note: "Matched your saved rule",
+                                  debtAccountId: learned.kind == .debtPayment ? learned.debtAccountId : nil,
+                                  source: "rule")
     }
 
-    // System rules
+    // Near-miss recovery: "AMZN MKTP GB" should still hit an "amazon" rule.
+    let fuzzy = rules
+        .filter { $0.kind != .transfer }
+        .map { rule in (rule: rule, score: tokenSetSimilarity(canonical, rule.pattern)) }
+        .filter { $0.score >= 0.6 }
+        .max(by: { $0.score < $1.score })
+    if let fuzzy {
+        return CategorySuggestion(kind: fuzzy.rule.kind, category: fuzzy.rule.category,
+                                  confidence: 0.85, note: "Close match to your rule “\(fuzzy.rule.pattern)”",
+                                  debtAccountId: fuzzy.rule.kind == .debtPayment ? fuzzy.rule.debtAccountId : nil,
+                                  source: "rule")
+    }
+
+    // System rules (tested against the raw description and the canonical form)
     let fullRange = NSRange(description.startIndex..., in: description)
+    let canonicalRange = NSRange(canonical.startIndex..., in: canonical)
     for sr in systemRules {
-        if sr.pattern.firstMatch(in: description, range: fullRange) != nil {
+        if sr.pattern.firstMatch(in: description, range: fullRange) != nil
+            || sr.pattern.firstMatch(in: canonical, range: canonicalRange) != nil {
             let kind: TransactionKind = sr.kind ?? (amount >= 0 ? .income : .expense)
             return CategorySuggestion(kind: kind, category: sr.category,
-                                       confidence: sr.confidence, note: sr.note)
+                                      confidence: sr.confidence, note: sr.note, source: "system")
         }
     }
 
@@ -689,17 +1125,18 @@ private func suggestCategory(description: String, amount: Double,
             kind: amount >= 0 ? .income : .expense,
             category: toTitleCase(trimmedBank),
             confidence: 0.72,
-            note: "Used category from bank export"
+            note: "Used category from bank export",
+            source: "bank"
         )
     }
 
     if amount >= 0 {
         return CategorySuggestion(kind: .income, category: "Income",
-                                   confidence: 0.48, note: "Positive amount treated as income")
+                                  confidence: 0.48, note: "Positive amount treated as income", source: "heuristic")
     }
 
     return CategorySuggestion(kind: .expense, category: "Unsorted",
-                               confidence: 0.32, note: "Needs review")
+                              confidence: 0.32, note: "Needs review", source: "heuristic")
 }
 
 // MARK: - Duplicate detection
@@ -727,7 +1164,9 @@ private func collectManualEntriesByDateAmount(_ state: LedgerState) -> [String: 
     return index
 }
 
-private func collectExistingTransactionHashes(_ state: LedgerState) -> Set<String> {
+/// Every hash already in the ledger: stored import hashes plus recomputed hashes
+/// for dated entries. Mirrors `collectExistingTransactionHashes`.
+public func collectExistingTransactionHashes(_ state: LedgerState) -> Set<String> {
     var hashes = Set<String>()
     for (_, month) in state.months {
         for income in month.incomes {

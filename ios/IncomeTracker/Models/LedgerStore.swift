@@ -34,6 +34,23 @@ public final class LedgerStore {
     /// should return true when the user is signed out (nothing to push).
     public var cloudPusher: (@MainActor (LedgerState) async -> Bool)?
 
+    /// False until `hydrate` has settled which copy of the ledger is current.
+    /// Cloud pushes are suppressed before that so an empty starter state can
+    /// never overwrite a real ledger during launch.
+    public internal(set) var isHydrated = false
+
+    /// Serialises hydration: a sign-in that lands while the launch hydrate is still
+    /// running waits for it instead of racing it.
+    var hydrationTask: Task<Void, Never>?
+
+    /// Fingerprint of the inputs that drive local notifications, so rescheduling only
+    /// happens when a due day, minimum payment or reminder setting actually changes.
+    var lastReminderFingerprint: String?
+
+    /// Set when an App Intent loaded the on-disk ledger without a full hydration (the
+    /// app was launched in the background just to run the intent).
+    var didLoadLocalWithoutHydration = false
+
     // MARK: - Undo
 
     private var undoStack: [LedgerState] = []
@@ -48,13 +65,38 @@ public final class LedgerStore {
 
     // MARK: - Core mutation
 
-    /// Apply a mutation and schedule a debounced autosave.
+    /// Apply a user edit: snapshots for undo, stamps `lastSavedAt` (so cross-device
+    /// conflict resolution sees this device's edit as fresh) and schedules a
+    /// debounced local save followed by a cloud push.
     public func update(_ mutation: (inout LedgerState) -> Void) {
-        scheduleSave()          // snapshot current state onto undo stack before applying
+        pushUndoSnapshot()
         mutation(&state)
-        // Stamp the modification time so cross-device conflict resolution
-        // (which compares lastSavedAt) sees local edits as fresh.
-        state.lastSavedAt = ISO8601DateFormatter().string(from: .now)
+        state.lastSavedAt = isoTimestampNow()
+        scheduleSave(pushToCloud: true)
+    }
+
+    /// Apply a change that is not a user edit — month navigation, launch-time
+    /// normalisation. Never creates an undo entry. Bumps `lastSavedAt` and pushes to
+    /// the cloud only when ledger data actually changed (a seeded month, say); merely
+    /// switching the month on screen persists locally without making this device look
+    /// like the newest writer.
+    public func applyQuietly(_ mutation: (inout LedgerState) -> Void) {
+        let before = state
+        mutation(&state)
+        guard state != before else { return }
+        if state.isEquivalent(to: before) {
+            scheduleSave(pushToCloud: false)
+        } else {
+            state.lastSavedAt = isoTimestampNow()
+            scheduleSave(pushToCloud: true)
+        }
+    }
+
+    /// Forget the undo history — called whenever the whole state is replaced from
+    /// outside (hydration, conflict resolution, sign-out) so "Undo" can never restore
+    /// a ledger that belongs to a different account or an older sync generation.
+    public func clearUndoHistory() {
+        undoStack.removeAll()
     }
 
     // MARK: - Undo
@@ -62,30 +104,28 @@ public final class LedgerStore {
     public func undo() {
         guard let previous = undoStack.popLast() else { return }
         state = previous
-        // Re-schedule save so the reverted state is persisted.
-        saveTask?.cancel()
-        saveTask = Task {
-            try? await Task.sleep(nanoseconds: 300_000_000)
-            guard !Task.isCancelled else { return }
-            await performSave()
+        // The reverted state is a fresh edit from this device's point of view.
+        state.lastSavedAt = isoTimestampNow()
+        scheduleSave(pushToCloud: true)
+    }
+
+    private func pushUndoSnapshot() {
+        undoStack.append(state)
+        if undoStack.count > 20 {
+            undoStack.removeFirst()
         }
     }
 
     // MARK: - Debounced autosave
 
-    private var saveTask: Task<Void, Never>?
+    var saveTask: Task<Void, Never>?
+    private var pendingCloudPush = false
+    private var isSaving = false
+    private var saveRequestedWhileSaving = false
 
-    private func scheduleSave() {
-        // 1. Push snapshot onto undo stack (cap at 20).
-        undoStack.append(state)
-        if undoStack.count > 20 {
-            undoStack.removeFirst()
-        }
-
-        // 2. Cancel any pending save.
+    private func scheduleSave(pushToCloud: Bool) {
+        pendingCloudPush = pendingCloudPush || pushToCloud
         saveTask?.cancel()
-
-        // 3. Schedule a new delayed save.
         saveTask = Task {
             try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 s
             guard !Task.isCancelled else { return }
@@ -93,15 +133,51 @@ public final class LedgerStore {
         }
     }
 
-    /// Persists locally, then pushes to the cloud (when a pusher is installed).
+    /// Writes any pending change immediately. Call when the app is about to be
+    /// suspended so a quick "log and swipe away" is never lost to the debounce.
+    public func flushPendingSave() async {
+        guard saveTask != nil else { return }
+        saveTask?.cancel()
+        saveTask = nil
+        await performSave()
+    }
+
+    /// True while an edit is waiting for the debounce or a save is in flight.
+    public var hasUnsavedChanges: Bool {
+        saveTask != nil || isSaving
+    }
+
+    /// Persists locally, then pushes to the cloud (when a pusher is installed and
+    /// hydration has finished). Saves never overlap: a request that arrives while one
+    /// is in flight runs once more afterwards.
     private func performSave() async {
-        saveStatus = .saving
-        await persistLocally()
-        if let cloudPusher {
-            saveStatus = await cloudPusher(state) ? .loaded : .offline
-        } else {
-            saveStatus = .loaded
+        saveTask = nil
+        if isSaving {
+            saveRequestedWhileSaving = true
+            return
         }
+        isSaving = true
+        defer { isSaving = false }
+
+        repeat {
+            saveRequestedWhileSaving = false
+            let shouldPush = pendingCloudPush
+            pendingCloudPush = false
+
+            saveStatus = .saving
+            await persistLocally()
+            if shouldPush, isHydrated, let cloudPusher {
+                let pushed = state
+                if await cloudPusher(pushed) {
+                    recordSyncedStamp(pushed.lastSavedAt)
+                    saveStatus = .loaded
+                } else {
+                    saveStatus = .offline
+                }
+            } else {
+                saveStatus = .loaded
+            }
+        } while saveRequestedWhileSaving
     }
 
     // MARK: - Month navigation
@@ -122,11 +198,13 @@ public final class LedgerStore {
         selectMonth(shiftMonth(state.selectedMonth, by: -1))
     }
 
+    /// Opens a month. A month that does not exist yet is seeded from the month on
+    /// screen when moving forward in time (recurring entries carry over, web parity);
+    /// moving back to an untouched past month opens it empty.
     public func selectMonth(_ key: String) {
-        update { s in
+        guard isValidMonthKey(key) else { return }
+        applyQuietly { s in
             if s.months[key] == nil {
-                // Forward navigation auto-seeds the recurring entries (web parity);
-                // backward navigation to an untouched past month stays empty.
                 s.months[key] = FinanceEngine.seedMonth(
                     from: s.months[s.selectedMonth],
                     fromKey: s.selectedMonth,
@@ -137,25 +215,14 @@ public final class LedgerStore {
         }
     }
 
-    /// Opens the ledger on the real current month. The persisted selectedMonth
-    /// is whatever month was on screen when state was last saved — often last
-    /// month by the time the app is next opened. Seeds today's month from the
-    /// last-worked month when it doesn't exist yet, same as navigating forward.
-    ///
-    /// Mutates `state` directly rather than via `update`: this is a launch-time
-    /// normalisation, not a user edit, so it must not touch the undo stack or
-    /// bump `lastSavedAt` (which would skew cross-device conflict resolution).
+    /// Opens the ledger on the real current month. The persisted selectedMonth is
+    /// whatever month was on screen when state was last saved — often last month by
+    /// the time the app is next opened. Seeds today's month from the last-worked month
+    /// when it doesn't exist yet, same as navigating forward.
     public func snapToCurrentMonth() {
         let today = getMonthKey()
         guard state.selectedMonth != today else { return }
-        if state.months[today] == nil {
-            state.months[today] = FinanceEngine.seedMonth(
-                from: state.months[state.selectedMonth],
-                fromKey: state.selectedMonth,
-                toKey: today
-            )
-        }
-        state.selectedMonth = today
+        selectMonth(today)
     }
 
     // MARK: - Income mutations
@@ -193,11 +260,36 @@ public final class LedgerStore {
         }
     }
 
-    public func updateExpense(_ entry: ExpenseEntry) {
+    /// Saves an edited expense. Correcting the category of an imported (or
+    /// automatically categorised) entry also teaches a rule and re-sorts earlier
+    /// automated guesses for the same payee — the return value says how many.
+    @discardableResult
+    public func updateExpense(_ entry: ExpenseEntry) -> Int {
+        var retroactivelyApplied = 0
         update { s in
-            guard let idx = s.months[s.selectedMonth]?.expenses.firstIndex(where: { $0.id == entry.id }) else { return }
-            s.months[s.selectedMonth]?.expenses[idx] = entry
+            guard let idx = s.months[s.selectedMonth]?.expenses.firstIndex(where: { $0.id == entry.id }),
+                  let previous = s.months[s.selectedMonth]?.expenses[idx] else { return }
+            var next = entry
+            let category = next.category.trimmingCharacters(in: .whitespaces)
+            let categoryChanged = previous.category != next.category
+            let wasAutomated = previous.imported != nil || previous.categorySource != nil
+            if categoryChanged && wasAutomated {
+                // A human decision; automation must never override it again.
+                next.categorySource = "user"
+                if !category.isEmpty && category != "Unsorted" {
+                    let original = previous.imported?.originalDescription ?? ""
+                    retroactivelyApplied = learnCategoryRule(
+                        in: &s,
+                        description: original.isEmpty ? previous.name : original,
+                        category: category,
+                        kind: next.debtAccountId != nil ? .debtPayment : .expense,
+                        excludeEntryId: next.id
+                    )
+                }
+            }
+            s.months[s.selectedMonth]?.expenses[idx] = next
         }
+        return retroactivelyApplied
     }
 
     public func removeExpense(id: String) {
@@ -208,6 +300,34 @@ public final class LedgerStore {
                 s.months[seededFrom.monthKey]?.expenses[originIndex].recurring = false
             }
             s.months[s.selectedMonth]?.expenses.removeAll { $0.id == id }
+        }
+    }
+
+    /// Flips the recurring flag on an entry in the open month.
+    public func setRecurring(_ recurring: Bool, entryId: String) {
+        update { s in
+            if let idx = s.months[s.selectedMonth]?.incomes.firstIndex(where: { $0.id == entryId }) {
+                s.months[s.selectedMonth]?.incomes[idx].recurring = recurring
+            }
+            if let idx = s.months[s.selectedMonth]?.expenses.firstIndex(where: { $0.id == entryId }) {
+                s.months[s.selectedMonth]?.expenses[idx].recurring = recurring
+            }
+        }
+    }
+
+    /// Accepts a detected recurring pattern: marks the newest occurrence recurring
+    /// so it seeds into future months (web parity with `applyRecurringFlag`).
+    public func markRecurring(_ candidate: RecurrenceCandidate) {
+        update { s in
+            s = Recurrence.applyRecurringFlag(s, candidate: candidate)
+        }
+    }
+
+    /// Free-text note for the open month.
+    public func setMonthNote(_ note: String) {
+        guard currentMonthBudget.note != note else { return }
+        update { s in
+            s.months[s.selectedMonth, default: .empty].note = note
         }
     }
 
@@ -229,14 +349,55 @@ public final class LedgerStore {
     public func removeGoal(id: String) {
         update { s in
             s.goals.removeAll { $0.id == id }
+            if s.ledgerGoalId == id { s.ledgerGoalId = nil }
         }
     }
 
     public func reorderGoals(from source: IndexSet, to destination: Int) {
         update { s in
-            s.goals.move(fromOffsets: source, toOffset: destination)
+            // Manual move so this file stays Foundation-only: SwiftUI's
+            // move(fromOffsets:toOffset:) is not visible without importing it.
+            let moving = source.sorted().compactMap { s.goals.indices.contains($0) ? s.goals[$0] : nil }
+            guard !moving.isEmpty else { return }
+            var remaining = s.goals.enumerated().filter { !source.contains($0.offset) }.map(\.element)
+            let removedBefore = source.filter { $0 < destination }.count
+            let insertAt = max(0, min(remaining.count, destination - removedBefore))
+            remaining.insert(contentsOf: moving, at: insertAt)
+            s.goals = remaining
             // Re-assign priority to reflect new order (1 = highest).
-            for (idx, _) in s.goals.enumerated() {
+            for idx in s.goals.indices {
+                s.goals[idx].priority = idx + 1
+            }
+        }
+    }
+
+    /// Reorders goals to match `ids` (unknown ids are ignored, missing goals keep
+    /// their relative order at the end) and renumbers priorities 1…n.
+    public func setGoalOrder(ids: [String]) {
+        let byId = Dictionary(uniqueKeysWithValues: state.goals.map { ($0.id, $0) })
+        var ordered = ids.compactMap { byId[$0] }
+        let placed = Set(ordered.map(\.id))
+        ordered += state.goals.sorted { $0.priority < $1.priority }.filter { !placed.contains($0.id) }
+        guard ordered.map(\.id) != state.goals.map(\.id) || ordered.enumerated().contains(where: { $0.element.priority != $0.offset + 1 }) else { return }
+        update { s in
+            s.goals = ordered
+            for idx in s.goals.indices {
+                s.goals[idx].priority = idx + 1
+            }
+        }
+    }
+
+    /// Moves a goal one step up or down the priority order.
+    public func moveGoal(id: String, by offset: Int) {
+        let ordered = state.goals.sorted { $0.priority < $1.priority }
+        guard let index = ordered.firstIndex(where: { $0.id == id }) else { return }
+        let target = index + offset
+        guard ordered.indices.contains(target) else { return }
+        var reordered = ordered
+        reordered.swapAt(index, target)
+        update { s in
+            s.goals = reordered
+            for idx in s.goals.indices {
                 s.goals[idx].priority = idx + 1
             }
         }
@@ -295,11 +456,37 @@ public final class LedgerStore {
         }
     }
 
+    public func duplicateAccount(id: String) {
+        update { s in
+            guard let index = s.accounts.firstIndex(where: { $0.id == id }) else { return }
+            var copy = s.accounts[index]
+            copy.id = createId(prefix: "account")
+            copy.name = "\(copy.name) copy"
+            copy.balanceAsOf = getMonthKey()
+            s.accounts.insert(copy, at: index + 1)
+        }
+    }
+
+    public func moveAccounts(from source: IndexSet, to destination: Int) {
+        update { s in
+            let moving = source.sorted().compactMap { s.accounts.indices.contains($0) ? s.accounts[$0] : nil }
+            guard !moving.isEmpty else { return }
+            var remaining = s.accounts.enumerated().filter { !source.contains($0.offset) }.map(\.element)
+            let removedBefore = source.filter { $0 < destination }.count
+            let insertAt = max(0, min(remaining.count, destination - removedBefore))
+            remaining.insert(contentsOf: moving, at: insertAt)
+            s.accounts = remaining
+        }
+    }
+
     // MARK: - CategoryRule mutations
 
     public func addCategoryRule(_ rule: CategoryRule) {
         update { s in
             s.categoryRules.append(rule)
+            if s.categoryRules.count > 120 {
+                s.categoryRules = Array(s.categoryRules.suffix(120))
+            }
         }
     }
 
@@ -309,71 +496,44 @@ public final class LedgerStore {
         }
     }
 
-    // MARK: - Import batch mutations
-
-    /// Apply an import batch.  `entries` maps each transaction ref to a closure
-    /// that transforms the target month's `MonthBudget`.
-    public func addImportBatch(
-        _ batch: ImportBatch,
-        entries: [ImportedTransactionRef: (MonthBudget) -> MonthBudget]
-    ) {
+    /// Saves a "transfer between my accounts" payee pattern and removes every existing
+    /// entry that matches it. Returns how many entries were swept.
+    @discardableResult
+    public func addTransferRule(pattern: String) -> Int {
+        let cleaned = pattern.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !cleaned.isEmpty else { return 0 }
+        var removed = 0
         update { s in
-            // Apply each per-ref budget transform.
-            for (ref, transform) in entries {
-                let current = s.months[ref.monthKey] ?? .empty
-                s.months[ref.monthKey] = transform(current)
-            }
-            s.importBatches.append(batch)
+            s.categoryRules = upsertTransferRule(s.categoryRules, pattern: cleaned, timestamp: isoTimestampNow())
+            let swept = sweepTransferEntries(months: s.months, rules: s.categoryRules)
+            s.months = swept.months
+            removed = swept.removed
         }
+        return removed
     }
+
+    // MARK: - Import batch mutations
 
     /// Roll back all entries belonging to a previously imported batch.
     public func undoImportBatch(id: String) {
+        guard state.importBatches.contains(where: { $0.id == id }) else { return }
         update { s in
-            guard let batch = s.importBatches.first(where: { $0.id == id }) else { return }
-
-            let refsToRemove = Set(batch.transactionRefs)
-
-            // Walk every referenced month and strip entries that carry this batchId.
-            let affectedMonths = Set(batch.transactionRefs.map { $0.monthKey })
-            for monthKey in affectedMonths {
-                s.months[monthKey]?.incomes.removeAll { entry in
-                    guard let meta = entry.imported else { return false }
-                    return meta.batchId == id
-                }
-                s.months[monthKey]?.expenses.removeAll { entry in
-                    guard let meta = entry.imported else { return false }
-                    return meta.batchId == id
-                }
-            }
-
-            // Remove the batch record itself.
-            s.importBatches.removeAll { $0.id == id }
-
-            // Suppress the "unused variable" warning for refsToRemove.
-            _ = refsToRemove
+            removeImportBatch(from: &s, batchId: id)
         }
     }
 
-    /// Commits reviewed CSV rows in a single atomic update. Runs commitImport
-    /// against a snapshot first so the store mutation stays all-or-nothing.
-    public func commitCSVImport(rows: [CsvImportRow], fileName: String) {
-        let includedRows = rows.filter(\.include)
-        guard !includedRows.isEmpty else { return }
-
-        var tempState = state
-        let batch = commitImport(rows: rows, into: &tempState, fileName: fileName)
-
+    /// Commits reviewed rows (CSV, OFX, QIF, pasted text or a screenshot) in a single
+    /// undoable update. The work runs against a copy first so the store only changes
+    /// when the import actually did something.
+    @discardableResult
+    public func commitCSVImport(rows: [CsvImportRow], fileName: String, totalRows: Int? = nil) -> ImportCommitResult {
+        var staged = state
+        let result = commitImport(rows: rows, into: &staged, fileName: fileName, totalRows: totalRows)
+        guard result.didChangeLedger else { return result }
         update { s in
-            for ref in batch.transactionRefs {
-                s.months[ref.monthKey] = tempState.months[ref.monthKey]
-            }
-            s.importBatches.append(batch)
-            for rule in tempState.categoryRules
-                where !s.categoryRules.contains(where: { $0.id == rule.id }) {
-                s.categoryRules.append(rule)
-            }
+            s = staged
         }
+        return result
     }
 
     // MARK: - Settings mutations
@@ -387,7 +547,7 @@ public final class LedgerStore {
     }
 
     public func setSavingsTarget(_ target: Double) {
-        update { s in s.savingsTarget = target }
+        update { s in s.savingsTarget = max(0, min(100, target)) }
     }
 
     public func setGoalPlannerSurplus(_ value: Double?) {
@@ -395,6 +555,28 @@ public final class LedgerStore {
     }
 
     public func setAssumedInvestmentReturn(_ rate: Double) {
-        update { s in s.assumedInvestmentReturn = rate }
+        update { s in s.assumedInvestmentReturn = max(-50, min(50, rate)) }
+    }
+
+    public func setGoalsHorizonMonths(_ months: Int) {
+        guard months > 0 else { return }
+        update { s in s.goalsHorizonMonths = months }
+    }
+
+    public func setLedgerGoalId(_ id: String?) {
+        update { s in s.ledgerGoalId = id }
+    }
+
+    // MARK: - Whole-state replacement
+
+    /// Replaces the ledger outright (conflict resolution, sign-out). Not undoable.
+    public func replaceState(_ newState: LedgerState, pushToCloud: Bool) {
+        clearUndoHistory()
+        state = newState
+        if pushToCloud {
+            state.lastSavedAt = isoTimestampNow()
+        }
+        snapToCurrentMonth()
+        scheduleSave(pushToCloud: pushToCloud)
     }
 }

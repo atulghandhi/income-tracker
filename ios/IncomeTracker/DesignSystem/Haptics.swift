@@ -12,6 +12,10 @@ import UIKit
 /// Central haptic-feedback coordinator with pre-warmed generators.
 /// Call `Haptics.prepare()` on app launch (or before a likely interaction)
 /// so the first feedback fires without latency.
+///
+/// UIFeedbackGenerator is main-actor bound, and every caller is a view or a
+/// view action, so the whole namespace lives on the main actor.
+@MainActor
 public enum Haptics {
 
     // ── Pre-warmed generators ─────────────────────────────────────────────────

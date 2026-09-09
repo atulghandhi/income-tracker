@@ -45,11 +45,6 @@ public extension Font {
 
     // ── Utility ───────────────────────────────────────────────────────────────
 
-    /// Captions and footnotes.
-    static var caption: Font {
-        .caption
-    }
-
     /// Eyebrow / all-caps section label with monospaced digits.
     static var eyebrow: Font {
         Font.caption2.monospacedDigit()

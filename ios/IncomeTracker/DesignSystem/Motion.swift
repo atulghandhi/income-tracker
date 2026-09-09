@@ -24,12 +24,23 @@ public enum Motion {
     /// Delay increment (seconds) between staggered list items.
     static let stagger: Double = 0.04
 
-    /// Returns the correct animation based on the current reduce-motion preference.
+    /// UserDefaults key for the in-app "Enable animations" switch (Settings → Appearance).
+    static let animationsEnabledKey = "animationsEnabled"
+
+    /// Whether the user has switched motion off inside the app (system Reduce Motion is
+    /// read separately from the environment).
+    static var animationsEnabled: Bool {
+        UserDefaults.standard.object(forKey: animationsEnabledKey) as? Bool ?? true
+    }
+
+    /// Returns the correct animation for the current preferences: nil (no animation)
+    /// when the in-app switch is off, a short fade under Reduce Motion, else `animation`.
     /// - Parameters:
     ///   - animation: The full-motion animation to use when not reduced.
     ///   - env: The value of `\.accessibilityReduceMotion` from the environment.
-    static func resolve(_ animation: Animation, env: Bool) -> Animation {
-        env ? .easeOut(duration: 0.12) : animation
+    static func resolve(_ animation: Animation, env: Bool) -> Animation? {
+        guard animationsEnabled else { return nil }
+        return env ? .easeOut(duration: 0.12) : animation
     }
 }
 
@@ -77,5 +88,5 @@ public extension AnyTransition {
     }
 
     /// Scale + fade — good for cards appearing on screen.
-    static let scaleFade: AnyTransition = .scale(scale: 0.92).combined(with: .opacity)
+    static var scaleFade: AnyTransition { .scale(scale: 0.92).combined(with: .opacity) }
 }
