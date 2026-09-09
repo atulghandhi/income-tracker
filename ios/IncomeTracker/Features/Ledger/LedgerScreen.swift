@@ -744,6 +744,9 @@ struct QuickLogBar: View {
         .task(id: store.state.lastSavedAt) {
             memory = MerchantMemory(state: store.state)
         }
+        .onChange(of: text) { _, _ in
+            lastError = nil
+        }
     }
 
     private struct Preview: Equatable {
@@ -752,7 +755,8 @@ struct QuickLogBar: View {
     }
 
     private var previewText: Preview? {
-        if let lastError, text.isEmpty { return Preview(text: lastError, isError: true) }
+        // A failed Return shows its reason until the text changes.
+        if let lastError { return Preview(text: lastError, isError: true) }
         guard let parsed else { return nil }
         switch parsed {
         case .ok(let draft):
@@ -808,7 +812,11 @@ struct QuickLogBar: View {
         text = ""
         lastError = nil
         // Keep the keyboard up with the cursor back in the field for the next line.
-        isFocused = true
+        // Re-assert focus on the next run loop turn so it lands after SwiftUI's own
+        // Return-key handling rather than being overwritten by it.
+        Task { @MainActor in
+            isFocused = true
+        }
         onAdded(draft)
     }
 
@@ -1418,7 +1426,9 @@ struct AddEntrySheet: View {
         isAddingCategory = false
         customCategoryText = ""
         recurring = false
-        focusedField = .name
+        Task { @MainActor in
+            focusedField = .name
+        }
         withAnimation(Motion.snappy) { savedFlash = true }
         Task {
             try? await Task.sleep(for: .seconds(1.2))
