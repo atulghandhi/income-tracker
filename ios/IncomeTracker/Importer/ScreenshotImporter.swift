@@ -82,10 +82,17 @@ public struct ScreenshotImporter {
     /// observations whose vertical centers sit within half a line-height of
     /// each other belong to the same row of the on-screen table.
     private func recognizeLines(in cgImage: CGImage) async throws -> [String] {
-        try await withCheckedThrowingContinuation { continuation in
+        // VNImageRequestHandler.perform runs the request synchronously and invokes the
+        // completion handler before returning, so a continuation is not needed — and
+        // resuming one from both the handler and a `catch` would trap. Do the work on a
+        // background task and hand back plain values.
+        let handlerBox = SendableBox(cgImage)
+        return try await Task.detached(priority: .userInitiated) {
+            var lines: [String] = []
+            var failure: Error?
             let request = VNRecognizeTextRequest { request, error in
                 if let error {
-                    continuation.resume(throwing: error)
+                    failure = error
                     return
                 }
                 let observations = (request.results as? [VNRecognizedTextObservation]) ?? []
@@ -102,32 +109,35 @@ public struct ScreenshotImporter {
                 }
 
                 // Cluster by y (Vision's y grows upward; sort top-of-screen first).
-                var lines: [[Fragment]] = []
+                var rows: [[Fragment]] = []
                 for fragment in fragments.sorted(by: { $0.yCenter > $1.yCenter }) {
-                    if var last = lines.last,
+                    if var last = rows.last,
                        let anchor = last.first,
                        abs(anchor.yCenter - fragment.yCenter) < max(anchor.height, fragment.height) * 0.6 {
                         last.append(fragment)
-                        lines[lines.count - 1] = last
+                        rows[rows.count - 1] = last
                     } else {
-                        lines.append([fragment])
+                        rows.append([fragment])
                     }
                 }
 
-                let texts = lines.map { line in
-                    line.sorted { $0.x < $1.x }.map(\.text).joined(separator: "  ")
+                lines = rows.map { row in
+                    row.sorted { $0.x < $1.x }.map(\.text).joined(separator: "  ")
                 }
-                continuation.resume(returning: texts)
             }
             request.recognitionLevel = .accurate
             request.usesLanguageCorrection = false // merchant names aren't dictionary words
 
-            do {
-                try VNImageRequestHandler(cgImage: cgImage).perform([request])
-            } catch {
-                continuation.resume(throwing: error)
-            }
-        }
+            try VNImageRequestHandler(cgImage: handlerBox.value).perform([request])
+            if let failure { throw failure }
+            return lines
+        }.value
+    }
+
+    /// CGImage is thread-safe to read but not marked Sendable; wrap it for the detached task.
+    private struct SendableBox: @unchecked Sendable {
+        let value: CGImage
+        init(_ value: CGImage) { self.value = value }
     }
 
     // MARK: - Line parsing (mirrors the web app's parseLooseLine)

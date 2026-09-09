@@ -1,15 +1,14 @@
 // AppIntents.swift
-// App Intents for Siri Shortcuts integration.
+// App Intents for Siri and Shortcuts.
 //
-// Three intents are exposed:
-//   • AddExpenseIntent  — add an expense to the current month via Siri / Shortcuts.
-//   • GetSurplusIntent  — read back this month's surplus via Siri.
-//   • GetNetWorthIntent — read back current net worth via Siri.
+//   • AddExpenseIntent  — log an expense to the current month from Siri / Shortcuts.
+//   • GetSurplusIntent  — read back this month's surplus.
+//   • GetNetWorthIntent — read back current net worth.
 //
-// The intents extension cannot import the main app target, so lightweight
-// Codable shims are used to read/write the ledger state from the shared
-// App Group UserDefaults. These shims must stay wire-compatible with the
-// real Types defined in the main target.
+// The intents are compiled into the app target, so they use the real LedgerStore
+// (injected through AppDependencyManager at launch) and the same persistence as
+// the rest of the app. Nothing here touches UserDefaults directly, which is how an
+// earlier version managed to write a stale schema key and drop accounts and goals.
 
 import AppIntents
 import Foundation
@@ -23,7 +22,7 @@ struct AddExpenseIntent: AppIntent {
         categoryName: "Ledger"
     )
 
-    /// Setting this to `false` means the intent can run without opening the app.
+    /// Runs in the background — logging a coffee should not open the app.
     static let openAppWhenRun: Bool = false
 
     @Parameter(title: "Name", description: "What the expense is for.")
@@ -32,66 +31,61 @@ struct AddExpenseIntent: AppIntent {
     @Parameter(title: "Amount", description: "How much the expense costs.")
     var amount: Double
 
-    @Parameter(
-        title: "Category",
-        description: "Expense category, e.g. Food, Transport.",
-        default: "General"
-    )
-    var category: String
+    @Parameter(title: "Category", description: "Expense category, e.g. Food or Travel. Guessed from the name when left blank.")
+    var category: String?
+
+    @Dependency
+    private var store: LedgerStore
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("Add \(\.$name) for \(\.$amount)") {
+            \.$category
+        }
+    }
 
     @MainActor
-    func perform() async throws -> some ReturnsValue<String> {
-        guard
-            let defaults = UserDefaults(suiteName: AppGroupConstants.suiteName),
-            let data = defaults.data(forKey: AppGroupConstants.ledgerStateKey),
-            var ledger = try? JSONDecoder.shim.decode(LedgerStateShim.self, from: data)
-        else {
-            throw IntentError.noData
-        }
+    func perform() async throws -> some ReturnsValue<String> & ProvidesDialog {
+        let cleanedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanedName.isEmpty else { throw IntentError.missingName }
+        guard amount.isFinite, amount > 0 else { throw IntentError.badAmount }
 
-        let key = ledger.selectedMonth
-        var budget = ledger.months[key] ?? .empty
-        let entry = ExpenseEntryShim(
-            id: "exp_\(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(8).lowercased())",
-            name: name,
-            category: category,
-            amount: amount,
-            color: "#ff6b6b",
+        store.ensureLocalStateLoaded()
+        store.snapToCurrentMonth()
+
+        let suggestion = suggestEntryCategory(description: cleanedName, amount: -abs(amount), rules: store.state.categoryRules)
+        let chosen = (category ?? "").trimmingCharacters(in: .whitespaces)
+        let finalCategory = chosen.isEmpty ? suggestion.category : chosen
+        let today = isoDateString(Date())
+
+        let entry = ExpenseEntry(
+            id: createId(prefix: "expense"),
+            name: cleanedName,
+            category: finalCategory,
+            amount: (amount * 100).rounded() / 100,
+            color: categoryColor(for: finalCategory),
             recurring: false,
-            date: nil,
-            imported: nil
+            date: today,
+            categorySource: chosen.isEmpty ? suggestion.source : "user"
         )
-        budget.expenses.append(entry)
-        ledger.months[key] = budget
+        store.addExpense(entry)
+        // Siri may suspend the process straight after perform() returns; write now.
+        await store.flushPendingSave()
 
-        if let encoded = try? JSONEncoder.shim.encode(ledger) {
-            defaults.set(encoded, forKey: AppGroupConstants.ledgerStateKey)
-        }
-
-        return .result(value: "Added \(name) (\(formattedAmount(amount))) to \(category).")
+        let money = FinanceEngine.currencyFormatter(for: store.state.currency)
+            .string(from: NSNumber(value: entry.amount)) ?? String(format: "%.2f", entry.amount)
+        let spoken = "Added \(cleanedName), \(money), to \(finalCategory)."
+        return .result(value: spoken, dialog: IntentDialog(stringLiteral: spoken))
     }
 
-    // MARK: - Helpers
+    enum IntentError: Error, CustomLocalizedStringResourceConvertible {
+        case missingName
+        case badAmount
 
-    /// Formats using the widget snapshot's currency if available, falls back to raw number.
-    private func formattedAmount(_ amount: Double) -> String {
-        guard let snapshot = WidgetDataProviderShim.read() else {
-            return String(format: "%.2f", amount)
-        }
-        let fmt = NumberFormatter()
-        fmt.numberStyle = .currency
-        fmt.currencyCode = snapshot.currency
-        fmt.maximumFractionDigits = snapshot.currency == "JPY" ? 0 : 2
-        return fmt.string(from: NSNumber(value: amount)) ?? String(format: "%.2f", amount)
-    }
-
-    // MARK: - Errors
-
-    enum IntentError: Error, LocalizedError {
-        case noData
-
-        var errorDescription: String? {
-            "Could not load Income Tracker data. Open the app and try again."
+        var localizedStringResource: LocalizedStringResource {
+            switch self {
+            case .missingName: return "Tell me what the expense was for."
+            case .badAmount: return "The amount needs to be a number greater than zero."
+            }
         }
     }
 }
@@ -104,23 +98,27 @@ struct GetSurplusIntent: AppIntent {
         "Find out your surplus for this month.",
         categoryName: "Insights"
     )
+    static let openAppWhenRun: Bool = false
+
+    @Dependency
+    private var store: LedgerStore
 
     @MainActor
     func perform() async throws -> some ReturnsValue<Double> & ProvidesDialog {
-        guard let snapshot = WidgetDataProviderShim.read() else {
-            return .result(
-                value: 0,
-                dialog: "No data available in Income Tracker. Open the app to get started."
-            )
+        store.ensureLocalStateLoaded()
+        let state = store.state
+        let budget = state.months[getMonthKey()] ?? .empty
+        let projection = FinanceEngine.projection(for: budget)
+
+        if state.privacyMode {
+            return .result(value: projection.monthlySurplus, dialog: "Privacy mode is on. Open Income Tracker to see this month's figures.")
         }
-        let formatted = currencyString(snapshot.monthlySurplus, currency: snapshot.currency)
-        let dialog: String
-        if snapshot.monthlySurplus >= 0 {
-            dialog = "Your surplus this month is \(formatted)."
-        } else {
-            dialog = "You're \(currencyString(abs(snapshot.monthlySurplus), currency: snapshot.currency)) over budget this month."
-        }
-        return .result(value: snapshot.monthlySurplus, dialog: IntentDialog(stringLiteral: dialog))
+        let money = FinanceEngine.currencyFormatter(for: state.currency)
+        let formatted = money.string(from: NSNumber(value: abs(projection.monthlySurplus))) ?? "\(projection.monthlySurplus)"
+        let dialog = projection.monthlySurplus >= 0
+            ? "Your surplus this month is \(formatted)."
+            : "You're \(formatted) over budget this month."
+        return .result(value: projection.monthlySurplus, dialog: IntentDialog(stringLiteral: dialog))
     }
 }
 
@@ -132,41 +130,33 @@ struct GetNetWorthIntent: AppIntent {
         "See your current net worth.",
         categoryName: "Insights"
     )
+    static let openAppWhenRun: Bool = false
+
+    @Dependency
+    private var store: LedgerStore
 
     @MainActor
     func perform() async throws -> some ReturnsValue<Double> & ProvidesDialog {
-        guard let snapshot = WidgetDataProviderShim.read() else {
-            return .result(
-                value: 0,
-                dialog: "No data available in Income Tracker. Open the app to get started."
-            )
+        store.ensureLocalStateLoaded()
+        let state = store.state
+        let netWorth = FinanceEngine.netWorthSummary(store.effectiveAccounts).netWorth
+
+        if state.privacyMode {
+            return .result(value: netWorth, dialog: "Privacy mode is on. Open Income Tracker to see your net worth.")
         }
-        let formatted = currencyString(snapshot.netWorth, currency: snapshot.currency)
-        let dialog: String
-        if snapshot.netWorth >= 0 {
-            dialog = "Your net worth is \(formatted)."
-        } else {
-            dialog = "Your net position is \(formatted) — you currently owe more than you own."
-        }
-        return .result(value: snapshot.netWorth, dialog: IntentDialog(stringLiteral: dialog))
+        let money = FinanceEngine.currencyFormatter(for: state.currency)
+        let formatted = money.string(from: NSNumber(value: netWorth)) ?? "\(netWorth)"
+        let dialog = netWorth >= 0
+            ? "Your net worth is \(formatted)."
+            : "Your net position is \(formatted). You currently owe more than you own."
+        return .result(value: netWorth, dialog: IntentDialog(stringLiteral: dialog))
     }
-}
-
-// MARK: - Shared currency formatter
-
-private func currencyString(_ amount: Double, currency: String) -> String {
-    let fmt = NumberFormatter()
-    fmt.numberStyle = .currency
-    fmt.currencyCode = currency
-    fmt.maximumFractionDigits = currency == "JPY" ? 0 : 2
-    fmt.minimumFractionDigits = currency == "JPY" ? 0 : 2
-    return fmt.string(from: NSNumber(value: amount)) ?? String(format: "%.2f", amount)
 }
 
 // MARK: - App Shortcuts Provider
 
-/// Registers the three intents as App Shortcuts so they appear in Spotlight
-/// and are discoverable by Siri without any user setup.
+/// Registers the intents as App Shortcuts so they appear in Spotlight and are
+/// discoverable by Siri without any user setup.
 struct IncomeTrackerShortcutsProvider: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
@@ -202,97 +192,4 @@ struct IncomeTrackerShortcutsProvider: AppShortcutsProvider {
             systemImageName: "banknote"
         )
     }
-}
-
-// MARK: - App Group Constants
-
-private enum AppGroupConstants {
-    static let suiteName = "group.com.incometracker"
-    /// Must match `kStateKey` in LedgerStore+Persistence.swift.
-    static let ledgerStateKey = "ledgerState_v7"
-    static let snapshotKey = "widgetSnapshot"
-}
-
-// MARK: - Lightweight Shims
-//
-// The intents extension cannot import the main app target, so we define
-// minimal Codable types that mirror the relevant parts of the real model.
-// Wire-format (camelCase JSON keys, same enum raw values) must stay in sync
-// with Types.swift and LedgerStore+Persistence.swift.
-
-private struct LedgerStateShim: Codable {
-    var selectedMonth: String
-    var months: [String: MonthBudgetShim]
-    var currency: String
-
-    struct MonthBudgetShim: Codable {
-        var incomes: [IncomeEntryShim]
-        var expenses: [ExpenseEntryShim]
-        var note: String
-
-        static var empty: MonthBudgetShim {
-            MonthBudgetShim(incomes: [], expenses: [], note: "")
-        }
-    }
-}
-
-private struct IncomeEntryShim: Codable {
-    var id: String
-    var source: String
-    var amount: Double
-    var color: String
-    var recurring: Bool
-    var date: String?
-    var imported: String?
-}
-
-private struct ExpenseEntryShim: Codable {
-    var id: String
-    var name: String
-    var category: String
-    var amount: Double
-    var color: String
-    var recurring: Bool
-    var date: String?
-    var imported: String?
-}
-
-// MARK: - Widget Snapshot Shim
-
-/// Subset of `WidgetSnapshot` sufficient for the intents (currency + key figures).
-private struct WidgetSnapshotShim: Codable {
-    var currency: String
-    var monthlySurplus: Double
-    var netWorth: Double
-    var privacyMode: Bool
-}
-
-private enum WidgetDataProviderShim {
-    static func read() -> WidgetSnapshotShim? {
-        guard
-            let defaults = UserDefaults(suiteName: AppGroupConstants.suiteName),
-            let data = defaults.data(forKey: AppGroupConstants.snapshotKey)
-        else { return nil }
-        return try? JSONDecoder.shim.decode(WidgetSnapshotShim.self, from: data)
-    }
-}
-
-// MARK: - JSON Coder Preset
-
-private extension JSONEncoder {
-    static let shim: JSONEncoder = {
-        let e = JSONEncoder()
-        e.keyEncodingStrategy = .useDefaultKeys
-        e.dateEncodingStrategy = .iso8601
-        return e
-    }()
-}
-
-private extension JSONDecoder {
-    static let shim: JSONDecoder = {
-        let d = JSONDecoder()
-        d.keyDecodingStrategy = .useDefaultKeys
-        d.dateDecodingStrategy = .iso8601
-        return d
-    }()
 }

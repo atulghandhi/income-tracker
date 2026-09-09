@@ -18,32 +18,55 @@ extension AccountClass: CaseIterable {
         case .debt:       return "Debt"
         }
     }
+
+    var symbol: String {
+        switch self {
+        case .cash:       return "banknote"
+        case .savings:    return "building.columns"
+        case .investment: return "chart.line.uptrend.xyaxis"
+        case .debt:       return "creditcard"
+        }
+    }
 }
 
 extension AccountType {
     var displayName: String {
         switch self {
-        case .creditCard:    return "Credit Card"
-        case .loan:          return "Loan"
-        case .overdraft:     return "Overdraft"
-        case .other:         return "Other"
-        case .current:       return "Current Account"
-        case .savingsAccount: return "Savings Account"
-        case .isa:           return "ISA"
-        case .investment:    return "Investment Account"
-        case .pension:       return "Pension"
-        case .otherAsset:    return "Other Asset"
+        case .creditCard:     return "Credit card"
+        case .loan:           return "Loan"
+        case .overdraft:      return "Overdraft"
+        case .other:          return "Other"
+        case .current:        return "Current account"
+        case .savingsAccount: return "Savings account"
+        case .isa:            return "ISA"
+        case .investment:     return "Investment account"
+        case .pension:        return "Pension"
+        case .otherAsset:     return "Other asset"
         }
     }
+}
+
+/// "3.9%" rather than "3.9000000000000004%".
+func formatPercent(_ value: Double, digits: Int = 1) -> String {
+    let formatter = NumberFormatter()
+    formatter.numberStyle = .decimal
+    formatter.minimumFractionDigits = 0
+    formatter.maximumFractionDigits = digits
+    return (formatter.string(from: NSNumber(value: value)) ?? "\(value)") + "%"
 }
 
 // MARK: - AccountsScreen
 
 struct AccountsScreen: View {
     @Environment(LedgerStore.self) var store
+    @Environment(SyncCoordinator.self) var sync
     @State private var filter: AccountClass? = nil
     @State private var showAddAccount = false
     @State private var editingAccount: Account? = nil
+    @State private var showSettings = false
+    @State private var pendingDelete: Account? = nil
+
+    private var isPrivate: Bool { store.state.privacyMode }
 
     var filteredAccounts: [Account] {
         // Rolled-forward balances: debt accounts show what's left after the scheduled
@@ -59,52 +82,161 @@ struct AccountsScreen: View {
         }
     }
 
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                NetWorthSummaryCard()
-                FilterChipsRow(selected: $filter)
+    private var debtSummary: DebtSummary { FinanceEngine.debtSummary(store.effectiveAccounts) }
+    private var utilizationHigh: Bool { debtSummary.utilization >= 80 }
 
-                if store.state.accounts.isEmpty {
+    var body: some View {
+        List {
+            Section {
+                NetWorthSummaryCard()
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+
+                AccountsMetricRow()
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+
+                FilterChipsRow(selected: $filter)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+            }
+
+            if store.state.accounts.isEmpty {
+                Section {
                     EmptyStateView(
                         title: "No accounts yet",
-                        subtitle: "Add your cash, savings, investments, and debts to track your net worth.",
+                        subtitle: "Add your cash, savings, investments and debts to see your net worth and where it is heading.",
                         systemImage: "creditcard.and.123",
-                        actionLabel: "Add Account"
+                        actionLabel: "Add account"
                     ) {
                         showAddAccount = true
                         Haptics.impact(.light)
                     }
-                    .padding(.top, 40)
-                } else if accountsByClass.isEmpty {
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                }
+            } else if accountsByClass.isEmpty {
+                Section {
                     EmptyStateView(
-                        title: "No accounts in this class",
-                        subtitle: "Switch filter or add a new account.",
+                        title: "Nothing in this class",
+                        subtitle: "Switch the filter or add an account.",
                         systemImage: "line.3.horizontal.decrease.circle"
                     )
-                    .padding(.top, 40)
-                } else {
-                    ForEach(accountsByClass, id: \.0) { cls, accounts in
-                        AccountClassSection(
-                            accountClass: cls,
-                            accounts: accounts,
-                            onEdit: { editingAccount = $0 }
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                }
+            } else {
+                ForEach(accountsByClass, id: \.0) { cls, accounts in
+                    Section {
+                        ForEach(accounts) { account in
+                            AccountRow(account: account)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    editingAccount = account
+                                    Haptics.impact(.light)
+                                }
+                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                    Button(role: .destructive) {
+                                        pendingDelete = account
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                    Button {
+                                        editingAccount = account
+                                    } label: {
+                                        Label("Edit", systemImage: "pencil")
+                                    }
+                                    .tint(.brandBlue)
+                                }
+                                .swipeActions(edge: .leading) {
+                                    Button {
+                                        store.duplicateAccount(id: account.id)
+                                        Haptics.impact(.medium)
+                                    } label: {
+                                        Label("Duplicate", systemImage: "plus.square.on.square")
+                                    }
+                                    .tint(.brandMint)
+                                }
+                                .contextMenu {
+                                    Button { editingAccount = account } label: {
+                                        Label("Edit", systemImage: "pencil")
+                                    }
+                                    Button {
+                                        store.duplicateAccount(id: account.id)
+                                    } label: {
+                                        Label("Duplicate", systemImage: "plus.square.on.square")
+                                    }
+                                    Button {
+                                        var updated = account
+                                        updated.includeInNetWorth.toggle()
+                                        store.updateAccount(updated)
+                                    } label: {
+                                        Label(
+                                            account.includeInNetWorth ? "Exclude from net worth" : "Include in net worth",
+                                            systemImage: account.includeInNetWorth ? "minus.circle" : "plus.circle"
+                                        )
+                                    }
+                                    Divider()
+                                    Button(role: .destructive) {
+                                        pendingDelete = account
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                }
+                                .accessibilityElement(children: .combine)
+                                .accessibilityHint("Double tap to edit")
+                        }
+                        .onMove { source, destination in
+                            move(source: source, destination: destination, within: accounts)
+                        }
+                    } header: {
+                        SectionHeader(
+                            title: cls.displayName,
+                            total: isPrivate ? "•••" : formatMoney(accounts.reduce(0) { $0 + $1.balance }, currency: store.state.currency),
+                            color: cls == .debt ? .brandRed : .brandMint
                         )
                     }
                 }
             }
-            .padding()
+
+            Section {
+                InvestmentAssumptionRow()
+            } header: {
+                SectionHeader(title: "Assumptions")
+            } footer: {
+                Text("Used for the net-worth outlook and the widgets. Balances of investment accounts grow at this rate; savings use their own AER.")
+            }
         }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
         .background(Color.bg.ignoresSafeArea())
         .navigationTitle("Accounts")
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .topBarLeading) {
                 Button {
-                    showAddAccount = true
-                    Haptics.impact(.light)
+                    showSettings = true
                 } label: {
-                    Image(systemName: "plus")
+                    Image(systemName: "gearshape")
+                        .foregroundStyle(Color.muted)
+                }
+                .accessibilityLabel("Settings")
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                HStack(spacing: Spacing.sm) {
+                    if store.state.accounts.count > 1 {
+                        EditButton()
+                    }
+                    Button {
+                        showAddAccount = true
+                        Haptics.impact(.light)
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .accessibilityLabel("Add account")
                 }
             }
         }
@@ -116,6 +248,47 @@ struct AccountsScreen: View {
             AccountEditorSheet(account: account)
                 .environment(store)
         }
+        .sheet(isPresented: $showSettings) {
+            SettingsSheet()
+                .environment(store)
+                .environment(sync)
+        }
+        .alert("Delete \(pendingDelete?.name ?? "account")?", isPresented: Binding(
+            get: { pendingDelete != nil },
+            set: { if !$0 { pendingDelete = nil } }
+        )) {
+            Button("Delete", role: .destructive) {
+                if let account = pendingDelete {
+                    withAnimation(Motion.snappy) { store.removeAccount(id: account.id) }
+                    Haptics.notification(.error)
+                }
+                pendingDelete = nil
+            }
+            Button("Cancel", role: .cancel) { pendingDelete = nil }
+        } message: {
+            Text("Linked payments in the ledger stay; only the account and its balance history go.")
+        }
+        .onChange(of: utilizationHigh) { _, high in
+            if high { Haptics.notification(.warning) }
+        }
+    }
+
+    /// Maps a move inside one class section onto the full accounts array.
+    private func move(source: IndexSet, destination: Int, within accounts: [Account]) {
+        let all = store.state.accounts
+        let globalSource = IndexSet(source.compactMap { index in
+            all.firstIndex(where: { $0.id == accounts[index].id })
+        })
+        let globalDestination: Int
+        if destination < accounts.count, let index = all.firstIndex(where: { $0.id == accounts[destination].id }) {
+            globalDestination = index
+        } else if let last = accounts.last, let index = all.firstIndex(where: { $0.id == last.id }) {
+            globalDestination = index + 1
+        } else {
+            globalDestination = all.count
+        }
+        store.moveAccounts(from: globalSource, to: globalDestination)
+        Haptics.selection()
     }
 }
 
@@ -126,7 +299,7 @@ private struct FilterChipsRow: View {
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
+            HStack(spacing: Spacing.sm) {
                 FilterChip(label: "All", isSelected: selected == nil) {
                     withAnimation(Motion.snappy) { selected = nil }
                     Haptics.selection()
@@ -153,21 +326,16 @@ private struct FilterChip: View {
     var body: some View {
         Button(action: action) {
             Text(label)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.footnote.weight(.semibold))
                 .foregroundStyle(isSelected ? Color.surface : Color.ink)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
-                .background(
-                    Capsule()
-                        .fill(isSelected ? Color.brandBlue : Color.surfaceHigh)
-                )
-                .overlay(
-                    Capsule()
-                        .strokeBorder(isSelected ? Color.clear : Color.lineStrong, lineWidth: 0.5)
-                )
+                .background(Capsule().fill(isSelected ? Color.brandBlue : Color.surfaceHigh))
+                .overlay(Capsule().strokeBorder(isSelected ? Color.clear : Color.line, lineWidth: 0.5))
         }
         .buttonStyle(.plain)
-        .animation(Motion.snappy, value: isSelected)
+        .motionAnimation(Motion.snappy, value: isSelected)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 }
 
@@ -177,11 +345,10 @@ struct NetWorthSummaryCard: View {
     @Environment(LedgerStore.self) var store
 
     private var summary: NetWorthSummary { FinanceEngine.netWorthSummary(store.effectiveAccounts) }
-    private var debt: DebtSummary { FinanceEngine.debtSummary(store.effectiveAccounts) }
 
     var body: some View {
         Card {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: Spacing.lg) {
                 Text("Net worth")
                     .font(.cardTitle)
                     .foregroundStyle(Color.muted)
@@ -208,29 +375,17 @@ struct NetWorthSummaryCard: View {
                     }
                 }
                 .frame(height: 8)
-                .animation(Motion.standard, value: summary.totalAssets)
+                .motionAnimation(Motion.standard, value: summary.totalAssets)
+                .accessibilityHidden(true)
 
-                // Metrics row
-                HStack(spacing: 12) {
+                HStack(spacing: Spacing.md) {
                     metricItem("Assets", value: summary.totalAssets, color: .brandMint)
                     Divider().frame(height: 32)
                     metricItem("Debt", value: summary.totalDebt, color: .brandRed)
-                    Divider().frame(height: 32)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Utilization")
-                            .font(.caption)
-                            .foregroundStyle(Color.muted)
-                        Text(String(format: "%.0f%%", debt.utilization))
-                            .font(.moneySmall)
-                            .foregroundStyle(
-                                debt.utilization > 75 ? Color.brandRed
-                                : debt.utilization > 30 ? Color.brandAmber
-                                : Color.ink
-                            )
-                    }
                 }
             }
         }
+        .accessibilityElement(children: .combine)
     }
 
     private func metricItem(_ label: String, value: Double, color: Color) -> some View {
@@ -248,68 +403,73 @@ struct NetWorthSummaryCard: View {
     }
 }
 
-// MARK: - AccountClassSection
+// MARK: - AccountsMetricRow
 
-struct AccountClassSection: View {
-    var accountClass: AccountClass
-    var accounts: [Account]
-    var onEdit: (Account) -> Void
+/// The web's "Monthly into accounts" and "Card utilization" tiles plus the scheduled
+/// debt payments, side by side.
+struct AccountsMetricRow: View {
+    @Environment(LedgerStore.self) var store
+
+    private var accounts: [Account] { store.effectiveAccounts }
+    private var monthlyIntoAccounts: Double {
+        accounts.filter { $0.accountClass != .debt }.reduce(0) { $0 + max(0, $1.monthlyContribution) }
+    }
+    private var monthlyPayments: Double {
+        accounts.filter { $0.accountClass == .debt && $0.balance > 0 }.reduce(0) { $0 + max(0, $1.minimumPayment) }
+    }
+    private var debt: DebtSummary { FinanceEngine.debtSummary(accounts) }
+
+    var body: some View {
+        HStack(spacing: Spacing.md) {
+            MetricCard(
+                label: "Into accounts",
+                value: formatMoney(monthlyIntoAccounts, currency: store.state.currency),
+                tone: .brandMint,
+                isPrivate: store.state.privacyMode,
+                detail: "per month"
+            )
+            MetricCard(
+                label: "Debt payments",
+                value: formatMoney(monthlyPayments, currency: store.state.currency),
+                tone: .brandRed,
+                isPrivate: store.state.privacyMode,
+                detail: "per month"
+            )
+            MetricCard(
+                label: "Utilisation",
+                value: formatPercent(debt.utilization, digits: 0),
+                tone: debt.utilization >= 80 ? .brandRed : debt.utilization > 30 ? .brandAmber : .ink,
+                detail: debt.utilization >= 80 ? "keep under 30%" : "of card limits"
+            )
+        }
+    }
+}
+
+// MARK: - InvestmentAssumptionRow
+
+struct InvestmentAssumptionRow: View {
     @Environment(LedgerStore.self) var store
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            SectionHeader(title: accountClass.displayName)
-
-            ForEach(accounts) { account in
-                AccountRow(account: account)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        onEdit(account)
-                        Haptics.impact(.light)
-                    }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        Button(role: .destructive) {
-                            withAnimation(Motion.snappy) {
-                                store.removeAccount(id: account.id)
-                            }
-                            Haptics.notification(.error)
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-
-                        Button { onEdit(account) } label: {
-                            Label("Edit", systemImage: "pencil")
-                        }
-                        .tint(.brandBlue)
-                    }
-                    .contextMenu {
-                        Button { onEdit(account) } label: {
-                            Label("Edit", systemImage: "pencil")
-                        }
-                        Button {
-                            var updated = account
-                            updated.includeInNetWorth.toggle()
-                            store.updateAccount(updated)
-                        } label: {
-                            Label(
-                                account.includeInNetWorth
-                                    ? "Exclude from net worth"
-                                    : "Include in net worth",
-                                systemImage: account.includeInNetWorth
-                                    ? "minus.circle"
-                                    : "plus.circle"
-                            )
-                        }
-                        Divider()
-                        Button(role: .destructive) {
-                            store.removeAccount(id: account.id)
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                    }
-                    .transition(.slideIn())
+        Stepper(
+            value: Binding(
+                get: { store.state.assumedInvestmentReturn },
+                set: { store.setAssumedInvestmentReturn(($0 * 2).rounded() / 2) }
+            ),
+            in: -50...50,
+            step: 0.5
+        ) {
+            HStack {
+                Text("Investment return")
+                    .foregroundStyle(Color.ink)
+                Spacer()
+                Text("\(formatPercent(store.state.assumedInvestmentReturn)) a year")
+                    .foregroundStyle(Color.muted)
+                    .monospacedDigit()
             }
         }
+        .accessibilityLabel("Assumed investment return")
+        .accessibilityValue("\(formatPercent(store.state.assumedInvestmentReturn)) a year")
     }
 }
 
@@ -320,49 +480,56 @@ struct AccountRow: View {
     @Environment(LedgerStore.self) var store
 
     var body: some View {
-        Card(padding: 14) {
-            HStack(spacing: 12) {
+        HStack(spacing: Spacing.md) {
+            ZStack {
                 Circle()
-                    .fill(Color(hex: account.color))
-                    .frame(width: 10, height: 10)
+                    .fill(Color(hex: account.color).opacity(0.18))
+                Image(systemName: account.accountClass.symbol)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Color(hex: account.color))
+            }
+            .frame(width: 34, height: 34)
+            .accessibilityHidden(true)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(account.name)
-                        .font(.body)
-                        .foregroundStyle(Color.ink)
-                    Text(secondaryLabel)
-                        .font(.caption)
-                        .foregroundStyle(Color.muted)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(account.name)
+                    .font(.body)
+                    .foregroundStyle(Color.ink)
+                    .lineLimit(1)
+                Text(secondaryLabel)
+                    .font(.caption)
+                    .foregroundStyle(Color.muted)
+                    .lineLimit(2)
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 2) {
+                MoneyText(
+                    amount: account.balance,
+                    currency: store.state.currency,
+                    font: .moneySmall,
+                    color: account.accountClass == .debt ? .brandRed : .ink,
+                    isPrivate: store.state.privacyMode
+                )
+                if account.accountClass == .debt && account.creditLimit > 0 {
+                    Text("\(formatPercent((account.balance / account.creditLimit) * 100, digits: 0)) used")
+                        .font(.caption2)
+                        .foregroundStyle((account.balance / account.creditLimit) >= 0.8 ? Color.brandRed : Color.muted)
                 }
-
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: 2) {
-                    MoneyText(
-                        amount: account.balance,
-                        currency: store.state.currency,
-                        font: .moneySmall,
-                        color: account.accountClass == .debt ? .brandRed : .ink,
-                        isPrivate: store.state.privacyMode
-                    )
-                    if account.accountClass == .debt && account.creditLimit > 0 {
-                        Text(String(format: "%.0f%% used", (account.balance / account.creditLimit) * 100))
-                            .font(.caption2)
-                            .foregroundStyle(Color.muted)
-                    }
-                    if let note = autoTrackNote {
-                        Text(note)
-                            .font(.caption2)
-                            .foregroundStyle(Color.faint)
-                    }
-                    if !account.includeInNetWorth {
-                        Text("Excluded")
-                            .font(.caption2)
-                            .foregroundStyle(Color.faint)
-                    }
+                if let note = autoTrackNote {
+                    Text(note)
+                        .font(.caption2)
+                        .foregroundStyle(Color.faint)
+                }
+                if !account.includeInNetWorth {
+                    Text("Excluded")
+                        .font(.caption2)
+                        .foregroundStyle(Color.faint)
                 }
             }
         }
+        .padding(.vertical, 4)
     }
 
     /// Shown when the displayed balance was rolled forward past its snapshot month, so the
@@ -378,17 +545,43 @@ struct AccountRow: View {
     private var secondaryLabel: String {
         switch account.accountClass {
         case .debt:
+            var parts: [String] = []
             if account.promoMonths > 0 {
-                return "\(account.promoRate)% promo \u{2192} \(account.rate)% APR"
+                let anchor = account.balanceAsOf ?? getMonthKey()
+                let promoEnds = shiftMonth(anchor, by: account.promoMonths)
+                parts.append("\(formatPercent(account.promoRate)) until \(formatMonth(promoEnds)), then \(formatPercent(account.rate)) APR")
+            } else {
+                parts.append("\(formatPercent(account.rate)) APR")
             }
-            return "\(account.rate)% APR"
+            if account.minimumPayment > 0 {
+                let money = store.state.privacyMode ? "•••" : formatMoney(account.minimumPayment, currency: store.state.currency)
+                parts.append("\(money) due on the \(ordinalDay(account.dueDay))")
+            }
+            return parts.joined(separator: " · ")
         case .savings:
-            return "\(account.rate)% AER"
+            return "\(formatPercent(account.rate)) AER" + contributionSuffix
         case .investment:
-            return "\(account.rate)% expected return"
+            return "\(formatPercent(account.rate)) expected" + contributionSuffix
         case .cash:
-            return account.type.displayName
+            return account.type.displayName + contributionSuffix
         }
+    }
+
+    private var contributionSuffix: String {
+        guard account.monthlyContribution > 0 else { return "" }
+        let money = store.state.privacyMode ? "•••" : formatMoney(account.monthlyContribution, currency: store.state.currency)
+        return " · \(money)/month in"
+    }
+
+    private func ordinalDay(_ day: Int) -> String {
+        let suffix: String
+        switch day % 10 {
+        case 1 where day % 100 != 11: suffix = "st"
+        case 2 where day % 100 != 12: suffix = "nd"
+        case 3 where day % 100 != 13: suffix = "rd"
+        default: suffix = "th"
+        }
+        return "\(day)\(suffix)"
     }
 }
 
@@ -402,48 +595,62 @@ struct AccountEditorSheet: View {
     @State private var name = ""
     @State private var accountClass: AccountClass = .cash
     @State private var accountType: AccountType = .current
-    @State private var balance: String = "0"
-    @State private var rate: String = "0"
-    @State private var promoRate: String = "0"
-    @State private var promoMonths: String = "0"
-    @State private var monthlyContribution: String = "0"
-    @State private var creditLimit: String = "0"
-    @State private var minimumPayment: String = "0"
+    @State private var balance: String = ""
+    @State private var rate: String = ""
+    @State private var promoRate: String = ""
+    @State private var promoMonths: String = ""
+    @State private var monthlyContribution: String = ""
+    @State private var creditLimit: String = ""
+    @State private var minimumPayment: String = ""
     @State private var dueDay: String = "1"
     @State private var includeInNetWorth = true
     @State private var colorHex = CATEGORY_COLORS[0]
     @State private var note = ""
+    @State private var showDeleteConfirm = false
+    @FocusState private var nameFocused: Bool
 
     private var isEditing: Bool { account != nil }
+
+    private var typeOptions: [AccountTypeOption] {
+        ACCOUNT_TYPE_OPTIONS[accountClass] ?? []
+    }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("Details") {
                     TextField("Account name", text: $name)
+                        .focused($nameFocused)
+                        .textInputAutocapitalization(.words)
                     Picker("Class", selection: $accountClass) {
                         ForEach(AccountClass.allCases, id: \.self) { cls in
                             Text(cls.displayName).tag(cls)
                         }
                     }
-                    .onChange(of: accountClass) { _, _ in
-                        accountType = defaultType(for: accountClass)
+                    .onChange(of: accountClass) { _, newClass in
+                        accountType = resolveAccountType(accountType, for: newClass)
                         Haptics.selection()
                     }
 
                     Picker("Type", selection: $accountType) {
-                        ForEach(accountTypes(for: accountClass), id: \.self) { t in
-                            Text(t.displayName).tag(t)
+                        ForEach(typeOptions, id: \.value) { option in
+                            Text(option.label).tag(option.value)
                         }
                     }
                 }
 
-                Section("Balance") {
+                Section {
                     HStack {
                         Text(FinanceEngine.currencySymbol(for: store.state.currency))
                             .foregroundStyle(Color.muted)
                         TextField("0.00", text: $balance)
                             .keyboardType(.decimalPad)
+                    }
+                } header: {
+                    Text(accountClass == .debt ? "Balance owed" : "Balance")
+                } footer: {
+                    if accountClass == .debt {
+                        Text("Debt balances roll forward each month by the scheduled payment (or the payments you link in the ledger). Edit the figure whenever your statement says otherwise.")
                     }
                 }
 
@@ -465,42 +672,40 @@ struct AccountEditorSheet: View {
                         HStack {
                             TextField("0", text: $promoMonths)
                                 .keyboardType(.numberPad)
-                            Text("promo months")
+                            Text("promo months left")
                                 .foregroundStyle(Color.muted)
                         }
                     }
                 }
 
                 if accountClass != .debt {
-                    Section("Monthly contribution") {
+                    Section {
                         HStack {
                             Text(FinanceEngine.currencySymbol(for: store.state.currency))
                                 .foregroundStyle(Color.muted)
                             TextField("0.00", text: $monthlyContribution)
                                 .keyboardType(.decimalPad)
                         }
+                    } header: {
+                        Text("Monthly contribution")
+                    } footer: {
+                        Text("Surplus routed into this account every month in the net-worth outlook.")
                     }
                 }
 
                 if accountClass == .debt {
                     Section("Credit details") {
-                        HStack {
-                            Text("Limit").foregroundStyle(Color.muted)
-                            Spacer()
+                        LabeledContent("Limit") {
                             TextField("0.00", text: $creditLimit)
                                 .keyboardType(.decimalPad)
                                 .multilineTextAlignment(.trailing)
                         }
-                        HStack {
-                            Text("Min. payment").foregroundStyle(Color.muted)
-                            Spacer()
+                        LabeledContent("Minimum payment") {
                             TextField("0.00", text: $minimumPayment)
                                 .keyboardType(.decimalPad)
                                 .multilineTextAlignment(.trailing)
                         }
-                        HStack {
-                            Text("Due day").foregroundStyle(Color.muted)
-                            Spacer()
+                        LabeledContent("Due day of month") {
                             TextField("1", text: $dueDay)
                                 .keyboardType(.numberPad)
                                 .multilineTextAlignment(.trailing)
@@ -511,24 +716,9 @@ struct AccountEditorSheet: View {
                 Section("Options") {
                     Toggle("Include in net worth", isOn: $includeInNetWorth)
 
-                    HStack(spacing: 10) {
-                        Text("Color").foregroundStyle(Color.muted)
-                        Spacer()
-                        ForEach(CATEGORY_COLORS, id: \.self) { hex in
-                            Circle()
-                                .fill(Color(hex: hex))
-                                .frame(width: 22, height: 22)
-                                .overlay(
-                                    Circle()
-                                        .strokeBorder(Color.white, lineWidth: colorHex == hex ? 2.5 : 0)
-                                )
-                                .shadow(color: colorHex == hex ? Color(hex: hex).opacity(0.5) : .clear, radius: 3)
-                                .onTapGesture {
-                                    colorHex = hex
-                                    Haptics.selection()
-                                }
-                                .animation(Motion.snappy, value: colorHex)
-                        }
+                    VStack(alignment: .leading, spacing: Spacing.sm) {
+                        Text("Colour").foregroundStyle(Color.muted)
+                        ColorSwatchGrid(selected: $colorHex)
                     }
                 }
 
@@ -540,11 +730,7 @@ struct AccountEditorSheet: View {
                 if isEditing {
                     Section {
                         Button(role: .destructive) {
-                            if let id = account?.id {
-                                store.removeAccount(id: id)
-                            }
-                            Haptics.notification(.error)
-                            dismiss()
+                            showDeleteConfirm = true
                         } label: {
                             Text("Delete account")
                                 .frame(maxWidth: .infinity)
@@ -552,13 +738,15 @@ struct AccountEditorSheet: View {
                     }
                 }
             }
-            .navigationTitle(isEditing ? "Edit Account" : "Add Account")
+            .scrollContentBackground(.hidden)
+            .background(Color.bg)
+            .navigationTitle(isEditing ? "Edit account" : "Add account")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         save()
                         Haptics.confirmSave()
@@ -568,7 +756,19 @@ struct AccountEditorSheet: View {
                     .fontWeight(.semibold)
                 }
             }
-            .onAppear { populateFromAccount() }
+            .confirmationDialog("Delete \(name)?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+                Button("Delete account", role: .destructive) {
+                    if let id = account?.id {
+                        store.removeAccount(id: id)
+                    }
+                    Haptics.notification(.error)
+                    dismiss()
+                }
+            }
+            .onAppear {
+                populateFromAccount()
+                if !isEditing { nameFocused = true }
+            }
         }
     }
 
@@ -587,26 +787,8 @@ struct AccountEditorSheet: View {
         switch accountClass {
         case .debt:       return "% APR"
         case .savings:    return "% AER"
-        case .investment: return "% p.a."
+        case .investment: return "% a year"
         case .cash:       return "%"
-        }
-    }
-
-    private func defaultType(for cls: AccountClass) -> AccountType {
-        switch cls {
-        case .cash:       return .current
-        case .savings:    return .savingsAccount
-        case .investment: return .investment
-        case .debt:       return .creditCard
-        }
-    }
-
-    private func accountTypes(for cls: AccountClass) -> [AccountType] {
-        switch cls {
-        case .cash:       return [.current, .other]
-        case .savings:    return [.savingsAccount, .isa, .other]
-        case .investment: return [.investment, .pension, .otherAsset]
-        case .debt:       return [.creditCard, .loan, .overdraft, .other]
         }
     }
 
@@ -617,13 +799,13 @@ struct AccountEditorSheet: View {
         name = a.name
         accountClass = a.accountClass
         accountType = a.type
-        balance = String(a.balance)
-        rate = String(a.rate)
-        promoRate = String(a.promoRate)
+        balance = formatAmountInput(a.balance)
+        rate = formatAmountInput(a.rate, fractionDigits: 2)
+        promoRate = formatAmountInput(a.promoRate, fractionDigits: 2)
         promoMonths = String(a.promoMonths)
-        monthlyContribution = String(a.monthlyContribution)
-        creditLimit = String(a.creditLimit)
-        minimumPayment = String(a.minimumPayment)
+        monthlyContribution = formatAmountInput(a.monthlyContribution)
+        creditLimit = formatAmountInput(a.creditLimit)
+        minimumPayment = formatAmountInput(a.minimumPayment)
         dueDay = String(a.dueDay)
         includeInNetWorth = a.includeInNetWorth
         colorHex = a.color
@@ -631,20 +813,22 @@ struct AccountEditorSheet: View {
     }
 
     private func save() {
-        let id = account?.id ?? createId(prefix: "acc")
+        let id = account?.id ?? createId(prefix: "account")
+        let isDebt = accountClass == .debt
         let built = Account(
             id: id,
             name: name.trimmingCharacters(in: .whitespaces),
             accountClass: accountClass,
-            type: accountType,
-            balance: Double(balance) ?? 0,
-            rate: Double(rate) ?? 0,
-            promoRate: Double(promoRate) ?? 0,
-            promoMonths: Int(promoMonths) ?? 0,
-            monthlyContribution: Double(monthlyContribution) ?? 0,
-            creditLimit: Double(creditLimit) ?? 0,
-            minimumPayment: Double(minimumPayment) ?? 0,
-            dueDay: Int(dueDay) ?? 1,
+            type: resolveAccountType(accountType, for: accountClass),
+            balance: parseAmountInput(balance) ?? 0,
+            rate: parseAmountInput(rate) ?? 0,
+            promoRate: max(0, parseAmountInput(promoRate) ?? 0),
+            promoMonths: clampWholeNumber(Double(parseIntegerInput(promoMonths) ?? 0), max: 120),
+            monthlyContribution: isDebt ? 0 : max(0, parseAmountInput(monthlyContribution) ?? 0),
+            creditLimit: isDebt ? (parseAmountInput(creditLimit) ?? 0) : 0,
+            minimumPayment: isDebt ? (parseAmountInput(minimumPayment) ?? 0) : 0,
+            dueDay: isDebt ? clampDueDay(Double(parseIntegerInput(dueDay) ?? 1)) : 1,
+            balanceAsOf: account?.balanceAsOf,
             includeInNetWorth: includeInNetWorth,
             color: colorHex,
             note: note

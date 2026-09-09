@@ -23,12 +23,14 @@ struct SyncNudgeBanner: View {
                 .tint(.brandBlue)
                 .controlSize(.small)
             Button { onDismiss() } label: { Image(systemName: "xmark").foregroundStyle(Color.muted) }
+                .accessibilityLabel("Dismiss")
         }
-        .padding(16)
+        .padding(Spacing.lg)
         .background(Color.surfaceHigh)
-        .clipShape(.rect(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Color.lineStrong))
-        .shadow(color: .black.opacity(0.18), radius: 20, y: 8)
+        .clipShape(.rect(cornerRadius: Radius.lg, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous).stroke(Color.line))
+        .shadow(color: Color.ink.opacity(0.18), radius: 20, y: 8)
         .padding(.horizontal)
+        .accessibilityElement(children: .contain)
     }
 }

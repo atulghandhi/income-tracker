@@ -37,15 +37,9 @@ struct MergeConflictSheet: View {
                         summary: ledgerSummary(conflict.local),
                         warning: "Cloud data will be replaced.",
                         action: {
-                            // Keep local: save local to cloud
-                            Task {
-                                store.update { $0 = conflict.local }
-                                store.snapToCurrentMonth()
-                                if let userId = sync.currentUser?.id {
-                                    try? await sync.saveCloudState(conflict.local, userId: userId)
-                                }
-                                sync.mergeConflict = nil
-                            }
+                            // Keep local: it becomes the newest write and is pushed to the cloud.
+                            sync.mergeConflict = nil
+                            store.replaceState(conflict.local, pushToCloud: true)
                         }
                     )
 
@@ -54,9 +48,9 @@ struct MergeConflictSheet: View {
                         summary: ledgerSummary(conflict.cloud),
                         warning: "Local data will be cleared.",
                         action: {
-                            store.update { $0 = conflict.cloud }
-                            store.snapToCurrentMonth()
+                            // Use cloud: adopt it as-is (its timestamp already wins) and save locally.
                             sync.mergeConflict = nil
+                            store.replaceState(conflict.cloud, pushToCloud: false)
                         }
                     )
                 }
@@ -83,7 +77,6 @@ struct ConflictChoiceCard: View {
     var summary: String
     var warning: String
     var action: () -> Void
-    @State private var isPressed = false
 
     var body: some View {
         Button(action: { Haptics.impact(.medium); action() }) {
@@ -96,12 +89,20 @@ struct ConflictChoiceCard: View {
             .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
             .padding(16)
         }
-        .buttonStyle(.plain)
-        .background(Color.surfaceHigh)
-        .clipShape(.rect(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Color.lineStrong))
-        .scaleEffect(isPressed ? 0.97 : 1.0)
-        .animation(Motion.snappy, value: isPressed)
-        ._onButtonGesture { pressing in isPressed = pressing } perform: {}
+        .buttonStyle(PressableCardButtonStyle())
+        .accessibilityHint(warning)
+    }
+}
+
+/// Card-shaped button that dips slightly while pressed, using the public
+/// `configuration.isPressed` instead of a private SwiftUI gesture hook.
+struct PressableCardButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(Color.surfaceHigh)
+            .clipShape(.rect(cornerRadius: 16, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Color.lineStrong))
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .animation(Motion.snappy, value: configuration.isPressed)
     }
 }

@@ -11,6 +11,7 @@
 
 import Foundation
 import AuthenticationServices
+import UIKit
 import CryptoKit
 
 // MARK: - SyncCoordinator
@@ -131,6 +132,11 @@ final class SyncCoordinator {
                 _ = try await refreshAccessToken()
             } catch SyncError.httpError(let code, _) where (400...403).contains(code) {
                 // Refresh token was revoked/invalid — a real sign-out.
+                await signOutLocally()
+                return
+            } catch SyncError.notSignedIn {
+                // No refresh token to work with: the cached identity can never make an
+                // authenticated request again, so don't pretend to be signed in.
                 await signOutLocally()
                 return
             } catch {
@@ -281,6 +287,9 @@ final class SyncCoordinator {
     /// If the URL carries a PKCE `code` query parameter, it exchanges it for a
     /// token; otherwise it parses fragment-style tokens (implicit flow fallback).
     func handleAuthCallback(url: URL) {
+        // Only the OAuth redirect (incometracker://auth-callback...) belongs here;
+        // widget deep links such as incometracker://dashboard use the same scheme.
+        guard url.host?.lowercased() == "auth-callback" else { return }
         Task {
             do {
                 try await exchangeOAuthCode(from: url)
@@ -342,7 +351,7 @@ final class SyncCoordinator {
             user_id: userId,
             state: state,
             schema_version: state.schemaVersion,
-            updated_at: ISO8601DateFormatter().string(from: .now)
+            updated_at: isoTimestampNow()
         )
         let body = try JSONEncoder.ledgerState.encode(payload)
 
@@ -366,7 +375,7 @@ final class SyncCoordinator {
         let payload = ProfilePayload(
             id: user.id,
             email: user.email,
-            updated_at: ISO8601DateFormatter().string(from: .now)
+            updated_at: isoTimestampNow()
         )
         let body = try JSONEncoder().encode(payload)
 
@@ -732,24 +741,25 @@ private extension Data {
 // MARK: - ASWebAuthenticationSession presentation context
 
 /// Minimal presentationContextProvider that returns the key window.
+/// The system calls `presentationAnchor` on the main thread; the class itself is
+/// nonisolated so it can satisfy the non-isolated protocol requirement.
 private final class PresentationContextProvider: NSObject,
-    ASWebAuthenticationPresentationContextProviding
+    ASWebAuthenticationPresentationContextProviding, @unchecked Sendable
 {
     static let shared = PresentationContextProvider()
 
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        // keyWindow is deprecated on iOS 15+; search windows directly so we don't
-        // fall back to a detached UIWindow() that causes ASWebAuthenticationSession
-        // to immediately fire error 1 (canceledLogin) without showing the browser.
-        UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .filter { $0.activationState == .foregroundActive }
-            .flatMap { $0.windows }
-            .first(where: { $0.isKeyWindow })
-            ?? UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .flatMap { $0.windows }
-            .first
-            ?? ASPresentationAnchor()
+        MainActor.assumeIsolated {
+            // keyWindow is deprecated on iOS 15+; search windows directly so we don't
+            // fall back to a detached UIWindow() that causes ASWebAuthenticationSession
+            // to immediately fire error 1 (canceledLogin) without showing the browser.
+            let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+            return scenes
+                .filter { $0.activationState == .foregroundActive }
+                .flatMap { $0.windows }
+                .first(where: { $0.isKeyWindow })
+                ?? scenes.flatMap { $0.windows }.first
+                ?? ASPresentationAnchor()
+        }
     }
 }

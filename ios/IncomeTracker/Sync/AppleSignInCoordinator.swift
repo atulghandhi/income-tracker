@@ -7,6 +7,7 @@
 import AuthenticationServices
 import CryptoKit
 import Foundation
+import UIKit
 
 // MARK: - AppleSignInCoordinator
 
@@ -22,6 +23,8 @@ final class AppleSignInCoordinator: NSObject,
     var onSuccess: ((String, String) -> Void)?
     /// Called on failure with the underlying error.
     var onFailure: ((Error) -> Void)?
+    /// Called when the user dismisses the Apple sheet without signing in.
+    var onCancel: (() -> Void)?
 
     // MARK: - Private state
 
@@ -47,43 +50,53 @@ final class AppleSignInCoordinator: NSObject,
 
     // MARK: - ASAuthorizationControllerPresentationContextProviding
 
-    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
-        UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .first?
-            .keyWindow
-            ?? ASPresentationAnchor()
+    nonisolated func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        // Delegate callbacks arrive on the main thread; hop back onto the actor explicitly
+        // because the protocol requirement itself is not isolated.
+        MainActor.assumeIsolated {
+            let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+            return scenes
+                .filter { $0.activationState == .foregroundActive }
+                .flatMap { $0.windows }
+                .first(where: { $0.isKeyWindow })
+                ?? scenes.flatMap { $0.windows }.first
+                ?? ASPresentationAnchor()
+        }
     }
 
     // MARK: - ASAuthorizationControllerDelegate
 
-    func authorizationController(
+    nonisolated func authorizationController(
         controller: ASAuthorizationController,
         didCompleteWithAuthorization authorization: ASAuthorization
     ) {
-        guard
-            let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
-            let tokenData = credential.identityToken,
-            let idToken = String(data: tokenData, encoding: .utf8)
-        else {
-            onFailure?(AppleSignInError.missingIdentityToken)
-            return
+        MainActor.assumeIsolated {
+            guard
+                let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                let tokenData = credential.identityToken,
+                let idToken = String(data: tokenData, encoding: .utf8)
+            else {
+                onFailure?(AppleSignInError.missingIdentityToken)
+                return
+            }
+            onSuccess?(idToken, currentNonce)
         }
-        onSuccess?(idToken, currentNonce)
     }
 
-    func authorizationController(
+    nonisolated func authorizationController(
         controller: ASAuthorizationController,
         didCompleteWithError error: Error
     ) {
-        // ASAuthorizationError.canceled is raised when the user taps "Cancel"
-        // — treat that as a silent dismissal rather than a true error.
-        if let authError = error as? ASAuthorizationError,
-           authError.code == .canceled
-        {
-            return
+        MainActor.assumeIsolated {
+            // ASAuthorizationError.canceled is raised when the user taps "Cancel"
+            // — a dismissal, not a failure, but the caller still needs to reset its
+            // "signing in" spinner.
+            if let authError = error as? ASAuthorizationError, authError.code == .canceled {
+                onCancel?()
+                return
+            }
+            onFailure?(error)
         }
-        onFailure?(error)
     }
 
     // MARK: - Nonce helpers

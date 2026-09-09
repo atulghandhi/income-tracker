@@ -14,8 +14,8 @@ public struct Card<Content: View>: View {
     private let content: Content
 
     public init(
-        padding: CGFloat = 16,
-        cornerRadius: CGFloat = 16,
+        padding: CGFloat = Spacing.lg,
+        cornerRadius: CGFloat = Radius.lg,
         @ViewBuilder content: () -> Content
     ) {
         self.padding = padding
@@ -24,15 +24,7 @@ public struct Card<Content: View>: View {
     }
 
     public var body: some View {
-        content
-            .padding(padding)
-            .background(Color.surface)
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(Color.lineStrong, lineWidth: 0.5)
-            )
-            .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 2)
+        content.cardStyle(padding: padding, cornerRadius: cornerRadius)
     }
 }
 
@@ -46,49 +38,69 @@ public struct MetricCard: View {
     public var value: String
     public var tone: Color
     public var isPrivate: Bool
+    /// Optional one-line context under the value ("+12% vs last month").
+    public var detail: String?
 
     public init(
         label: String,
         value: String,
         tone: Color = .ink,
-        isPrivate: Bool = false
+        isPrivate: Bool = false,
+        detail: String? = nil
     ) {
         self.label = label
         self.value = value
         self.tone = tone
         self.isPrivate = isPrivate
+        self.detail = detail
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: Spacing.xs + 2) {
             Text(label)
                 .font(.metricLabel)
                 .foregroundStyle(Color.muted)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
 
-            Group {
-                if isPrivate {
-                    Text("•••••")
-                        .font(.metricValue)
-                        .foregroundStyle(Color.faint)
-                } else {
-                    Text(value)
-                        .font(.metricValue)
-                        .foregroundStyle(tone)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                }
+            Text(isPrivate ? "•••••" : value)
+                .font(.metricValue)
+                .foregroundStyle(isPrivate ? Color.faint : tone)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .contentTransition(.numericText())
+                .motionAnimation(Motion.standard, value: value)
+
+            if let detail {
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(Color.faint)
+                    .lineLimit(1)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(Color.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.lineStrong, lineWidth: 0.5)
-        )
-        .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 2)
+        .cardStyle()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityValue(isPrivate ? "Hidden" : (detail.map { "\(value), \($0)" } ?? value))
     }
+}
+
+// MARK: - Money formatting
+
+/// Formats an amount with the app's single currency formatter (same locale, symbol
+/// and digit rules as every other screen and the widgets).
+public func formatMoney(_ amount: Double, currency: CurrencyCode) -> String {
+    FinanceEngine.currencyFormatter(for: currency).string(from: NSNumber(value: amount))
+        ?? String(format: "%.2f", amount)
+}
+
+/// Formats a signed amount with an explicit "+" for positive values.
+public func formatSignedMoney(_ amount: Double, currency: CurrencyCode) -> String {
+    let base = formatMoney(abs(amount), currency: currency)
+    if amount > 0.004 { return "+\(base)" }
+    if amount < -0.004 { return "−\(base)" }
+    return base
 }
 
 // MARK: - MoneyText
@@ -116,37 +128,18 @@ public struct MoneyText: View {
         self.isPrivate = isPrivate
     }
 
-    private var formatted: String {
-        Self.formatter(for: currency).string(from: NSNumber(value: amount)) ?? "\(amount)"
-    }
-
-    private static func formatter(for code: CurrencyCode) -> NumberFormatter {
-        let option = CURRENCY_OPTIONS.first { $0.code == code }
-        let fmt = NumberFormatter()
-        fmt.numberStyle = .currency
-        fmt.locale = Locale(identifier: option?.locale ?? "en-GB")
-        fmt.minimumFractionDigits = 2
-        fmt.maximumFractionDigits = 2
-        return fmt
-    }
-
     public var body: some View {
-        Group {
-            if isPrivate {
-                Text("•••••")
-                    .foregroundStyle(Color.faint)
-            } else {
-                Text(formatted)
-                    .foregroundStyle(color)
-            }
-        }
-        .font(font)
+        Text(isPrivate ? "•••••" : formatMoney(amount, currency: currency))
+            .foregroundStyle(isPrivate ? Color.faint : color)
+            .font(font)
+            .monospacedDigit()
+            .accessibilityLabel(isPrivate ? "Hidden amount" : formatMoney(amount, currency: currency))
     }
 }
 
 // MARK: - AnimatedMoneyText
 
-/// MoneyText that animates the value change with `.contentTransition(.numericText(value:))`.
+/// MoneyText that animates value changes with a numeric content transition.
 public struct AnimatedMoneyText: View {
 
     public var amount: Double
@@ -169,39 +162,21 @@ public struct AnimatedMoneyText: View {
         self.isPrivate = isPrivate
     }
 
-    private var formatted: String {
-        Self.formatter(for: currency).string(from: NSNumber(value: amount)) ?? "\(amount)"
-    }
-
-    private static func formatter(for code: CurrencyCode) -> NumberFormatter {
-        let option = CURRENCY_OPTIONS.first { $0.code == code }
-        let fmt = NumberFormatter()
-        fmt.numberStyle = .currency
-        fmt.locale = Locale(identifier: option?.locale ?? "en-GB")
-        fmt.minimumFractionDigits = 2
-        fmt.maximumFractionDigits = 2
-        return fmt
-    }
-
     public var body: some View {
-        Group {
-            if isPrivate {
-                Text("•••••")
-                    .foregroundStyle(Color.faint)
-            } else {
-                Text(formatted)
-                    .foregroundStyle(color)
-                    .contentTransition(.numericText(value: amount))
-                    .animation(Motion.standard, value: amount)
-            }
-        }
-        .font(font)
+        Text(isPrivate ? "•••••" : formatMoney(amount, currency: currency))
+            .foregroundStyle(isPrivate ? Color.faint : color)
+            .font(font)
+            .monospacedDigit()
+            .contentTransition(.numericText(value: amount))
+            .motionAnimation(Motion.standard, value: amount)
+            .accessibilityLabel(isPrivate ? "Hidden amount" : formatMoney(amount, currency: currency))
     }
 }
 
 // MARK: - StatusPill
 
-/// Small pill showing the current sync state of the ledger.
+/// Small pill showing the current sync state of the ledger. "Saved" fades out after
+/// two seconds; the next state change brings the pill back.
 public struct StatusPill: View {
 
     public enum State: Equatable {
@@ -248,31 +223,37 @@ public struct StatusPill: View {
     }
 
     public var body: some View {
-        if visible {
-            HStack(spacing: 4) {
-                Image(systemName: iconName)
-                    .font(.system(size: 11, weight: .semibold))
-                Text(label)
-                    .font(.system(size: 11, weight: .semibold))
-            }
-            .foregroundStyle(pillColor)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(pillColor.opacity(0.15), in: Capsule())
-            .transition(.opacity.combined(with: .scale(scale: 0.9)))
-            .onChange(of: state) { _, newState in
-                hideTask?.cancel()
-                visible = true
-                if newState == .saved {
-                    hideTask = Task {
-                        try? await Task.sleep(for: .seconds(2))
-                        guard !Task.isCancelled else { return }
-                        withAnimation(Motion.snappy) {
-                            visible = false
-                        }
-                    }
+        // The observer sits on a container that is always present, so it keeps
+        // firing after the pill has hidden itself.
+        ZStack {
+            if visible {
+                HStack(spacing: Spacing.xs) {
+                    Image(systemName: iconName)
+                    Text(label)
                 }
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(pillColor)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(pillColor.opacity(0.15), in: Capsule())
+                .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                .accessibilityLabel("Sync status: \(label)")
             }
+        }
+        .onAppear { scheduleAutoHide(for: state) }
+        .onChange(of: state) { _, newState in
+            hideTask?.cancel()
+            withAnimation(Motion.snappy) { visible = true }
+            scheduleAutoHide(for: newState)
+        }
+    }
+
+    private func scheduleAutoHide(for state: State) {
+        guard state == .saved else { return }
+        hideTask = Task {
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            withAnimation(Motion.snappy) { visible = false }
         }
     }
 }
@@ -376,7 +357,7 @@ public struct TonePill: View {
 
     public var body: some View {
         Text(label)
-            .font(.system(size: 11, weight: .semibold))
+            .font(.caption2.weight(.semibold))
             .foregroundStyle(color)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
@@ -438,7 +419,7 @@ public struct SectionHeader: View {
 
                 if onToggle != nil {
                     Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.caption2.weight(.semibold))
                         .foregroundStyle(Color.faint)
                         .animation(Motion.snappy, value: isCollapsed)
                 }
@@ -447,5 +428,8 @@ public struct SectionHeader: View {
         }
         .buttonStyle(.plain)
         .disabled(onToggle == nil)
+        .accessibilityLabel(total.map { "\(title), \($0)" } ?? title)
+        .accessibilityHint(onToggle == nil ? "" : (isCollapsed ? "Expands the section" : "Collapses the section"))
+        .accessibilityAddTraits(onToggle == nil ? [] : .isButton)
     }
 }
