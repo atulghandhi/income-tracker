@@ -1,0 +1,26 @@
+Date,Description,Category,Money in,Money out,Frequency
+2026-09-01,Wages or salary (take-home),Income,2100.00,,Monthly
+2026-09-01,Partner's wages (take-home),Income,0.00,,Monthly
+2026-09-01,Benefits and tax credits,Income,0.00,,Monthly
+2026-09-01,Pension income,Income,0.00,,Monthly
+2026-09-01,"Other income (maintenance, lodger, side work)",Income,0.00,,Monthly
+2026-09-01,Rent or mortgage,Housing,,850.00,Monthly
+2026-09-01,Council tax,Fixed costs,,130.00,Monthly (10 or 12 instalments)
+2026-09-01,Gas and electricity,Fixed costs,,110.00,Monthly
+2026-09-01,Water,Fixed costs,,35.00,Monthly
+2026-09-01,Home insurance,Fixed costs,,18.00,Monthly
+2026-09-01,TV licence,Fixed costs,,14.50,Monthly
+2026-09-01,Broadband and landline,Fixed costs,,30.00,Monthly
+2026-09-01,Mobile phones,Fixed costs,,20.00,Monthly
+2026-09-01,Food and household shopping,Living costs,,320.00,Monthly
+2026-09-01,"Travel (fuel, fares, parking)",Living costs,,120.00,Monthly
+2026-09-01,"Car costs (insurance, tax, maintenance)",Living costs,,90.00,Monthly
+2026-09-01,Childcare and school costs,Living costs,,0.00,Monthly
+2026-09-01,Clothing and footwear,Living costs,,40.00,Monthly
+2026-09-01,"Health (prescriptions, dentist, optician)",Living costs,,15.00,Monthly
+2026-09-01,Subscriptions and entertainment,Flexible costs,,45.00,Monthly
+2026-09-01,Eating out and takeaways,Flexible costs,,60.00,Monthly
+2026-09-01,Gifts and celebrations,Flexible costs,,25.00,Monthly
+2026-09-01,Credit card minimum payment,Debts,,45.00,Monthly
+2026-09-01,Loan repayment,Debts,,0.00,Monthly
+2026-09-01,Savings,Savings,,50.00,Monthly

@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>What's new in The Income Tracker: release notes</title>
+    <meta name="description" content="Every meaningful update to The Income Tracker, newest first: imports, categorisation, goals, guides and calculators. Last update 8 September 2026." />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+    <meta name="author" content="The Income Tracker" />
+    <meta name="theme-color" content="#051424" />
+    <link rel="canonical" href="https://www.theincometracker.com/whats-new.html" />
+    <meta name="geo.region" content="GB" />
+    <meta http-equiv="content-language" content="en-GB" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="en_GB" />
+    <meta property="og:site_name" content="The Income Tracker" />
+    <meta property="og:url" content="https://www.theincometracker.com/whats-new.html" />
+    <meta property="og:title" content="What's new in The Income Tracker: release notes" />
+    <meta property="og:description" content="Every meaningful update to The Income Tracker, newest first: imports, categorisation, goals, guides and calculators. Last update 8 September 2026." />
+    <meta property="og:image" content="https://www.theincometracker.com/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="The Income Tracker: free, private, local-first budget tracker for the UK" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="What's new in The Income Tracker: release notes" />
+    <meta name="twitter:description" content="Every meaningful update to The Income Tracker, newest first: imports, categorisation, goals, guides and calculators. Last update 8 September 2026." />
+    <meta name="twitter:image" content="https://www.theincometracker.com/og-image.png" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="icon" type="image/png" sizes="240x240" href="/icon.png" />
+    <link rel="apple-touch-icon" href="/icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="alternate" type="application/rss+xml" title="The Income Tracker: new guides and updates" href="https://www.theincometracker.com/feed.xml" />
+    <style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; padding: 0 24px 96px; background: #051424; color: #d4e4fa;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 16px; line-height: 1.7;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  a { color: #00dfc1; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  header.site { max-width: 980px; margin: 0 auto; padding: 18px 0 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+  header.site .brand { color: #fff; font-weight: 800; letter-spacing: -0.01em; font-size: 1.02rem; margin-right: auto; }
+  header.site .brand:hover { text-decoration: none; color: #00dfc1; }
+  nav.sitenav { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; font-size: 0.88rem; }
+  nav.sitenav a { color: #b8c8e0; padding: 4px 0; }
+  nav.sitenav a:hover { color: #00dfc1; text-decoration: none; }
+  nav.sitenav a.navbtn { background: rgba(0,223,193,0.12); border: 1px solid rgba(0,223,193,0.35); color: #00dfc1; padding: 6px 12px; border-radius: 8px; font-weight: 700; }
+  nav.sitenav a.navbtn:hover { background: rgba(0,223,193,0.2); }
+  header.top { padding: 22px 0 8px; }
+  nav.crumbs { font-size: 0.85rem; color: #9ea8b7; }
+  nav.crumbs a { color: #9ea8b7; }
+  nav.crumbs a:hover { color: #00dfc1; }
+  h1 { font-size: clamp(1.7rem, 4vw, 2.3rem); font-weight: 800; line-height: 1.15; margin: 18px 0 10px; color: #fff; letter-spacing: -0.02em; }
+  .meta { color: #9ea8b7; font-size: 0.85rem; margin-bottom: 24px; }
+  .lede { font-size: 1.12rem; color: #eaf2ff; line-height: 1.65; margin: 0 0 24px; }
+  .tldr { background: rgba(0,223,193,0.07); border: 1px solid rgba(0,223,193,0.22); border-radius: 12px; padding: 16px 20px; margin: 0 0 28px; }
+  .tldr strong { color: #00dfc1; letter-spacing: 0.02em; font-size: 0.8rem; text-transform: uppercase; display: block; margin-bottom: 6px; }
+  .tldr p { margin: 0; color: #d4e4fa; }
+  h2 { font-size: 1.3rem; font-weight: 700; color: #fff; margin: 40px 0 12px; letter-spacing: -0.01em; }
+  h3 { font-size: 1.05rem; font-weight: 650; color: #fff; margin: 28px 0 8px; }
+  p, li { color: #c8d8ee; }
+  ul, ol { padding-left: 22px; }
+  li + li { margin-top: 8px; }
+  ol.steps { counter-reset: step; list-style: none; padding-left: 0; }
+  ol.steps > li { position: relative; padding: 0 0 4px 44px; margin-top: 18px; }
+  ol.steps > li::before {
+    counter-increment: step; content: counter(step);
+    position: absolute; left: 0; top: 0; width: 30px; height: 30px;
+    background: rgba(0,223,193,0.12); border: 1px solid rgba(0,223,193,0.4);
+    color: #00dfc1; border-radius: 50%; display: grid; place-items: center;
+    font-weight: 700; font-size: 0.9rem;
+  }
+  .note { background: rgba(212,228,250,0.05); border-left: 3px solid rgba(212,228,250,0.25); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 20px 0; font-size: 0.95rem; color: #b8c8e0; }
+  .cta { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin: 34px 0; padding: 24px; background: rgba(8,22,38,0.85); border: 1px solid rgba(0,223,193,0.18); border-radius: 14px; }
+  .cta .cta-text { flex: 1; min-width: 220px; }
+  .cta .cta-text strong { color: #fff; display: block; font-size: 1.05rem; margin-bottom: 2px; }
+  .cta .cta-text span { color: #9ea8b7; font-size: 0.9rem; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; background: #00dfc1; color: #051424; font-weight: 700; padding: 13px 22px; border-radius: 10px; white-space: nowrap; border: none; font-size: 1rem; font-family: inherit; cursor: pointer; }
+  .btn:hover { text-decoration: none; filter: brightness(1.06); }
+  .btn.ghost { background: transparent; color: #00dfc1; border: 1px solid rgba(0,223,193,0.4); }
+  .btn.ghost:hover { background: rgba(0,223,193,0.08); }
+  .btnrow { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 18px 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; margin: 24px 0; }
+  .card { display: block; padding: 16px 18px; background: rgba(8,22,38,0.7); border: 1px solid rgba(212,228,250,0.1); border-radius: 12px; transition: border-color 140ms ease, transform 140ms ease; }
+  .card:hover { text-decoration: none; border-color: rgba(0,223,193,0.4); transform: translateY(-2px); }
+  .card .card-t { color: #fff; font-weight: 650; display: block; margin-bottom: 4px; }
+  .card .card-d { color: #9ea8b7; font-size: 0.88rem; }
+  .faq dt { font-weight: 650; color: #fff; margin-top: 22px; }
+  .faq dd { margin: 6px 0 0; color: #c8d8ee; }
+  .tablewrap { overflow-x: auto; margin: 18px 0; border: 1px solid rgba(212,228,250,0.12); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.93rem; min-width: 460px; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid rgba(212,228,250,0.1); vertical-align: top; color: #c8d8ee; }
+  th { color: #fff; font-weight: 700; background: rgba(8,22,38,0.9); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  tr:last-child td { border-bottom: none; }
+  td.hi { color: #00dfc1; font-weight: 600; }
+  .verdict { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin: 20px 0; }
+  .verdict > div { background: rgba(8,22,38,0.7); border: 1px solid rgba(212,228,250,0.1); border-radius: 12px; padding: 16px 18px; }
+  .verdict h3 { margin: 0 0 8px; font-size: 0.98rem; }
+  .verdict ul { margin: 0; padding-left: 18px; }
+  .verdict li { font-size: 0.93rem; }
+  .sources { font-size: 0.86rem; color: #9ea8b7; }
+  .sources ul { padding-left: 18px; }
+  .sources li { color: #9ea8b7; margin-top: 4px; }
+  .sources a { color: #9ea8b7; text-decoration: underline; }
+  .sources a:hover { color: #00dfc1; }
+  .tag { display: inline-block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #00dfc1; background: rgba(0,223,193,0.1); border: 1px solid rgba(0,223,193,0.3); padding: 2px 8px; border-radius: 999px; margin-right: 8px; vertical-align: middle; }
+  .changelog li { margin-top: 14px; }
+  .changelog time { color: #9ea8b7; font-size: 0.82rem; display: block; }
+  .changelog strong { color: #fff; }
+  /* Calculator widget */
+  .calc { background: rgba(8,22,38,0.9); border: 1px solid rgba(0,223,193,0.2); border-radius: 16px; padding: 22px; margin: 0 0 14px; }
+  .calc-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
+  .calc-field { display: flex; flex-direction: column; gap: 6px; }
+  .calc-label { font-size: 0.82rem; color: #9ea8b7; font-weight: 600; }
+  .calc-inwrap { display: flex; align-items: center; background: #06182b; border: 1px solid rgba(212,228,250,0.16); border-radius: 10px; padding: 0 12px; }
+  .calc-inwrap:focus-within { border-color: rgba(0,223,193,0.5); }
+  .calc-inwrap i { color: #9ea8b7; font-style: normal; font-size: 0.95rem; }
+  .calc-inwrap input { flex: 1; min-width: 0; background: none; border: none; color: #fff; font-size: 1.05rem; font-weight: 600; padding: 11px 6px; outline: none; font-family: inherit; }
+  .calc-inwrap input::-webkit-outer-spin-button, .calc-inwrap input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .calc-out { margin-top: 18px; padding-top: 18px; border-top: 1px solid rgba(212,228,250,0.1); }
+  .calc-out p { margin: 8px 0 0; }
+  .calc-headline { font-size: 2rem; font-weight: 800; color: #00dfc1; line-height: 1.1; letter-spacing: -0.02em; }
+  .calc-headline small { font-size: 0.9rem; font-weight: 600; color: #9ea8b7; letter-spacing: 0; }
+  .calc-hint { color: #9ea8b7; }
+  .calc-good { color: #00dfc1; }
+  .calc-warn { color: #ffd479; }
+  .calc-bad { color: #ff8b8b; }
+  .calc-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 16px; }
+  .calc-actions .btn { padding: 9px 14px; font-size: 0.88rem; }
+  .calc-share-note { font-size: 0.82rem; color: #9ea8b7; }
+  hr { border: none; border-top: 1px solid rgba(212,228,250,0.1); margin: 48px 0 24px; }
+  footer.site { color: #9ea8b7; font-size: 0.85rem; }
+  footer.site .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 18px; margin-bottom: 22px; }
+  footer.site h4 { color: #d4e4fa; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 8px; }
+  footer.site ul { list-style: none; padding: 0; margin: 0; }
+  footer.site li { margin: 0 0 6px; color: #9ea8b7; }
+  footer.site a { color: #9ea8b7; }
+  footer.site a:hover { color: #00dfc1; }
+  footer.site .legal { border-top: 1px solid rgba(212,228,250,0.08); padding-top: 14px; }
+  @media (max-width: 560px) {
+    body { padding: 0 16px 72px; }
+    header.site { padding-top: 14px; }
+    nav.sitenav { font-size: 0.84rem; gap: 2px 12px; }
+    .calc { padding: 16px; }
+  }
+</style>
+    <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://www.theincometracker.com/#website",
+      "url": "https://www.theincometracker.com/",
+      "name": "The Income Tracker",
+      "description": "A free, local-first income and expense tracker for the UK. Import a CSV from your bank. No account, no bank login.",
+      "inLanguage": "en-GB",
+      "publisher": {
+        "@id": "https://www.theincometracker.com/#org"
+      }
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://www.theincometracker.com/#org",
+      "name": "The Income Tracker",
+      "url": "https://www.theincometracker.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.theincometracker.com/icon.png",
+        "width": 240,
+        "height": 240
+      },
+      "email": "hello@theincometracker.com",
+      "areaServed": "GB"
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://www.theincometracker.com/whats-new.html#webpage",
+      "url": "https://www.theincometracker.com/whats-new.html",
+      "name": "What's new in The Income Tracker: release notes",
+      "description": "Every meaningful update to The Income Tracker, newest first: imports, categorisation, goals, guides and calculators. Last update 8 September 2026.",
+      "inLanguage": "en-GB",
+      "isPartOf": {
+        "@id": "https://www.theincometracker.com/#website"
+      },
+      "datePublished": "2026-06-16",
+      "dateModified": "2026-09-08",
+      "primaryImageOfPage": {
+        "@type": "ImageObject",
+        "url": "https://www.theincometracker.com/og-image.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.theincometracker.com/whats-new.html#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.theincometracker.com/whats-new.html#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.theincometracker.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "What's new",
+          "item": "https://www.theincometracker.com/whats-new.html"
+        }
+      ]
+    },
+    {
+      "@type": "ItemList",
+      "name": "Release notes",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "2026-09-08: Bigger help library, calculators, templates and comparisons"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "2026-09-08: Install it, and get a monthly nudge"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "2026-07-21: Skippable setup wizard and a getting-started checklist"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "2026-07-13: Credit card CSVs no longer import back to front"
+        },
+        {
+          "@type": "ListItem",
+          "position": 5,
+          "name": "2026-07-12: Clearer imports, tidier rules, transfer pairing"
+        },
+        {
+          "@type": "ListItem",
+          "position": 6,
+          "name": "2026-07-09: Recurring months, merchant memory and multi-format imports"
+        },
+        {
+          "@type": "ListItem",
+          "position": 7,
+          "name": "2026-07-09: Optional AI categorisation for the leftovers"
+        },
+        {
+          "@type": "ListItem",
+          "position": 8,
+          "name": "2026-07-07: Debt balances roll forward automatically"
+        },
+        {
+          "@type": "ListItem",
+          "position": 9,
+          "name": "2026-07-06: New look and the right month on open"
+        },
+        {
+          "@type": "ListItem",
+          "position": 10,
+          "name": "2026-07-02: iOS: sign in with Apple or email, quick add, duplicate review"
+        },
+        {
+          "@type": "ListItem",
+          "position": 11,
+          "name": "2026-06-18: Work begins on a native iOS app"
+        },
+        {
+          "@type": "ListItem",
+          "position": 12,
+          "name": "2026-06-17: Free money calculators and use-case pages"
+        },
+        {
+          "@type": "ListItem",
+          "position": 13,
+          "name": "2026-06-16: Bank CSV export guides and a feedback form"
+        },
+        {
+          "@type": "ListItem",
+          "position": 14,
+          "name": "2026-06-15: Home page demos and the annual chart"
+        },
+        {
+          "@type": "ListItem",
+          "position": 15,
+          "name": "2026-06-14: Transfers auto-skipped, tutorials, responsive accounts"
+        }
+      ]
+    }
+  ]
+}
+    </script>
+  </head>
+  <body>
+    <header class="site">
+      <a class="brand" href="/">The Income Tracker</a>
+      <nav class="sitenav" aria-label="Site">
+        <a href="/import/">Bank CSV guides</a>
+        <a href="/guides/">Guides</a>
+        <a href="/tools/">Calculators</a>
+        <a href="/compare/">Compare</a>
+        <a href="/templates/">Templates</a>
+        <a class="navbtn" href="/?ref=nav" data-track="cta_click" data-ref="nav">Open the tracker</a>
+      </nav>
+    </header>
+    <div class="wrap">
+      <header class="top"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> &rsaquo; What's new</nav></header>
+      <h1>What&rsquo;s new</h1>
+      <p class="meta">Updated 8 September 2026 · <a href="/feed.xml">Subscribe by RSS</a></p>
+      <div class="tldr"><strong>In short</strong><p>The Income Tracker ships small improvements often. This page lists the ones you would notice, newest first. Bank export steps and guide figures are re-checked on their own pages.</p></div>
+      <ul class="changelog">
+        <li><time datetime="2026-09-08">8 September 2026</time><strong>Bigger help library, calculators, templates and comparisons</strong> CSV export guides now cover 20 UK banks and card providers, plus a guide for PDF-only statements. New calculators for the 50/30/20 split, emergency funds, spend-per-day until payday, snowball versus avalanche and subscription costs. Free CSV budget templates that import in one step. Honest comparisons with Emma, Snoop, Moneyhub, YNAB, Plum and Monzo Trends. A site-wide menu, an RSS feed and a What's new page. <a href="/guides/">Browse the guides</a></li>
+        <li><time datetime="2026-09-08">8 September 2026</time><strong>Install it, and get a monthly nudge</strong> The web app can now be installed to your phone or desktop and opens offline. A one-tap calendar reminder prompts you to import last month's statement, and the dashboard points you to your bank's export guide when a new month starts empty.</li>
+        <li><time datetime="2026-07-21">21 July 2026</time><strong>Skippable setup wizard and a getting-started checklist</strong> First-run setup asks for the basics in under a minute and can be skipped entirely. The dashboard checklist ticks itself off as you add income, spending, an account, a goal and your first import.</li>
+        <li><time datetime="2026-07-13">13 July 2026</time><strong>Credit card CSVs no longer import back to front</strong> Card statements that list spending as positive numbers are detected and flipped automatically, with a one-click undo in the review screen. The AI categorisation toggle now explains itself when the backend is unavailable.</li>
+        <li><time datetime="2026-07-12">12 July 2026</time><strong>Clearer imports, tidier rules, transfer pairing</strong> Every import shows a visible summary toast, category rules can be reviewed and pruned, and money moved between your own accounts is paired up and skipped so it never counts as spending. The iOS app gained the same behaviour.</li>
+        <li><time datetime="2026-07-09">9 July 2026</time><strong>Recurring months, merchant memory and multi-format imports</strong> Recurring income and bills seed the next month on their own. The app remembers how you categorised each merchant. Quick add turns one line of text into an entry. OFX and QIF files and pasted transaction lists import alongside CSV, and repeating payments are detected and suggested as recurring.</li>
+        <li><time datetime="2026-07-09">9 July 2026</time><strong>Optional AI categorisation for the leftovers</strong> Turn it on and low-confidence rows get a suggested category from a shared merchant cache. Off by default, and never sent anything the rules already handled.</li>
+        <li><time datetime="2026-07-07">7 July 2026</time><strong>Debt balances roll forward automatically</strong> Loans and cards reduce by each month's payment, with a manual override when the statement says otherwise.</li>
+        <li><time datetime="2026-07-06">6 July 2026</time><strong>New look and the right month on open</strong> A layered light theme with a proper dark mode, cash-flow style reports, and the app now opens on the real current month.</li>
+        <li><time datetime="2026-07-02">2 July 2026</time><strong>iOS: sign in with Apple or email, quick add, duplicate review</strong> The iOS app syncs reliably, supports Apple and email sign-in alongside Google, and reviews CSV duplicates before committing.</li>
+        <li><time datetime="2026-06-18">18 June 2026</time><strong>Work begins on a native iOS app</strong> A SwiftUI app sharing the same ledger engine, with home-screen widgets and private cloud sync for people who sign in.</li>
+        <li><time datetime="2026-06-17">17 June 2026</time><strong>Free money calculators and use-case pages</strong> 0% card payoff, credit utilisation, savings goal, monthly surplus and loan repayment calculators, each with the answer at the top of the page. <a href="/tools/">See the calculators</a></li>
+        <li><time datetime="2026-06-16">16 June 2026</time><strong>Bank CSV export guides and a feedback form</strong> Step-by-step CSV export guides for Barclays, HSBC, Monzo, Starling, Lloyds, NatWest, Santander and Revolut. A contact form inside the app and in every page footer. <a href="/import/">Find your bank</a></li>
+        <li><time datetime="2026-06-15">15 June 2026</time><strong>Home page demos and the annual chart</strong> The landing page shows the ledger, the CSV import and the annual picture in motion. The annual chart scrolls a full year without snapping back.</li>
+        <li><time datetime="2026-06-14">14 June 2026</time><strong>Transfers auto-skipped, tutorials, responsive accounts</strong> Money moved between your own accounts is remembered and skipped on future imports. Per-page tutorials explain each view. The accounts view fits on a phone.</li>
+      </ul>
+      <div class="cta">
+  <div class="cta-text"><strong>The Income Tracker</strong><span>Try the latest version. Free, no account, no bank login.</span></div>
+  <a class="btn" href="/?ref=whats-new" data-track="cta_click" data-ref="whats-new">Open the tracker &rarr;</a>
+</div>
+      <h2>Related</h2>
+      <div class="grid">
+        <a class="card" href="/about.html"><span class="card-t">About The Income Tracker</span><span class="card-d">Who makes it and how it is funded</span></a>
+        <a class="card" href="/guides/"><span class="card-t">Budgeting guides</span><span class="card-d">Private, free, no bank login</span></a>
+        <a class="card" href="/tools/"><span class="card-t">Free money calculators</span><span class="card-d">Payoff, utilisation, savings and more</span></a>
+        <a class="card" href="/import/"><span class="card-t">Bank CSV import guides</span><span class="card-d">Export from any UK bank</span></a>
+      </div>
+      <hr />
+      <footer class="site">
+        <div class="cols">
+          <div>
+            <h4>Use it</h4>
+            <ul>
+              <li><a href="/?ref=footer" data-track="cta_click" data-ref="footer">Open the tracker</a></li>
+              <li><a href="/import/">Bank CSV guides</a></li>
+              <li><a href="/templates/">Budget templates</a></li>
+              <li><a href="/tools/">Calculators</a></li>
+            </ul>
+          </div>
+          <div>
+            <h4>Learn</h4>
+            <ul>
+              <li><a href="/guides/">Budgeting guides</a></li>
+              <li><a href="/compare/">Compare apps</a></li>
+              <li><a href="/compare/best-free-budgeting-apps-uk.html">Best free budgeting apps (UK)</a></li>
+              <li><a href="/whats-new.html">What&rsquo;s new</a></li>
+            </ul>
+          </div>
+          <div>
+            <h4>About</h4>
+            <ul>
+              <li><a href="/about.html">About</a></li>
+              <li><a href="/?feedback=1">Contact us</a></li>
+              <li><a href="/privacy.html">Privacy</a></li>
+              <li><a href="/tos.html">Terms</a></li>
+              <li><a href="/feed.xml">RSS feed</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="legal">&copy; 2026 The Income Tracker. Free, private, local-first budgeting for the UK. No account, no bank login.</div>
+      </footer>
+    </div>
+<script>
+window.va=window.va||function(){(window.vaq=window.vaq||[]).push(arguments)};
+(function(){
+  var PH_KEY="",PH_HOST="https://us.i.posthog.com";
+  var dnt=typeof navigator!=="undefined"&&navigator.doNotTrack==="1";
+  function id(){try{var k="it_analytics_id",v=localStorage.getItem(k);if(!v){v="anon-"+(window.crypto&&crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2));localStorage.setItem(k,v);}return v;}catch(e){return "anon-ephemeral";}}
+  function track(name,props){
+    props=props||{};props.page=location.pathname;
+    try{window.va("event",{name:name,data:props});}catch(e){}
+    if(!PH_KEY||dnt)return;
+    try{fetch(PH_HOST+"/capture/",{method:"POST",keepalive:true,headers:{"content-type":"application/json"},body:JSON.stringify({api_key:PH_KEY,event:name,distinct_id:id(),properties:Object.assign({app:"income-tracker-web",surface:"static"},props),timestamp:new Date().toISOString()})}).catch(function(){});}catch(e){}
+  }
+  window.itTrack=track;
+  document.addEventListener("click",function(ev){
+    var t=ev.target;if(!t||!t.closest)return;var el=t.closest("[data-track]");if(!el)return;
+    track(el.getAttribute("data-track"),{ref:el.getAttribute("data-ref")||"",href:el.getAttribute("href")||""});
+  });
+  if(PH_KEY&&!dnt)track("static_pageview",{});
+})();
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
+
+  </body>
+</html>

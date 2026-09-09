@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { createInitialState } from "../src/finance";
-import { buildRulePattern, createTransactionHash, parseBankCsv } from "../src/importer";
+import { buildRulePattern, createTransactionHash, parseBankCsv, parseLooseLines } from "../src/importer";
 
 test.describe("CSV bank importer", () => {
   test("parses quoted debit and credit rows, categorizes them, and warns on duplicates", () => {
@@ -95,5 +95,43 @@ test.describe("CSV bank importer", () => {
       include: true,
     });
     expect(buildRulePattern("PRET A MANGER 1234")).toBe("pret manger");
+  });
+});
+
+test.describe("Pasted statement lines (PDF copy and paste)", () => {
+  test("ignores a running balance column and keeps the transaction amount", () => {
+    const state = createInitialState();
+    const result = parseLooseLines({
+      text: ["12 Jun 2026  TESCO STORES 3241  42.61  1,234.56", "15 Jun 2026  ACME PAYROLL  +2,500.00  3,734.56"].join("\n"),
+      fileName: "Pasted transactions",
+      state,
+      fallbackMonthKey: "2026-06",
+    });
+
+    expect(result.errors).toEqual([]);
+    expect(result.rows.find((row) => row.description.includes("TESCO"))).toMatchObject({ amount: -42.61, date: "2026-06-12" });
+    expect(result.rows.find((row) => row.description.includes("PAYROLL"))).toMatchObject({ amount: 2500, date: "2026-06-15" });
+  });
+
+  test("gives day-month dates the year of the month being imported into", () => {
+    const state = createInitialState();
+    const june = parseLooseLines({ text: "13 Jun  COSTA COFFEE  4.35", fileName: "Pasted transactions", state, fallbackMonthKey: "2026-06" });
+    expect(june.rows[0]).toMatchObject({ amount: -4.35, date: "2026-06-13" });
+
+    // A December statement pasted while looking at January belongs to the previous year.
+    const december = parseLooseLines({ text: "28 Dec  RENT  950.00", fileName: "Pasted transactions", state, fallbackMonthKey: "2027-01" });
+    expect(december.rows[0]).toMatchObject({ amount: -950, date: "2026-12-28" });
+  });
+
+  test("reads month-name dates like 12-Sep-26 in CSV files", () => {
+    const state = createInitialState();
+    const result = parseBankCsv({
+      fileName: "metro.csv",
+      state,
+      text: ["Booking Date,Transaction Reference,Money In/Out", "12-Sep-26,PRET A MANGER,-8.40", "01 Sep 2026,SALARY,\"2,100.00\""].join("\n"),
+    });
+    expect(result.errors).toEqual([]);
+    expect(result.rows.find((row) => row.description.includes("PRET"))).toMatchObject({ amount: -8.4, date: "2026-09-12" });
+    expect(result.rows.find((row) => row.description.includes("SALARY"))).toMatchObject({ amount: 2100, date: "2026-09-01" });
   });
 });

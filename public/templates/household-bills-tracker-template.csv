@@ -1,0 +1,15 @@
+Date,Description,Category,Money out,Billing day,How paid
+2026-09-01,Rent or mortgage,Housing,950.00,1,Standing order
+2026-09-01,Council tax,Bills,142.00,1,Direct debit
+2026-09-03,Gas and electricity,Bills,118.00,3,Direct debit
+2026-09-03,Water,Bills,38.00,3,Direct debit
+2026-09-05,Broadband,Bills,29.99,5,Direct debit
+2026-09-05,Mobile phone,Bills,15.00,5,Direct debit
+2026-09-08,Home insurance,Insurance,18.00,8,Direct debit
+2026-09-10,Car insurance,Insurance,48.50,10,Direct debit
+2026-09-12,Streaming service,Subscriptions,10.99,12,Card (continuous payment)
+2026-09-12,Music streaming,Subscriptions,11.99,12,Card (continuous payment)
+2026-09-15,Gym,Health,24.99,15,Direct debit
+2026-09-15,TV licence,Bills,14.50,15,Direct debit
+2026-09-20,Cloud storage,Subscriptions,2.99,20,Card (continuous payment)
+2026-09-25,Savings transfer,Savings,300.00,25,Standing order

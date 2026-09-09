@@ -83,6 +83,20 @@ import { parseQuickAdd } from "./quickAdd";
 import { applyRecurringFlag, detectSubscriptions, findMissedRecurring, reconcileSeededEntries, suggestRecurringFlags, type RecurrenceCandidate } from "./recurrence";
 import { aiCategorizeRows, applyAiSuggestions, isAiCategorizationAvailable, testAiConnection } from "./aiCategorize";
 import { bucketCount, identifyAnalytics, track } from "./analytics";
+import { InstallBanner, MonthlyReminderPanel, NewMonthNudge } from "./RetentionPanels";
+import {
+  INSTALL_DISMISSED_KEY,
+  NUDGE_DISMISSED_KEY,
+  isIosSafari,
+  isStandalone,
+  readBankSlug,
+  recordVisit,
+  shouldShowNewMonthNudge,
+  writeBankSlug,
+} from "./retention";
+
+// The browser's install prompt event (not yet in lib.dom).
+type BeforeInstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: "accepted" | "dismissed" }> };
 import {
   BANK_FEED_SOURCE_NAME,
   completeBankConnection,
@@ -438,6 +452,42 @@ function App() {
   const [tutorialView, setTutorialView] = useState<AppView | null>(null);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [checklistDismissed, setChecklistDismissed] = useState(() => readFlag(GETTING_STARTED_KEY));
+
+  // Retention: remembered bank, the new-month nudge, and the install prompt.
+  const [bankSlug, setBankSlugState] = useState(() => readBankSlug());
+  const [nudgeDismissedMonth, setNudgeDismissedMonth] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(NUDGE_DISMISSED_KEY);
+    } catch {
+      return null;
+    }
+  });
+  const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
+  const [installDismissed, setInstallDismissed] = useState(() => readFlag(INSTALL_DISMISSED_KEY));
+  const [visitCount] = useState(() => recordVisit());
+
+  function setBankSlug(slug: string) {
+    setBankSlugState(slug);
+    writeBankSlug(slug);
+    if (slug) track("bank_selected", { bank: slug });
+  }
+
+  useEffect(() => {
+    const onPrompt = (event: Event) => {
+      event.preventDefault();
+      setInstallEvent(event as BeforeInstallPromptEvent);
+    };
+    const onInstalled = () => {
+      setInstallEvent(null);
+      track("app_installed");
+    };
+    window.addEventListener("beforeinstallprompt", onPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onPrompt);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
+  }, []);
   const [animationsEnabled, setAnimationsEnabled] = useState(true);
   const [query, setQuery] = useState("");
   // Starts empty so nothing flashes on load — the toast effect ignores empty values.
@@ -783,9 +833,29 @@ function App() {
   // so a refresh doesn't reopen it.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    let changed = false;
     if (params.has("feedback")) {
       setShowFeedbackModal(true);
       params.delete("feedback");
+      changed = true;
+    }
+    // Static pages tag their CTAs with ?ref=<page> so we can see which guides,
+    // calculators and comparisons actually send people into the app.
+    const ref = params.get("ref");
+    if (ref !== null) {
+      const clean = ref.replace(/[^a-z0-9_-]/gi, "").slice(0, 60);
+      if (clean) {
+        track("landing_ref", { ref: clean });
+        try {
+          if (!localStorage.getItem("it_first_ref")) localStorage.setItem("it_first_ref", clean);
+        } catch {
+          // Storage unavailable; attribution is best-effort.
+        }
+      }
+      params.delete("ref");
+      changed = true;
+    }
+    if (changed) {
       const query = params.toString();
       const url = window.location.pathname + (query ? `?${query}` : "") + window.location.hash;
       window.history.replaceState(null, "", url);
@@ -2360,6 +2430,71 @@ function App() {
                 </div>
               </div>
 
+              {(() => {
+                const today = new Date();
+                const previousKey = shiftMonth(getMonthKey(today), -1);
+                const previous = ledger.months[previousKey];
+                const previousMonthHasImports = Boolean(
+                  previous && (previous.expenses.some((entry) => entry.imported) || previous.incomes.some((entry) => entry.imported)),
+                );
+                const show = shouldShowNewMonthNudge({
+                  today,
+                  previousMonthHasImports,
+                  hasImportedBefore: ledger.importBatches.length > 0,
+                  hasBank: Boolean(bankSlug),
+                  dismissedMonth: nudgeDismissedMonth,
+                });
+                if (!show) return null;
+                const dismiss = () => {
+                  const key = getMonthKey(today);
+                  setNudgeDismissedMonth(key);
+                  try {
+                    localStorage.setItem(NUDGE_DISMISSED_KEY, key);
+                  } catch {
+                    // Storage unavailable; the nudge returns next load, which is acceptable.
+                  }
+                  track("new_month_nudge", { action: "dismiss" });
+                };
+                return (
+                  <NewMonthNudge
+                    bankSlug={bankSlug}
+                    previousMonthLabel={formatMonth(previousKey).replace(/ \d{4}$/, "")}
+                    onBankChange={setBankSlug}
+                    onImport={() => {
+                      track("new_month_nudge", { action: "import" });
+                      csvInputRef.current?.click();
+                    }}
+                    onGuideOpened={() => track("new_month_nudge", { action: "guide" })}
+                    onDismiss={dismiss}
+                  />
+                );
+              })()}
+
+              {!installDismissed && !isStandalone() && visitCount >= 2 && (installEvent || isIosSafari()) && (
+                <InstallBanner
+                  mode={installEvent ? "prompt" : "ios"}
+                  onInstall={() => {
+                    if (!installEvent) return;
+                    track("install_prompt", { action: "shown" });
+                    void installEvent.prompt().then(() =>
+                      installEvent.userChoice.then((choice) => {
+                        track("install_prompt", { action: choice.outcome });
+                        if (choice.outcome === "dismissed") {
+                          writeFlag(INSTALL_DISMISSED_KEY);
+                          setInstallDismissed(true);
+                        }
+                        setInstallEvent(null);
+                      }),
+                    );
+                  }}
+                  onDismiss={() => {
+                    track("install_prompt", { action: installEvent ? "dismissed" : "ios_hint" });
+                    writeFlag(INSTALL_DISMISSED_KEY);
+                    setInstallDismissed(true);
+                  }}
+                />
+              )}
+
               {!checklistDismissed && (
                 <GettingStartedCard
                   items={[
@@ -3251,6 +3386,16 @@ function App() {
                       <span />
                     </button>
                   </article>
+
+                  <MonthlyReminderPanel
+                    bankSlug={bankSlug}
+                    onBankChange={setBankSlug}
+                    onDownloadIcs={(name, contents) => {
+                      downloadFile(name, contents, "text/calendar");
+                      setToast("Reminder saved. Open the file to add it to your calendar.");
+                    }}
+                    onReminderAdded={(method) => track("reminder_added", { method })}
+                  />
 
                   {isSupabaseConfigured() && (
                     <article className="settingsPanel compactSetting">

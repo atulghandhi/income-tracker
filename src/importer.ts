@@ -74,7 +74,7 @@ type CategorySuggestion = {
 
 const DATE_HEADERS = ["date", "transaction date", "posted date", "booking date", "completed date", "value date"];
 const DESCRIPTION_HEADERS = ["description", "details", "narrative", "merchant", "name", "transaction", "reference", "payee", "memo"];
-const AMOUNT_HEADERS = ["amount", "value", "transaction amount", "net amount"];
+const AMOUNT_HEADERS = ["amount", "value", "transaction amount", "net amount", "money in/out", "in/out", "paid in/out"];
 const DEBIT_HEADERS = ["debit", "withdrawal", "withdrawals", "paid out", "money out", "out", "debits"];
 const CREDIT_HEADERS = ["credit", "deposit", "deposits", "paid in", "money in", "in", "credits"];
 const CATEGORY_HEADERS = ["category", "type", "classification"];
@@ -130,7 +130,7 @@ export function parseBankCsv({ text, fileName, state, fallbackMonthKey, flipSign
     const rowNumber = index + 2;
     const description = getCell(cells, columns.description).trim();
     const parsedAmount = readAmount(cells, columns);
-    const isoDate = parseDateValue(getCell(cells, columns.date)) ?? monthStartDate(fallbackMonth);
+    const isoDate = parseDateValue(getCell(cells, columns.date), fallbackMonth) ?? monthStartDate(fallbackMonth);
 
     if (!description || parsedAmount === null) return [];
 
@@ -367,12 +367,25 @@ function parseCsvTableWithDelimiter(text: string, delimiter: "," | ";" | "\t"): 
 }
 
 function detectColumns(headers: string[]): ColumnMap {
+  let amount = optionalColumn(headers, AMOUNT_HEADERS);
+  let debit = optionalColumn(headers, DEBIT_HEADERS);
+  let credit = optionalColumn(headers, CREDIT_HEADERS);
+  // One column matched both "money in" and "money out": it is a signed amount.
+  if (debit !== undefined && debit === credit) {
+    amount = amount ?? debit;
+    debit = undefined;
+    credit = undefined;
+  }
+  // "Debit Amount" + "Credit Amount": keep the pair, not one of them as the amount.
+  if (debit !== undefined && credit !== undefined && (amount === debit || amount === credit)) {
+    amount = undefined;
+  }
   return {
     date: findColumn(headers, DATE_HEADERS),
     description: findColumn(headers, DESCRIPTION_HEADERS),
-    amount: optionalColumn(headers, AMOUNT_HEADERS),
-    debit: optionalColumn(headers, DEBIT_HEADERS),
-    credit: optionalColumn(headers, CREDIT_HEADERS),
+    amount,
+    debit,
+    credit,
     category: optionalColumn(headers, CATEGORY_HEADERS),
   };
 }
@@ -390,7 +403,23 @@ function validateColumns(columns: ColumnMap): string[] {
 function findColumn(headers: string[], aliases: string[]): number {
   const exact = headers.findIndex((header) => aliases.includes(header));
   if (exact >= 0) return exact;
-  return headers.findIndex((header) => aliases.some((alias) => header.includes(alias)));
+  return headers.findIndex((header) => aliases.some((alias) => containsAliasWords(header, alias)));
+}
+
+// Whole-word containment, so "in" does not match "booking date" and "out"
+// does not match "checkout". "/" and "_" count as separators.
+function headerWords(value: string): string[] {
+  return value.toLowerCase().split(/[^a-z0-9%£$]+/).filter(Boolean);
+}
+
+function containsAliasWords(header: string, alias: string): boolean {
+  const words = headerWords(header);
+  const needle = headerWords(alias);
+  if (!needle.length) return false;
+  for (let start = 0; start + needle.length <= words.length; start += 1) {
+    if (needle.every((word, offset) => words[start + offset] === word)) return true;
+  }
+  return false;
 }
 
 function optionalColumn(headers: string[], aliases: string[]): number | undefined {
@@ -439,9 +468,18 @@ function parseAmount(value: string): number | null {
   return Number((negativeByParentheses ? -Math.abs(parsed) : parsed).toFixed(2));
 }
 
-function parseDateValue(value: string): string | null {
+function parseDateValue(value: string, fallbackMonth?: string): string | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
+
+  const dayMonthOnly = trimmed.match(/^(\d{1,2})[ \-/]([A-Za-z]{3,9})\.?$/) ?? trimmed.match(/^([A-Za-z]{3,9})\.?[ \-/]+(\d{1,2})$/);
+  if (dayMonthOnly) {
+    const dayMonth = parseDayMonth(dayMonthOnly[1], dayMonthOnly[2]);
+    if (dayMonth) {
+      const year = fallbackMonth ? yearForDayMonth(dayMonth.month, fallbackMonth) : new Date().getFullYear();
+      return formatDateParts(year, dayMonth.month, dayMonth.day);
+    }
+  }
   const iso = trimmed.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
   if (iso) return formatDateParts(Number(iso[1]), Number(iso[2]), Number(iso[3]));
 
@@ -455,9 +493,47 @@ function parseDateValue(value: string): string | null {
     return formatDateParts(year, month, day);
   }
 
+  const named = trimmed.match(/^(\d{1,2})[ \-/]([A-Za-z]{3,9})\.?[ \-/,]+(\d{2,4})$/);
+  if (named) {
+    const month = monthFromName(named[2]);
+    if (month) return formatDateParts(normalizeYear(Number(named[3])), month, Number(named[1]));
+  }
+
   const parsed = new Date(trimmed);
   if (Number.isNaN(parsed.getTime())) return null;
   return formatDateParts(parsed.getFullYear(), parsed.getMonth() + 1, parsed.getDate());
+}
+
+const MONTH_NAMES = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+
+function monthFromName(name: string): number | null {
+  const index = MONTH_NAMES.indexOf(name.slice(0, 3).toLowerCase());
+  return index >= 0 ? index + 1 : null;
+}
+
+// "13 Jun" / "Jun 13" with no year: statement PDFs and app screens drop the year
+// constantly. Returns day and month so the caller can supply the year.
+function parseDayMonth(first: string, second: string): { day: number; month: number } | null {
+  const a = first.replace(/[.,]$/, "");
+  const b = second.replace(/[.,]$/, "");
+  if (/^\d{1,2}$/.test(a) && /^[A-Za-z]{3,9}$/.test(b)) {
+    const month = monthFromName(b);
+    return month ? { day: Number(a), month } : null;
+  }
+  if (/^[A-Za-z]{3,9}$/.test(a) && /^\d{1,2}$/.test(b)) {
+    const month = monthFromName(a);
+    return month ? { day: Number(b), month } : null;
+  }
+  return null;
+}
+
+// Pick the year for a day-month date: the month being imported into, unless
+// that would put the transaction more than a month into the future (a December
+// statement pasted in January), in which case the previous year.
+function yearForDayMonth(month: number, fallbackMonth: string): number {
+  const year = Number(fallbackMonth.slice(0, 4));
+  const fallbackMonthNumber = Number(fallbackMonth.slice(5, 7));
+  return month > fallbackMonthNumber + 1 ? year - 1 : year;
 }
 
 function normalizeYear(year: number): number {
@@ -911,19 +987,36 @@ function parseLooseLine(line: string, fallbackMonth: string): { date: string; de
   }
   if (amount === null) return null;
 
+  // "… 42.61 1,234.56": a transaction amount followed by a running balance. Only
+  // treat it that way when both tokens carry pence, so "REF 12345 42.61" is left alone.
+  const money = /^[-+(]?[£$€]?\d[\d,]*\.\d{2}\)?$/;
+  if (amountIndex > 0 && money.test(tokens[amountIndex]) && money.test(tokens[amountIndex - 1])) {
+    const previous = parseAmount(tokens[amountIndex - 1]);
+    if (previous !== null) {
+      tokens.splice(amountIndex, 1);
+      amountIndex -= 1;
+      amount = previous;
+      signed = /^[-+(]/.test(tokens[amountIndex]) || /\)$/.test(tokens[amountIndex]);
+    }
+  }
+
   let date: string | null = null;
   let dateIndex = -1;
   for (let index = 0; index < tokens.length; index += 1) {
     if (index === amountIndex) continue;
-    const candidate = parseDateValue(tokens[index]);
+    const candidate = parseDateValue(tokens[index], fallbackMonth);
     if (candidate) {
       date = candidate;
       dateIndex = index;
       break;
     }
-    // "13 Jun" / "Jun 13" style two-token dates.
+    // "13 Jun" / "Jun 13" style two-token dates, with the year taken from the
+    // month being imported into (new Date("13 Jun") would say 2001).
     if (index + 1 < tokens.length && index + 1 !== amountIndex) {
-      const pair = parseDateValue(`${tokens[index]} ${tokens[index + 1]}`);
+      const dayMonth = parseDayMonth(tokens[index], tokens[index + 1]);
+      const pair = dayMonth
+        ? formatDateParts(yearForDayMonth(dayMonth.month, fallbackMonth), dayMonth.month, dayMonth.day)
+        : parseDateValue(`${tokens[index]} ${tokens[index + 1]}`, fallbackMonth);
       if (pair) {
         date = pair;
         dateIndex = index;

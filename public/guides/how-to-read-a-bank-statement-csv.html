@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>How to read a bank statement CSV (UK columns and codes)</title>
+    <meta name="description" content="What the columns in a UK bank CSV mean, what codes like DD, SO, FPI, BGC and DEB stand for, and why some banks split money in and money out into two columns." />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+    <meta name="author" content="The Income Tracker" />
+    <meta name="theme-color" content="#051424" />
+    <link rel="canonical" href="https://www.theincometracker.com/guides/how-to-read-a-bank-statement-csv.html" />
+    <meta name="geo.region" content="GB" />
+    <meta http-equiv="content-language" content="en-GB" />
+    <meta property="og:type" content="article" />
+    <meta property="og:locale" content="en_GB" />
+    <meta property="og:site_name" content="The Income Tracker" />
+    <meta property="og:url" content="https://www.theincometracker.com/guides/how-to-read-a-bank-statement-csv.html" />
+    <meta property="og:title" content="How to read a bank statement CSV (UK columns and codes)" />
+    <meta property="og:description" content="What the columns in a UK bank CSV mean, what codes like DD, SO, FPI, BGC and DEB stand for, and why some banks split money in and money out into two columns." />
+    <meta property="og:image" content="https://www.theincometracker.com/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="The Income Tracker: free, private, local-first budget tracker for the UK" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="How to read a bank statement CSV (UK columns and codes)" />
+    <meta name="twitter:description" content="What the columns in a UK bank CSV mean, what codes like DD, SO, FPI, BGC and DEB stand for, and why some banks split money in and money out into two columns." />
+    <meta name="twitter:image" content="https://www.theincometracker.com/og-image.png" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="icon" type="image/png" sizes="240x240" href="/icon.png" />
+    <link rel="apple-touch-icon" href="/icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="alternate" type="application/rss+xml" title="The Income Tracker: new guides and updates" href="https://www.theincometracker.com/feed.xml" />
+    <style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; padding: 0 24px 96px; background: #051424; color: #d4e4fa;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 16px; line-height: 1.7;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  a { color: #00dfc1; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  header.site { max-width: 980px; margin: 0 auto; padding: 18px 0 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+  header.site .brand { color: #fff; font-weight: 800; letter-spacing: -0.01em; font-size: 1.02rem; margin-right: auto; }
+  header.site .brand:hover { text-decoration: none; color: #00dfc1; }
+  nav.sitenav { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; font-size: 0.88rem; }
+  nav.sitenav a { color: #b8c8e0; padding: 4px 0; }
+  nav.sitenav a:hover { color: #00dfc1; text-decoration: none; }
+  nav.sitenav a.navbtn { background: rgba(0,223,193,0.12); border: 1px solid rgba(0,223,193,0.35); color: #00dfc1; padding: 6px 12px; border-radius: 8px; font-weight: 700; }
+  nav.sitenav a.navbtn:hover { background: rgba(0,223,193,0.2); }
+  header.top { padding: 22px 0 8px; }
+  nav.crumbs { font-size: 0.85rem; color: #9ea8b7; }
+  nav.crumbs a { color: #9ea8b7; }
+  nav.crumbs a:hover { color: #00dfc1; }
+  h1 { font-size: clamp(1.7rem, 4vw, 2.3rem); font-weight: 800; line-height: 1.15; margin: 18px 0 10px; color: #fff; letter-spacing: -0.02em; }
+  .meta { color: #9ea8b7; font-size: 0.85rem; margin-bottom: 24px; }
+  .lede { font-size: 1.12rem; color: #eaf2ff; line-height: 1.65; margin: 0 0 24px; }
+  .tldr { background: rgba(0,223,193,0.07); border: 1px solid rgba(0,223,193,0.22); border-radius: 12px; padding: 16px 20px; margin: 0 0 28px; }
+  .tldr strong { color: #00dfc1; letter-spacing: 0.02em; font-size: 0.8rem; text-transform: uppercase; display: block; margin-bottom: 6px; }
+  .tldr p { margin: 0; color: #d4e4fa; }
+  h2 { font-size: 1.3rem; font-weight: 700; color: #fff; margin: 40px 0 12px; letter-spacing: -0.01em; }
+  h3 { font-size: 1.05rem; font-weight: 650; color: #fff; margin: 28px 0 8px; }
+  p, li { color: #c8d8ee; }
+  ul, ol { padding-left: 22px; }
+  li + li { margin-top: 8px; }
+  ol.steps { counter-reset: step; list-style: none; padding-left: 0; }
+  ol.steps > li { position: relative; padding: 0 0 4px 44px; margin-top: 18px; }
+  ol.steps > li::before {
+    counter-increment: step; content: counter(step);
+    position: absolute; left: 0; top: 0; width: 30px; height: 30px;
+    background: rgba(0,223,193,0.12); border: 1px solid rgba(0,223,193,0.4);
+    color: #00dfc1; border-radius: 50%; display: grid; place-items: center;
+    font-weight: 700; font-size: 0.9rem;
+  }
+  .note { background: rgba(212,228,250,0.05); border-left: 3px solid rgba(212,228,250,0.25); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 20px 0; font-size: 0.95rem; color: #b8c8e0; }
+  .cta { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin: 34px 0; padding: 24px; background: rgba(8,22,38,0.85); border: 1px solid rgba(0,223,193,0.18); border-radius: 14px; }
+  .cta .cta-text { flex: 1; min-width: 220px; }
+  .cta .cta-text strong { color: #fff; display: block; font-size: 1.05rem; margin-bottom: 2px; }
+  .cta .cta-text span { color: #9ea8b7; font-size: 0.9rem; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; background: #00dfc1; color: #051424; font-weight: 700; padding: 13px 22px; border-radius: 10px; white-space: nowrap; border: none; font-size: 1rem; font-family: inherit; cursor: pointer; }
+  .btn:hover { text-decoration: none; filter: brightness(1.06); }
+  .btn.ghost { background: transparent; color: #00dfc1; border: 1px solid rgba(0,223,193,0.4); }
+  .btn.ghost:hover { background: rgba(0,223,193,0.08); }
+  .btnrow { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 18px 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; margin: 24px 0; }
+  .card { display: block; padding: 16px 18px; background: rgba(8,22,38,0.7); border: 1px solid rgba(212,228,250,0.1); border-radius: 12px; transition: border-color 140ms ease, transform 140ms ease; }
+  .card:hover { text-decoration: none; border-color: rgba(0,223,193,0.4); transform: translateY(-2px); }
+  .card .card-t { color: #fff; font-weight: 650; display: block; margin-bottom: 4px; }
+  .card .card-d { color: #9ea8b7; font-size: 0.88rem; }
+  .faq dt { font-weight: 650; color: #fff; margin-top: 22px; }
+  .faq dd { margin: 6px 0 0; color: #c8d8ee; }
+  .tablewrap { overflow-x: auto; margin: 18px 0; border: 1px solid rgba(212,228,250,0.12); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.93rem; min-width: 460px; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid rgba(212,228,250,0.1); vertical-align: top; color: #c8d8ee; }
+  th { color: #fff; font-weight: 700; background: rgba(8,22,38,0.9); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  tr:last-child td { border-bottom: none; }
+  td.hi { color: #00dfc1; font-weight: 600; }
+  .verdict { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin: 20px 0; }
+  .verdict > div { background: rgba(8,22,38,0.7); border: 1px solid rgba(212,228,250,0.1); border-radius: 12px; padding: 16px 18px; }
+  .verdict h3 { margin: 0 0 8px; font-size: 0.98rem; }
+  .verdict ul { margin: 0; padding-left: 18px; }
+  .verdict li { font-size: 0.93rem; }
+  .sources { font-size: 0.86rem; color: #9ea8b7; }
+  .sources ul { padding-left: 18px; }
+  .sources li { color: #9ea8b7; margin-top: 4px; }
+  .sources a { color: #9ea8b7; text-decoration: underline; }
+  .sources a:hover { color: #00dfc1; }
+  .tag { display: inline-block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #00dfc1; background: rgba(0,223,193,0.1); border: 1px solid rgba(0,223,193,0.3); padding: 2px 8px; border-radius: 999px; margin-right: 8px; vertical-align: middle; }
+  .changelog li { margin-top: 14px; }
+  .changelog time { color: #9ea8b7; font-size: 0.82rem; display: block; }
+  .changelog strong { color: #fff; }
+  /* Calculator widget */
+  .calc { background: rgba(8,22,38,0.9); border: 1px solid rgba(0,223,193,0.2); border-radius: 16px; padding: 22px; margin: 0 0 14px; }
+  .calc-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
+  .calc-field { display: flex; flex-direction: column; gap: 6px; }
+  .calc-label { font-size: 0.82rem; color: #9ea8b7; font-weight: 600; }
+  .calc-inwrap { display: flex; align-items: center; background: #06182b; border: 1px solid rgba(212,228,250,0.16); border-radius: 10px; padding: 0 12px; }
+  .calc-inwrap:focus-within { border-color: rgba(0,223,193,0.5); }
+  .calc-inwrap i { color: #9ea8b7; font-style: normal; font-size: 0.95rem; }
+  .calc-inwrap input { flex: 1; min-width: 0; background: none; border: none; color: #fff; font-size: 1.05rem; font-weight: 600; padding: 11px 6px; outline: none; font-family: inherit; }
+  .calc-inwrap input::-webkit-outer-spin-button, .calc-inwrap input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .calc-out { margin-top: 18px; padding-top: 18px; border-top: 1px solid rgba(212,228,250,0.1); }
+  .calc-out p { margin: 8px 0 0; }
+  .calc-headline { font-size: 2rem; font-weight: 800; color: #00dfc1; line-height: 1.1; letter-spacing: -0.02em; }
+  .calc-headline small { font-size: 0.9rem; font-weight: 600; color: #9ea8b7; letter-spacing: 0; }
+  .calc-hint { color: #9ea8b7; }
+  .calc-good { color: #00dfc1; }
+  .calc-warn { color: #ffd479; }
+  .calc-bad { color: #ff8b8b; }
+  .calc-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 16px; }
+  .calc-actions .btn { padding: 9px 14px; font-size: 0.88rem; }
+  .calc-share-note { font-size: 0.82rem; color: #9ea8b7; }
+  hr { border: none; border-top: 1px solid rgba(212,228,250,0.1); margin: 48px 0 24px; }
+  footer.site { color: #9ea8b7; font-size: 0.85rem; }
+  footer.site .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 18px; margin-bottom: 22px; }
+  footer.site h4 { color: #d4e4fa; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 8px; }
+  footer.site ul { list-style: none; padding: 0; margin: 0; }
+  footer.site li { margin: 0 0 6px; color: #9ea8b7; }
+  footer.site a { color: #9ea8b7; }
+  footer.site a:hover { color: #00dfc1; }
+  footer.site .legal { border-top: 1px solid rgba(212,228,250,0.08); padding-top: 14px; }
+  @media (max-width: 560px) {
+    body { padding: 0 16px 72px; }
+    header.site { padding-top: 14px; }
+    nav.sitenav { font-size: 0.84rem; gap: 2px 12px; }
+    .calc { padding: 16px; }
+  }
+</style>
+    <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://www.theincometracker.com/#website",
+      "url": "https://www.theincometracker.com/",
+      "name": "The Income Tracker",
+      "description": "A free, local-first income and expense tracker for the UK. Import a CSV from your bank. No account, no bank login.",
+      "inLanguage": "en-GB",
+      "publisher": {
+        "@id": "https://www.theincometracker.com/#org"
+      }
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://www.theincometracker.com/#org",
+      "name": "The Income Tracker",
+      "url": "https://www.theincometracker.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.theincometracker.com/icon.png",
+        "width": 240,
+        "height": 240
+      },
+      "email": "hello@theincometracker.com",
+      "areaServed": "GB"
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://www.theincometracker.com/guides/how-to-read-a-bank-statement-csv.html#webpage",
+      "url": "https://www.theincometracker.com/guides/how-to-read-a-bank-statement-csv.html",
+      "name": "How to read a bank statement CSV (UK columns and codes)",
+      "description": "What the columns in a UK bank CSV mean, what codes like DD, SO, FPI, BGC and DEB stand for, and why some banks split money in and money out into two columns.",
+      "inLanguage": "en-GB",
+      "isPartOf": {
+        "@id": "https://www.theincometracker.com/#website"
+      },
+      "datePublished": "2026-09-08",
+      "dateModified": "2026-09-08",
+      "primaryImageOfPage": {
+        "@type": "ImageObject",
+        "url": "https://www.theincometracker.com/og-image.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.theincometracker.com/guides/how-to-read-a-bank-statement-csv.html#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.theincometracker.com/guides/how-to-read-a-bank-statement-csv.html#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.theincometracker.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Guides",
+          "item": "https://www.theincometracker.com/guides/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "How to read a bank statement CSV",
+          "item": "https://www.theincometracker.com/guides/how-to-read-a-bank-statement-csv.html"
+        }
+      ]
+    },
+    {
+      "@type": "Article",
+      "headline": "How to read a bank statement CSV",
+      "description": "What the columns in a UK bank CSV mean, what codes like DD, SO, FPI, BGC and DEB stand for, and why some banks split money in and money out into two columns.",
+      "datePublished": "2026-09-08",
+      "dateModified": "2026-09-08",
+      "inLanguage": "en-GB",
+      "author": {
+        "@type": "Organization",
+        "name": "The Income Tracker",
+        "url": "https://www.theincometracker.com"
+      },
+      "publisher": {
+        "@id": "https://www.theincometracker.com/#org"
+      },
+      "mainEntityOfPage": "https://www.theincometracker.com/guides/how-to-read-a-bank-statement-csv.html",
+      "image": "https://www.theincometracker.com/og-image.png"
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What does DD mean on a bank statement?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Direct Debit: a payment a company collects from your account on an agreed date, covered by the Direct Debit Guarantee."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What is the difference between FPI and FPO?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "FPI is a Faster Payment coming in; FPO is one going out. Both are ordinary bank transfers."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What does BGC mean?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Bank giro credit, an older label for money paid into your account, often salary or a refund."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Do I need to edit the CSV before importing it?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. The Income Tracker reads standard bank exports as they come. Import the original download rather than a copy re-saved from a spreadsheet."
+          }
+        }
+      ]
+    }
+  ]
+}
+    </script>
+  </head>
+  <body>
+    <header class="site">
+      <a class="brand" href="/">The Income Tracker</a>
+      <nav class="sitenav" aria-label="Site">
+        <a href="/import/">Bank CSV guides</a>
+        <a href="/guides/">Guides</a>
+        <a href="/tools/">Calculators</a>
+        <a href="/compare/">Compare</a>
+        <a href="/templates/">Templates</a>
+        <a class="navbtn" href="/?ref=nav" data-track="cta_click" data-ref="nav">Open the tracker</a>
+      </nav>
+    </header>
+    <div class="wrap">
+      <header class="top"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> &rsaquo; <a href="/guides/">Guides</a> &rsaquo; How to read a bank statement CSV</nav></header>
+      <h1>How to read a bank statement CSV</h1>
+      <p class="meta">By The Income Tracker · Updated 8 September 2026 · 5 min read</p>
+      <div class="tldr"><strong>The short answer</strong><p>A bank CSV is a plain table: one row per transaction, with a date, a description, an amount (either one signed column or separate money in and money out columns) and usually a running balance. The cryptic two or three letter codes are the payment type. DD is a Direct Debit, SO a standing order, FPI a Faster Payment in, DEB a debit card purchase.</p></div>
+
+      <h2>The columns you will see</h2>
+      <div class="tablewrap"><table><thead><tr><th scope="col">Column</th><th scope="col">What it holds</th><th scope="col">Notes</th></tr></thead><tbody>
+<tr><th scope="row" style="font-weight:600;text-transform:none;letter-spacing:0;font-size:0.93rem;background:none;">Transaction date</th><td>When the payment was made or posted</td><td>Some banks add a separate value date. The tracker uses the transaction date.</td></tr>
+<tr><th scope="row" style="font-weight:600;text-transform:none;letter-spacing:0;font-size:0.93rem;background:none;">Description or narrative</th><td>Who was paid, in the bank's shorthand</td><td>Card payments often carry a location and a partial card number. Ignore those.</td></tr>
+<tr><th scope="row" style="font-weight:600;text-transform:none;letter-spacing:0;font-size:0.93rem;background:none;">Amount</th><td>One column, negative for money out</td><td>Used by Monzo, Starling, Revolut and most fintechs.</td></tr>
+<tr><th scope="row" style="font-weight:600;text-transform:none;letter-spacing:0;font-size:0.93rem;background:none;">Money out / money in (debit / credit)</th><td>Two columns, both positive</td><td>Used by Lloyds, Halifax, Nationwide, HSBC and most high street banks.</td></tr>
+<tr><th scope="row" style="font-weight:600;text-transform:none;letter-spacing:0;font-size:0.93rem;background:none;">Balance</th><td>Running balance after the row</td><td>Useful for checking, not for budgeting. The importer ignores it.</td></tr>
+<tr><th scope="row" style="font-weight:600;text-transform:none;letter-spacing:0;font-size:0.93rem;background:none;">Type</th><td>The payment method code</td><td>See the code table below.</td></tr>
+<tr><th scope="row" style="font-weight:600;text-transform:none;letter-spacing:0;font-size:0.93rem;background:none;">Category</th><td>The bank's own guess at a category</td><td>Monzo and Starling include one. The tracker reads it as a hint.</td></tr>
+</tbody></table></div>
+
+      <h2>Transaction type codes</h2>
+      <p>High street banks label each row with a code. Lloyds, Halifax and Bank of Scotland use most of these; other banks use similar ones. They tell you how the money moved, which is handy when a description is unhelpful.</p>
+      <div class="tablewrap"><table><thead><tr><th scope="col">Code</th><th scope="col">Meaning</th><th scope="col">Typically</th></tr></thead><tbody>
+<tr><th scope="row" style="font-weight:600;text-transform:none;letter-spacing:0;font-size:0.93rem;background:none;">DD</th><td>Direct Debit</td><td>Bills, subscriptions, council tax</td></tr>
+<tr><th scope="row" style="font-weight:600;text-transform:none;letter-spacing:0;font-size:0.93rem;background:none;">SO</th><td>Standing order</td><td>Rent, savings transfers, regular payments you set up</td></tr>
+<tr><th scope="row" style="font-weight:600;text-transform:none;letter-spacing:0;font-size:0.93rem;background:none;">FPI</th><td>Faster Payment in</td><td>Salary from some employers, money from friends</td></tr>
+<tr><th scope="row" style="font-weight:600;text-transform:none;letter-spacing:0;font-size:0.93rem;background:none;">FPO</th><td>Faster Payment out</td><td>Payments you sent by bank transfer</td></tr>
+<tr><th scope="row" style="font-weight:600;text-transform:none;letter-spacing:0;font-size:0.93rem;background:none;">BGC</th><td>Bank giro credit</td><td>Salary, benefits, refunds paid in</td></tr>
+<tr><th scope="row" style="font-weight:600;text-transform:none;letter-spacing:0;font-size:0.93rem;background:none;">TFR</th><td>Transfer</td><td>Between your own accounts</td></tr>
+<tr><th scope="row" style="font-weight:600;text-transform:none;letter-spacing:0;font-size:0.93rem;background:none;">DEB</th><td>Debit card payment</td><td>Shops, online purchases</td></tr>
+<tr><th scope="row" style="font-weight:600;text-transform:none;letter-spacing:0;font-size:0.93rem;background:none;">CPT</th><td>Cashpoint</td><td>ATM withdrawals</td></tr>
+<tr><th scope="row" style="font-weight:600;text-transform:none;letter-spacing:0;font-size:0.93rem;background:none;">CHG</th><td>Charge</td><td>Bank fees</td></tr>
+<tr><th scope="row" style="font-weight:600;text-transform:none;letter-spacing:0;font-size:0.93rem;background:none;">INT</th><td>Interest</td><td>Paid or charged</td></tr>
+<tr><th scope="row" style="font-weight:600;text-transform:none;letter-spacing:0;font-size:0.93rem;background:none;">BP</th><td>Bill payment</td><td>One-off payments to a company</td></tr>
+</tbody></table></div>
+
+      <h2>Why amounts look wrong on credit cards</h2>
+      <p>Credit card exports usually list purchases as positive numbers and payments to the card as negative, the opposite of a current account. If you import one and everything looks upside down, that is why. The Income Tracker detects the pattern and flips it, and the import review has a one-click undo if it guessed wrong.</p>
+
+      <h2>Dates and other traps</h2>
+      <ul>
+        <li>UK banks write dates day first (12/09/2026). Spreadsheets sometimes flip them to month first when you open and re-save the file. Import the original download rather than a re-saved copy.</li>
+        <li>Some exports include a time stamp with the date. Harmless; it is stripped.</li>
+        <li>Large amounts may contain thousands separators (1,234.56). Also handled.</li>
+        <li>A row with money in AND money out is almost always a reversal. Check it rather than trusting it.</li>
+      </ul>
+
+      <h2>Do you need to clean the file first?</h2>
+      <p>No. Download it, import it. The tracker finds the date, description and amount columns by their headers, whatever order they are in, and shows you the result before anything is saved. If you like, open the file in a spreadsheet first just to see what is in it; then import the original.</p>
+
+      <div class="cta">
+  <div class="cta-text"><strong>The Income Tracker</strong><span>Track it free. No account, no bank login.</span></div>
+  <a class="btn" href="/?ref=guide-how-to-read-a-bank-statement-csv" data-track="cta_click" data-ref="guide-how-to-read-a-bank-statement-csv">Open the tracker &rarr;</a>
+</div>
+
+      <h2>Frequently asked questions</h2>
+<dl class="faq">
+<dt>What does DD mean on a bank statement?</dt>
+<dd>Direct Debit: a payment a company collects from your account on an agreed date, covered by the Direct Debit Guarantee.</dd>
+<dt>What is the difference between FPI and FPO?</dt>
+<dd>FPI is a Faster Payment coming in; FPO is one going out. Both are ordinary bank transfers.</dd>
+<dt>What does BGC mean?</dt>
+<dd>Bank giro credit, an older label for money paid into your account, often salary or a refund.</dd>
+<dt>Do I need to edit the CSV before importing it?</dt>
+<dd>No. The Income Tracker reads standard bank exports as they come. Import the original download rather than a copy re-saved from a spreadsheet.</dd>
+</dl>
+
+      
+
+      <h2>Related</h2>
+      <div class="grid">
+        <a class="card" href="/import/"><span class="card-t">Bank CSV import guides</span><span class="card-d">Export from any UK bank</span></a>
+        <a class="card" href="/guides/import-pdf-bank-statement.html"><span class="card-t">How to import a PDF bank statement</span><span class="card-d">Copy, paste, done. No converter needed.</span></a>
+        <a class="card" href="/guides/how-to-categorise-bank-transactions.html"><span class="card-t">How to categorise bank transactions</span><span class="card-d">A category list that you will actually keep up</span></a>
+        <a class="card" href="/import/lloyds-csv.html"><span class="card-t">Export Lloyds Bank to CSV</span><span class="card-d">Step-by-step guide</span></a>
+      </div>
+      <hr />
+      <footer class="site">
+        <div class="cols">
+          <div>
+            <h4>Use it</h4>
+            <ul>
+              <li><a href="/?ref=footer" data-track="cta_click" data-ref="footer">Open the tracker</a></li>
+              <li><a href="/import/">Bank CSV guides</a></li>
+              <li><a href="/templates/">Budget templates</a></li>
+              <li><a href="/tools/">Calculators</a></li>
+            </ul>
+          </div>
+          <div>
+            <h4>Learn</h4>
+            <ul>
+              <li><a href="/guides/">Budgeting guides</a></li>
+              <li><a href="/compare/">Compare apps</a></li>
+              <li><a href="/compare/best-free-budgeting-apps-uk.html">Best free budgeting apps (UK)</a></li>
+              <li><a href="/whats-new.html">What&rsquo;s new</a></li>
+            </ul>
+          </div>
+          <div>
+            <h4>About</h4>
+            <ul>
+              <li><a href="/about.html">About</a></li>
+              <li><a href="/?feedback=1">Contact us</a></li>
+              <li><a href="/privacy.html">Privacy</a></li>
+              <li><a href="/tos.html">Terms</a></li>
+              <li><a href="/feed.xml">RSS feed</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="legal">&copy; 2026 The Income Tracker. Free, private, local-first budgeting for the UK. No account, no bank login.</div>
+      </footer>
+    </div>
+<script>
+window.va=window.va||function(){(window.vaq=window.vaq||[]).push(arguments)};
+(function(){
+  var PH_KEY="",PH_HOST="https://us.i.posthog.com";
+  var dnt=typeof navigator!=="undefined"&&navigator.doNotTrack==="1";
+  function id(){try{var k="it_analytics_id",v=localStorage.getItem(k);if(!v){v="anon-"+(window.crypto&&crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2));localStorage.setItem(k,v);}return v;}catch(e){return "anon-ephemeral";}}
+  function track(name,props){
+    props=props||{};props.page=location.pathname;
+    try{window.va("event",{name:name,data:props});}catch(e){}
+    if(!PH_KEY||dnt)return;
+    try{fetch(PH_HOST+"/capture/",{method:"POST",keepalive:true,headers:{"content-type":"application/json"},body:JSON.stringify({api_key:PH_KEY,event:name,distinct_id:id(),properties:Object.assign({app:"income-tracker-web",surface:"static"},props),timestamp:new Date().toISOString()})}).catch(function(){});}catch(e){}
+  }
+  window.itTrack=track;
+  document.addEventListener("click",function(ev){
+    var t=ev.target;if(!t||!t.closest)return;var el=t.closest("[data-track]");if(!el)return;
+    track(el.getAttribute("data-track"),{ref:el.getAttribute("data-ref")||"",href:el.getAttribute("href")||""});
+  });
+  if(PH_KEY&&!dnt)track("static_pageview",{});
+})();
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
+
+  </body>
+</html>

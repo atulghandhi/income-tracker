@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Spend per day until payday calculator · The Income Tracker</title>
+    <meta name="description" content="Enter what is left in your account, the days until payday and the bills still to come out, and see what you can spend per day and per week without going overdrawn." />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+    <meta name="author" content="The Income Tracker" />
+    <meta name="theme-color" content="#051424" />
+    <link rel="canonical" href="https://www.theincometracker.com/tools/spend-per-day-until-payday-calculator.html" />
+    <meta name="geo.region" content="GB" />
+    <meta http-equiv="content-language" content="en-GB" />
+    <meta property="og:type" content="article" />
+    <meta property="og:locale" content="en_GB" />
+    <meta property="og:site_name" content="The Income Tracker" />
+    <meta property="og:url" content="https://www.theincometracker.com/tools/spend-per-day-until-payday-calculator.html" />
+    <meta property="og:title" content="Spend per day until payday calculator · The Income Tracker" />
+    <meta property="og:description" content="Enter what is left in your account, the days until payday and the bills still to come out, and see what you can spend per day and per week without going overdrawn." />
+    <meta property="og:image" content="https://www.theincometracker.com/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="The Income Tracker: free, private, local-first budget tracker for the UK" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Spend per day until payday calculator · The Income Tracker" />
+    <meta name="twitter:description" content="Enter what is left in your account, the days until payday and the bills still to come out, and see what you can spend per day and per week without going overdrawn." />
+    <meta name="twitter:image" content="https://www.theincometracker.com/og-image.png" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="icon" type="image/png" sizes="240x240" href="/icon.png" />
+    <link rel="apple-touch-icon" href="/icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="alternate" type="application/rss+xml" title="The Income Tracker: new guides and updates" href="https://www.theincometracker.com/feed.xml" />
+    <style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; padding: 0 24px 96px; background: #051424; color: #d4e4fa;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 16px; line-height: 1.7;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  a { color: #00dfc1; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  header.site { max-width: 980px; margin: 0 auto; padding: 18px 0 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+  header.site .brand { color: #fff; font-weight: 800; letter-spacing: -0.01em; font-size: 1.02rem; margin-right: auto; }
+  header.site .brand:hover { text-decoration: none; color: #00dfc1; }
+  nav.sitenav { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; font-size: 0.88rem; }
+  nav.sitenav a { color: #b8c8e0; padding: 4px 0; }
+  nav.sitenav a:hover { color: #00dfc1; text-decoration: none; }
+  nav.sitenav a.navbtn { background: rgba(0,223,193,0.12); border: 1px solid rgba(0,223,193,0.35); color: #00dfc1; padding: 6px 12px; border-radius: 8px; font-weight: 700; }
+  nav.sitenav a.navbtn:hover { background: rgba(0,223,193,0.2); }
+  header.top { padding: 22px 0 8px; }
+  nav.crumbs { font-size: 0.85rem; color: #9ea8b7; }
+  nav.crumbs a { color: #9ea8b7; }
+  nav.crumbs a:hover { color: #00dfc1; }
+  h1 { font-size: clamp(1.7rem, 4vw, 2.3rem); font-weight: 800; line-height: 1.15; margin: 18px 0 10px; color: #fff; letter-spacing: -0.02em; }
+  .meta { color: #9ea8b7; font-size: 0.85rem; margin-bottom: 24px; }
+  .lede { font-size: 1.12rem; color: #eaf2ff; line-height: 1.65; margin: 0 0 24px; }
+  .tldr { background: rgba(0,223,193,0.07); border: 1px solid rgba(0,223,193,0.22); border-radius: 12px; padding: 16px 20px; margin: 0 0 28px; }
+  .tldr strong { color: #00dfc1; letter-spacing: 0.02em; font-size: 0.8rem; text-transform: uppercase; display: block; margin-bottom: 6px; }
+  .tldr p { margin: 0; color: #d4e4fa; }
+  h2 { font-size: 1.3rem; font-weight: 700; color: #fff; margin: 40px 0 12px; letter-spacing: -0.01em; }
+  h3 { font-size: 1.05rem; font-weight: 650; color: #fff; margin: 28px 0 8px; }
+  p, li { color: #c8d8ee; }
+  ul, ol { padding-left: 22px; }
+  li + li { margin-top: 8px; }
+  ol.steps { counter-reset: step; list-style: none; padding-left: 0; }
+  ol.steps > li { position: relative; padding: 0 0 4px 44px; margin-top: 18px; }
+  ol.steps > li::before {
+    counter-increment: step; content: counter(step);
+    position: absolute; left: 0; top: 0; width: 30px; height: 30px;
+    background: rgba(0,223,193,0.12); border: 1px solid rgba(0,223,193,0.4);
+    color: #00dfc1; border-radius: 50%; display: grid; place-items: center;
+    font-weight: 700; font-size: 0.9rem;
+  }
+  .note { background: rgba(212,228,250,0.05); border-left: 3px solid rgba(212,228,250,0.25); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 20px 0; font-size: 0.95rem; color: #b8c8e0; }
+  .cta { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin: 34px 0; padding: 24px; background: rgba(8,22,38,0.85); border: 1px solid rgba(0,223,193,0.18); border-radius: 14px; }
+  .cta .cta-text { flex: 1; min-width: 220px; }
+  .cta .cta-text strong { color: #fff; display: block; font-size: 1.05rem; margin-bottom: 2px; }
+  .cta .cta-text span { color: #9ea8b7; font-size: 0.9rem; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; background: #00dfc1; color: #051424; font-weight: 700; padding: 13px 22px; border-radius: 10px; white-space: nowrap; border: none; font-size: 1rem; font-family: inherit; cursor: pointer; }
+  .btn:hover { text-decoration: none; filter: brightness(1.06); }
+  .btn.ghost { background: transparent; color: #00dfc1; border: 1px solid rgba(0,223,193,0.4); }
+  .btn.ghost:hover { background: rgba(0,223,193,0.08); }
+  .btnrow { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 18px 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; margin: 24px 0; }
+  .card { display: block; padding: 16px 18px; background: rgba(8,22,38,0.7); border: 1px solid rgba(212,228,250,0.1); border-radius: 12px; transition: border-color 140ms ease, transform 140ms ease; }
+  .card:hover { text-decoration: none; border-color: rgba(0,223,193,0.4); transform: translateY(-2px); }
+  .card .card-t { color: #fff; font-weight: 650; display: block; margin-bottom: 4px; }
+  .card .card-d { color: #9ea8b7; font-size: 0.88rem; }
+  .faq dt { font-weight: 650; color: #fff; margin-top: 22px; }
+  .faq dd { margin: 6px 0 0; color: #c8d8ee; }
+  .tablewrap { overflow-x: auto; margin: 18px 0; border: 1px solid rgba(212,228,250,0.12); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.93rem; min-width: 460px; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid rgba(212,228,250,0.1); vertical-align: top; color: #c8d8ee; }
+  th { color: #fff; font-weight: 700; background: rgba(8,22,38,0.9); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  tr:last-child td { border-bottom: none; }
+  td.hi { color: #00dfc1; font-weight: 600; }
+  .verdict { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin: 20px 0; }
+  .verdict > div { background: rgba(8,22,38,0.7); border: 1px solid rgba(212,228,250,0.1); border-radius: 12px; padding: 16px 18px; }
+  .verdict h3 { margin: 0 0 8px; font-size: 0.98rem; }
+  .verdict ul { margin: 0; padding-left: 18px; }
+  .verdict li { font-size: 0.93rem; }
+  .sources { font-size: 0.86rem; color: #9ea8b7; }
+  .sources ul { padding-left: 18px; }
+  .sources li { color: #9ea8b7; margin-top: 4px; }
+  .sources a { color: #9ea8b7; text-decoration: underline; }
+  .sources a:hover { color: #00dfc1; }
+  .tag { display: inline-block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #00dfc1; background: rgba(0,223,193,0.1); border: 1px solid rgba(0,223,193,0.3); padding: 2px 8px; border-radius: 999px; margin-right: 8px; vertical-align: middle; }
+  .changelog li { margin-top: 14px; }
+  .changelog time { color: #9ea8b7; font-size: 0.82rem; display: block; }
+  .changelog strong { color: #fff; }
+  /* Calculator widget */
+  .calc { background: rgba(8,22,38,0.9); border: 1px solid rgba(0,223,193,0.2); border-radius: 16px; padding: 22px; margin: 0 0 14px; }
+  .calc-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
+  .calc-field { display: flex; flex-direction: column; gap: 6px; }
+  .calc-label { font-size: 0.82rem; color: #9ea8b7; font-weight: 600; }
+  .calc-inwrap { display: flex; align-items: center; background: #06182b; border: 1px solid rgba(212,228,250,0.16); border-radius: 10px; padding: 0 12px; }
+  .calc-inwrap:focus-within { border-color: rgba(0,223,193,0.5); }
+  .calc-inwrap i { color: #9ea8b7; font-style: normal; font-size: 0.95rem; }
+  .calc-inwrap input { flex: 1; min-width: 0; background: none; border: none; color: #fff; font-size: 1.05rem; font-weight: 600; padding: 11px 6px; outline: none; font-family: inherit; }
+  .calc-inwrap input::-webkit-outer-spin-button, .calc-inwrap input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .calc-out { margin-top: 18px; padding-top: 18px; border-top: 1px solid rgba(212,228,250,0.1); }
+  .calc-out p { margin: 8px 0 0; }
+  .calc-headline { font-size: 2rem; font-weight: 800; color: #00dfc1; line-height: 1.1; letter-spacing: -0.02em; }
+  .calc-headline small { font-size: 0.9rem; font-weight: 600; color: #9ea8b7; letter-spacing: 0; }
+  .calc-hint { color: #9ea8b7; }
+  .calc-good { color: #00dfc1; }
+  .calc-warn { color: #ffd479; }
+  .calc-bad { color: #ff8b8b; }
+  .calc-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 16px; }
+  .calc-actions .btn { padding: 9px 14px; font-size: 0.88rem; }
+  .calc-share-note { font-size: 0.82rem; color: #9ea8b7; }
+  hr { border: none; border-top: 1px solid rgba(212,228,250,0.1); margin: 48px 0 24px; }
+  footer.site { color: #9ea8b7; font-size: 0.85rem; }
+  footer.site .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 18px; margin-bottom: 22px; }
+  footer.site h4 { color: #d4e4fa; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 8px; }
+  footer.site ul { list-style: none; padding: 0; margin: 0; }
+  footer.site li { margin: 0 0 6px; color: #9ea8b7; }
+  footer.site a { color: #9ea8b7; }
+  footer.site a:hover { color: #00dfc1; }
+  footer.site .legal { border-top: 1px solid rgba(212,228,250,0.08); padding-top: 14px; }
+  @media (max-width: 560px) {
+    body { padding: 0 16px 72px; }
+    header.site { padding-top: 14px; }
+    nav.sitenav { font-size: 0.84rem; gap: 2px 12px; }
+    .calc { padding: 16px; }
+  }
+</style>
+    <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://www.theincometracker.com/#website",
+      "url": "https://www.theincometracker.com/",
+      "name": "The Income Tracker",
+      "description": "A free, local-first income and expense tracker for the UK. Import a CSV from your bank. No account, no bank login.",
+      "inLanguage": "en-GB",
+      "publisher": {
+        "@id": "https://www.theincometracker.com/#org"
+      }
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://www.theincometracker.com/#org",
+      "name": "The Income Tracker",
+      "url": "https://www.theincometracker.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.theincometracker.com/icon.png",
+        "width": 240,
+        "height": 240
+      },
+      "email": "hello@theincometracker.com",
+      "areaServed": "GB"
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://www.theincometracker.com/tools/spend-per-day-until-payday-calculator.html#webpage",
+      "url": "https://www.theincometracker.com/tools/spend-per-day-until-payday-calculator.html",
+      "name": "Spend per day until payday calculator · The Income Tracker",
+      "description": "Enter what is left in your account, the days until payday and the bills still to come out, and see what you can spend per day and per week without going overdrawn.",
+      "inLanguage": "en-GB",
+      "isPartOf": {
+        "@id": "https://www.theincometracker.com/#website"
+      },
+      "datePublished": "2026-09-08",
+      "dateModified": "2026-09-08",
+      "primaryImageOfPage": {
+        "@type": "ImageObject",
+        "url": "https://www.theincometracker.com/og-image.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.theincometracker.com/tools/spend-per-day-until-payday-calculator.html#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.theincometracker.com/tools/spend-per-day-until-payday-calculator.html#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.theincometracker.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Calculators",
+          "item": "https://www.theincometracker.com/tools/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Spend per day until payday",
+          "item": "https://www.theincometracker.com/tools/spend-per-day-until-payday-calculator.html"
+        }
+      ]
+    },
+    {
+      "@type": "WebApplication",
+      "name": "Spend per day until payday calculator",
+      "description": "Enter what is left in your account, the days until payday and the bills still to come out, and see what you can spend per day and per week without going overdrawn.",
+      "applicationCategory": "FinanceApplication",
+      "operatingSystem": "Any (web browser)",
+      "browserRequirements": "Requires JavaScript",
+      "url": "https://www.theincometracker.com/tools/spend-per-day-until-payday-calculator.html",
+      "isAccessibleForFree": true,
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "GBP"
+      },
+      "publisher": {
+        "@id": "https://www.theincometracker.com/#org"
+      }
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How do I work out how much I can spend a day?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Money in the account, minus bills still to come out before payday, divided by the days until payday."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What if the answer is negative?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The bills exceed what you have. Move a payment date, use savings if you have them, or contact your bank before a payment fails; unarranged overdrafts are expensive."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does this replace a budget?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. It gets you to payday. A monthly ledger shows why you keep needing it, which is the more useful fix."
+          }
+        }
+      ]
+    }
+  ]
+}
+    </script>
+  </head>
+  <body>
+    <header class="site">
+      <a class="brand" href="/">The Income Tracker</a>
+      <nav class="sitenav" aria-label="Site">
+        <a href="/import/">Bank CSV guides</a>
+        <a href="/guides/">Guides</a>
+        <a href="/tools/">Calculators</a>
+        <a href="/compare/">Compare</a>
+        <a href="/templates/">Templates</a>
+        <a class="navbtn" href="/?ref=nav" data-track="cta_click" data-ref="nav">Open the tracker</a>
+      </nav>
+    </header>
+    <div class="wrap">
+      <header class="top"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> &rsaquo; <a href="/tools/">Calculators</a> &rsaquo; Spend per day until payday</nav></header>
+      <h1>How much can I spend per day until payday?</h1>
+      <p class="meta">By The Income Tracker · Updated 8 September 2026</p>
+      <div class="tldr"><strong>The short answer</strong><p>Take what is in your account, subtract the bills that still have to come out before payday, and divide by the days left. That is your daily allowance. Enter the three numbers and the calculator does it, with a weekly figure too.</p></div>
+      <div class="calc">
+        <div class="calc-fields">
+          <label class="calc-field"><span class="calc-label">Money left in the account</span><span class="calc-inwrap"><i>£</i><input id="balance" type="number" inputmode="decimal" step="any" value="420" min="0" /></span></label>
+          <label class="calc-field"><span class="calc-label">Days until payday</span><span class="calc-inwrap"><input id="days" type="number" inputmode="decimal" step="any" value="12" min="0" /></span></label>
+          <label class="calc-field"><span class="calc-label">Bills still to come out</span><span class="calc-inwrap"><i>£</i><input id="bills" type="number" inputmode="decimal" step="any" value="60" min="0" /></span></label>
+        </div>
+        <div class="calc-out" id="calc-out" aria-live="polite"></div>
+        <div class="calc-actions">
+          <button class="btn ghost" type="button" id="calc-share">Share this result</button>
+          <a class="btn" href="/?ref=calc-spend-per-day-until-payday-calculator" data-track="cta_click" data-ref="calc-spend-per-day-until-payday-calculator">Track it in the app &rarr;</a>
+          <span class="calc-share-note" id="calc-share-note">Nothing you type leaves your browser.</span>
+        </div>
+      </div>
+
+      <h2>Do not forget the bills</h2>
+      <p>The number people get wrong is the middle one. A balance of £420 looks fine until the £60 phone bill and the £45 gym come out on the 20th. Check the direct debit list in your banking app for anything dated before payday and add it up. The household bills template makes this a one-off job.</p>
+
+      <h2>Make the allowance stick</h2>
+      <ul>
+        <li>Move the spendable amount to a separate pot or card and spend only from that.</li>
+        <li>Recalculate mid-way; a good week early on buys slack later.</li>
+        <li>If you are here every month, the problem is the month, not the week. Track a full month and find the category that is doing it.</li>
+      </ul>
+
+      <div class="cta">
+  <div class="cta-text"><strong>The Income Tracker</strong><span>Track it free. No account, no bank login.</span></div>
+  <a class="btn" href="/?ref=calc-spend-per-day-until-payday-calculator" data-track="cta_click" data-ref="calc-spend-per-day-until-payday-calculator">Open the tracker &rarr;</a>
+</div>
+
+      <h2>Frequently asked questions</h2>
+<dl class="faq">
+<dt>How do I work out how much I can spend a day?</dt>
+<dd>Money in the account, minus bills still to come out before payday, divided by the days until payday.</dd>
+<dt>What if the answer is negative?</dt>
+<dd>The bills exceed what you have. Move a payment date, use savings if you have them, or contact your bank before a payment fails; unarranged overdrafts are expensive.</dd>
+<dt>Does this replace a budget?</dt>
+<dd>No. It gets you to payday. A monthly ledger shows why you keep needing it, which is the more useful fix.</dd>
+</dl>
+
+      
+
+      <h2>Related</h2>
+      <div class="grid">
+        <a class="card" href="/tools/monthly-surplus-calculator.html"><span class="card-t">Monthly surplus</span><span class="card-d">What is left after spending</span></a>
+        <a class="card" href="/templates/household-bills-tracker-template.html"><span class="card-t">Household bills tracker</span><span class="card-d">Every direct debit, standing order and subscription</span></a>
+        <a class="card" href="/guides/find-and-cancel-unused-subscriptions.html"><span class="card-t">How to find and cancel unused subscriptions</span><span class="card-d">Find them in your statement, then cancel the right way</span></a>
+        <a class="card" href="/?ref=related"><span class="card-t">Open The Income Tracker</span><span class="card-d">Free, no account, no bank login</span></a>
+      </div>
+      <hr />
+      <footer class="site">
+        <div class="cols">
+          <div>
+            <h4>Use it</h4>
+            <ul>
+              <li><a href="/?ref=footer" data-track="cta_click" data-ref="footer">Open the tracker</a></li>
+              <li><a href="/import/">Bank CSV guides</a></li>
+              <li><a href="/templates/">Budget templates</a></li>
+              <li><a href="/tools/">Calculators</a></li>
+            </ul>
+          </div>
+          <div>
+            <h4>Learn</h4>
+            <ul>
+              <li><a href="/guides/">Budgeting guides</a></li>
+              <li><a href="/compare/">Compare apps</a></li>
+              <li><a href="/compare/best-free-budgeting-apps-uk.html">Best free budgeting apps (UK)</a></li>
+              <li><a href="/whats-new.html">What&rsquo;s new</a></li>
+            </ul>
+          </div>
+          <div>
+            <h4>About</h4>
+            <ul>
+              <li><a href="/about.html">About</a></li>
+              <li><a href="/?feedback=1">Contact us</a></li>
+              <li><a href="/privacy.html">Privacy</a></li>
+              <li><a href="/tos.html">Terms</a></li>
+              <li><a href="/feed.xml">RSS feed</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="legal">&copy; 2026 The Income Tracker. Free, private, local-first budgeting for the UK. No account, no bank login.</div>
+      </footer>
+    </div>
+<script>
+window.va=window.va||function(){(window.vaq=window.vaq||[]).push(arguments)};
+(function(){
+  var PH_KEY="",PH_HOST="https://us.i.posthog.com";
+  var dnt=typeof navigator!=="undefined"&&navigator.doNotTrack==="1";
+  function id(){try{var k="it_analytics_id",v=localStorage.getItem(k);if(!v){v="anon-"+(window.crypto&&crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2));localStorage.setItem(k,v);}return v;}catch(e){return "anon-ephemeral";}}
+  function track(name,props){
+    props=props||{};props.page=location.pathname;
+    try{window.va("event",{name:name,data:props});}catch(e){}
+    if(!PH_KEY||dnt)return;
+    try{fetch(PH_HOST+"/capture/",{method:"POST",keepalive:true,headers:{"content-type":"application/json"},body:JSON.stringify({api_key:PH_KEY,event:name,distinct_id:id(),properties:Object.assign({app:"income-tracker-web",surface:"static"},props),timestamp:new Date().toISOString()})}).catch(function(){});}catch(e){}
+  }
+  window.itTrack=track;
+  document.addEventListener("click",function(ev){
+    var t=ev.target;if(!t||!t.closest)return;var el=t.closest("[data-track]");if(!el)return;
+    track(el.getAttribute("data-track"),{ref:el.getAttribute("data-ref")||"",href:el.getAttribute("href")||""});
+  });
+  if(PH_KEY&&!dnt)track("static_pageview",{});
+})();
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
+<script>
+(function(){
+  var IDS=["balance","days","bills"],SLUG="spend-per-day-until-payday-calculator",used=false;
+  function n(id){var el=document.getElementById(id);if(!el)return 0;var v=parseFloat(el.value);return isNaN(v)?0:v;}
+  function gbp(x){return '£'+(Math.round(x*100)/100).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});}
+  function pct(x){return (Math.round(x*10)/10)+'%';}
+  var out=document.getElementById('calc-out');
+  function render(){
+    var bal=n('balance'),d=n('days'),bills=n('bills');
+    if(d<=0){out.innerHTML='<p class="calc-hint">Enter the number of days until you are paid.</p>';return;}
+    var free=bal-bills;
+    if(free<0){out.innerHTML='<div class="calc-headline calc-bad">'+gbp(-free)+' <small>short</small></div><p class="calc-bad">The bills still to come out ('+gbp(bills)+') are more than the money you have left. Move a payment date, dip into savings, or talk to your bank before anything bounces. Unarranged overdraft charges are the expensive way to find out.</p>';return;}
+    var perDay=free/d,perWeek=perDay*7,cls=perDay<5?'bad':(perDay<12?'warn':'good');
+    var html='<div class="calc-headline calc-'+cls+'">'+gbp(perDay)+' <small>a day</small></div>';
+    html+='<p>'+gbp(free)+' spendable over '+d+(d===1?' day':' days')+', or about <strong>'+gbp(perWeek)+' a week</strong>.</p>';
+    if(cls==='bad')html+='<p class="calc-bad">Tight. Plan meals from what is in the cupboard and keep the card in the drawer for the non-essentials.</p>';
+    else if(cls==='warn')html+='<p class="calc-warn">Doable, but one unplanned spend eats two days. Decide now what the week's one treat is.</p>';
+    else html+='<p class="calc-good">Comfortable. Consider moving some of it to savings today, before it becomes spending.</p>';
+    out.innerHTML=html;
+  }
+  try{var q=new URLSearchParams(location.search);IDS.forEach(function(id){if(q.has(id)){var el=document.getElementById(id);var v=parseFloat(q.get(id));if(el&&!isNaN(v))el.value=v;}});}catch(e){}
+  IDS.forEach(function(id){var el=document.getElementById(id);if(el)el.addEventListener('input',function(){render();if(!used){used=true;if(window.itTrack)window.itTrack('calc_used',{calc:SLUG});}});});
+  var share=document.getElementById('calc-share'),note=document.getElementById('calc-share-note');
+  if(share){share.addEventListener('click',function(){
+    var q=new URLSearchParams();IDS.forEach(function(id){q.set(id,String(n(id)));});
+    var url=location.origin+location.pathname+'?'+q.toString();
+    if(window.itTrack)window.itTrack('calc_shared',{calc:SLUG});
+    if(navigator.share){navigator.share({title:document.title,url:url}).catch(function(){});return;}
+    if(navigator.clipboard){navigator.clipboard.writeText(url).then(function(){note.textContent='Link copied. Paste it anywhere.';}).catch(function(){note.textContent=url;});}
+    else{note.textContent=url;}
+  });}
+  render();
+})();
+</script>
+  </body>
+</html>
