@@ -4,14 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <title>The Income Tracker — Free UK Income &amp; Expense Tracker (No Bank Login)</title>
+    <title>The Income Tracker: free UK income &amp; expense tracker, no bank login</title>
     <meta
       name="description"
-      content="A free, easy-to-use income and expense tracker for the UK. Import a CSV from Barclays, HSBC, Monzo or Starling, see every month side by side, and track your budget. No account, no bank login — your data stays in your browser."
+      content="A free, private income and expense tracker for the UK. Import a CSV from any of 20 UK banks, see every month side by side, and track your budget. No account, no bank login. Your data stays in your browser."
     />
     <meta
       name="keywords"
-      content="income tracker, finance tracker, expense tracker, budget tracker UK, free budgeting app, money tracker, personal finance app, UK budget app, spending tracker, CSV budget tracker, no bank login budgeting"
+      content="income tracker, expense tracker, budget tracker UK, free budgeting app UK, budget app without open banking, CSV budget tracker, money dashboard alternative, moneyhub alternative, free YNAB alternative, self employed income tracker"
     />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <meta name="author" content="The Income Tracker" />
@@ -52,8 +52,8 @@
     <meta property="og:locale" content="en_GB" />
     <meta property="og:url" content="https://www.theincometracker.com/" />
     <meta property="og:site_name" content="The Income Tracker" />
-    <meta property="og:title" content="The Income Tracker — Free UK Income &amp; Expense Tracker" />
-    <meta property="og:description" content="A free, easy-to-use income and expense tracker for the UK. Import a CSV from Barclays, HSBC, Monzo or Starling. No account, no bank login — your data stays in your browser." />
+    <meta property="og:title" content="The Income Tracker: free UK income &amp; expense tracker, no bank login" />
+    <meta property="og:description" content="A free, private income and expense tracker for the UK. Import a CSV from any of 20 UK banks. No account, no bank login. Your data stays in your browser." />
     <meta property="og:image" content="https://www.theincometracker.com/og-image.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -62,107 +62,147 @@
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:url" content="https://www.theincometracker.com/" />
-    <meta name="twitter:title" content="The Income Tracker — Free UK Income &amp; Expense Tracker" />
-    <meta name="twitter:description" content="A free, easy-to-use income and expense tracker for the UK. Import a CSV from your bank. No account, no bank login — your data stays in your browser." />
+    <meta name="twitter:title" content="The Income Tracker: free UK income &amp; expense tracker, no bank login" />
+    <meta name="twitter:description" content="A free, private income and expense tracker for the UK. Import a CSV from your bank. No account, no bank login. Your data stays in your browser." />
     <meta name="twitter:image" content="https://www.theincometracker.com/og-image.png" />
 
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="icon" type="image/png" sizes="120x120" href="/icon.png" />
     <link rel="apple-touch-icon" href="/icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
+    <link rel="alternate" type="application/rss+xml" title="The Income Tracker: new guides and updates" href="https://www.theincometracker.com/feed.xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
     <!-- Structured data: helps search engines and AI assistants understand and recommend the app -->
     <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
     {
-      "@context": "https://schema.org",
-      "@graph": [
+      "@type": "WebSite",
+      "@id": "https://www.theincometracker.com/#website",
+      "url": "https://www.theincometracker.com/",
+      "name": "The Income Tracker",
+      "description": "A free, local-first income and expense tracker for the UK. Import a CSV from your bank. No account, no bank login.",
+      "inLanguage": "en-GB",
+      "publisher": {
+        "@id": "https://www.theincometracker.com/#org"
+      }
+    },
+    {
+      "@type": "WebApplication",
+      "@id": "https://www.theincometracker.com/#app",
+      "name": "The Income Tracker",
+      "alternateName": [
+        "Income Tracker",
+        "The Income Tracker UK budget app"
+      ],
+      "url": "https://www.theincometracker.com/",
+      "description": "A free, private income and expense tracker for the UK. Import a CSV, OFX or QIF from any UK bank, categorise your transactions, and see every month side by side. No account and no bank login required. Your data stays in your browser.",
+      "applicationCategory": "FinanceApplication",
+      "applicationSubCategory": "Budgeting & Personal Finance",
+      "operatingSystem": "Any (web browser: Chrome, Safari, Firefox, Edge); installable as a web app",
+      "browserRequirements": "Requires a modern web browser with JavaScript enabled.",
+      "inLanguage": "en-GB",
+      "isAccessibleForFree": true,
+      "countriesSupported": "GB",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "GBP",
+        "availability": "https://schema.org/InStock"
+      },
+      "featureList": [
+        "Free to use with no account and no sign-up",
+        "Import CSV, OFX and QIF statements from 20 UK banks including Barclays, HSBC, Lloyds, NatWest, Nationwide, Halifax, Monzo, Starling and Revolut, or paste a PDF statement",
+        "Track income and expenses month by month in a clear ledger",
+        "Drag-and-drop categorisation with rules that remember each merchant",
+        "Recurring bills detected and seeded into the next month; transfers and duplicates skipped",
+        "Savings goals with projected dates and an annual summary",
+        "Local-first and private: data is stored in your own browser, never on a server unless you sign in to sync",
+        "No bank credentials or open-banking connection required; installable and works offline"
+      ],
+      "permissions": "No special permissions. No bank login or personal account needed.",
+      "creator": {
+        "@id": "https://www.theincometracker.com/#org"
+      },
+      "publisher": {
+        "@id": "https://www.theincometracker.com/#org"
+      },
+      "datePublished": "2026-06-14",
+      "dateModified": "2026-09-08"
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://www.theincometracker.com/#org",
+      "name": "The Income Tracker",
+      "url": "https://www.theincometracker.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.theincometracker.com/icon.png",
+        "width": 240,
+        "height": 240
+      },
+      "email": "hello@theincometracker.com",
+      "areaServed": "GB"
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://www.theincometracker.com/#faq",
+      "mainEntity": [
         {
-          "@type": "WebApplication",
-          "@id": "https://www.theincometracker.com/#app",
-          "name": "The Income Tracker",
-          "alternateName": ["Income Tracker", "The Income Tracker UK budget app"],
-          "url": "https://www.theincometracker.com/",
-          "description": "A free, easy-to-use income and expense tracker for the UK. Import a CSV from Barclays, HSBC, Monzo or Starling, categorise your transactions, and see every month side by side. No account and no bank login required — your data stays in your browser.",
-          "applicationCategory": "FinanceApplication",
-          "applicationSubCategory": "Budgeting & Personal Finance",
-          "operatingSystem": "Any (web browser: Chrome, Safari, Firefox, Edge)",
-          "browserRequirements": "Requires a modern web browser with JavaScript enabled.",
-          "inLanguage": "en-GB",
-          "isAccessibleForFree": true,
-          "countriesSupported": "GB",
-          "offers": {
-            "@type": "Offer",
-            "price": "0",
-            "priceCurrency": "GBP",
-            "availability": "https://schema.org/InStock"
-          },
-          "featureList": [
-            "Free to use with no account and no sign-up",
-            "Import CSV statements from UK banks including Barclays, HSBC, Monzo and Starling",
-            "Track income and expenses month by month in a clear ledger",
-            "Drag-and-drop categorisation of transactions",
-            "Annual summary with monthly average and projected savings",
-            "Local-first and private — data is stored in your own browser, never on a server",
-            "No bank credentials or open-banking connection required"
-          ],
-          "permissions": "No special permissions. No bank login or personal account needed.",
-          "creator": { "@id": "https://www.theincometracker.com/#org" }
+          "@type": "Question",
+          "name": "Is The Income Tracker free?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. Completely free: no credit card, no subscription, no sign-up. Open it and start."
+          }
         },
         {
-          "@type": "Organization",
-          "@id": "https://www.theincometracker.com/#org",
-          "name": "The Income Tracker",
-          "url": "https://www.theincometracker.com/",
-          "logo": "https://www.theincometracker.com/icon.png"
+          "@type": "Question",
+          "name": "Do I need to connect or log in to my bank?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. Download a CSV from your bank and drop it in. There is no open banking connection and you never enter bank credentials."
+          }
         },
         {
-          "@type": "FAQPage",
-          "@id": "https://www.theincometracker.com/#faq",
-          "mainEntity": [
-            {
-              "@type": "Question",
-              "name": "Is The Income Tracker free?",
-              "acceptedAnswer": {
-                "@type": "Answer",
-                "text": "Yes. The Income Tracker is completely free to use. There is no credit card, no subscription and no sign-up required."
-              }
-            },
-            {
-              "@type": "Question",
-              "name": "Do I need to connect or log in to my bank?",
-              "acceptedAnswer": {
-                "@type": "Answer",
-                "text": "No. You never enter bank credentials and there is no open-banking connection. You simply download a CSV statement from your bank and drop it into the app."
-              }
-            },
-            {
-              "@type": "Question",
-              "name": "Which UK banks does it work with?",
-              "acceptedAnswer": {
-                "@type": "Answer",
-                "text": "It works with standard CSV exports from UK banks including Barclays, HSBC, Monzo and Starling, as well as most other banks that let you download a CSV statement."
-              }
-            },
-            {
-              "@type": "Question",
-              "name": "Where is my financial data stored?",
-              "acceptedAnswer": {
-                "@type": "Answer",
-                "text": "Your data is stored locally in your own web browser. It is never uploaded to a server, so your finances stay private on your device."
-              }
-            },
-            {
-              "@type": "Question",
-              "name": "Is it easy to use?",
-              "acceptedAnswer": {
-                "@type": "Answer",
-                "text": "Yes. It is designed to be simple — you can open your first month and start tracking your income and expenses in about two minutes."
-              }
-            }
-          ]
+          "@type": "Question",
+          "name": "Which UK banks does it work with?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Any bank that exports CSV, OFX or QIF: Barclays, HSBC, Lloyds, NatWest, Santander, Nationwide, Halifax, TSB, Monzo, Starling, Revolut, Chase, Amex and more. Step-by-step export guides cover 20 banks, and PDF statements can be pasted in."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Where is my financial data stored?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "In your browser, on your device. Nothing is uploaded unless you choose to sign in to sync across devices, and you can export everything at any time."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is it an alternative to YNAB, Emma or Money Dashboard?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "For a free, private monthly picture of income, spending and surplus, yes. The comparison pages say plainly where each of those wins."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does it work on a phone?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. It runs in any browser, installs to your home screen like an app, and works offline once loaded."
+          }
         }
       ]
     }
+  ]
+}
     </script>
   </head>
   <body>
@@ -182,11 +222,11 @@
       >
         <section style="max-width: 640px; text-align: center;">
           <h1 style="margin: 0 0 12px; font-size: 28px; line-height: 1.15;">
-            The Income Tracker — a free UK income &amp; expense tracker
+            The Income Tracker: a free UK income &amp; expense tracker
           </h1>
           <p style="margin: 0 0 16px; color: #455571; line-height: 1.6;">
-            Track your income and spending without linking your bank. Import a CSV from Barclays, HSBC,
-            Monzo or Starling, see every month side by side, and watch your totals update as you type.
+            Track your income and spending without linking your bank. Import a CSV from any of 20 UK banks,
+            see every month side by side, and watch your totals update as you type.
           </p>
           <p style="margin: 0; color: #5d6b84; line-height: 1.6;">
             Free. No account, no bank login. Your data stays in your browser. Loading the app…
@@ -197,33 +237,45 @@
 
     <noscript>
       <section style="max-width: 720px; margin: 40px auto; padding: 0 24px; font-family: system-ui, sans-serif; line-height: 1.6;">
-        <h1>The Income Tracker — Free UK Income &amp; Expense Tracker</h1>
+        <h1>The Income Tracker: free UK income &amp; expense tracker</h1>
         <p>
-          The Income Tracker is a free, easy-to-use budgeting and finance tracker built for people in
-          the UK. Import a CSV statement from your bank — Barclays, HSBC, Monzo, Starling and most
-          others are supported — then track your income and expenses month by month in a clear ledger.
+          The Income Tracker is a free, private budgeting and finance tracker built for people in the UK. Import a
+          CSV, OFX or QIF statement from your bank, or paste a PDF statement, then track your income and expenses
+          month by month in a clear ledger. No account, no bank login, and your data stays in your browser.
         </p>
         <h2>Why people use it</h2>
         <ul>
           <li><strong>Free:</strong> no account, no subscription, no credit card.</li>
-          <li><strong>Private:</strong> your data stays in your own browser and never reaches a server.</li>
+          <li><strong>Private:</strong> your data stays in your own browser and never reaches a server unless you sign in to sync.</li>
           <li><strong>No bank login:</strong> no open-banking connection or bank credentials needed.</li>
           <li><strong>Easy:</strong> open your first month and start tracking in about two minutes.</li>
-          <li><strong>UK banks:</strong> works with standard CSV exports from Barclays, HSBC, Monzo, Starling and more.</li>
+          <li><strong>Every UK bank:</strong> works with standard exports from 20 banks and card providers, with a guide for each.</li>
         </ul>
 
         <h2>How to export your bank statement as a CSV</h2>
-        <p>Download your transactions as a CSV from your bank, then import the file here. Step-by-step guides:</p>
         <ul>
           <li><a href="/import/barclays-csv.html">Export a Barclays statement to CSV</a></li>
-          <li><a href="/import/hsbc-csv.html">Export an HSBC UK statement to CSV</a></li>
-          <li><a href="/import/monzo-csv.html">Export Monzo transactions to CSV</a></li>
-          <li><a href="/import/starling-csv.html">Export Starling transactions to CSV</a></li>
-          <li><a href="/import/lloyds-csv.html">Export a Lloyds statement to CSV</a></li>
-          <li><a href="/import/natwest-csv.html">Export NatWest transactions to CSV</a></li>
-          <li><a href="/import/santander-csv.html">Export a Santander statement to CSV</a></li>
-          <li><a href="/import/revolut-csv.html">Export Revolut transactions to CSV</a></li>
+          <li><a href="/import/hsbc-csv.html">Export a HSBC UK statement to CSV</a></li>
+          <li><a href="/import/monzo-csv.html">Export a Monzo statement to CSV</a></li>
+          <li><a href="/import/starling-csv.html">Export a Starling Bank statement to CSV</a></li>
+          <li><a href="/import/lloyds-csv.html">Export a Lloyds Bank statement to CSV</a></li>
+          <li><a href="/import/natwest-csv.html">Export a NatWest statement to CSV</a></li>
+          <li><a href="/import/santander-csv.html">Export a Santander UK statement to CSV</a></li>
+          <li><a href="/import/revolut-csv.html">Export a Revolut statement to CSV</a></li>
+          <li><a href="/import/nationwide-csv.html">Export a Nationwide statement to CSV</a></li>
+          <li><a href="/import/halifax-csv.html">Export a Halifax statement to CSV</a></li>
+          <li><a href="/import/bank-of-scotland-csv.html">Export a Bank of Scotland statement to CSV</a></li>
+          <li><a href="/import/tsb-csv.html">Export a TSB statement to CSV</a></li>
+          <li><a href="/import/chase-uk-csv.html">Export a Chase UK statement to CSV</a></li>
+          <li><a href="/import/first-direct-csv.html">Export a first direct statement to CSV</a></li>
+          <li><a href="/import/amex-csv.html">Export a American Express statement to CSV</a></li>
+          <li><a href="/import/virgin-money-csv.html">Export a Virgin Money statement to CSV</a></li>
+          <li><a href="/import/co-operative-bank-csv.html">Export a Co-operative Bank statement to CSV</a></li>
+          <li><a href="/import/metro-bank-csv.html">Export a Metro Bank statement to CSV</a></li>
+          <li><a href="/import/wise-csv.html">Export a Wise statement to CSV</a></li>
+          <li><a href="/import/tide-csv.html">Export a Tide statement to CSV</a></li>
           <li><a href="/import/">All bank CSV guides</a></li>
+          <li><a href="/guides/import-pdf-bank-statement.html">Import a PDF bank statement</a></li>
         </ul>
 
         <h2>Use it with your bank</h2>
@@ -237,10 +289,15 @@
 
         <h2>Free money calculators</h2>
         <ul>
+          <li><a href="/tools/50-30-20-budget-calculator-uk.html">50/30/20 budget calculator</a></li>
+          <li><a href="/tools/emergency-fund-calculator-uk.html">Emergency fund calculator</a></li>
           <li><a href="/tools/0-percent-credit-card-payoff-calculator-uk.html">0% credit card payoff calculator</a></li>
           <li><a href="/tools/credit-card-utilisation-calculator-uk.html">Credit card utilisation calculator</a></li>
+          <li><a href="/tools/debt-snowball-vs-avalanche-calculator.html">Debt snowball vs avalanche calculator</a></li>
           <li><a href="/tools/how-long-to-save-10000-for-a-car.html">How long to save £10,000 for a car</a></li>
           <li><a href="/tools/monthly-surplus-calculator.html">Monthly surplus calculator</a></li>
+          <li><a href="/tools/spend-per-day-until-payday-calculator.html">Spend per day until payday</a></li>
+          <li><a href="/tools/subscription-cost-calculator.html">Subscription cost calculator</a></li>
           <li><a href="/tools/loan-repayment-and-savings-goal-planner.html">Loan repayment and savings goal planner</a></li>
           <li><a href="/tools/">All money calculators</a></li>
         </ul>
@@ -248,22 +305,43 @@
         <h2>Guides</h2>
         <ul>
           <li><a href="/guides/budget-without-linking-bank.html">How to budget without linking your bank account</a></li>
+          <li><a href="/guides/how-to-read-a-bank-statement-csv.html">How to read a bank statement CSV</a></li>
+          <li><a href="/guides/how-to-categorise-bank-transactions.html">How to categorise bank transactions</a></li>
+          <li><a href="/guides/self-employed-income-tracker-uk.html">Self-employed income tracking for Self Assessment</a></li>
+          <li><a href="/guides/how-much-should-i-save-each-month-uk.html">How much should I save each month?</a></li>
+          <li><a href="/guides/find-and-cancel-unused-subscriptions.html">Find and cancel unused subscriptions</a></li>
           <li><a href="/guides/free-ynab-alternative-uk.html">The best free YNAB alternative in the UK</a></li>
           <li><a href="/guides/is-it-safe-to-upload-bank-statements.html">Is it safe to upload your bank statement to a budgeting app?</a></li>
+          <li><a href="/guides/">All guides</a></li>
+        </ul>
+
+        <h2>Compare and templates</h2>
+        <ul>
+          <li><a href="/compare/best-free-budgeting-apps-uk.html">Best free budgeting apps in the UK (2026)</a></li>
+          <li><a href="/compare/moneyhub-alternative.html">Moneyhub alternative</a></li>
+          <li><a href="/compare/money-dashboard-alternative.html">Money Dashboard alternative</a></li>
+          <li><a href="/compare/">All comparisons</a></li>
+          <li><a href="/templates/monthly-budget-planner-template.html">Monthly budget planner template</a></li>
+          <li><a href="/templates/">All templates</a></li>
         </ul>
 
         <h2>Frequently asked questions</h2>
         <dl>
           <dt><strong>Is The Income Tracker free?</strong></dt>
-          <dd>Yes. It is completely free, with no credit card, subscription or sign-up.</dd>
+          <dd>Yes. Completely free: no credit card, no subscription, no sign-up. Open it and start.</dd>
           <dt><strong>Do I need to connect or log in to my bank?</strong></dt>
-          <dd>No. There is no open-banking connection and you never enter bank credentials. You download a CSV from your bank and import it yourself.</dd>
-          <dt><strong>Is there a free YNAB alternative for the UK?</strong></dt>
-          <dd>Yes. The Income Tracker is a free, no-subscription budgeting tool that imports CSV exports from UK banks.</dd>
+          <dd>No. Download a CSV from your bank and drop it in. There is no open banking connection and you never enter bank credentials.</dd>
+          <dt><strong>Which UK banks does it work with?</strong></dt>
+          <dd>Any bank that exports CSV, OFX or QIF: Barclays, HSBC, Lloyds, NatWest, Santander, Nationwide, Halifax, TSB, Monzo, Starling, Revolut, Chase, Amex and more. Step-by-step export guides cover 20 banks, and PDF statements can be pasted in.</dd>
           <dt><strong>Where is my financial data stored?</strong></dt>
-          <dd>Locally in your own browser. It is never uploaded to a server unless you choose to sign in to sync across devices.</dd>
+          <dd>In your browser, on your device. Nothing is uploaded unless you choose to sign in to sync across devices, and you can export everything at any time.</dd>
+          <dt><strong>Is it an alternative to YNAB, Emma or Money Dashboard?</strong></dt>
+          <dd>For a free, private monthly picture of income, spending and surplus, yes. The comparison pages say plainly where each of those wins.</dd>
+          <dt><strong>Does it work on a phone?</strong></dt>
+          <dd>Yes. It runs in any browser, installs to your home screen like an app, and works offline once loaded.</dd>
         </dl>
 
+        <p><a href="/about.html">About</a> · <a href="/whats-new.html">What's new</a> · <a href="/privacy.html">Privacy</a> · <a href="/tos.html">Terms</a></p>
         <p>This app needs JavaScript enabled in your browser to run.</p>
       </section>
     </noscript>

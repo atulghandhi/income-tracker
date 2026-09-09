@@ -9,6 +9,9 @@ export default defineConfig({
   use: {
     baseURL: "http://127.0.0.1:5173",
     trace: "on-first-retry",
+    // Remote sandboxes ship a pinned Chromium rather than letting Playwright
+    // download one. Point PW_CHROMIUM_PATH at it to run the browser specs there.
+    ...(process.env.PW_CHROMIUM_PATH ? { launchOptions: { executablePath: process.env.PW_CHROMIUM_PATH } } : {}),
   },
   webServer: {
     command: "npm run dev -- --port 5173",

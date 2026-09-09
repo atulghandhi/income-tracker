@@ -30,7 +30,13 @@ export type AnalyticsEvent =
   | "feed_connected"
   | "signed_in"
   | "onboarding_completed" // { added: bucket, skipped_steps }
-  | "onboarding_skipped"; // { added: bucket, skipped_steps }
+  | "onboarding_skipped" // { added: bucket, skipped_steps }
+  | "landing_ref" // { ref } — which static page or CTA sent the visitor to the app
+  | "bank_selected" // { bank }
+  | "reminder_added" // { method: "ics"|"google" }
+  | "new_month_nudge" // { action: "shown"|"import"|"guide"|"dismiss" }
+  | "install_prompt" // { action: "shown"|"accepted"|"dismissed"|"ios_hint" }
+  | "app_installed";
 
 let identifiedUserId: string | null = null;
 

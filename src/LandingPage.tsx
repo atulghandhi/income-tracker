@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Check } from "lucide-react";
+import { BANK_GUIDES } from "./generated/bankGuides";
 
 // ─── Audio ────────────────────────────────────────────────────────────────────
 
@@ -82,6 +83,24 @@ const CMP = [
   { label: "Month-by-month ledger view",                 s: "Manual",       b: "No" },
   { label: "Free",                                       s: "Yes",          b: "Yes" },
 ];
+
+const FAQ = [
+  { q: "Is The Income Tracker free?", a: "Yes. Completely free: no credit card, no subscription, no sign-up. Open it and start." },
+  { q: "Do I need to connect or log in to my bank?", a: "No. Download a CSV from your bank and drop it in. There is no open banking connection and you never enter bank credentials." },
+  { q: "Which UK banks does it work with?", a: "Any bank that exports CSV, OFX or QIF: Barclays, HSBC, Lloyds, NatWest, Santander, Nationwide, Halifax, TSB, Monzo, Starling, Revolut, Chase, Amex and more. Step-by-step export guides cover 20 banks, and PDF statements can be pasted in." },
+  { q: "Where is my financial data stored?", a: "In your browser, on your device. Nothing is uploaded unless you choose to sign in to sync across devices, and you can export everything at any time." },
+  { q: "Is it an alternative to YNAB, Emma or Money Dashboard?", a: "For a free, private monthly picture of income, spending and surplus, yes. The comparison pages say plainly where each of those wins." },
+  { q: "Does it work on a phone?", a: "Yes. It runs in any browser, installs to your home screen like an app, and works offline once loaded." },
+] as const;
+
+const RESOURCES = [
+  { href: "/import/", t: "Bank CSV guides", d: "Export from 20 UK banks, step by step" },
+  { href: "/guides/", t: "Budgeting guides", d: "Answer-first, no jargon, no bank login" },
+  { href: "/tools/", t: "Free calculators", d: "50/30/20, emergency fund, payoff, surplus" },
+  { href: "/templates/", t: "Budget templates", d: "Free CSVs that import in one step" },
+  { href: "/compare/", t: "Compare apps", d: "Honest side-by-sides, including where we lose" },
+  { href: "/whats-new.html", t: "What\u2019s new", d: "Release notes, newest first" },
+] as const;
 
 type HeroFocus = "inc-name" | "inc-amt" | "exp-name" | "exp-amt" | null;
 
@@ -378,6 +397,12 @@ export default function LandingPage({ onEnter, onFeedback }: { onEnter: () => vo
       <header className={`lp-nav${navIn ? " lp-nav--in" : ""}`}>
         <div className="lp-nav-inner">
           <span className="lp-nav-brand">The Income Tracker</span>
+          <nav className="lp-nav-links" aria-label="Site">
+            <a href="/import/">Bank guides</a>
+            <a href="/guides/">Guides</a>
+            <a href="/tools/">Calculators</a>
+            <a href="/compare/">Compare</a>
+          </nav>
           <button className="lp-btn lp-btn--sm" onClick={enter} onMouseEnter={hover}>
             Continue to app <ArrowRight size={14} />
           </button>
@@ -683,6 +708,23 @@ export default function LandingPage({ onEnter, onFeedback }: { onEnter: () => vo
           </div>
         </section>
 
+        {/* ════ BANKS ════ */}
+        <section className="lp-banks lp-r" aria-labelledby="lp-banks-h2">
+          <span className="lp-eyebrow">Works with your bank</span>
+          <h2 className="lp-cmp-h2" id="lp-banks-h2">CSV export guides for {BANK_GUIDES.length} UK banks</h2>
+          <p className="lp-section-p">
+            Every major UK bank lets you download your own transactions. Pick yours for the exact steps, then import the file here.
+            Only got a PDF? <a href="/guides/import-pdf-bank-statement.html">Paste it in</a>.
+          </p>
+          <ul className="lp-bank-grid">
+            {BANK_GUIDES.map(bank => (
+              <li key={bank.slug}>
+                <a className="lp-bank" href={`/import/${bank.slug}.html`}>{bank.name}</a>
+              </li>
+            ))}
+          </ul>
+        </section>
+
         {/* ════ COMPARISON ════ */}
         <section className="lp-cmp lp-r">
           <h2 className="lp-cmp-h2">How it compares</h2>
@@ -708,6 +750,37 @@ export default function LandingPage({ onEnter, onFeedback }: { onEnter: () => vo
           </div>
         </section>
 
+        {/* ════ RESOURCES ════ */}
+        <section className="lp-res lp-r" aria-labelledby="lp-res-h2">
+          <span className="lp-eyebrow">Free, with or without the app</span>
+          <h2 className="lp-cmp-h2" id="lp-res-h2">Guides, calculators and templates</h2>
+          <div className="lp-res-grid">
+            {RESOURCES.map(r => (
+              <a className="lp-res-card" href={r.href} key={r.href}>
+                <strong>{r.t}</strong>
+                <span>{r.d}</span>
+              </a>
+            ))}
+          </div>
+        </section>
+
+        {/* ════ FAQ ════ */}
+        <section className="lp-faq lp-r" aria-labelledby="lp-faq-h2">
+          <h2 className="lp-cmp-h2" id="lp-faq-h2">Questions people ask</h2>
+          <dl className="lp-faq-list">
+            {FAQ.map(item => (
+              <div className="lp-faq-item" key={item.q}>
+                <dt>{item.q}</dt>
+                <dd>{item.a}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="lp-section-p">
+            More in the <a href="/about.html">about page</a>, the <a href="/privacy.html">privacy policy</a> and the{" "}
+            <a href="/guides/is-it-safe-to-upload-bank-statements.html">guide to keeping statements private</a>.
+          </p>
+        </section>
+
         {/* ════ FINAL CTA ════ */}
         <section className="lp-end lp-r">
           <h2 className="lp-end-h2">Open your first month.</h2>
@@ -727,6 +800,12 @@ export default function LandingPage({ onEnter, onFeedback }: { onEnter: () => vo
             <a href="/import/" className="lp-footer-link">Bank CSV guides</a>
             <span aria-hidden="true">·</span>
             <a href="/guides/" className="lp-footer-link">Guides</a>
+            <span aria-hidden="true">·</span>
+            <a href="/compare/" className="lp-footer-link">Compare</a>
+            <span aria-hidden="true">·</span>
+            <a href="/templates/" className="lp-footer-link">Templates</a>
+            <span aria-hidden="true">·</span>
+            <a href="/about.html" className="lp-footer-link">About</a>
             <span aria-hidden="true">·</span>
             <button type="button" className="lp-footer-link lp-footer-linkbtn" onClick={onFeedback}>Contact us</button>
             <span aria-hidden="true">·</span>
@@ -1177,6 +1256,48 @@ const CSS = `
 .lp-end-h2 { font-size: clamp(30px, 4vw, 52px); font-weight: 820; letter-spacing: -0.03em; color: #eef4ff; margin-bottom: 10px; }
 .lp-end-deck { font-size: 18px; color: rgba(212, 228, 250, 0.44); margin-bottom: 36px; }
 .lp-end-note { margin-top: 18px; font-size: 13.5px; color: rgba(212, 228, 250, 0.3); }
+
+/* ── Nav links ── */
+.lp-nav-links { display: flex; align-items: center; gap: 18px; margin: 0 auto 0 32px; }
+.lp-nav-links a { color: rgba(212, 228, 250, 0.6); text-decoration: none; font-size: 13.5px; font-weight: 500; transition: color 120ms ease; }
+.lp-nav-links a:hover { color: #00dfc1; }
+
+/* ── Banks ── */
+.lp-banks, .lp-res, .lp-faq { max-width: 900px; margin: 0 auto; padding: 72px 40px 24px; }
+.lp-section-p { color: rgba(212, 228, 250, 0.62); font-size: 15px; line-height: 1.7; max-width: 640px; margin: -12px 0 24px; }
+.lp-section-p a, .lp-faq-item dd a { color: #00dfc1; text-decoration: none; }
+.lp-section-p a:hover { text-decoration: underline; }
+.lp-bank-grid { list-style: none; display: flex; flex-wrap: wrap; gap: 10px; }
+.lp-bank {
+  display: inline-block; padding: 9px 14px; border-radius: 999px;
+  border: 1px solid rgba(212, 228, 250, 0.12); background: rgba(8, 22, 38, 0.7);
+  color: rgba(212, 228, 250, 0.85); text-decoration: none; font-size: 13.5px; font-weight: 600;
+  transition: border-color 140ms ease, color 140ms ease, transform 140ms ease;
+}
+.lp-bank:hover { border-color: rgba(0, 223, 193, 0.5); color: #00dfc1; transform: translateY(-1px); }
+
+/* ── Resources ── */
+.lp-res-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.lp-res-card {
+  display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; border-radius: 12px;
+  border: 1px solid rgba(212, 228, 250, 0.1); background: rgba(8, 22, 38, 0.7); text-decoration: none;
+  transition: border-color 140ms ease, transform 140ms ease;
+}
+.lp-res-card:hover { border-color: rgba(0, 223, 193, 0.45); transform: translateY(-2px); }
+.lp-res-card strong { color: #eef4ff; font-size: 15px; font-weight: 650; }
+.lp-res-card span { color: rgba(212, 228, 250, 0.55); font-size: 13px; line-height: 1.5; }
+
+/* ── FAQ ── */
+.lp-faq-list { margin: 0 0 20px; }
+.lp-faq-item { padding: 16px 0; border-top: 1px solid rgba(212, 228, 250, 0.08); }
+.lp-faq-item:last-child { border-bottom: 1px solid rgba(212, 228, 250, 0.08); }
+.lp-faq-item dt { color: #eef4ff; font-weight: 650; font-size: 15.5px; margin-bottom: 6px; }
+.lp-faq-item dd { color: rgba(212, 228, 250, 0.66); font-size: 14.5px; line-height: 1.65; }
+
+@media (max-width: 880px) {
+  .lp-nav-links { display: none; }
+  .lp-banks, .lp-res, .lp-faq { padding: 56px 24px 16px; }
+}
 
 /* ── Scroll reveal ── */
 .lp-r {

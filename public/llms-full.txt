@@ -1,0 +1,473 @@
+# The Income Tracker: full page index for AI assistants
+
+> Every public page on https://www.theincometracker.com, with a one-paragraph summary. Facts are checked on the
+> dated pages themselves. The app is free, UK-focused, local-first, and needs no bank login.
+
+## Bank CSV export guides (hub)
+
+URL: https://www.theincometracker.com/import/
+Updated: 2026-09-08
+
+Index of step-by-step CSV export guides for 20 UK banks and fintechs, with notes on PDF-only statements.
+
+## How to export your Barclays statement to CSV
+
+URL: https://www.theincometracker.com/import/barclays-csv.html
+Updated: 2026-09-08
+
+Where to find the export in Barclays Online Banking on a computer (the app cannot export CSV), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Barclays only offers CSV export on the desktop Online Banking site. The mobile app cannot do it.
+
+## How to export your HSBC UK statement to CSV
+
+URL: https://www.theincometracker.com/import/hsbc-csv.html
+Updated: 2026-09-08
+
+Where to find the export in HSBC Online Banking on desktop, from the transactions list rather than the PDF statement, the exact steps, formats offered, limits, and how to import the file into The Income Tracker. HSBC's official monthly statements are PDF only. CSV comes from the transactions list and usually covers recent activity, so export in chunks if you need more history.
+
+## How to export your Monzo statement to CSV
+
+URL: https://www.theincometracker.com/import/monzo-csv.html
+Updated: 2026-09-08
+
+Where to find the export in the Monzo app (iOS or Android), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Monzo also offers PDF and QIF. Pick CSV for the cleanest import.
+
+## How to export your Starling Bank statement to CSV
+
+URL: https://www.theincometracker.com/import/starling-csv.html
+Updated: 2026-09-08
+
+Where to find the export in the Starling app or web banking, the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Starling lets you export specific date ranges as CSV, which is handy for filling one month at a time.
+
+## How to export your Lloyds Bank statement to CSV
+
+URL: https://www.theincometracker.com/import/lloyds-csv.html
+Updated: 2026-09-08
+
+Where to find the export in Lloyds Internet Banking on a computer (the app cannot export CSV), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Lloyds caps each export at the last 12 months and 150 transactions. Hit the cap? Export again with a narrower date range and import each file.
+
+## How to export your NatWest statement to CSV
+
+URL: https://www.theincometracker.com/import/natwest-csv.html
+Updated: 2026-09-08
+
+Where to find the export in NatWest Online Banking on desktop, the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Always set the date range before exporting so you capture the full period you want.
+
+## How to export your Santander UK statement to CSV
+
+URL: https://www.theincometracker.com/import/santander-csv.html
+Updated: 2026-09-08
+
+Where to find the export in Santander Online Banking on desktop, the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Santander's midata export covers up to 12 months and masks some sensitive details for security. That is normal and still imports fine.
+
+## How to export your Revolut statement to CSV
+
+URL: https://www.theincometracker.com/import/revolut-csv.html
+Updated: 2026-09-08
+
+Where to find the export in the Revolut app or web app, the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Revolut's CSV can include multi-currency columns. If a file looks messy, export one currency per file for the cleanest import.
+
+## How to export your Nationwide statement to CSV
+
+URL: https://www.theincometracker.com/import/nationwide-csv.html
+Updated: 2026-09-08
+
+Where to find the export in the Nationwide Internet Bank on a computer (the Banking app only offers PDF statements), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Download transactions appears on current accounts and credit cards. Some savings accounts only offer PDF statements, which you can still paste in. Older months live under Documents, then Statements, as PDFs going back 36 months.
+
+## How to export your Halifax statement to CSV
+
+URL: https://www.theincometracker.com/import/halifax-csv.html
+Updated: 2026-09-08
+
+Where to find the export in Halifax Online Banking in a web browser (the app only offers PDF statements), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Each export covers at most 12 months, so a longer history means a few files. Overlaps are fine: the tracker drops duplicates. Credit card statements are not downloadable in Online Banking, only in the app as PDFs.
+
+## How to export your Bank of Scotland statement to CSV
+
+URL: https://www.theincometracker.com/import/bank-of-scotland-csv.html
+Updated: 2026-09-08
+
+Where to find the export in Bank of Scotland Internet Banking in a web browser (the app only offers PDF statements), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Bank of Scotland shares its online platform with Halifax and Lloyds, so the screens match those guides. Business Internet Banking has the export under Statement options, then Export transactions (CSV, QIF), with a cap of 1,000 lines per file.
+
+## How to export your TSB statement to CSV
+
+URL: https://www.theincometracker.com/import/tsb-csv.html
+Updated: 2026-09-08
+
+Where to find the export in TSB Internet Banking on a computer (the app only offers PDF statements in your Inbox), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. The 90-day, 150-transaction cap means a full year takes four or five files. Overlapping ranges are safe because the tracker drops duplicates. TSB's CSV dates carry a time stamp, which the importer strips.
+
+## How to export your Chase UK statement to CSV
+
+URL: https://www.theincometracker.com/import/chase-uk-csv.html
+Updated: 2026-09-08
+
+Where to find the export in the Chase app (Chase has no web banking), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Custom statements are capped at 90 days each. Monthly statements appear on the 2nd of the following month (the 3rd for the credit card) and stay available for six years, even after you close the account.
+
+## How to export your first direct statement to CSV
+
+URL: https://www.theincometracker.com/import/first-direct-csv.html
+Updated: 2026-09-08
+
+Where to find the export in first direct Online Banking in a desktop browser (the app only offers PDF statements), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. first direct's own help pages only describe PDF statements, so the label on the download option may differ from what you expect. Look on the transactions page rather than under Statements. Credit card exports cover a shorter period, around six months.
+
+## How to export your American Express statement to CSV
+
+URL: https://www.theincometracker.com/import/amex-csv.html
+Updated: 2026-09-08
+
+Where to find the export in your American Express online account in a desktop browser (the app shows PDF statements only), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Card statements list spending as positive numbers. The tracker spots this and flips the signs so purchases land as expenses, with a one-click undo if it guesses wrong. Roughly two years of transactions are downloadable; older periods are PDF only.
+
+## How to export your Virgin Money statement to CSV
+
+URL: https://www.theincometracker.com/import/virgin-money-csv.html
+Updated: 2026-09-08
+
+Where to find the export in Virgin Money Internet Banking in a desktop browser (the app offers PDF statements only), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Virgin Money says the export is not available on every account type. If yours only shows PDF statements, copy the transactions out of the PDF and paste them in instead.
+
+## How to export your Co-operative Bank statement to CSV
+
+URL: https://www.theincometracker.com/import/co-operative-bank-csv.html
+Updated: 2026-09-08
+
+Where to find the export in Co-operative Bank online banking in a desktop browser, the exact steps, formats offered, limits, and how to import the file into The Income Tracker. The export is easy to miss because it only shows once you have searched. Personal exports include Date, Description, Type, Money In, Money Out and Balance columns, which the tracker reads directly. Business online banking keeps 25 months of transactions.
+
+## How to export your Metro Bank statement to CSV
+
+URL: https://www.theincometracker.com/import/metro-bank-csv.html
+Updated: 2026-09-08
+
+Where to find the export in Metro Bank Internet Banking in a desktop browser (the app offers PDF statements only), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Advanced Search reaches back to when the account opened. Metro's CSV writes dates like 12-Sep-26 and puts commas in large amounts; the importer handles both.
+
+## How to export your Wise statement to CSV
+
+URL: https://www.theincometracker.com/import/wise-csv.html
+Updated: 2026-09-08
+
+Where to find the export in the Wise app or wise.com, the exact steps, formats offered, limits, and how to import the file into The Income Tracker. One statement per currency balance, 365 days each. Payments made straight from an external card do not appear in statements, only on the Transactions page, so check that page if something is missing.
+
+## How to export your Tide statement to CSV
+
+URL: https://www.theincometracker.com/import/tide-csv.html
+Updated: 2026-09-08
+
+Where to find the export in the Tide app or web app, the exact steps, formats offered, limits, and how to import the file into The Income Tracker. The Standard CSV excludes pending transactions, so export once the month has settled. Official PDF statements arrive on the 4th of the following month, and custom-range statements can cover up to six months.
+
+## Budgeting guides (hub)
+
+URL: https://www.theincometracker.com/guides/
+Updated: 2026-09-08
+
+Index of 13 answer-first UK budgeting guides.
+
+## How to budget without linking your bank account
+
+URL: https://www.theincometracker.com/guides/budget-without-linking-bank.html
+Updated: 2026-09-08
+
+Yes, you can budget without open banking. Download a CSV of your transactions from your bank, import it into a local-first tool like The Income Tracker, and you are done. Nothing connects to your bank. No credentials shared. Your data stays in your browser.
+
+## A free YNAB alternative for the UK
+
+URL: https://www.theincometracker.com/guides/free-ynab-alternative-uk.html
+Updated: 2026-09-08
+
+Want YNAB's clarity without the monthly fee? The Income Tracker is free, needs no sign-up, and is built for the UK. Import a CSV from any UK bank, track income and spending month by month, and keep your data private in your browser.
+
+## Is it safe to upload your bank statement to a budgeting app?
+
+URL: https://www.theincometracker.com/guides/is-it-safe-to-upload-bank-statements.html
+Updated: 2026-09-08
+
+It depends on where the file goes. The safest setup is a local-first tool that reads your CSV in your browser and never uploads it. That is exactly how The Income Tracker works. Steer clear of tools that quietly send your statement to their servers.
+
+## How to import a PDF bank statement
+
+URL: https://www.theincometracker.com/guides/import-pdf-bank-statement.html
+Updated: 2026-09-08
+
+Open the PDF, select the transaction rows, copy them, and paste them into The Income Tracker. Each line needs a date, a description and an amount, which is exactly what a statement row is. No PDF converter, no upload to a stranger's server, nothing typed by hand.
+
+## How to read a bank statement CSV
+
+URL: https://www.theincometracker.com/guides/how-to-read-a-bank-statement-csv.html
+Updated: 2026-09-08
+
+A bank CSV is a plain table: one row per transaction, with a date, a description, an amount (either one signed column or separate money in and money out columns) and usually a running balance. The cryptic two or three letter codes are the payment type. DD is a Direct Debit, SO a standing order, FPI a Faster Payment in, DEB a debit card purchase.
+
+## How to categorise bank transactions
+
+URL: https://www.theincometracker.com/guides/how-to-categorise-bank-transactions.html
+Updated: 2026-09-08
+
+Use about ten categories, decide them once, and let rules do the repeat work. Housing, Bills, Groceries, Transport, Eating out, Subscriptions, Health, Shopping, Fun and Savings cover almost everyone. Transfers between your own accounts are not spending at all, so keep them out.
+
+## The 10-minute monthly money review
+
+URL: https://www.theincometracker.com/guides/monthly-money-review-checklist.html
+Updated: 2026-09-08
+
+Once a month, right after payday: export last month's transactions, import them, categorise the few strays, check nothing recurring has crept up, compare the month with the one before, move the surplus somewhere useful, and make one decision. Ten minutes. The tracker can put the reminder in your calendar.
+
+## How to find and cancel unused subscriptions
+
+URL: https://www.theincometracker.com/guides/find-and-cancel-unused-subscriptions.html
+Updated: 2026-09-08
+
+Export three months of transactions, import them, and look for the same amount from the same name every month. That list is your subscriptions. Cancel the ones you do not use with the company first, then, if it is a card payment, tell your bank to block the continuous payment authority. Banks must stop a CPA when you ask.
+
+## Budgeting as a couple with separate accounts
+
+URL: https://www.theincometracker.com/guides/budgeting-for-couples-separate-accounts-uk.html
+Updated: 2026-09-08
+
+You do not need a joint account or a shared banking login to budget as a couple. Pick a split for the shared costs (equal, proportional to income, or a joint bills pot), then import each person's bank CSV into one ledger. Transfers between you are skipped automatically, so nothing double-counts.
+
+## Zero-based budgeting, the simple version
+
+URL: https://www.theincometracker.com/guides/zero-based-budgeting-uk.html
+Updated: 2026-09-08
+
+Zero-based budgeting means every pound of take-home pay is assigned a job before the month starts: bills, food, transport, fun, savings, until income minus assignments equals zero. The simple UK version uses last month's real transactions as the starting point, so you are adjusting numbers rather than inventing them.
+
+## How to budget on a variable income
+
+URL: https://www.theincometracker.com/guides/budget-on-a-variable-income-uk.html
+Updated: 2026-09-08
+
+Budget on your lowest recent month, not your average. Pay yourself a fixed amount from a buffer account on the same day each month, and let the good months fill the buffer. If you are self-employed, skim a fixed share of every payment into a tax pot before it touches anything else.
+
+## Track self-employed income and expenses for Self Assessment
+
+URL: https://www.theincometracker.com/guides/self-employed-income-tracker-uk.html
+Updated: 2026-09-08
+
+Keep a dated record of every payment in and every business cost out, with a category that matches the expense headings on the self-employment pages of the tax return, and a tax pot. Import your business account's CSV each month and the record builds itself. If your gross self-employed and property income is over £50,000 you are in Making Tax Digital from April 2026, which adds quarterly updates through HMRC-recognised software.
+
+## How much should you save each month?
+
+URL: https://www.theincometracker.com/guides/how-much-should-i-save-each-month-uk.html
+Updated: 2026-09-08
+
+The common guideline is 20% of take-home pay, from the 50/30/20 rule. The more useful answer is an order: first £1,000 in instant-access savings, then three to six months of essential outgoings as an emergency fund, then the percentage. Around three in ten UK adults have under £1,000 saved, so the first milestone is a real one.
+
+## Free money calculators (hub)
+
+URL: https://www.theincometracker.com/tools/
+Updated: 2026-09-08
+
+Index of 10 free, instant UK money calculators with shareable results.
+
+## 0% credit card payoff calculator (UK)
+
+URL: https://www.theincometracker.com/tools/0-percent-credit-card-payoff-calculator-uk.html
+Updated: 2026-09-08
+
+A 0% card is free money, but only if you clear it before the deal ends. Enter your balance and the months you have left, and this works out the monthly payment that gets you to zero in time.
+
+## Credit card utilisation calculator (UK)
+
+URL: https://www.theincometracker.com/tools/credit-card-utilisation-calculator-uk.html
+Updated: 2026-09-08
+
+Utilisation is the share of your credit limit you are using. UK lenders like to see it low. Experian and Equifax both suggest keeping it below 25%, and under 10% is better still. Enter your balance and limit to see where you stand.
+
+## How long to save £10,000 for a car (calculator)
+
+URL: https://www.theincometracker.com/tools/how-long-to-save-10000-for-a-car.html
+Updated: 2026-09-08
+
+Saving for a car comes down to one number: how much you put away each month. Pop in your goal and your monthly amount, and this tells you the month you will hit it. Add a savings rate to factor in interest.
+
+## Monthly surplus calculator (UK)
+
+URL: https://www.theincometracker.com/tools/monthly-surplus-calculator.html
+Updated: 2026-09-08
+
+Your surplus is what is left after expenses. It is the single most useful number in personal finance. Enter your monthly income and spending to see your surplus and savings rate.
+
+## Loan repayment and savings goal planner (UK)
+
+URL: https://www.theincometracker.com/tools/loan-repayment-and-savings-goal-planner.html
+Updated: 2026-09-08
+
+See how long your loan takes to clear and what the interest costs. Then watch what happens when you point that same monthly payment at savings. Same money, two very different jobs.
+
+## 50/30/20 budget calculator (UK)
+
+URL: https://www.theincometracker.com/tools/50-30-20-budget-calculator-uk.html
+Updated: 2026-09-08
+
+The 50/30/20 rule splits take-home pay three ways: half for needs, 30% for wants, 20% for savings and debt repayment. Enter your monthly pay for the targets. Add what you actually spend on needs and wants and it tells you how far off you are.
+
+## Emergency fund calculator (UK)
+
+URL: https://www.theincometracker.com/tools/emergency-fund-calculator-uk.html
+Updated: 2026-09-08
+
+An emergency fund is three to six months of essential outgoings, MoneyHelper's rule of thumb, kept in instant-access savings. Enter your essentials, pick the months of cover, add what you have saved and what you can add each month, and the calculator gives you the target and the date.
+
+## Spend per day until payday calculator
+
+URL: https://www.theincometracker.com/tools/spend-per-day-until-payday-calculator.html
+Updated: 2026-09-08
+
+Take what is in your account, subtract the bills that still have to come out before payday, and divide by the days left. That is your daily allowance. Enter the three numbers and the calculator does it, with a weekly figure too.
+
+## Debt snowball vs avalanche calculator (UK)
+
+URL: https://www.theincometracker.com/tools/debt-snowball-vs-avalanche-calculator.html
+Updated: 2026-09-08
+
+Avalanche pays the highest APR first and costs the least in interest. Snowball pays the smallest balance first and gives quicker wins. Enter your debts and your extra monthly payment to see the months and the interest for both, side by side. Then pick the one you will stick to.
+
+## Subscription cost calculator (yearly and five-year cost)
+
+URL: https://www.theincometracker.com/tools/subscription-cost-calculator.html
+Updated: 2026-09-08
+
+Small monthly amounts hide big yearly ones. Enter your monthly subscription total to see the annual and five-year cost. Add the amount you could cancel and the calculator shows what that becomes if you save it at a typical interest rate.
+
+## A free Monzo CSV expense tracker
+
+URL: https://www.theincometracker.com/monzo-csv-expense-tracker.html
+Updated: 2026-09-08
+
+Export a CSV from Monzo, drop it into The Income Tracker, and every transaction lands in a clean month-by-month view you can categorise in seconds. Free, private, no bank login.
+
+## A free Barclays CSV budget planner
+
+URL: https://www.theincometracker.com/barclays-csv-budget-planner.html
+Updated: 2026-09-08
+
+Download a CSV from Barclays Online Banking, import it into The Income Tracker, and plan your month around real numbers. Income, spending and what is left, all in one view. Free, no bank login.
+
+## A free Starling CSV budget tracker
+
+URL: https://www.theincometracker.com/starling-csv-budget-tracker.html
+Updated: 2026-09-08
+
+Export a CSV from Starling, import it into The Income Tracker, and track your spending in a clean monthly ledger. Free, private, no open banking.
+
+## A UK budget app with no open banking
+
+URL: https://www.theincometracker.com/budget-app-without-open-banking.html
+Updated: 2026-09-08
+
+The Income Tracker is a free UK budget app that does not use open banking. You import a CSV you download yourself, so no third party ever connects to your accounts. Private by design.
+
+## A spreadsheet alternative for tracking income and expenses
+
+URL: https://www.theincometracker.com/spreadsheet-alternative-income-expense-tracker.html
+Updated: 2026-09-08
+
+Love the control of a spreadsheet but hate maintaining one? The Income Tracker keeps the control and drops the busywork. Import your bank CSV and it builds the totals, categories and projections for you. Free.
+
+## Compare budgeting apps (hub)
+
+URL: https://www.theincometracker.com/compare/
+Updated: 2026-09-08
+
+Index of honest comparisons between The Income Tracker and other UK budgeting apps, plus a best-free-apps round-up.
+
+## The best free budgeting apps in the UK (2026)
+
+URL: https://www.theincometracker.com/compare/best-free-budgeting-apps-uk.html
+Updated: 2026-09-08
+
+There is no single best. If you want automatic bank feeds, Emma's and Snoop's free tiers are the strongest, with paid upgrades waiting. If you want to budget without connecting a bank, the free options are The Income Tracker (CSV import, no login), Goodbudget (envelopes, manual) and Spendee (manual with paid sync). Monzo Trends is the best built-in option if you bank with Monzo. Everything below says what each one is bad at, including ours.
+
+## The Income Tracker vs Emma
+
+URL: https://www.theincometracker.com/compare/emma-alternative.html
+Updated: 2026-09-08
+
+Emma is the slicker app, with automatic bank feeds, strong subscription detection and a free tier that connects two accounts. The Income Tracker is free with no tiers, never asks for a bank login, and imports CSV files for nothing, which Emma only allows on its £9.99-a-month Pro plan and above. Pick on that trade.
+
+## The Income Tracker vs Snoop
+
+URL: https://www.theincometracker.com/compare/snoop-alternative.html
+Updated: 2026-09-08
+
+Snoop is a free open-banking app whose whole value is the nudges it generates from your connected accounts; without a connection it offers only basic tips. The Income Tracker is the opposite shape: no connection, a CSV import, and a ledger you control. Snoop has no web app and no CSV import; we have no automatic feed.
+
+## The Income Tracker vs YNAB
+
+URL: https://www.theincometracker.com/compare/vs-ynab.html
+Updated: 2026-09-08
+
+YNAB is the best-known zero-based budgeting tool and it is good at it: every pound gets a job, manual entry and file import are first-class, and it does not need a bank link. It costs around £99 a year in the UK. The Income Tracker is free and deliberately simpler: a month-by-month ledger from your bank CSV with categories, recurring items, goals and a surplus figure. If you want the method, pay for YNAB. If you want the picture, we are free.
+
+## The Income Tracker vs Plum
+
+URL: https://www.theincometracker.com/compare/plum-alternative.html
+Updated: 2026-09-08
+
+Plum is a saving and investing app first and a budgeting tool second: it reads your bank through open banking, skims money into pots and offers ISAs and investments, with paid tiers from £3.99 a month. The Income Tracker does none of that. It shows you where the money goes, for free, from a CSV, with no bank link. Different jobs; many people use one of each.
+
+## The Income Tracker vs Monzo Trends
+
+URL: https://www.theincometracker.com/compare/monzo-trends-alternative.html
+Updated: 2026-09-08
+
+If you bank with Monzo, Trends is free, automatic and already on your phone, and you can connect one other bank or card for nothing. The catch is the ceiling: more connections need a paid plan, there is no CSV or manual entry, and it only exists inside Monzo. The Income Tracker works with every bank, needs no Monzo account, and is free with no ceiling.
+
+## Moneyhub alternative: what to use now the app has closed
+
+URL: https://www.theincometracker.com/compare/moneyhub-alternative.html
+Updated: 2026-09-08
+
+Moneyhub exited direct-to-consumer in 2025 and its help centre confirms the app was sunsetted on 31 July 2026, with remaining accounts deleted. Its business behind the scenes continues. If you used it to see all your accounts in one place, the free replacement that needs no bank connection is a CSV-based ledger: The Income Tracker.
+
+## Money Dashboard alternative: a free replacement
+
+URL: https://www.theincometracker.com/compare/money-dashboard-alternative.html
+Updated: 2026-09-08
+
+Money Dashboard, owned by ClearScore, closed its Neon and Classic apps on 31 October 2023 after saying it could not find a sustainable business model. Users could export a CSV before the date and nothing after. The free replacement that does not depend on a company staying in business is a local-first ledger fed by your own bank CSVs: The Income Tracker.
+
+## Free budget templates (hub)
+
+URL: https://www.theincometracker.com/templates/
+Updated: 2026-09-08
+
+Index of 4 free CSV budget templates that open in Excel or Google Sheets and import into the app.
+
+## Free monthly budget planner template
+
+URL: https://www.theincometracker.com/templates/monthly-budget-planner-template.html
+Updated: 2026-09-08
+
+One sheet, one month: income at the top, then rent, bills, groceries, transport, subscriptions and savings. Download the CSV, swap the example rows for your own, and either total it in a spreadsheet or import it into The Income Tracker for live totals. Download: https://www.theincometracker.com/templates/monthly-budget-planner-template.csv
+
+## Free income and expenditure form template
+
+URL: https://www.theincometracker.com/templates/income-and-expenditure-form-template.html
+Updated: 2026-09-08
+
+An income and expenditure form is a one-page monthly budget: everything coming in, everything going out, grouped into fixed costs, living costs, flexible costs and debts. Download the template, fill in your monthly figures, and you have the sheet a mortgage lender, landlord or debt adviser will ask for. Download: https://www.theincometracker.com/templates/income-and-expenditure-form-template.csv
+
+## Free self-employed income and expense tracker template
+
+URL: https://www.theincometracker.com/templates/self-employed-income-tracker-template.html
+Updated: 2026-09-08
+
+Sole traders need three things on record: every invoice paid, every allowable expense with its category, and a tax pot. This template does all three, using the same expense categories as the self-employment pages of a Self Assessment return so nothing needs re-sorting in January. Download: https://www.theincometracker.com/templates/self-employed-income-tracker-template.csv
+
+## Free household bills tracker template
+
+URL: https://www.theincometracker.com/templates/household-bills-tracker-template.html
+Updated: 2026-09-08
+
+List every regular payment once, with its billing day and how it is paid, and you will never be surprised by a direct debit again. Download the CSV, fill it in from your last statement, and import it into The Income Tracker to have the bills seed themselves every month. Download: https://www.theincometracker.com/templates/household-bills-tracker-template.csv
+
+## About The Income Tracker
+
+URL: https://www.theincometracker.com/about.html
+Updated: 2026-09-08
+
+Who makes The Income Tracker, how it is funded (it is free; no ads, no data sales), the principles it will not bend on, and how facts are checked.
+
+## What's new
+
+URL: https://www.theincometracker.com/whats-new.html
+Updated: 2026-09-08
+
+Release notes for The Income Tracker, newest first.
