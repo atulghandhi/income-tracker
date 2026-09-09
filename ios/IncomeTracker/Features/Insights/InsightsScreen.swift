@@ -319,11 +319,14 @@ private struct HealthArc: View {
 
 private struct SubScoreRow: View {
     var label: String
-    var score: Double   // 0–10
+    /// 0–100, as FinanceEngine.healthScore reports the component scores.
+    var score: Double
+
+    private var fraction: Double { max(0, min(score / 100.0, 1)) }
 
     private var color: Color {
-        if score >= 7.5 { return .brandMint }
-        if score >= 5.0 { return .brandAmber }
+        if score >= 75 { return .brandMint }
+        if score >= 50 { return .brandAmber }
         return .brandRed
     }
 
@@ -332,7 +335,7 @@ private struct SubScoreRow: View {
             HStack {
                 Text(label).font(.caption).foregroundStyle(Color.muted)
                 Spacer()
-                Text(String(format: "%.1f", score)).font(.caption.weight(.semibold)).foregroundStyle(color)
+                Text(String(format: "%.0f", score)).font(.caption.weight(.semibold)).foregroundStyle(color)
             }
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
@@ -341,14 +344,14 @@ private struct SubScoreRow: View {
                         .frame(height: 5)
                     RoundedRectangle(cornerRadius: 3)
                         .fill(color)
-                        .frame(width: geo.size.width * (score / 10.0), height: 5)
+                        .frame(width: geo.size.width * fraction, height: 5)
                         .motionAnimation(Motion.standard, value: score)
                 }
             }
             .frame(height: 5)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityValue(String(format: "%.1f out of 10", score))
+        .accessibilityValue(String(format: "%.0f out of 100", score))
     }
 }
 

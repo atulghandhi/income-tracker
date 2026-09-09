@@ -63,17 +63,22 @@ struct SettingsSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                accountSection
-                cloudVaultSection
-                ledgerSection
-                remindersSection
-                dataControlSection
-                privacySection
-                appearanceSection
-                rulesSection
-                feedbackSection
-                dangerZoneSection
-                aboutSection
+                // Grouped so the builder never exceeds ten children on older toolchains.
+                Group {
+                    accountSection
+                    cloudVaultSection
+                    ledgerSection
+                    remindersSection
+                    dataControlSection
+                }
+                Group {
+                    privacySection
+                    appearanceSection
+                    rulesSection
+                    feedbackSection
+                    dangerZoneSection
+                    aboutSection
+                }
             }
             .scrollContentBackground(.hidden)
             .background(Color.bg)
