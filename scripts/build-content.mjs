@@ -43,11 +43,8 @@ export const SITE = "https://www.theincometracker.com";
 export const BRAND = "The Income Tracker";
 const CONTACT_EMAIL = "hello@theincometracker.com";
 
-// Single source of truth for the "last updated" date stamped on every page and
-// the sitemap. Bump this when content is meaningfully revised. Visible, recent
-// dates are a strong freshness signal for both Google and Perplexity.
-// Individual items can carry `published` (first publish date) so Article schema
-// keeps an honest datePublished while dateModified moves with each revision.
+// Historical content date retained until an individual page is revised.
+// Never replace these dates with the build time. See modifiedAt() below.
 const UPDATED = "2026-09-08";
 const FIRST_PUBLISHED = "2026-06-16";
 
@@ -64,6 +61,19 @@ export function humanDate(iso) {
   return `${d} ${MONTHS[m - 1]} ${y}`;
 }
 const UPDATED_HUMAN = humanDate(UPDATED);
+
+const PAGE_UPDATES = new Map([
+  ["/", "2026-09-14"], ["/tools/", "2026-09-14"], ["/whats-new.html", "2026-09-14"],
+  ...BANKS.map(p => [`/import/${p.slug}.html`, p.updated || UPDATED]),
+  ...GUIDES.map(p => [`/guides/${p.slug}.html`, p.updated || UPDATED]),
+  // All calculator pages received input validation and accessible result updates.
+  ...CALCULATORS.map(p => [`/tools/${p.slug}.html`, p.updated || "2026-09-14"]),
+  ...LANDINGS.map(p => [`/${p.slug}.html`, p.updated || UPDATED]),
+  ...COMPARISONS.map(p => [`/compare/${p.slug}.html`, p.updated || UPDATED]),
+  ...TEMPLATES.map(p => [`/templates/${p.slug}.html`, p.updated || UPDATED]),
+]);
+function modifiedAt(path) { return PAGE_UPDATES.get(path) || UPDATED; }
+
 
 export const esc = (s) =>
   String(s)
@@ -170,6 +180,7 @@ const CSS = `
   .calc-inwrap { display: flex; align-items: center; background: #06182b; border: 1px solid rgba(212,228,250,0.16); border-radius: 10px; padding: 0 12px; }
   .calc-inwrap:focus-within { border-color: rgba(0,223,193,0.5); }
   .calc-inwrap i { color: #9ea8b7; font-style: normal; font-size: 0.95rem; }
+  .calc-inwrap select { min-width: 0; width: 100%; padding: 12px; border: 0; background: #102638; color: #d4e4fa; font: inherit; }
   .calc-inwrap input { flex: 1; min-width: 0; background: none; border: none; color: #fff; font-size: 1.05rem; font-weight: 600; padding: 11px 6px; outline: none; font-family: inherit; }
   .calc-inwrap input::-webkit-outer-spin-button, .calc-inwrap input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   .calc-out { margin-top: 18px; padding-top: 18px; border-top: 1px solid rgba(212,228,250,0.1); }
@@ -318,7 +329,7 @@ function webPageLd({ path, title, description, published, type = "WebPage", trai
     inLanguage: "en-GB",
     isPartOf: { "@id": `${SITE}/#website` },
     datePublished: published || FIRST_PUBLISHED,
-    dateModified: UPDATED,
+    dateModified: modifiedAt(path),
     primaryImageOfPage: { "@type": "ImageObject", url: `${SITE}/og-image.png`, width: 1200, height: 630 },
   };
   if (trail) page.breadcrumb = { "@id": `${canonical}#breadcrumb` };
@@ -365,7 +376,7 @@ function shell({ title, description, path, jsonLd = [], body, script = "", publi
     <meta name="twitter:image" content="${SITE}/og-image.png" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="icon" type="image/png" sizes="240x240" href="/icon.png" />
-    <link rel="apple-touch-icon" href="/icon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
     <link rel="alternate" type="application/rss+xml" title="${BRAND}: new guides and updates" href="${SITE}/feed.xml" />
     <style>${CSS}</style>
@@ -376,7 +387,7 @@ ${JSON.stringify(graph, null, 2)}
   <body>
 ${siteHeader()}
     <div class="wrap">
-${body}
+${body.replaceAll(`Updated ${UPDATED_HUMAN}`, `Updated ${humanDate(modifiedAt(path))}`)}
       <hr />
 ${siteFooter()}
     </div>
@@ -480,7 +491,7 @@ function relatedCards(keys) {
 function sourcesHtml(sources, checked) {
   if (!sources || !sources.length) return "";
   return `<div class="sources"><h3>Sources and checking</h3><p>Facts on this page were last checked on ${esc(checked || UPDATED_HUMAN)} against:</p><ul>${sources
-    .map((s) => `<li><a href="${esc(s.href)}" rel="nofollow noopener" target="_blank">${esc(s.t)}</a></li>`)
+    .map((s) => `<li><a href="${esc(s.href)}" rel="noopener" target="_blank">${esc(s.t)}</a></li>`)
     .join("")}</ul><p>Spotted something out of date? <a href="/?feedback=1">Tell us</a> and we will fix it.</p></div>`;
 }
 
@@ -660,7 +671,7 @@ function guidePage(guide) {
       headline: guide.h1,
       description: guide.description,
       datePublished: guide.published || FIRST_PUBLISHED,
-      dateModified: UPDATED,
+      dateModified: modifiedAt(path),
       inLanguage: "en-GB",
       author: { "@type": "Organization", name: BRAND, url: SITE },
       publisher: { "@id": `${SITE}/#org` },
@@ -746,18 +757,22 @@ function calcWidget(calc) {
     .map((f) => {
       const pre = f.prefix ? `<i>${esc(f.prefix)}</i>` : "";
       const suf = f.suffix ? `<i>${esc(f.suffix)}</i>` : "";
-      return `<label class="calc-field"><span class="calc-label">${esc(f.label)}</span><span class="calc-inwrap">${pre}<input id="${f.id}" type="number" inputmode="decimal" step="any" value="${f.value}" min="0" />${suf}</span></label>`;
+      const control = f.options
+        ? `<select id="${esc(f.id)}">${f.options.map(o => `<option value="${esc(o.value)}"${o.value === f.value ? ' selected' : ''}>${esc(o.label)}</option>`).join('')}</select>`
+        : `<input id="${esc(f.id)}" type="number" inputmode="decimal" step="${f.step || 'any'}" value="${f.value}" min="${f.min ?? 0}" max="1000000000000" required />`;
+      return `<label class="calc-field"><span class="calc-label">${esc(f.label)}</span><span class="calc-inwrap">${pre}${control}${suf}</span></label>`;
     })
     .join("\n          ");
   const html = `<div class="calc">
         <div class="calc-fields">
           ${fields}
         </div>
-        <div class="calc-out" id="calc-out" aria-live="polite"></div>
+        <div class="calc-out" id="calc-out" role="status" aria-live="polite" aria-atomic="true"></div>
+        <noscript><p>Enable JavaScript to calculate your own result. The formulas and worked examples below are available without it.</p></noscript>
         <div class="calc-actions">
           <button class="btn ghost" type="button" id="calc-share">Share this result</button>
           <a class="btn" href="/?ref=calc-${esc(calc.slug)}" data-track="cta_click" data-ref="calc-${esc(calc.slug)}">Track it in the app &rarr;</a>
-          <span class="calc-share-note" id="calc-share-note">Nothing you type leaves your browser.</span>
+          <span class="calc-share-note" id="calc-share-note">Calculated on your device. Shared links include the amounts you enter.</span>
         </div>
       </div>`;
   // Prefill from the query string (shared links), share via Web Share or the
@@ -765,15 +780,21 @@ function calcWidget(calc) {
   const script = `<script>
 (function(){
   var IDS=${JSON.stringify(ids)},SLUG=${JSON.stringify(calc.slug)},used=false;
-  function n(id){var el=document.getElementById(id);if(!el)return 0;var v=parseFloat(el.value);return isNaN(v)?0:v;}
+  function n(id){var el=document.getElementById(id);if(!el)return 0;var v=Number(el.value);return Number.isFinite(v)?v:0;}
   function gbp(x){return '£'+(Math.round(x*100)/100).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});}
   function pct(x){return (Math.round(x*10)/10)+'%';}
   var out=document.getElementById('calc-out');
-  function render(){${calc.compute}}
-  try{var q=new URLSearchParams(location.search);IDS.forEach(function(id){if(q.has(id)){var el=document.getElementById(id);var v=parseFloat(q.get(id));if(el&&!isNaN(v))el.value=v;}});}catch(e){}
+  function render(){
+    if(IDS.some(function(id){var el=document.getElementById(id);return !el||!el.value||!el.checkValidity()||!Number.isFinite(Number(el.value));})){
+      out.innerHTML='<p class="calc-hint">Enter a valid non-negative number in each field. Payment counts must be whole numbers.</p>';return;
+    }
+    ${calc.compute.trim()}
+  }
+  try{var q=new URLSearchParams(location.search);IDS.forEach(function(id){if(q.has(id)){var el=document.getElementById(id);var v=Number(q.get(id));if(el&&Number.isFinite(v))el.value=String(v);}});}catch(e){}
   IDS.forEach(function(id){var el=document.getElementById(id);if(el)el.addEventListener('input',function(){render();if(!used){used=true;if(window.itTrack)window.itTrack('calc_used',{calc:SLUG});}});});
   var share=document.getElementById('calc-share'),note=document.getElementById('calc-share-note');
   if(share){share.addEventListener('click',function(){
+    if(IDS.some(function(id){return !document.getElementById(id).checkValidity();})){note.textContent="Check the inputs before sharing.";return;}
     var q=new URLSearchParams();IDS.forEach(function(id){q.set(id,String(n(id)));});
     var url=location.origin+location.pathname+'?'+q.toString();
     if(window.itTrack)window.itTrack('calc_shared',{calc:SLUG});
@@ -986,7 +1007,7 @@ function comparePage(c) {
           headline: c.h1,
           description: c.description,
           datePublished: c.published || UPDATED,
-          dateModified: UPDATED,
+          dateModified: modifiedAt(path),
           inLanguage: "en-GB",
           author: { "@type": "Organization", name: BRAND, url: SITE },
           publisher: { "@id": `${SITE}/#org` },
@@ -1058,7 +1079,7 @@ function roundupPage(r) {
           headline: r.h1,
           description: r.description,
           datePublished: r.published || UPDATED,
-          dateModified: UPDATED,
+          dateModified: modifiedAt(path),
           inLanguage: "en-GB",
           author: { "@type": "Organization", name: BRAND, url: SITE },
           publisher: { "@id": `${SITE}/#org` },
@@ -1400,9 +1421,7 @@ function sitemap(urls) {
     .map(
       (u) => `  <url>
     <loc>${SITE}${u.path}</loc>
-    <lastmod>${u.lastmod || UPDATED}</lastmod>
-    <changefreq>${u.changefreq}</changefreq>
-    <priority>${u.priority}</priority>
+    <lastmod>${u.lastmod || modifiedAt(u.path)}</lastmod>
   </url>`,
     )
     .join("\n");
@@ -1538,7 +1557,7 @@ ${templateLines}
 
 function llmsFullTxt(pages) {
   const blocks = pages
-    .map((p) => `## ${p.title}\n\nURL: ${SITE}${p.path}\nUpdated: ${UPDATED}\n\n${p.summary}\n`)
+    .map((p) => `## ${p.title}\n\nURL: ${SITE}${p.path}\nUpdated: ${modifiedAt(p.path)}\n\n${p.summary}\n`)
     .join("\n");
   return `# ${BRAND}: full page index for AI assistants
 

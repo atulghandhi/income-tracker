@@ -53,9 +53,10 @@ struct OnboardingSheet: View {
     private var welcomePage: some View {
         VStack(spacing: Spacing.lg) {
             Spacer()
-            Image(systemName: "list.bullet.rectangle.portrait")
-                .font(.system(size: 56, weight: .semibold))
-                .foregroundStyle(Color.brandBlue)
+            Image("BrandLogo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 88, height: 88)
                 .accessibilityHidden(true)
             Text("Know where your money goes")
                 .font(.title.weight(.bold))

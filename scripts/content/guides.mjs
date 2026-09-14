@@ -503,6 +503,7 @@ export const GUIDES = [
   },
   {
     slug: "budgeting-for-couples-separate-accounts-uk",
+    updated: "2026-09-14",
     topic: "Budgeting basics",
     cardD: "One picture from two banks, without a shared login",
     published: "2026-09-08",
@@ -557,10 +558,10 @@ export const GUIDES = [
     ],
     faqs: [
       { q: "Do couples need a joint account to budget together?", a: "No. Agree a split for the shared bills and track both accounts in one ledger. A joint bills account is convenient, not essential." },
-      { q: "How should couples split bills when one earns more?", a: "Proportionally. Each pays the same percentage of the bills as their percentage of the combined income. It keeps the same amount of disposable income in proportion for each of you." },
+      { q: "How should couples split bills when one earns more?", a: "One option is an income-based split: each pays the same share of the bills as their share of combined take-home income. Compare it with 50/50 and agree what works for your circumstances, including caring responsibilities and personal commitments." },
       { q: "Can we track two different banks in one app without sharing logins?", a: "Yes. Each of you exports a CSV from your own bank and both files go into one ledger in The Income Tracker. Nothing connects to either bank." },
     ],
-    related: ["import", "monthly-surplus-calculator", "budget-without-linking-bank", "how-to-categorise-bank-transactions"],
+    related: ["split-bills-by-income-calculator", "import", "monthly-surplus-calculator", "budget-without-linking-bank", "how-to-categorise-bank-transactions"],
   },
   {
     slug: "zero-based-budgeting-uk",
@@ -620,6 +621,7 @@ export const GUIDES = [
   },
   {
     slug: "budget-on-a-variable-income-uk",
+    updated: "2026-09-14",
     topic: "Budgeting basics",
     cardD: "Freelance, shifts, commission: budget on the low month",
     published: "2026-09-08",
@@ -671,7 +673,7 @@ export const GUIDES = [
       { q: "How big should the buffer be?", a: "Aim for two months of your baseline salary in the holding account, then build a separate emergency fund of three to six months of essential outgoings." },
       { q: "How much should a self-employed person set aside for tax?", a: "A fixed share of every payment, commonly 20 to 30 percent, adjusted once you know your actual bill. Keep it in a separate pot." },
     ],
-    related: ["self-employed-income-tracker-uk", "emergency-fund-calculator-uk", "zero-based-budgeting-uk", "import"],
+    related: ["weekly-to-monthly-budget-calculator", "self-employed-income-tracker-uk", "emergency-fund-calculator-uk", "zero-based-budgeting-uk", "import"],
   },
   {
     slug: "self-employed-income-tracker-uk",
@@ -770,6 +772,7 @@ export const GUIDES = [
   },
   {
     slug: "how-much-should-i-save-each-month-uk",
+    updated: "2026-09-14",
     topic: "Saving money",
     cardD: "A target you can defend, and the order to save in",
     published: "2026-09-08",
@@ -823,6 +826,6 @@ export const GUIDES = [
       { q: "Should I save or pay off debt first?", a: "Build a small starter fund, then clear expensive debt, then build the full emergency fund. Interest on cards and overdrafts is usually far higher than savings rates." },
       { q: "How do I know what I can afford to save?", a: "Import your bank CSV into The Income Tracker and read the surplus. That figure, month after month, is your real saving capacity." },
     ],
-    related: ["emergency-fund-calculator-uk", "50-30-20-budget-calculator-uk", "debt-snowball-vs-avalanche-calculator", "monthly-surplus-calculator"],
+    related: ["christmas-budget-savings-calculator", "emergency-fund-calculator-uk", "50-30-20-budget-calculator-uk", "debt-snowball-vs-avalanche-calculator", "monthly-surplus-calculator"],
   },
 ];

@@ -18,7 +18,7 @@ How the content side of The Income Tracker is built, and the short list of thing
 
 The generator also writes `sitemap.xml`, `feed.xml`, `llms.txt`, `llms-full.txt`, `404.html` and `src/generated/bankGuides.ts` (the bank list the app's reminder and nudge use). It fails the build if any generated page links to a path that does not exist, so a typo in a `related` key is caught before deploy.
 
-Bump `UPDATED` in `scripts/build-content.mjs` whenever content is meaningfully revised. It feeds every visible "Updated" line, `dateModified` in the structured data, and the sitemap.
+Set `updated: "YYYY-MM-DD"` on the individual content entry when its content changes. `modifiedAt()` in the generator keeps visible dates, structured data and sitemap dates consistent. Explicit route dates cover the homepage and hubs. Keep the historical fallback unchanged; do not refresh all dates because a build ran.
 
 ## Adding a page
 
@@ -30,9 +30,9 @@ Bump `UPDATED` in `scripts/build-content.mjs` whenever content is meaningfully r
 
 ## After each deploy
 
-1. `npm run indexnow` submits every sitemap URL to IndexNow (Bing, DuckDuckGo, Yandex). Google ignores IndexNow.
+1. Preview changed URLs with `npm run indexnow -- --since YYYY-MM-DD`, then add `--submit` after deployment. Live key, sitemap revision, HTTP status and canonical checks must pass before submission. Acceptance is not a promise of crawling or indexing.
 2. Google Search Console: add `https://www.theincometracker.com/` as a property (DNS or HTML-file verification; drop the verification file in `public/`), submit `/sitemap.xml` once, then use URL Inspection on anything new you want crawled quickly. This is the single most valuable thing not yet done: without it there is no query data to steer the next round of pages.
-3. Bing Webmaster Tools: import the site from Search Console (one click) so Bing has the sitemap too.
+3. Bing Webmaster Tools: verify the existing property (or import it from Search Console if available), submit `/sitemap.xml`, and inspect new URLs. Use the Search Performance web-search report to compare clicks, impressions, CTR and position. See `BING_SEO_2026-09-14.md`.
 4. Check the Vercel Analytics dashboard for `cta_click`, `calc_used`, `template_download` and, in the app, `landing_ref`. The `ref` value tells you which page sent the visitor.
 
 ## What to write next (in order of expected return)
@@ -45,3 +45,7 @@ Bump `UPDATED` in `scripts/build-content.mjs` whenever content is meaningfully r
 ## Facts that carry dates
 
 Anything with a number from outside (tax thresholds, allowances, competitor prices, bank export limits) has a `checked` date on the page and the source under it. Re-check on a schedule: tax figures each April, competitor prices twice a year, bank steps when a reader reports a change (the contact form is on every page).
+
+## Production checks
+
+`npm run build` now prerenders the actual React landing page into the production homepage, then audits all canonical pages. Run `PW_CHANNEL=chrome npx playwright test --config playwright.seo.config.ts` for desktop/mobile production tests (omit `PW_CHANNEL` when Playwright Chromium is installed). Run `node --test scripts/indexnow.test.mjs` for submission safeguards.

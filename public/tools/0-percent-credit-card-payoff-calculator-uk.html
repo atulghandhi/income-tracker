@@ -27,7 +27,7 @@
     <meta name="twitter:image" content="https://www.theincometracker.com/og-image.png" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="icon" type="image/png" sizes="240x240" href="/icon.png" />
-    <link rel="apple-touch-icon" href="/icon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
     <link rel="alternate" type="application/rss+xml" title="The Income Tracker: new guides and updates" href="https://www.theincometracker.com/feed.xml" />
     <style>
@@ -118,6 +118,7 @@
   .calc-inwrap { display: flex; align-items: center; background: #06182b; border: 1px solid rgba(212,228,250,0.16); border-radius: 10px; padding: 0 12px; }
   .calc-inwrap:focus-within { border-color: rgba(0,223,193,0.5); }
   .calc-inwrap i { color: #9ea8b7; font-style: normal; font-size: 0.95rem; }
+  .calc-inwrap select { min-width: 0; width: 100%; padding: 12px; border: 0; background: #102638; color: #d4e4fa; font: inherit; }
   .calc-inwrap input { flex: 1; min-width: 0; background: none; border: none; color: #fff; font-size: 1.05rem; font-weight: 600; padding: 11px 6px; outline: none; font-family: inherit; }
   .calc-inwrap input::-webkit-outer-spin-button, .calc-inwrap input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   .calc-out { margin-top: 18px; padding-top: 18px; border-top: 1px solid rgba(212,228,250,0.1); }
@@ -187,7 +188,7 @@
         "@id": "https://www.theincometracker.com/#website"
       },
       "datePublished": "2026-06-16",
-      "dateModified": "2026-09-08",
+      "dateModified": "2026-09-14",
       "primaryImageOfPage": {
         "@type": "ImageObject",
         "url": "https://www.theincometracker.com/og-image.png",
@@ -288,19 +289,20 @@
     <div class="wrap">
       <header class="top"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> &rsaquo; <a href="/tools/">Calculators</a> &rsaquo; 0% credit card payoff</nav></header>
       <h1>0% credit card payoff calculator</h1>
-      <p class="meta">By The Income Tracker · Updated 8 September 2026</p>
+      <p class="meta">By The Income Tracker · Updated 14 September 2026</p>
       <div class="tldr"><strong>The short answer</strong><p>A 0% card is free money, but only if you clear it before the deal ends. Enter your balance and the months you have left, and this works out the monthly payment that gets you to zero in time.</p></div>
       <div class="calc">
         <div class="calc-fields">
-          <label class="calc-field"><span class="calc-label">Balance left</span><span class="calc-inwrap"><i>£</i><input id="bal" type="number" inputmode="decimal" step="any" value="2000" min="0" /></span></label>
-          <label class="calc-field"><span class="calc-label">0% months remaining</span><span class="calc-inwrap"><input id="months" type="number" inputmode="decimal" step="any" value="18" min="0" /></span></label>
-          <label class="calc-field"><span class="calc-label">APR after 0% ends</span><span class="calc-inwrap"><input id="apr" type="number" inputmode="decimal" step="any" value="24.9" min="0" /><i>%</i></span></label>
+          <label class="calc-field"><span class="calc-label">Balance left</span><span class="calc-inwrap"><i>£</i><input id="bal" type="number" inputmode="decimal" step="any" value="2000" min="0" max="1000000000000" required /></span></label>
+          <label class="calc-field"><span class="calc-label">0% months remaining</span><span class="calc-inwrap"><input id="months" type="number" inputmode="decimal" step="any" value="18" min="0" max="1000000000000" required /></span></label>
+          <label class="calc-field"><span class="calc-label">APR after 0% ends</span><span class="calc-inwrap"><input id="apr" type="number" inputmode="decimal" step="any" value="24.9" min="0" max="1000000000000" required /><i>%</i></span></label>
         </div>
-        <div class="calc-out" id="calc-out" aria-live="polite"></div>
+        <div class="calc-out" id="calc-out" role="status" aria-live="polite" aria-atomic="true"></div>
+        <noscript><p>Enable JavaScript to calculate your own result. The formulas and worked examples below are available without it.</p></noscript>
         <div class="calc-actions">
           <button class="btn ghost" type="button" id="calc-share">Share this result</button>
           <a class="btn" href="/?ref=calc-0-percent-credit-card-payoff-calculator-uk" data-track="cta_click" data-ref="calc-0-percent-credit-card-payoff-calculator-uk">Track it in the app &rarr;</a>
-          <span class="calc-share-note" id="calc-share-note">Nothing you type leaves your browser.</span>
+          <span class="calc-share-note" id="calc-share-note">Calculated on your device. Shared links include the amounts you enter.</span>
         </div>
       </div>
 
@@ -397,11 +399,14 @@ window.va=window.va||function(){(window.vaq=window.vaq||[]).push(arguments)};
 <script>
 (function(){
   var IDS=["bal","months","apr"],SLUG="0-percent-credit-card-payoff-calculator-uk",used=false;
-  function n(id){var el=document.getElementById(id);if(!el)return 0;var v=parseFloat(el.value);return isNaN(v)?0:v;}
+  function n(id){var el=document.getElementById(id);if(!el)return 0;var v=Number(el.value);return Number.isFinite(v)?v:0;}
   function gbp(x){return '£'+(Math.round(x*100)/100).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});}
   function pct(x){return (Math.round(x*10)/10)+'%';}
   var out=document.getElementById('calc-out');
   function render(){
+    if(IDS.some(function(id){var el=document.getElementById(id);return !el||!el.value||!el.checkValidity()||!Number.isFinite(Number(el.value));})){
+      out.innerHTML='<p class="calc-hint">Enter a valid non-negative number in each field. Payment counts must be whole numbers.</p>';return;
+    }
     var bal=n('bal'), m=n('months'), apr=n('apr');
     if(bal<=0||m<=0){out.innerHTML='<p class="calc-hint">Enter your balance and the number of 0% months you have left.</p>';return;}
     var pay=bal/m;
@@ -410,10 +415,11 @@ window.va=window.va||function(){(window.vaq=window.vaq||[]).push(arguments)};
     if(apr>0){var mi=bal*(apr/100)/12;html+='<p class="calc-warn">Miss the deadline and interest starts at '+apr+'% APR. On this balance that is roughly '+gbp(mi)+' a month. That is the trap to avoid.</p>';}
     out.innerHTML=html;
   }
-  try{var q=new URLSearchParams(location.search);IDS.forEach(function(id){if(q.has(id)){var el=document.getElementById(id);var v=parseFloat(q.get(id));if(el&&!isNaN(v))el.value=v;}});}catch(e){}
+  try{var q=new URLSearchParams(location.search);IDS.forEach(function(id){if(q.has(id)){var el=document.getElementById(id);var v=Number(q.get(id));if(el&&Number.isFinite(v))el.value=String(v);}});}catch(e){}
   IDS.forEach(function(id){var el=document.getElementById(id);if(el)el.addEventListener('input',function(){render();if(!used){used=true;if(window.itTrack)window.itTrack('calc_used',{calc:SLUG});}});});
   var share=document.getElementById('calc-share'),note=document.getElementById('calc-share-note');
   if(share){share.addEventListener('click',function(){
+    if(IDS.some(function(id){return !document.getElementById(id).checkValidity();})){note.textContent="Check the inputs before sharing.";return;}
     var q=new URLSearchParams();IDS.forEach(function(id){q.set(id,String(n(id)));});
     var url=location.origin+location.pathname+'?'+q.toString();
     if(window.itTrack)window.itTrack('calc_shared',{calc:SLUG});

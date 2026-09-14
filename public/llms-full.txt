@@ -216,7 +216,7 @@ Export three months of transactions, import them, and look for the same amount f
 ## Budgeting as a couple with separate accounts
 
 URL: https://www.theincometracker.com/guides/budgeting-for-couples-separate-accounts-uk.html
-Updated: 2026-09-08
+Updated: 2026-09-14
 
 You do not need a joint account or a shared banking login to budget as a couple. Pick a split for the shared costs (equal, proportional to income, or a joint bills pot), then import each person's bank CSV into one ledger. Transfers between you are skipped automatically, so nothing double-counts.
 
@@ -230,7 +230,7 @@ Zero-based budgeting means every pound of take-home pay is assigned a job before
 ## How to budget on a variable income
 
 URL: https://www.theincometracker.com/guides/budget-on-a-variable-income-uk.html
-Updated: 2026-09-08
+Updated: 2026-09-14
 
 Budget on your lowest recent month, not your average. Pay yourself a fixed amount from a buffer account on the same day each month, and let the good months fill the buffer. If you are self-employed, skim a fixed share of every payment into a tax pot before it touches anything else.
 
@@ -244,84 +244,105 @@ Keep a dated record of every payment in and every business cost out, with a cate
 ## How much should you save each month?
 
 URL: https://www.theincometracker.com/guides/how-much-should-i-save-each-month-uk.html
-Updated: 2026-09-08
+Updated: 2026-09-14
 
 The common guideline is 20% of take-home pay, from the 50/30/20 rule. The more useful answer is an order: first £1,000 in instant-access savings, then three to six months of essential outgoings as an emergency fund, then the percentage. Around three in ten UK adults have under £1,000 saved, so the first milestone is a real one.
 
 ## Free money calculators (hub)
 
 URL: https://www.theincometracker.com/tools/
-Updated: 2026-09-08
+Updated: 2026-09-14
 
-Index of 10 free, instant UK money calculators with shareable results.
+Index of 13 free, instant UK money calculators with shareable results.
+
+## Weekly to Monthly Budget Calculator | Free Converter
+
+URL: https://www.theincometracker.com/tools/weekly-to-monthly-budget-calculator.html
+Updated: 2026-09-14
+
+Weekly amount × 52 ÷ 12 gives the monthly average. For example, £100 a week is £433.33 a month. Choose the payment frequency below to convert income, rent or another regular bill.
+
+## Split Bills by Income Calculator | Couples & Rent
+
+URL: https://www.theincometracker.com/tools/split-bills-by-income-calculator.html
+Updated: 2026-09-14
+
+An income-based split gives each person the same percentage of shared bills as their share of combined take-home pay. Enter both monthly incomes and the shared bill total to compare this with splitting equally.
+
+## Christmas Budget & Savings Calculator | Free Planner
+
+URL: https://www.theincometracker.com/tools/christmas-budget-savings-calculator.html
+Updated: 2026-09-14
+
+Add your planned Christmas costs, subtract money already saved, then divide the gap by your remaining paydays. Count only paydays before you need to buy things, which may be earlier than 25 December.
 
 ## 0% credit card payoff calculator (UK)
 
 URL: https://www.theincometracker.com/tools/0-percent-credit-card-payoff-calculator-uk.html
-Updated: 2026-09-08
+Updated: 2026-09-14
 
 A 0% card is free money, but only if you clear it before the deal ends. Enter your balance and the months you have left, and this works out the monthly payment that gets you to zero in time.
 
 ## Credit card utilisation calculator (UK)
 
 URL: https://www.theincometracker.com/tools/credit-card-utilisation-calculator-uk.html
-Updated: 2026-09-08
+Updated: 2026-09-14
 
 Utilisation is the share of your credit limit you are using. UK lenders like to see it low. Experian and Equifax both suggest keeping it below 25%, and under 10% is better still. Enter your balance and limit to see where you stand.
 
 ## How long to save £10,000 for a car (calculator)
 
 URL: https://www.theincometracker.com/tools/how-long-to-save-10000-for-a-car.html
-Updated: 2026-09-08
+Updated: 2026-09-14
 
 Saving for a car comes down to one number: how much you put away each month. Pop in your goal and your monthly amount, and this tells you the month you will hit it. Add a savings rate to factor in interest.
 
-## Monthly surplus calculator (UK)
+## Income and Expenditure Calculator | Monthly Budget
 
 URL: https://www.theincometracker.com/tools/monthly-surplus-calculator.html
-Updated: 2026-09-08
+Updated: 2026-09-14
 
 Your surplus is what is left after expenses. It is the single most useful number in personal finance. Enter your monthly income and spending to see your surplus and savings rate.
 
 ## Loan repayment and savings goal planner (UK)
 
 URL: https://www.theincometracker.com/tools/loan-repayment-and-savings-goal-planner.html
-Updated: 2026-09-08
+Updated: 2026-09-14
 
 See how long your loan takes to clear and what the interest costs. Then watch what happens when you point that same monthly payment at savings. Same money, two very different jobs.
 
 ## 50/30/20 budget calculator (UK)
 
 URL: https://www.theincometracker.com/tools/50-30-20-budget-calculator-uk.html
-Updated: 2026-09-08
+Updated: 2026-09-14
 
 The 50/30/20 rule splits take-home pay three ways: half for needs, 30% for wants, 20% for savings and debt repayment. Enter your monthly pay for the targets. Add what you actually spend on needs and wants and it tells you how far off you are.
 
 ## Emergency fund calculator (UK)
 
 URL: https://www.theincometracker.com/tools/emergency-fund-calculator-uk.html
-Updated: 2026-09-08
+Updated: 2026-09-14
 
 An emergency fund is three to six months of essential outgoings, MoneyHelper's rule of thumb, kept in instant-access savings. Enter your essentials, pick the months of cover, add what you have saved and what you can add each month, and the calculator gives you the target and the date.
 
 ## Spend per day until payday calculator
 
 URL: https://www.theincometracker.com/tools/spend-per-day-until-payday-calculator.html
-Updated: 2026-09-08
+Updated: 2026-09-14
 
 Take what is in your account, subtract the bills that still have to come out before payday, and divide by the days left. That is your daily allowance. Enter the three numbers and the calculator does it, with a weekly figure too.
 
 ## Debt snowball vs avalanche calculator (UK)
 
 URL: https://www.theincometracker.com/tools/debt-snowball-vs-avalanche-calculator.html
-Updated: 2026-09-08
+Updated: 2026-09-14
 
 Avalanche pays the highest APR first and costs the least in interest. Snowball pays the smallest balance first and gives quicker wins. Enter your debts and your extra monthly payment to see the months and the interest for both, side by side. Then pick the one you will stick to.
 
 ## Subscription cost calculator (yearly and five-year cost)
 
 URL: https://www.theincometracker.com/tools/subscription-cost-calculator.html
-Updated: 2026-09-08
+Updated: 2026-09-14
 
 Small monthly amounts hide big yearly ones. Enter your monthly subscription total to see the annual and five-year cost. Add the amount you could cancel and the calculator shows what that becomes if you save it at a typical interest rate.
 
@@ -468,6 +489,6 @@ Who makes The Income Tracker, how it is funded (it is free; no ads, no data sale
 ## What's new
 
 URL: https://www.theincometracker.com/whats-new.html
-Updated: 2026-09-08
+Updated: 2026-09-14
 
 Release notes for The Income Tracker, newest first.

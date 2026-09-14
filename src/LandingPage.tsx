@@ -94,6 +94,9 @@ const FAQ = [
 ] as const;
 
 const RESOURCES = [
+  { href: "/tools/weekly-to-monthly-budget-calculator.html", t: "Weekly to monthly calculator", d: "Convert pay and bills to the same budget period" },
+  { href: "/tools/split-bills-by-income-calculator.html", t: "Split bills by income", d: "Compare proportional contributions with 50/50" },
+  { href: "/tools/christmas-budget-savings-calculator.html", t: "Christmas savings planner", d: "Work out how much to put aside each payday" },
   { href: "/import/", t: "Bank CSV guides", d: "Export from 20 UK banks, step by step" },
   { href: "/guides/", t: "Budgeting guides", d: "Answer-first, no jargon, no bank login" },
   { href: "/tools/", t: "Free calculators", d: "50/30/20, emergency fund, payoff, surplus" },
@@ -437,7 +440,7 @@ export default function LandingPage({ onEnter, onFeedback }: { onEnter: () => vo
             <div className="lp-browser">
               <div className="lp-chrome">
                 <div className="lp-dots"><span /><span /><span /></div>
-                <div className="lp-url">theincometracker.app &nbsp;/&nbsp; Jun 2025</div>
+                <div className="lp-url">theincometracker.com &nbsp;/&nbsp; Example month</div>
               </div>
 
               {/* Two-column ledger mock */}

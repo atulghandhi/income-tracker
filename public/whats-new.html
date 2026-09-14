@@ -27,7 +27,7 @@
     <meta name="twitter:image" content="https://www.theincometracker.com/og-image.png" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="icon" type="image/png" sizes="240x240" href="/icon.png" />
-    <link rel="apple-touch-icon" href="/icon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
     <link rel="alternate" type="application/rss+xml" title="The Income Tracker: new guides and updates" href="https://www.theincometracker.com/feed.xml" />
     <style>
@@ -118,6 +118,7 @@
   .calc-inwrap { display: flex; align-items: center; background: #06182b; border: 1px solid rgba(212,228,250,0.16); border-radius: 10px; padding: 0 12px; }
   .calc-inwrap:focus-within { border-color: rgba(0,223,193,0.5); }
   .calc-inwrap i { color: #9ea8b7; font-style: normal; font-size: 0.95rem; }
+  .calc-inwrap select { min-width: 0; width: 100%; padding: 12px; border: 0; background: #102638; color: #d4e4fa; font: inherit; }
   .calc-inwrap input { flex: 1; min-width: 0; background: none; border: none; color: #fff; font-size: 1.05rem; font-weight: 600; padding: 11px 6px; outline: none; font-family: inherit; }
   .calc-inwrap input::-webkit-outer-spin-button, .calc-inwrap input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   .calc-out { margin-top: 18px; padding-top: 18px; border-top: 1px solid rgba(212,228,250,0.1); }
@@ -187,7 +188,7 @@
         "@id": "https://www.theincometracker.com/#website"
       },
       "datePublished": "2026-06-16",
-      "dateModified": "2026-09-08",
+      "dateModified": "2026-09-14",
       "primaryImageOfPage": {
         "@type": "ImageObject",
         "url": "https://www.theincometracker.com/og-image.png",
@@ -223,76 +224,81 @@
         {
           "@type": "ListItem",
           "position": 1,
-          "name": "2026-09-08: Bigger help library, calculators, templates and comparisons"
+          "name": "2026-09-14: Three new budget tools"
         },
         {
           "@type": "ListItem",
           "position": 2,
-          "name": "2026-09-08: Install it, and get a monthly nudge"
+          "name": "2026-09-08: Bigger help library, calculators, templates and comparisons"
         },
         {
           "@type": "ListItem",
           "position": 3,
-          "name": "2026-07-21: Skippable setup wizard and a getting-started checklist"
+          "name": "2026-09-08: Install it, and get a monthly nudge"
         },
         {
           "@type": "ListItem",
           "position": 4,
-          "name": "2026-07-13: Credit card CSVs no longer import back to front"
+          "name": "2026-07-21: Skippable setup wizard and a getting-started checklist"
         },
         {
           "@type": "ListItem",
           "position": 5,
-          "name": "2026-07-12: Clearer imports, tidier rules, transfer pairing"
+          "name": "2026-07-13: Credit card CSVs no longer import back to front"
         },
         {
           "@type": "ListItem",
           "position": 6,
-          "name": "2026-07-09: Recurring months, merchant memory and multi-format imports"
+          "name": "2026-07-12: Clearer imports, tidier rules, transfer pairing"
         },
         {
           "@type": "ListItem",
           "position": 7,
-          "name": "2026-07-09: Optional AI categorisation for the leftovers"
+          "name": "2026-07-09: Recurring months, merchant memory and multi-format imports"
         },
         {
           "@type": "ListItem",
           "position": 8,
-          "name": "2026-07-07: Debt balances roll forward automatically"
+          "name": "2026-07-09: Optional AI categorisation for the leftovers"
         },
         {
           "@type": "ListItem",
           "position": 9,
-          "name": "2026-07-06: New look and the right month on open"
+          "name": "2026-07-07: Debt balances roll forward automatically"
         },
         {
           "@type": "ListItem",
           "position": 10,
-          "name": "2026-07-02: iOS: sign in with Apple or email, quick add, duplicate review"
+          "name": "2026-07-06: New look and the right month on open"
         },
         {
           "@type": "ListItem",
           "position": 11,
-          "name": "2026-06-18: Work begins on a native iOS app"
+          "name": "2026-07-02: iOS: sign in with Apple or email, quick add, duplicate review"
         },
         {
           "@type": "ListItem",
           "position": 12,
-          "name": "2026-06-17: Free money calculators and use-case pages"
+          "name": "2026-06-18: Work begins on a native iOS app"
         },
         {
           "@type": "ListItem",
           "position": 13,
-          "name": "2026-06-16: Bank CSV export guides and a feedback form"
+          "name": "2026-06-17: Free money calculators and use-case pages"
         },
         {
           "@type": "ListItem",
           "position": 14,
-          "name": "2026-06-15: Home page demos and the annual chart"
+          "name": "2026-06-16: Bank CSV export guides and a feedback form"
         },
         {
           "@type": "ListItem",
           "position": 15,
+          "name": "2026-06-15: Home page demos and the annual chart"
+        },
+        {
+          "@type": "ListItem",
+          "position": 16,
           "name": "2026-06-14: Transfers auto-skipped, tutorials, responsive accounts"
         }
       ]
@@ -316,9 +322,10 @@
     <div class="wrap">
       <header class="top"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> &rsaquo; What's new</nav></header>
       <h1>What&rsquo;s new</h1>
-      <p class="meta">Updated 8 September 2026 · <a href="/feed.xml">Subscribe by RSS</a></p>
+      <p class="meta">Updated 14 September 2026 · <a href="/feed.xml">Subscribe by RSS</a></p>
       <div class="tldr"><strong>In short</strong><p>The Income Tracker ships small improvements often. This page lists the ones you would notice, newest first. Bank export steps and guide figures are re-checked on their own pages.</p></div>
       <ul class="changelog">
+        <li><time datetime="2026-09-14">14 September 2026</time><strong>Three new budget tools</strong> Convert weekly and four-weekly amounts into a monthly budget, compare income-based bill splitting with 50/50, and plan Christmas savings by payday. Each tool includes worked examples and runs in your browser without an account.</li>
         <li><time datetime="2026-09-08">8 September 2026</time><strong>Bigger help library, calculators, templates and comparisons</strong> CSV export guides now cover 20 UK banks and card providers, plus a guide for PDF-only statements. New calculators for the 50/30/20 split, emergency funds, spend-per-day until payday, snowball versus avalanche and subscription costs. Free CSV budget templates that import in one step. Honest comparisons with Emma, Snoop, Moneyhub, YNAB, Plum and Monzo Trends. A site-wide menu, an RSS feed and a What's new page. <a href="/guides/">Browse the guides</a></li>
         <li><time datetime="2026-09-08">8 September 2026</time><strong>Install it, and get a monthly nudge</strong> The web app can now be installed to your phone or desktop and opens offline. A one-tap calendar reminder prompts you to import last month's statement, and the dashboard points you to your bank's export guide when a new month starts empty.</li>
         <li><time datetime="2026-07-21">21 July 2026</time><strong>Skippable setup wizard and a getting-started checklist</strong> First-run setup asks for the basics in under a minute and can be skipped entirely. The dashboard checklist ticks itself off as you add income, spending, an account, a goal and your first import.</li>

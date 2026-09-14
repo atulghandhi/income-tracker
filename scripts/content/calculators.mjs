@@ -1,7 +1,10 @@
+import { BUDGET_TOOLS } from "./budget-tools.mjs";
+
 // Interactive calculators. Each `compute` is browser JS rendered inline.
 // It must not contain backticks or ${ so it can live inside template literals.
 
 export const CALCULATORS = [
+  ...BUDGET_TOOLS,
   {
     slug: "0-percent-credit-card-payoff-calculator-uk",
     published: "2026-06-16",
@@ -195,10 +198,10 @@ export const CALCULATORS = [
     card: "Monthly surplus",
     cardD: "What is left after spending",
     crumb: "Monthly surplus",
-    title: "Monthly surplus calculator (UK)",
+    title: "Income and Expenditure Calculator | Monthly Budget",
     description:
       "Free monthly surplus calculator. Subtract your expenses from your income to see how much you have left each month and your savings rate.",
-    h1: "Monthly surplus calculator",
+    h1: "Income and expenditure calculator",
     tldr:
       "Your surplus is what is left after expenses. It is the single most useful number in personal finance. Enter your monthly income and spending to see your surplus and savings rate.",
     fields: [

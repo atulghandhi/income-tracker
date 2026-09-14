@@ -8,6 +8,34 @@
     <language>en-gb</language>
     <lastBuildDate>Tue, 08 Sep 2026 09:00:00 GMT</lastBuildDate>
     <item>
+      <title>Update: Three new budget tools</title>
+      <link>https://www.theincometracker.com/whats-new.html</link>
+      <guid isPermaLink="true">https://www.theincometracker.com/whats-new.html#2026-09-14-three-new-budget-tools</guid>
+      <pubDate>Mon, 14 Sep 2026 09:00:00 GMT</pubDate>
+      <description>Convert weekly and four-weekly amounts into a monthly budget, compare income-based bill splitting with 50/50, and plan Christmas savings by payday. Each tool includes worked examples and runs in your browser without an account.</description>
+    </item>
+    <item>
+      <title>Christmas Budget &amp; Savings Calculator | Free Planner</title>
+      <link>https://www.theincometracker.com/tools/christmas-budget-savings-calculator.html</link>
+      <guid isPermaLink="true">https://www.theincometracker.com/tools/christmas-budget-savings-calculator.html</guid>
+      <pubDate>Mon, 14 Sep 2026 09:00:00 GMT</pubDate>
+      <description>Plan Christmas gifts, food, travel and extras. Subtract what you have saved and work out how much to save each payday before you need to spend it.</description>
+    </item>
+    <item>
+      <title>Split Bills by Income Calculator | Couples &amp; Rent</title>
+      <link>https://www.theincometracker.com/tools/split-bills-by-income-calculator.html</link>
+      <guid isPermaLink="true">https://www.theincometracker.com/tools/split-bills-by-income-calculator.html</guid>
+      <pubDate>Mon, 14 Sep 2026 09:00:00 GMT</pubDate>
+      <description>Work out each partner’s share of rent and household bills using take-home income. Compare an income-based split with 50/50 and see what each has left.</description>
+    </item>
+    <item>
+      <title>Weekly to Monthly Budget Calculator | Free Converter</title>
+      <link>https://www.theincometracker.com/tools/weekly-to-monthly-budget-calculator.html</link>
+      <guid isPermaLink="true">https://www.theincometracker.com/tools/weekly-to-monthly-budget-calculator.html</guid>
+      <pubDate>Mon, 14 Sep 2026 09:00:00 GMT</pubDate>
+      <description>Convert weekly, fortnightly, four-weekly or annual pay and bills to a monthly budget. See the formula, yearly total and why multiplying by four falls short.</description>
+    </item>
+    <item>
       <title>Update: Install it, and get a monthly nudge</title>
       <link>https://www.theincometracker.com/whats-new.html</link>
       <guid isPermaLink="true">https://www.theincometracker.com/whats-new.html#2026-09-08-install-it-and-get-a-monthly-nudge</guid>
@@ -258,34 +286,6 @@
       <guid isPermaLink="true">https://www.theincometracker.com/import/first-direct-csv.html</guid>
       <pubDate>Tue, 08 Sep 2026 09:00:00 GMT</pubDate>
       <description>Step-by-step CSV export guide for first direct.</description>
-    </item>
-    <item>
-      <title>How to export your Chase UK statement to CSV</title>
-      <link>https://www.theincometracker.com/import/chase-uk-csv.html</link>
-      <guid isPermaLink="true">https://www.theincometracker.com/import/chase-uk-csv.html</guid>
-      <pubDate>Tue, 08 Sep 2026 09:00:00 GMT</pubDate>
-      <description>Step-by-step CSV export guide for Chase UK.</description>
-    </item>
-    <item>
-      <title>How to export your TSB statement to CSV</title>
-      <link>https://www.theincometracker.com/import/tsb-csv.html</link>
-      <guid isPermaLink="true">https://www.theincometracker.com/import/tsb-csv.html</guid>
-      <pubDate>Tue, 08 Sep 2026 09:00:00 GMT</pubDate>
-      <description>Step-by-step CSV export guide for TSB.</description>
-    </item>
-    <item>
-      <title>How to export your Bank of Scotland statement to CSV</title>
-      <link>https://www.theincometracker.com/import/bank-of-scotland-csv.html</link>
-      <guid isPermaLink="true">https://www.theincometracker.com/import/bank-of-scotland-csv.html</guid>
-      <pubDate>Tue, 08 Sep 2026 09:00:00 GMT</pubDate>
-      <description>Step-by-step CSV export guide for Bank of Scotland.</description>
-    </item>
-    <item>
-      <title>How to export your Halifax statement to CSV</title>
-      <link>https://www.theincometracker.com/import/halifax-csv.html</link>
-      <guid isPermaLink="true">https://www.theincometracker.com/import/halifax-csv.html</guid>
-      <pubDate>Tue, 08 Sep 2026 09:00:00 GMT</pubDate>
-      <description>Step-by-step CSV export guide for Halifax.</description>
     </item>
   </channel>
 </rss>

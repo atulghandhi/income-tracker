@@ -13,7 +13,7 @@
 //     revalidate.
 //   - Cross-origin requests (Supabase, analytics, fonts): never intercepted.
 
-const VERSION = "it-sw-v1";
+const VERSION = "it-sw-v3-wallet";
 const SHELL_CACHE = `${VERSION}-shell`;
 const ASSET_CACHE = `${VERSION}-assets`;
 const OFFLINE_URL = "/offline.html";
@@ -22,7 +22,7 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(SHELL_CACHE)
-      .then((cache) => cache.addAll([OFFLINE_URL, "/icon.svg", "/icon.png", "/site.webmanifest"]).catch(() => undefined))
+      .then((cache) => cache.addAll([OFFLINE_URL, "/icon.svg", "/icon.png", "/apple-touch-icon.png", "/icon-192.png", "/icon-512.png", "/site.webmanifest"]).catch(() => undefined))
       .then(() => self.skipWaiting()),
   );
 });

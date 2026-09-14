@@ -70,7 +70,7 @@ final class SyncCoordinator {
     // MARK: - Keychain constants
 
     private enum KeychainKey {
-        static let service = "com.incometracker.app"
+        static let service = "com.incometracking.app"
         static let session = "supabase_session"
         // Legacy pre-refresh-support entries; cleared on sign-out.
         static let legacyAccessToken = "supabase_access_token"

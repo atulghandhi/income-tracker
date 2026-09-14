@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Split Bills by Income Calculator | Couples &amp; Rent</title>
+    <meta name="description" content="Work out each partner’s share of rent and household bills using take-home income. Compare an income-based split with 50/50 and see what each has left." />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+    <meta name="author" content="The Income Tracker" />
+    <meta name="theme-color" content="#051424" />
+    <link rel="canonical" href="https://www.theincometracker.com/tools/split-bills-by-income-calculator.html" />
+    <meta name="geo.region" content="GB" />
+    <meta http-equiv="content-language" content="en-GB" />
+    <meta property="og:type" content="article" />
+    <meta property="og:locale" content="en_GB" />
+    <meta property="og:site_name" content="The Income Tracker" />
+    <meta property="og:url" content="https://www.theincometracker.com/tools/split-bills-by-income-calculator.html" />
+    <meta property="og:title" content="Split Bills by Income Calculator | Couples &amp; Rent" />
+    <meta property="og:description" content="Work out each partner’s share of rent and household bills using take-home income. Compare an income-based split with 50/50 and see what each has left." />
+    <meta property="og:image" content="https://www.theincometracker.com/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="The Income Tracker: free, private, local-first budget tracker for the UK" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Split Bills by Income Calculator | Couples &amp; Rent" />
+    <meta name="twitter:description" content="Work out each partner’s share of rent and household bills using take-home income. Compare an income-based split with 50/50 and see what each has left." />
+    <meta name="twitter:image" content="https://www.theincometracker.com/og-image.png" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="icon" type="image/png" sizes="240x240" href="/icon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="alternate" type="application/rss+xml" title="The Income Tracker: new guides and updates" href="https://www.theincometracker.com/feed.xml" />
+    <style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; padding: 0 24px 96px; background: #051424; color: #d4e4fa;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 16px; line-height: 1.7;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  a { color: #00dfc1; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  header.site { max-width: 980px; margin: 0 auto; padding: 18px 0 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+  header.site .brand { color: #fff; font-weight: 800; letter-spacing: -0.01em; font-size: 1.02rem; margin-right: auto; }
+  header.site .brand:hover { text-decoration: none; color: #00dfc1; }
+  nav.sitenav { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; font-size: 0.88rem; }
+  nav.sitenav a { color: #b8c8e0; padding: 4px 0; }
+  nav.sitenav a:hover { color: #00dfc1; text-decoration: none; }
+  nav.sitenav a.navbtn { background: rgba(0,223,193,0.12); border: 1px solid rgba(0,223,193,0.35); color: #00dfc1; padding: 6px 12px; border-radius: 8px; font-weight: 700; }
+  nav.sitenav a.navbtn:hover { background: rgba(0,223,193,0.2); }
+  header.top { padding: 22px 0 8px; }
+  nav.crumbs { font-size: 0.85rem; color: #9ea8b7; }
+  nav.crumbs a { color: #9ea8b7; }
+  nav.crumbs a:hover { color: #00dfc1; }
+  h1 { font-size: clamp(1.7rem, 4vw, 2.3rem); font-weight: 800; line-height: 1.15; margin: 18px 0 10px; color: #fff; letter-spacing: -0.02em; }
+  .meta { color: #9ea8b7; font-size: 0.85rem; margin-bottom: 24px; }
+  .lede { font-size: 1.12rem; color: #eaf2ff; line-height: 1.65; margin: 0 0 24px; }
+  .tldr { background: rgba(0,223,193,0.07); border: 1px solid rgba(0,223,193,0.22); border-radius: 12px; padding: 16px 20px; margin: 0 0 28px; }
+  .tldr strong { color: #00dfc1; letter-spacing: 0.02em; font-size: 0.8rem; text-transform: uppercase; display: block; margin-bottom: 6px; }
+  .tldr p { margin: 0; color: #d4e4fa; }
+  h2 { font-size: 1.3rem; font-weight: 700; color: #fff; margin: 40px 0 12px; letter-spacing: -0.01em; }
+  h3 { font-size: 1.05rem; font-weight: 650; color: #fff; margin: 28px 0 8px; }
+  p, li { color: #c8d8ee; }
+  ul, ol { padding-left: 22px; }
+  li + li { margin-top: 8px; }
+  ol.steps { counter-reset: step; list-style: none; padding-left: 0; }
+  ol.steps > li { position: relative; padding: 0 0 4px 44px; margin-top: 18px; }
+  ol.steps > li::before {
+    counter-increment: step; content: counter(step);
+    position: absolute; left: 0; top: 0; width: 30px; height: 30px;
+    background: rgba(0,223,193,0.12); border: 1px solid rgba(0,223,193,0.4);
+    color: #00dfc1; border-radius: 50%; display: grid; place-items: center;
+    font-weight: 700; font-size: 0.9rem;
+  }
+  .note { background: rgba(212,228,250,0.05); border-left: 3px solid rgba(212,228,250,0.25); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 20px 0; font-size: 0.95rem; color: #b8c8e0; }
+  .cta { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin: 34px 0; padding: 24px; background: rgba(8,22,38,0.85); border: 1px solid rgba(0,223,193,0.18); border-radius: 14px; }
+  .cta .cta-text { flex: 1; min-width: 220px; }
+  .cta .cta-text strong { color: #fff; display: block; font-size: 1.05rem; margin-bottom: 2px; }
+  .cta .cta-text span { color: #9ea8b7; font-size: 0.9rem; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; background: #00dfc1; color: #051424; font-weight: 700; padding: 13px 22px; border-radius: 10px; white-space: nowrap; border: none; font-size: 1rem; font-family: inherit; cursor: pointer; }
+  .btn:hover { text-decoration: none; filter: brightness(1.06); }
+  .btn.ghost { background: transparent; color: #00dfc1; border: 1px solid rgba(0,223,193,0.4); }
+  .btn.ghost:hover { background: rgba(0,223,193,0.08); }
+  .btnrow { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 18px 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; margin: 24px 0; }
+  .card { display: block; padding: 16px 18px; background: rgba(8,22,38,0.7); border: 1px solid rgba(212,228,250,0.1); border-radius: 12px; transition: border-color 140ms ease, transform 140ms ease; }
+  .card:hover { text-decoration: none; border-color: rgba(0,223,193,0.4); transform: translateY(-2px); }
+  .card .card-t { color: #fff; font-weight: 650; display: block; margin-bottom: 4px; }
+  .card .card-d { color: #9ea8b7; font-size: 0.88rem; }
+  .faq dt { font-weight: 650; color: #fff; margin-top: 22px; }
+  .faq dd { margin: 6px 0 0; color: #c8d8ee; }
+  .tablewrap { overflow-x: auto; margin: 18px 0; border: 1px solid rgba(212,228,250,0.12); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.93rem; min-width: 460px; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid rgba(212,228,250,0.1); vertical-align: top; color: #c8d8ee; }
+  th { color: #fff; font-weight: 700; background: rgba(8,22,38,0.9); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  tr:last-child td { border-bottom: none; }
+  td.hi { color: #00dfc1; font-weight: 600; }
+  .verdict { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin: 20px 0; }
+  .verdict > div { background: rgba(8,22,38,0.7); border: 1px solid rgba(212,228,250,0.1); border-radius: 12px; padding: 16px 18px; }
+  .verdict h3 { margin: 0 0 8px; font-size: 0.98rem; }
+  .verdict ul { margin: 0; padding-left: 18px; }
+  .verdict li { font-size: 0.93rem; }
+  .sources { font-size: 0.86rem; color: #9ea8b7; }
+  .sources ul { padding-left: 18px; }
+  .sources li { color: #9ea8b7; margin-top: 4px; }
+  .sources a { color: #9ea8b7; text-decoration: underline; }
+  .sources a:hover { color: #00dfc1; }
+  .tag { display: inline-block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #00dfc1; background: rgba(0,223,193,0.1); border: 1px solid rgba(0,223,193,0.3); padding: 2px 8px; border-radius: 999px; margin-right: 8px; vertical-align: middle; }
+  .changelog li { margin-top: 14px; }
+  .changelog time { color: #9ea8b7; font-size: 0.82rem; display: block; }
+  .changelog strong { color: #fff; }
+  /* Calculator widget */
+  .calc { background: rgba(8,22,38,0.9); border: 1px solid rgba(0,223,193,0.2); border-radius: 16px; padding: 22px; margin: 0 0 14px; }
+  .calc-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
+  .calc-field { display: flex; flex-direction: column; gap: 6px; }
+  .calc-label { font-size: 0.82rem; color: #9ea8b7; font-weight: 600; }
+  .calc-inwrap { display: flex; align-items: center; background: #06182b; border: 1px solid rgba(212,228,250,0.16); border-radius: 10px; padding: 0 12px; }
+  .calc-inwrap:focus-within { border-color: rgba(0,223,193,0.5); }
+  .calc-inwrap i { color: #9ea8b7; font-style: normal; font-size: 0.95rem; }
+  .calc-inwrap select { min-width: 0; width: 100%; padding: 12px; border: 0; background: #102638; color: #d4e4fa; font: inherit; }
+  .calc-inwrap input { flex: 1; min-width: 0; background: none; border: none; color: #fff; font-size: 1.05rem; font-weight: 600; padding: 11px 6px; outline: none; font-family: inherit; }
+  .calc-inwrap input::-webkit-outer-spin-button, .calc-inwrap input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .calc-out { margin-top: 18px; padding-top: 18px; border-top: 1px solid rgba(212,228,250,0.1); }
+  .calc-out p { margin: 8px 0 0; }
+  .calc-headline { font-size: 2rem; font-weight: 800; color: #00dfc1; line-height: 1.1; letter-spacing: -0.02em; }
+  .calc-headline small { font-size: 0.9rem; font-weight: 600; color: #9ea8b7; letter-spacing: 0; }
+  .calc-hint { color: #9ea8b7; }
+  .calc-good { color: #00dfc1; }
+  .calc-warn { color: #ffd479; }
+  .calc-bad { color: #ff8b8b; }
+  .calc-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 16px; }
+  .calc-actions .btn { padding: 9px 14px; font-size: 0.88rem; }
+  .calc-share-note { font-size: 0.82rem; color: #9ea8b7; }
+  hr { border: none; border-top: 1px solid rgba(212,228,250,0.1); margin: 48px 0 24px; }
+  footer.site { color: #9ea8b7; font-size: 0.85rem; }
+  footer.site .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 18px; margin-bottom: 22px; }
+  footer.site h4 { color: #d4e4fa; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 8px; }
+  footer.site ul { list-style: none; padding: 0; margin: 0; }
+  footer.site li { margin: 0 0 6px; color: #9ea8b7; }
+  footer.site a { color: #9ea8b7; }
+  footer.site a:hover { color: #00dfc1; }
+  footer.site .legal { border-top: 1px solid rgba(212,228,250,0.08); padding-top: 14px; }
+  @media (max-width: 560px) {
+    body { padding: 0 16px 72px; }
+    header.site { padding-top: 14px; }
+    nav.sitenav { font-size: 0.84rem; gap: 2px 12px; }
+    .calc { padding: 16px; }
+  }
+</style>
+    <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://www.theincometracker.com/#website",
+      "url": "https://www.theincometracker.com/",
+      "name": "The Income Tracker",
+      "description": "A free, local-first income and expense tracker for the UK. Import a CSV from your bank. No account, no bank login.",
+      "inLanguage": "en-GB",
+      "publisher": {
+        "@id": "https://www.theincometracker.com/#org"
+      }
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://www.theincometracker.com/#org",
+      "name": "The Income Tracker",
+      "url": "https://www.theincometracker.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.theincometracker.com/icon.png",
+        "width": 240,
+        "height": 240
+      },
+      "email": "hello@theincometracker.com",
+      "areaServed": "GB"
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://www.theincometracker.com/tools/split-bills-by-income-calculator.html#webpage",
+      "url": "https://www.theincometracker.com/tools/split-bills-by-income-calculator.html",
+      "name": "Split Bills by Income Calculator | Couples & Rent",
+      "description": "Work out each partner’s share of rent and household bills using take-home income. Compare an income-based split with 50/50 and see what each has left.",
+      "inLanguage": "en-GB",
+      "isPartOf": {
+        "@id": "https://www.theincometracker.com/#website"
+      },
+      "datePublished": "2026-09-14",
+      "dateModified": "2026-09-14",
+      "primaryImageOfPage": {
+        "@type": "ImageObject",
+        "url": "https://www.theincometracker.com/og-image.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.theincometracker.com/tools/split-bills-by-income-calculator.html#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.theincometracker.com/tools/split-bills-by-income-calculator.html#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.theincometracker.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Calculators",
+          "item": "https://www.theincometracker.com/tools/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Split bills by income",
+          "item": "https://www.theincometracker.com/tools/split-bills-by-income-calculator.html"
+        }
+      ]
+    },
+    {
+      "@type": "WebApplication",
+      "name": "Split Bills by Income Calculator | Couples & Rent",
+      "description": "Work out each partner’s share of rent and household bills using take-home income. Compare an income-based split with 50/50 and see what each has left.",
+      "applicationCategory": "FinanceApplication",
+      "operatingSystem": "Any (web browser)",
+      "browserRequirements": "Requires JavaScript",
+      "url": "https://www.theincometracker.com/tools/split-bills-by-income-calculator.html",
+      "isAccessibleForFree": true,
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "GBP"
+      },
+      "publisher": {
+        "@id": "https://www.theincometracker.com/#org"
+      }
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How do you split rent based on income?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Divide each person’s take-home income by the combined take-home income, then multiply by the rent. The same formula works for an agreed total of shared bills."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Should we use gross or net income?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Use net, or take-home, income after deductions for this household-budget comparison. Use the same time period for both people."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What if one partner has no income?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The formula assigns the full shared bill to the person with income. That is only the mathematical result; agree an arrangement that accounts for care, savings and other circumstances."
+          }
+        }
+      ]
+    }
+  ]
+}
+    </script>
+  </head>
+  <body>
+    <header class="site">
+      <a class="brand" href="/">The Income Tracker</a>
+      <nav class="sitenav" aria-label="Site">
+        <a href="/import/">Bank CSV guides</a>
+        <a href="/guides/">Guides</a>
+        <a href="/tools/">Calculators</a>
+        <a href="/compare/">Compare</a>
+        <a href="/templates/">Templates</a>
+        <a class="navbtn" href="/?ref=nav" data-track="cta_click" data-ref="nav">Open the tracker</a>
+      </nav>
+    </header>
+    <div class="wrap">
+      <header class="top"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> &rsaquo; <a href="/tools/">Calculators</a> &rsaquo; Split bills by income</nav></header>
+      <h1>Split bills by income calculator</h1>
+      <p class="meta">By The Income Tracker · Updated 14 September 2026</p>
+      <div class="tldr"><strong>The short answer</strong><p>An income-based split gives each person the same percentage of shared bills as their share of combined take-home pay. Enter both monthly incomes and the shared bill total to compare this with splitting equally.</p></div>
+      <div class="calc">
+        <div class="calc-fields">
+          <label class="calc-field"><span class="calc-label">Person 1 monthly take-home pay</span><span class="calc-inwrap"><i>£</i><input id="income1" type="number" inputmode="decimal" step="any" value="3000" min="0" max="1000000000000" required /></span></label>
+          <label class="calc-field"><span class="calc-label">Person 2 monthly take-home pay</span><span class="calc-inwrap"><i>£</i><input id="income2" type="number" inputmode="decimal" step="any" value="2000" min="0" max="1000000000000" required /></span></label>
+          <label class="calc-field"><span class="calc-label">Shared monthly bills</span><span class="calc-inwrap"><i>£</i><input id="bills" type="number" inputmode="decimal" step="any" value="1500" min="0" max="1000000000000" required /></span></label>
+        </div>
+        <div class="calc-out" id="calc-out" role="status" aria-live="polite" aria-atomic="true"></div>
+        <noscript><p>Enable JavaScript to calculate your own result. The formulas and worked examples below are available without it.</p></noscript>
+        <div class="calc-actions">
+          <button class="btn ghost" type="button" id="calc-share">Share this result</button>
+          <a class="btn" href="/?ref=calc-split-bills-by-income-calculator" data-track="cta_click" data-ref="calc-split-bills-by-income-calculator">Track it in the app &rarr;</a>
+          <span class="calc-share-note" id="calc-share-note">Calculated on your device. Shared links include the amounts you enter.</span>
+        </div>
+      </div>
+
+      <h2>Worked example: £3,000 and £2,000 take-home pay</h2>
+      <p>Combined income is £5,000. Person 1 earns 60% and person 2 earns 40%. With £1,500 of shared bills, the contributions are £900 and £600. Both contribute 30% of their own income. With an equal split, each contributes £750.</p>
+
+      <h2>Which bills should be shared?</h2>
+      <ul>
+        <li>Include the rent or mortgage payment, utilities and groceries you have agreed to share.</li>
+        <li>Keep individual subscriptions, personal debts and individual spending separate unless you agree otherwise.</li>
+        <li>Use monthly take-home income for both people. Convert weekly or four-weekly pay to the same basis first.</li>
+      </ul>
+
+      <h2>Is an income-based split always fair?</h2>
+      <p>It is one option to discuss, rather than a rule. Childcare, unpaid caring, variable earnings and personal commitments can change what feels workable. The calculator compares two methods; it does not decide your arrangement. Review the numbers when income or responsibilities change.</p>
+      <p><a href="/guides/budgeting-for-couples-separate-accounts-uk.html">Read the guide to budgeting together with separate accounts</a>.</p>
+
+      <div class="cta">
+  <div class="cta-text"><strong>The Income Tracker</strong><span>Track it free. No account, no bank login.</span></div>
+  <a class="btn" href="/?ref=calc-split-bills-by-income-calculator" data-track="cta_click" data-ref="calc-split-bills-by-income-calculator">Open the tracker &rarr;</a>
+</div>
+
+      <h2>Frequently asked questions</h2>
+<dl class="faq">
+<dt>How do you split rent based on income?</dt>
+<dd>Divide each person’s take-home income by the combined take-home income, then multiply by the rent. The same formula works for an agreed total of shared bills.</dd>
+<dt>Should we use gross or net income?</dt>
+<dd>Use net, or take-home, income after deductions for this household-budget comparison. Use the same time period for both people.</dd>
+<dt>What if one partner has no income?</dt>
+<dd>The formula assigns the full shared bill to the person with income. That is only the mathematical result; agree an arrangement that accounts for care, savings and other circumstances.</dd>
+</dl>
+
+      <div class="sources"><h3>Sources and checking</h3><p>Facts on this page were last checked on 2026-09-14 against:</p><ul><li><a href="https://www.moneyhelper.org.uk/en/blog/utilities/how-to-split-rent-and-bills-fairly" rel="noopener" target="_blank">MoneyHelper: how to split rent and bills fairly</a></li></ul><p>Spotted something out of date? <a href="/?feedback=1">Tell us</a> and we will fix it.</p></div>
+
+      <h2>Related</h2>
+      <div class="grid">
+        <a class="card" href="/guides/budgeting-for-couples-separate-accounts-uk.html"><span class="card-t">Budgeting as a couple with separate accounts</span><span class="card-d">One picture from two banks, without a shared login</span></a>
+        <a class="card" href="/templates/household-bills-tracker-template.html"><span class="card-t">Household bills tracker</span><span class="card-d">Every direct debit, standing order and subscription</span></a>
+        <a class="card" href="/tools/weekly-to-monthly-budget-calculator.html"><span class="card-t">Weekly to monthly converter</span><span class="card-d">Convert weekly, fortnightly and four-weekly amounts</span></a>
+        <a class="card" href="/tools/monthly-surplus-calculator.html"><span class="card-t">Monthly surplus</span><span class="card-d">What is left after spending</span></a>
+      </div>
+      <hr />
+      <footer class="site">
+        <div class="cols">
+          <div>
+            <h4>Use it</h4>
+            <ul>
+              <li><a href="/?ref=footer" data-track="cta_click" data-ref="footer">Open the tracker</a></li>
+              <li><a href="/import/">Bank CSV guides</a></li>
+              <li><a href="/templates/">Budget templates</a></li>
+              <li><a href="/tools/">Calculators</a></li>
+            </ul>
+          </div>
+          <div>
+            <h4>Learn</h4>
+            <ul>
+              <li><a href="/guides/">Budgeting guides</a></li>
+              <li><a href="/compare/">Compare apps</a></li>
+              <li><a href="/compare/best-free-budgeting-apps-uk.html">Best free budgeting apps (UK)</a></li>
+              <li><a href="/whats-new.html">What&rsquo;s new</a></li>
+            </ul>
+          </div>
+          <div>
+            <h4>About</h4>
+            <ul>
+              <li><a href="/about.html">About</a></li>
+              <li><a href="/?feedback=1">Contact us</a></li>
+              <li><a href="/privacy.html">Privacy</a></li>
+              <li><a href="/tos.html">Terms</a></li>
+              <li><a href="/feed.xml">RSS feed</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="legal">&copy; 2026 The Income Tracker. Free, private, local-first budgeting for the UK. No account, no bank login.</div>
+      </footer>
+    </div>
+<script>
+window.va=window.va||function(){(window.vaq=window.vaq||[]).push(arguments)};
+(function(){
+  var PH_KEY="",PH_HOST="https://us.i.posthog.com";
+  var dnt=typeof navigator!=="undefined"&&navigator.doNotTrack==="1";
+  function id(){try{var k="it_analytics_id",v=localStorage.getItem(k);if(!v){v="anon-"+(window.crypto&&crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2));localStorage.setItem(k,v);}return v;}catch(e){return "anon-ephemeral";}}
+  function track(name,props){
+    props=props||{};props.page=location.pathname;
+    try{window.va("event",{name:name,data:props});}catch(e){}
+    if(!PH_KEY||dnt)return;
+    try{fetch(PH_HOST+"/capture/",{method:"POST",keepalive:true,headers:{"content-type":"application/json"},body:JSON.stringify({api_key:PH_KEY,event:name,distinct_id:id(),properties:Object.assign({app:"income-tracker-web",surface:"static"},props),timestamp:new Date().toISOString()})}).catch(function(){});}catch(e){}
+  }
+  window.itTrack=track;
+  document.addEventListener("click",function(ev){
+    var t=ev.target;if(!t||!t.closest)return;var el=t.closest("[data-track]");if(!el)return;
+    track(el.getAttribute("data-track"),{ref:el.getAttribute("data-ref")||"",href:el.getAttribute("href")||""});
+  });
+  if(PH_KEY&&!dnt)track("static_pageview",{});
+})();
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
+<script>
+(function(){
+  var IDS=["income1","income2","bills"],SLUG="split-bills-by-income-calculator",used=false;
+  function n(id){var el=document.getElementById(id);if(!el)return 0;var v=Number(el.value);return Number.isFinite(v)?v:0;}
+  function gbp(x){return '£'+(Math.round(x*100)/100).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});}
+  function pct(x){return (Math.round(x*10)/10)+'%';}
+  var out=document.getElementById('calc-out');
+  function render(){
+    if(IDS.some(function(id){var el=document.getElementById(id);return !el||!el.value||!el.checkValidity()||!Number.isFinite(Number(el.value));})){
+      out.innerHTML='<p class="calc-hint">Enter a valid non-negative number in each field. Payment counts must be whole numbers.</p>';return;
+    }
+    var a=n('income1'),b=n('income2'),bills=n('bills'),total=a+b;
+    if(total<=0){out.innerHTML='<p class="calc-hint">Enter a positive income for at least one person.</p>';return;}
+    var cents=Math.round(bills*100),one=Math.round(cents*a/total)/100,two=(cents-Math.round(cents*a/total))/100;
+    var half1=Math.ceil(cents/2)/100,half2=Math.floor(cents/2)/100;
+    out.innerHTML='<div class="calc-headline">'+pct(a/total*100)+' / '+pct(b/total*100)+' <small>income-based split</small></div><div class="tablewrap"><table><thead><tr><th scope="col">Monthly amount</th><th scope="col">Person 1</th><th scope="col">Person 2</th></tr></thead><tbody><tr><th scope="row">Income-based contribution</th><td>'+gbp(one)+'</td><td>'+gbp(two)+'</td></tr><tr><th scope="row">Left after shared bills</th><td>'+gbp(a-one)+'</td><td>'+gbp(b-two)+'</td></tr><tr><th scope="row">Equal split</th><td>'+gbp(half1)+'</td><td>'+gbp(half2)+'</td></tr></tbody></table></div><p>Contributions are rounded to pennies and add up to the shared total. Personal bills and debts are not included.</p>'+(bills>total?'<p class="calc-warn">Shared bills exceed your combined take-home income. Changing the split does not close that gap.</p>':'');
+  }
+  try{var q=new URLSearchParams(location.search);IDS.forEach(function(id){if(q.has(id)){var el=document.getElementById(id);var v=Number(q.get(id));if(el&&Number.isFinite(v))el.value=String(v);}});}catch(e){}
+  IDS.forEach(function(id){var el=document.getElementById(id);if(el)el.addEventListener('input',function(){render();if(!used){used=true;if(window.itTrack)window.itTrack('calc_used',{calc:SLUG});}});});
+  var share=document.getElementById('calc-share'),note=document.getElementById('calc-share-note');
+  if(share){share.addEventListener('click',function(){
+    if(IDS.some(function(id){return !document.getElementById(id).checkValidity();})){note.textContent="Check the inputs before sharing.";return;}
+    var q=new URLSearchParams();IDS.forEach(function(id){q.set(id,String(n(id)));});
+    var url=location.origin+location.pathname+'?'+q.toString();
+    if(window.itTrack)window.itTrack('calc_shared',{calc:SLUG});
+    if(navigator.share){navigator.share({title:document.title,url:url}).catch(function(){});return;}
+    if(navigator.clipboard){navigator.clipboard.writeText(url).then(function(){note.textContent='Link copied. Paste it anywhere.';}).catch(function(){note.textContent=url;});}
+    else{note.textContent=url;}
+  });}
+  render();
+})();
+</script>
+  </body>
+</html>

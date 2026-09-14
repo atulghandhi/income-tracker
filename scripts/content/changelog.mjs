@@ -4,6 +4,11 @@
 
 export const CHANGELOG = [
   {
+    date: "2026-09-14",
+    title: "Three new budget tools",
+    body: "Convert weekly and four-weekly amounts into a monthly budget, compare income-based bill splitting with 50/50, and plan Christmas savings by payday. Each tool includes worked examples and runs in your browser without an account.",
+  },
+  {
     date: "2026-09-08",
     title: "Bigger help library, calculators, templates and comparisons",
     body:

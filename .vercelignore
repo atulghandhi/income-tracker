@@ -1,0 +1,11 @@
+# Native app and local-only artifacts are not part of the web deployment.
+ios/
+supabase/
+docs/
+tests/
+test-results/
+playwright-report/
+.agents/
+.claude/
+.qodo/
+.idea/
