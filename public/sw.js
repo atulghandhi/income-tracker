@@ -22,7 +22,7 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(SHELL_CACHE)
-      .then((cache) => cache.addAll([OFFLINE_URL, "/icon.svg", "/icon.png", "/apple-touch-icon.png", "/icon-192.png", "/icon-512.png", "/site.webmanifest"]).catch(() => undefined))
+      .then((cache) => cache.addAll([OFFLINE_URL, "/icon.svg", "/icon-32.png", "/icon.png", "/apple-touch-icon.png", "/icon-192.png", "/icon-512.png", "/site.webmanifest"]).catch(() => undefined))
       .then(() => self.skipWaiting()),
   );
 });

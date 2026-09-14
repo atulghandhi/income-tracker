@@ -15,6 +15,7 @@ function png(path, size, source = svg) {
   }
 }
 png('public/icon.png', 240);
+png('public/icon-32.png', 32, fullBleed);
 png('public/apple-touch-icon.png', 180, fullBleed);
 png('public/icon-192.png', 192, fullBleed);
 png('public/icon-512.png', 512, fullBleed);
@@ -30,4 +31,4 @@ if (existsSync(resolve(root, assets))) {
     properties: { 'preserves-vector-representation': true }
   }, null, 2) + '\n');
 }
-console.log('Exported web icons and available iOS assets from public/icon.svg.');
+console.log('Exported the shared wallet icon to web, PWA, Apple touch, and iOS assets.');
