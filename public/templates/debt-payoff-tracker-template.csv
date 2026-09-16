@@ -1,0 +1,13 @@
+Date,Description,Category,Money out,Balance after,APR
+2026-09-01,"Credit card A, opening balance",Debt,0.00,2400.00,24.9
+2026-09-01,"Credit card B (0% until 2027-06), opening balance",Debt,0.00,1800.00,0
+2026-09-01,"Car loan, opening balance",Debt,0.00,5200.00,8.9
+2026-09-05,Credit card A payment,Debt,250.00,2199.80,24.9
+2026-09-10,Credit card B payment,Debt,100.00,1700.00,0
+2026-09-15,Car loan repayment,Debt,180.00,5058.55,8.9
+2026-10-05,Credit card A payment,Debt,250.00,1995.44,24.9
+2026-10-10,Credit card B payment,Debt,100.00,1600.00,0
+2026-10-15,Car loan repayment,Debt,180.00,4916.06,8.9
+2026-11-05,Credit card A payment,Debt,250.00,1786.85,24.9
+2026-11-10,Credit card B payment,Debt,100.00,1500.00,0
+2026-11-15,Car loan repayment,Debt,180.00,4772.52,8.9

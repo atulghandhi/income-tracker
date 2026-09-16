@@ -42,4 +42,35 @@ Allow: /
 User-agent: CCBot
 Allow: /
 
+User-agent: Perplexity-User
+Allow: /
+
+User-agent: DuckAssistBot
+Allow: /
+
+User-agent: Amazonbot
+Allow: /
+
+User-agent: meta-externalagent
+Allow: /
+
+User-agent: Meta-ExternalFetcher
+Allow: /
+
+User-agent: MistralAI-User
+Allow: /
+
+User-agent: cohere-ai
+Allow: /
+
+User-agent: YouBot
+Allow: /
+
+User-agent: Google-CloudVertexBot
+Allow: /
+
+# Machine-readable summaries for AI assistants
+# https://www.theincometracker.com/llms.txt
+# https://www.theincometracker.com/llms-full.txt
+
 Sitemap: https://www.theincometracker.com/sitemap.xml

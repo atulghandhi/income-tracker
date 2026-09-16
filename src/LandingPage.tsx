@@ -87,17 +87,20 @@ const CMP = [
 const FAQ = [
   { q: "Is The Income Tracker free?", a: "Yes. Completely free: no credit card, no subscription, no sign-up. Open it and start." },
   { q: "Do I need to connect or log in to my bank?", a: "No. Download a CSV from your bank and drop it in. There is no open banking connection and you never enter bank credentials." },
-  { q: "Which UK banks does it work with?", a: "Any bank that exports CSV, OFX or QIF: Barclays, HSBC, Lloyds, NatWest, Santander, Nationwide, Halifax, TSB, Monzo, Starling, Revolut, Chase, Amex and more. Step-by-step export guides cover 20 banks, and PDF statements can be pasted in." },
+  { q: "Which UK banks does it work with?", a: "Any bank that exports CSV, OFX or QIF: Barclays, HSBC, Lloyds, NatWest, Santander, Nationwide, Halifax, TSB, Monzo, Starling, Revolut, Chase, Amex and more. Step-by-step export guides cover 27 banks, and PDF statements can be pasted in." },
   { q: "Where is my financial data stored?", a: "In your browser, on your device. Nothing is uploaded unless you choose to sign in to sync across devices, and you can export everything at any time." },
   { q: "Is it an alternative to YNAB, Emma or Money Dashboard?", a: "For a free, private monthly picture of income, spending and surplus, yes. The comparison pages say plainly where each of those wins." },
   { q: "Does it work on a phone?", a: "Yes. It runs in any browser, installs to your home screen like an app, and works offline once loaded." },
 ] as const;
 
 const RESOURCES = [
+  { href: "/tools/budget-planner-uk.html", t: "Budget planner (UK)", d: "Surplus, savings rate and the 50/30/20 check" },
+  { href: "/tools/rent-affordability-calculator-uk.html", t: "Rent affordability", d: "The 30% rule and the letting-agent income check" },
+  { href: "/guides/income-and-expenditure-form-uk.html", t: "Income and expenditure form", d: "Fill in the Standard Financial Statement from real statements" },
   { href: "/tools/weekly-to-monthly-budget-calculator.html", t: "Weekly to monthly calculator", d: "Convert pay and bills to the same budget period" },
   { href: "/tools/split-bills-by-income-calculator.html", t: "Split bills by income", d: "Compare proportional contributions with 50/50" },
   { href: "/tools/christmas-budget-savings-calculator.html", t: "Christmas savings planner", d: "Work out how much to put aside each payday" },
-  { href: "/import/", t: "Bank CSV guides", d: "Export from 20 UK banks, step by step" },
+  { href: "/import/", t: "Bank CSV guides", d: "Export from 27 UK banks, step by step" },
   { href: "/guides/", t: "Budgeting guides", d: "Answer-first, no jargon, no bank login" },
   { href: "/tools/", t: "Free calculators", d: "50/30/20, emergency fund, payoff, surplus" },
   { href: "/templates/", t: "Budget templates", d: "Free CSVs that import in one step" },

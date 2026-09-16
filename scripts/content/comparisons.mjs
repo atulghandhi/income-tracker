@@ -493,7 +493,7 @@ export const ROUNDUP = {
       bestFor: "Private, no-login budgeting from bank CSVs",
       summary:
         "A month-by-month ledger fed by the CSV you download from your bank. Categories with merchant memory, recurring items, goals, an annual view, and data kept in your browser. Free with no tiers.",
-      pros: ["No bank connection and no account needed; import a file or type entries.", "Free for everything, including CSV import, custom categories and export.", "Guides for exporting a CSV from 20 UK banks and card providers."],
+      pros: ["No bank connection and no account needed; import a file or type entries.", "Free for everything, including CSV import, custom categories and export.", "Guides for exporting a CSV from 27 UK banks and card providers."],
       cons: ["No automatic daily feed: you export once a month yourself.", "Simpler than YNAB's method; no per-category envelope goals.", "The iOS app is still in development, so on a phone you install the web app."],
       url: "https://www.theincometracker.com/",
       href: "/?ref=roundup",

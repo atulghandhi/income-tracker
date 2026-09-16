@@ -35,12 +35,24 @@ Set `updated: "YYYY-MM-DD"` on the individual content entry when its content cha
 3. Bing Webmaster Tools: verify the existing property (or import it from Search Console if available), submit `/sitemap.xml`, and inspect new URLs. Use the Search Performance web-search report to compare clicks, impressions, CTR and position. See `BING_SEO_2026-09-14.md`.
 4. Check the Vercel Analytics dashboard for `cta_click`, `calc_used`, `template_download` and, in the app, `landing_ref`. The `ref` value tells you which page sent the visitor.
 
+## 16 September 2026 batch
+
+Added without query data (Search Console is still not connected to this domain, and the keyword APIs available in the session were locked), so the choice was driven by the queue below and by UK search intents the site did not yet answer.
+
+- Banks (27 total): Tesco Bank, Barclaycard, Monzo Business, Starling Business, plus Zopa, Kroo and Marcus as honest `pdfOnly` pages. A `pdfOnly: true` entry changes the title, h1, summary and first FAQ so the page never promises a CSV that does not exist; the hub card reads "PDF" instead of "CSV".
+- Guides: income and expenditure form (Standard Financial Statement), does a budgeting app need your bank login, what open banking shares and how to revoke it, Self Assessment countdown (publish early so it has indexed by December), budgeting for beginners, checking a statement for errors and unknown charges.
+- Calculators: UK budget planner, rent affordability (30% rule versus the 30-times-rent referencing check), overdraft cost at an EAR, pro rata salary.
+- Templates: weekly budget planner, savings tracker, debt payoff tracker, student budget.
+- Landings: free budget planner UK, free expense tracker UK.
+- robots.txt now lists the newer AI crawlers (Perplexity-User, DuckAssistBot, Amazonbot, meta-externalagent, MistralAI-User and others) and points at llms.txt.
+
 ## What to write next (in order of expected return)
 
-1. Bank pages for anything readers ask about that is missing (Tesco Bank, Marcus, Zopa, Kroo, Monzo Business, Starling Business). Same template; verify the steps against the bank's help page first.
-2. "Is it safe" style privacy content, which AI answer engines cite heavily: e.g. "does a budgeting app need my bank login", "what does open banking share".
-3. Seasonal calculators and guides: Self Assessment countdown (December and January), new tax year (April), Christmas budget (October and November).
-4. One comparison page per app that appears in Search Console queries with "vs" or "alternative".
+1. Connect Google Search Console to this domain. Every item below is a guess until there is query data.
+2. Seasonal: new tax year guide and calculator (publish in February for April), Christmas budget refresh (October).
+3. One comparison page per app that appears in Search Console queries with "vs" or "alternative". Candidates without data: HyperJar, Nous, Monzo Plus budgeting, Starling Spaces.
+4. Bank pages for anything readers ask about that is still missing (Capital One UK, MBNA, John Lewis Money, Atom, Chip). Verify against the provider's help page first.
+5. Deeper privacy content that AI answer engines cite: "which budgeting apps sell data", "GDPR rights over your transaction data".
 
 ## Facts that carry dates
 
@@ -48,4 +60,4 @@ Anything with a number from outside (tax thresholds, allowances, competitor pric
 
 ## Production checks
 
-`npm run build` now prerenders the actual React landing page into the production homepage, then audits all canonical pages. Run `PW_CHANNEL=chrome npx playwright test --config playwright.seo.config.ts` for desktop/mobile production tests (omit `PW_CHANNEL` when Playwright Chromium is installed). Run `node --test scripts/indexnow.test.mjs` for submission safeguards.
+`npm run build` now prerenders the actual React landing page into the production homepage, then audits all canonical pages. Run `PW_CHANNEL=chrome npx playwright test --config playwright.seo.config.ts` for desktop/mobile production tests (omit `PW_CHANNEL` when Playwright Chromium is installed, or set `PW_CHROMIUM_PATH=/opt/pw-browsers/chromium` in a remote sandbox with a pinned Chromium). Run `node --test scripts/indexnow.test.mjs` for submission safeguards.

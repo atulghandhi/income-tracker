@@ -4,6 +4,14 @@
 
 export const CHANGELOG = [
   {
+    date: "2026-09-16",
+    title: "Seven more bank guides, four calculators, four templates and six guides",
+    body:
+      "Export guides now cover 27 UK banks and card providers, adding Tesco Bank, Barclaycard, Monzo Business, Starling Business, and honest PDF-only pages for Zopa, Kroo and Marcus. New calculators: a UK budget planner, rent affordability, overdraft cost and pro rata salary. New CSV templates for weekly pay, savings goals, debt payoff and student budgets. New guides on the income and expenditure form, whether an app needs your bank login, what open banking shares, a Self Assessment countdown, budgeting for beginners, and checking a statement for errors.",
+    href: "/guides/",
+    hrefLabel: "Browse the guides",
+  },
+  {
     date: "2026-09-14",
     title: "Three new budget tools",
     body: "Convert weekly and four-weekly amounts into a monthly budget, compare income-based bill splitting with 50/50, and plan Christmas savings by payday. Each tool includes worked examples and runs in your browser without an account.",

@@ -2,11 +2,11 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://www.theincometracker.com/</loc>
-    <lastmod>2026-09-14</lastmod>
+    <lastmod>2026-09-16</lastmod>
   </url>
   <url>
     <loc>https://www.theincometracker.com/import/</loc>
-    <lastmod>2026-09-08</lastmod>
+    <lastmod>2026-09-16</lastmod>
   </url>
   <url>
     <loc>https://www.theincometracker.com/import/barclays-csv.html</loc>
@@ -89,8 +89,36 @@
     <lastmod>2026-09-08</lastmod>
   </url>
   <url>
+    <loc>https://www.theincometracker.com/import/tesco-bank-csv.html</loc>
+    <lastmod>2026-09-16</lastmod>
+  </url>
+  <url>
+    <loc>https://www.theincometracker.com/import/barclaycard-csv.html</loc>
+    <lastmod>2026-09-16</lastmod>
+  </url>
+  <url>
+    <loc>https://www.theincometracker.com/import/monzo-business-csv.html</loc>
+    <lastmod>2026-09-16</lastmod>
+  </url>
+  <url>
+    <loc>https://www.theincometracker.com/import/starling-business-csv.html</loc>
+    <lastmod>2026-09-16</lastmod>
+  </url>
+  <url>
+    <loc>https://www.theincometracker.com/import/zopa-csv.html</loc>
+    <lastmod>2026-09-16</lastmod>
+  </url>
+  <url>
+    <loc>https://www.theincometracker.com/import/kroo-csv.html</loc>
+    <lastmod>2026-09-16</lastmod>
+  </url>
+  <url>
+    <loc>https://www.theincometracker.com/import/marcus-csv.html</loc>
+    <lastmod>2026-09-16</lastmod>
+  </url>
+  <url>
     <loc>https://www.theincometracker.com/tools/</loc>
-    <lastmod>2026-09-14</lastmod>
+    <lastmod>2026-09-16</lastmod>
   </url>
   <url>
     <loc>https://www.theincometracker.com/tools/weekly-to-monthly-budget-calculator.html</loc>
@@ -103,6 +131,22 @@
   <url>
     <loc>https://www.theincometracker.com/tools/christmas-budget-savings-calculator.html</loc>
     <lastmod>2026-09-14</lastmod>
+  </url>
+  <url>
+    <loc>https://www.theincometracker.com/tools/budget-planner-uk.html</loc>
+    <lastmod>2026-09-16</lastmod>
+  </url>
+  <url>
+    <loc>https://www.theincometracker.com/tools/rent-affordability-calculator-uk.html</loc>
+    <lastmod>2026-09-16</lastmod>
+  </url>
+  <url>
+    <loc>https://www.theincometracker.com/tools/overdraft-cost-calculator-uk.html</loc>
+    <lastmod>2026-09-16</lastmod>
+  </url>
+  <url>
+    <loc>https://www.theincometracker.com/tools/pro-rata-salary-calculator-uk.html</loc>
+    <lastmod>2026-09-16</lastmod>
   </url>
   <url>
     <loc>https://www.theincometracker.com/tools/0-percent-credit-card-payoff-calculator-uk.html</loc>
@@ -146,7 +190,7 @@
   </url>
   <url>
     <loc>https://www.theincometracker.com/guides/</loc>
-    <lastmod>2026-09-08</lastmod>
+    <lastmod>2026-09-16</lastmod>
   </url>
   <url>
     <loc>https://www.theincometracker.com/guides/budget-without-linking-bank.html</loc>
@@ -201,6 +245,30 @@
     <lastmod>2026-09-14</lastmod>
   </url>
   <url>
+    <loc>https://www.theincometracker.com/guides/income-and-expenditure-form-uk.html</loc>
+    <lastmod>2026-09-16</lastmod>
+  </url>
+  <url>
+    <loc>https://www.theincometracker.com/guides/does-a-budgeting-app-need-my-bank-login.html</loc>
+    <lastmod>2026-09-16</lastmod>
+  </url>
+  <url>
+    <loc>https://www.theincometracker.com/guides/what-does-open-banking-share.html</loc>
+    <lastmod>2026-09-16</lastmod>
+  </url>
+  <url>
+    <loc>https://www.theincometracker.com/guides/self-assessment-countdown-checklist.html</loc>
+    <lastmod>2026-09-16</lastmod>
+  </url>
+  <url>
+    <loc>https://www.theincometracker.com/guides/how-to-budget-for-beginners-uk.html</loc>
+    <lastmod>2026-09-16</lastmod>
+  </url>
+  <url>
+    <loc>https://www.theincometracker.com/guides/check-bank-statement-for-errors-and-unknown-charges.html</loc>
+    <lastmod>2026-09-16</lastmod>
+  </url>
+  <url>
     <loc>https://www.theincometracker.com/compare/</loc>
     <lastmod>2026-09-08</lastmod>
   </url>
@@ -238,7 +306,7 @@
   </url>
   <url>
     <loc>https://www.theincometracker.com/templates/</loc>
-    <lastmod>2026-09-08</lastmod>
+    <lastmod>2026-09-16</lastmod>
   </url>
   <url>
     <loc>https://www.theincometracker.com/templates/monthly-budget-planner-template.html</loc>
@@ -255,6 +323,22 @@
   <url>
     <loc>https://www.theincometracker.com/templates/household-bills-tracker-template.html</loc>
     <lastmod>2026-09-08</lastmod>
+  </url>
+  <url>
+    <loc>https://www.theincometracker.com/templates/weekly-budget-planner-template.html</loc>
+    <lastmod>2026-09-16</lastmod>
+  </url>
+  <url>
+    <loc>https://www.theincometracker.com/templates/savings-tracker-template.html</loc>
+    <lastmod>2026-09-16</lastmod>
+  </url>
+  <url>
+    <loc>https://www.theincometracker.com/templates/debt-payoff-tracker-template.html</loc>
+    <lastmod>2026-09-16</lastmod>
+  </url>
+  <url>
+    <loc>https://www.theincometracker.com/templates/student-budget-template.html</loc>
+    <lastmod>2026-09-16</lastmod>
   </url>
   <url>
     <loc>https://www.theincometracker.com/monzo-csv-expense-tracker.html</loc>
@@ -277,12 +361,20 @@
     <lastmod>2026-09-08</lastmod>
   </url>
   <url>
+    <loc>https://www.theincometracker.com/free-budget-planner-uk.html</loc>
+    <lastmod>2026-09-16</lastmod>
+  </url>
+  <url>
+    <loc>https://www.theincometracker.com/free-expense-tracker-uk.html</loc>
+    <lastmod>2026-09-16</lastmod>
+  </url>
+  <url>
     <loc>https://www.theincometracker.com/about.html</loc>
     <lastmod>2026-09-08</lastmod>
   </url>
   <url>
     <loc>https://www.theincometracker.com/whats-new.html</loc>
-    <lastmod>2026-09-14</lastmod>
+    <lastmod>2026-09-16</lastmod>
   </url>
   <url>
     <loc>https://www.theincometracker.com/privacy.html</loc>

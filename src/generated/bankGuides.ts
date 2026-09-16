@@ -99,6 +99,41 @@ export const BANK_GUIDES = [
     "slug": "tide-csv",
     "name": "Tide",
     "group": "Credit cards and business accounts"
+  },
+  {
+    "slug": "tesco-bank-csv",
+    "name": "Tesco Bank",
+    "group": "Credit cards and business accounts"
+  },
+  {
+    "slug": "barclaycard-csv",
+    "name": "Barclaycard",
+    "group": "Credit cards and business accounts"
+  },
+  {
+    "slug": "monzo-business-csv",
+    "name": "Monzo Business",
+    "group": "Credit cards and business accounts"
+  },
+  {
+    "slug": "starling-business-csv",
+    "name": "Starling Business",
+    "group": "Credit cards and business accounts"
+  },
+  {
+    "slug": "zopa-csv",
+    "name": "Zopa",
+    "group": "App-based banks and fintechs"
+  },
+  {
+    "slug": "kroo-csv",
+    "name": "Kroo",
+    "group": "App-based banks and fintechs"
+  },
+  {
+    "slug": "marcus-csv",
+    "name": "Marcus by Goldman Sachs",
+    "group": "App-based banks and fintechs"
   }
 ] as const;
 
