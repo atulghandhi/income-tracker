@@ -828,4 +828,481 @@ export const GUIDES = [
     ],
     related: ["christmas-budget-savings-calculator", "emergency-fund-calculator-uk", "50-30-20-budget-calculator-uk", "debt-snowball-vs-avalanche-calculator", "monthly-surplus-calculator"],
   },
+  // Added 16 September 2026.
+  {
+    slug: "income-and-expenditure-form-uk",
+    topic: "Budgeting basics",
+    cardD: "The Standard Financial Statement, filled in from real statements",
+    published: "2026-09-16",
+    updated: "2026-09-16",
+    checked: "2026-09-16",
+    readMinutes: 7,
+    title: "How to fill in an income and expenditure form (UK, 2026)",
+    description:
+      "What an income and expenditure form is, who asks for one (creditors, debt advisers, courts, lenders), the Standard Financial Statement categories, and how to fill it in accurately from your bank statements.",
+    h1: "How to fill in an income and expenditure form",
+    tldr:
+      "An income and expenditure form lists everything coming in and everything going out each month, so a creditor, adviser, lender or court can see what you can genuinely afford. Most UK creditors and advice charities now use one shared layout, the Standard Financial Statement. Fill it in from three months of real bank statements rather than memory, convert every figure to a monthly amount, include the irregular costs, and keep the evidence.",
+    sections: [
+      {
+        h: "Who asks for one, and why",
+        p: [
+          "You will meet this form when you ask a creditor for a payment arrangement, when a debt adviser at StepChange, Citizens Advice or National Debtline sets up a plan, when a mortgage lender discusses arrears, when a court considers how much you can pay towards a judgment, and sometimes when a landlord or lender checks affordability. In every case the question is the same: after essential costs, what is left?",
+          "The form is not a test you pass or fail. A realistic form that shows a small surplus, or none, is more useful to everyone than an optimistic one that falls apart in month two.",
+        ],
+      },
+      {
+        h: "The Standard Financial Statement",
+        p: [
+          "Since 2017 the UK debt advice sector has used the Standard Financial Statement, overseen by the Money and Pensions Service. Creditors who sign up to it agree to accept the same layout and the same spending guidelines, so you fill it in once and everyone works from the same numbers. It also has a savings line, so you can set aside a small amount each month (the guideline allows up to £20) without a creditor objecting.",
+          "If a creditor sends their own form, the categories will be close enough that a completed Standard Financial Statement transfers across in minutes.",
+        ],
+      },
+      {
+        h: "What counts as income",
+        ul: [
+          "Take-home pay from every job, after tax, National Insurance and pension. Use the amount that actually lands.",
+          "Benefits and tax credits: Universal Credit, Child Benefit, PIP, State Pension and so on.",
+          "Pension income, maintenance received, rent from a lodger, and any regular money from family.",
+          "Irregular income (overtime, self-employed earnings): average the last three to six months rather than picking a good one.",
+        ],
+      },
+      {
+        h: "What counts as expenditure",
+        table: {
+          head: ["Group", "Typical lines", "Where the number comes from"],
+          rows: [
+            ["Fixed costs", "Rent or mortgage, council tax, gas and electricity, water, insurance, TV licence, broadband, phones", "Direct debits and standing orders on the statement"],
+            ["Living costs", "Food and household shopping, travel, car costs, childcare, school costs, clothing, health", "Card spending, averaged over three months"],
+            ["Flexible costs", "Subscriptions, entertainment, eating out, gifts, hobbies", "Card spending, averaged; be honest"],
+            ["Priority debts", "Rent or mortgage arrears, council tax arrears, energy arrears, court fines, child maintenance, tax", "Letters and statements from each creditor"],
+            ["Non-priority debts", "Credit cards, loans, overdrafts, catalogues, buy-now-pay-later", "Current balances and minimum payments"],
+          ],
+        },
+      },
+      {
+        h: "Fill it in from your bank statements, not from memory",
+        p: [
+          "People underestimate their spending by a wide margin when they guess. The fix is mechanical. Download the last three months of transactions from each account as a CSV, import them into The Income Tracker, and let it group them by category. The monthly average for each category goes straight onto the form. A quarter is long enough to catch the annual car insurance, the dentist and the school trip that a single month misses.",
+          "Anything paid yearly or quarterly gets divided into a monthly figure. Anything paid weekly is multiplied by 52 and divided by 12, not by four. The weekly to monthly calculator on this site does that conversion.",
+        ],
+      },
+      {
+        h: "Mistakes that get forms sent back",
+        ul: [
+          "Leaving out costs because they feel embarrassing. Put them in. An adviser has seen it all and a creditor would rather see the real picture.",
+          "Forgetting priority debts. Rent, council tax, energy, fines and child maintenance come before credit cards, and the form must show that order.",
+          "Counting the same money twice, for example a savings transfer that also appears as a bill.",
+          "Using what you plan to spend instead of what you did spend. Fill it in from the statements first, then note what you intend to cut.",
+          "Not keeping evidence. Keep the statements, payslips and benefit letters the figures came from.",
+        ],
+      },
+    ],
+    howto: {
+      name: "Fill in an income and expenditure form from your bank statements",
+      steps: [
+        "Download the last three months of transactions from every account as CSV files.",
+        "Import them into The Income Tracker and check each merchant is in the right category.",
+        "Read the average monthly total for each category and enter it on the form under the matching heading.",
+        "Add income lines from payslips and benefit letters, and priority debts from creditor letters.",
+        "Subtract total expenditure from total income. The result is the amount available for non-priority creditors.",
+      ],
+    },
+    sources: [
+      { t: "Standard Financial Statement: about the SFS", href: "https://sfs.moneyadviceservice.org.uk/en/what-is-the-sfs" },
+      { t: "MoneyHelper: budget planner", href: "https://www.moneyhelper.org.uk/en/everyday-money/budgeting/budget-planner" },
+      { t: "StepChange: how to make a budget", href: "https://www.stepchange.org/debt-info/how-to-make-a-budget.aspx" },
+      { t: "National Debtline: your budget", href: "https://nationaldebtline.org/get-information/guides/your-budget-ew/" },
+      { t: "Citizens Advice: work out your budget", href: "https://www.citizensadvice.org.uk/debt-and-money/budgeting/budgeting/work-out-your-budget/" },
+    ],
+    faqs: [
+      { q: "What is an income and expenditure form?", a: "A monthly statement of all your income and all your outgoings, used by creditors, debt advisers, lenders and courts to see what you can afford to pay. In the UK most of them use the Standard Financial Statement layout." },
+      { q: "Is there a free income and expenditure form template?", a: "Yes. This site has a free CSV income and expenditure template with the standard headings, and MoneyHelper offers an online budget planner. Both are free and need no sign-up." },
+      { q: "Should I include irregular costs like car repairs?", a: "Yes. Average them over the year and enter a monthly figure. A form with no allowance for repairs, birthdays or the dentist is not realistic and will not last." },
+      { q: "What if my expenditure is higher than my income?", a: "Say so on the form. That is exactly the situation the advice charities exist for. Contact StepChange, Citizens Advice or National Debtline, all free, before agreeing payments you cannot make." },
+    ],
+    related: ["income-and-expenditure-form-template", "monthly-surplus-calculator", "weekly-to-monthly-budget-calculator", "how-to-categorise-bank-transactions", "import"],
+  },
+  {
+    slug: "does-a-budgeting-app-need-my-bank-login",
+    topic: "Privacy and safety",
+    cardD: "What 'connect your bank' really means, and the alternative",
+    published: "2026-09-16",
+    updated: "2026-09-16",
+    checked: "2026-09-16",
+    readMinutes: 5,
+    title: "Does a budgeting app need your bank login? (UK, 2026)",
+    description:
+      "No budgeting app needs your online banking password. Here is how UK apps actually get your transactions (open banking or a file you download), what each one means for your privacy, and the one warning sign to never ignore.",
+    h1: "Does a budgeting app need your bank login?",
+    tldr:
+      "No. A budgeting app needs your transactions, not your login. UK apps that connect to your bank use open banking, a regulated consent you grant on your bank's own site or app, never by typing your password into the budgeting app. Apps that avoid connections altogether work from a CSV you download yourself. If any app asks for your online banking password or your card PIN, close it.",
+    sections: [
+      {
+        h: "The three ways an app can get your transactions",
+        table: {
+          head: ["Method", "What you hand over", "Status in the UK"],
+          rows: [
+            ["Screen scraping", "Your actual online banking username and password", "Largely gone since the 2019 rules on strong customer authentication. Treat any app still asking as a red flag."],
+            ["Open banking", "A consent, given on your bank's own login page, to share account data with a regulated provider", "The standard route for Emma, Snoop, Plum and most connected apps"],
+            ["File import", "A CSV, OFX or QIF you download from your bank and open in the app", "How The Income Tracker works. Nothing connects to the bank at all."],
+          ],
+        },
+      },
+      {
+        h: "What happens when you tap 'connect your bank'",
+        p: [
+          "The app sends you to your bank. You log in there, with your bank, and approve a list of what can be shared: account details, balances and transactions. The bank issues the app a token that lets it read that data. The app never sees your password. The provider must be authorised by the Financial Conduct Authority, or be an agent of one, and it has to ask you to reconfirm the consent every 90 days.",
+          "That is a genuinely safer design than the old scraping approach. It is still an ongoing feed of everything you spend to a company you have to trust with it, and it is worth reading what that company does with the data before you approve.",
+        ],
+      },
+      {
+        h: "Warning signs",
+        ul: [
+          "A form inside the app asking for your online banking password, memorable word or card PIN.",
+          "A 'connect' flow that does not send you to your bank's own website or app.",
+          "No mention of FCA authorisation, and no entry for the company on the FCA register.",
+          "A privacy policy that allows selling transaction data to third parties.",
+        ],
+      },
+      {
+        h: "The route that needs no login at all",
+        p: [
+          "Every UK bank lets you download your own transactions. You export a CSV, drop it into The Income Tracker, and the file is read in your browser. No credentials, no consent to manage, no company holding a live feed of your account. It costs you a minute a month. For most people that is the right trade, and it is why the bank export guides on this site exist.",
+        ],
+      },
+    ],
+    sources: [
+      { t: "FCA: open banking", href: "https://www.fca.org.uk/firms/open-banking" },
+      { t: "Open Banking Limited: what is open banking?", href: "https://www.openbanking.org.uk/what-is-open-banking/" },
+      { t: "FCA: the Financial Services Register", href: "https://register.fca.org.uk/" },
+      { t: "Take Five to Stop Fraud: advice", href: "https://www.takefive-stopfraud.org.uk/advice/" },
+    ],
+    faqs: [
+      { q: "Is it safe to give a budgeting app my bank login?", a: "You should never need to. Regulated UK apps use open banking, where you log in with your bank rather than the app. An app that asks for your password directly is not following the rules." },
+      { q: "Can an open banking app move my money?", a: "Not with a data-sharing consent. Payment initiation is a separate consent you would have to approve each time. Account information access is read-only." },
+      { q: "How do I budget without connecting my bank?", a: "Download a CSV from your bank and import it into a tool that reads files locally, such as The Income Tracker. There is a step-by-step export guide for every major UK bank on this site." },
+    ],
+    related: ["what-does-open-banking-share", "is-it-safe-to-upload-bank-statements", "budget-app-without-open-banking", "import"],
+  },
+  {
+    slug: "what-does-open-banking-share",
+    topic: "Privacy and safety",
+    cardD: "Exactly what a connected app can see, and how to switch it off",
+    published: "2026-09-16",
+    updated: "2026-09-16",
+    checked: "2026-09-16",
+    readMinutes: 5,
+    title: "What does open banking share about you? (and how to revoke it)",
+    description:
+      "Exactly what data a UK open banking app can read once you consent (balances, 12 months of transactions, direct debits, standing orders), how often it refreshes, how long it can keep it, and how to revoke access at the app or at your bank.",
+    h1: "What does open banking share about you?",
+    tldr:
+      "With your consent, an account information provider can read your account name and numbers, balances, up to 12 months of transaction history, and your standing orders, direct debits and saved payees. It can refresh that data several times a day for 90 days, after which it must ask you to reconfirm. It cannot move money unless you approve a separate payment consent. You can revoke access in the app's settings or from your bank's list of connected apps at any time.",
+    sections: [
+      {
+        h: "The data an app can read",
+        ul: [
+          "Account details: the account name, sort code and account number, and the type of account.",
+          "Balances: current and available, including any overdraft.",
+          "Transactions: typically up to 12 months of history at the first connection, then new items as they arrive. Each row carries the date, amount, merchant or payee name and the bank's own description.",
+          "Regular payments: your standing orders and direct debits, plus saved beneficiaries.",
+          "What it does not get: your login details, your card PIN, and the ability to move money without a separate, explicit payment consent.",
+        ],
+      },
+      {
+        h: "How often, and for how long",
+        p: [
+          "The connection can pull fresh data up to four times a day without you doing anything. Consent lasts 90 days, then the app must ask you to confirm it again. Deleting the app does not by itself revoke the consent, which is the bit people miss. Revoke it explicitly.",
+          "How long the company keeps the data after you disconnect is set by its own privacy policy under UK GDPR, not by the open banking rules. Some delete on disconnection, some keep it for years. Read the policy before you connect, not after.",
+        ],
+      },
+      {
+        h: "How to revoke access",
+        ol: [
+          "In the budgeting app: find the connected accounts screen and choose disconnect or revoke for each bank.",
+          "At your bank: most banking apps have a page called something like Connected apps, Third-party access or Manage open banking. Barclays, Monzo, Starling, NatWest and Lloyds all list every active consent there, with a button to remove it.",
+          "Check the app is authorised: search the FCA register for the company name. If it is not there, and not listed as an agent of a firm that is, revoke immediately.",
+        ],
+      },
+      {
+        h: "If you would rather share nothing",
+        p: [
+          "The zero-consent route is a file. Download a CSV from your bank once a month and import it into The Income Tracker. It reads the file in your browser, no company gets a live feed, and there is nothing to revoke later.",
+        ],
+      },
+    ],
+    sources: [
+      { t: "Open Banking Limited: what is open banking?", href: "https://www.openbanking.org.uk/what-is-open-banking/" },
+      { t: "FCA: open banking", href: "https://www.fca.org.uk/firms/open-banking" },
+      { t: "FCA: the Financial Services Register", href: "https://register.fca.org.uk/" },
+      { t: "ICO: your right to get your data deleted", href: "https://ico.org.uk/for-the-public/your-right-to-get-your-data-deleted/" },
+    ],
+    faqs: [
+      { q: "Can open banking apps see my password?", a: "No. You log in on your bank's own page and the bank issues the app a token. The app never sees your credentials." },
+      { q: "How much transaction history does open banking share?", a: "Usually up to 12 months at the first connection, then ongoing. Some banks share less; the consent screen at your bank states the range." },
+      { q: "Does deleting the app stop it accessing my account?", a: "Not necessarily. Revoke the consent in the app or from your bank's connected apps page. Consents also expire after 90 days if not reconfirmed." },
+      { q: "Is there a budgeting app that does not use open banking?", a: "Yes. The Income Tracker works from a CSV you download yourself, so no consent is ever granted." },
+    ],
+    related: ["does-a-budgeting-app-need-my-bank-login", "budget-app-without-open-banking", "is-it-safe-to-upload-bank-statements", "budget-without-linking-bank"],
+  },
+  {
+    slug: "self-assessment-countdown-checklist",
+    topic: "Self-employed",
+    cardD: "Six weeks of small jobs so 31 January is boring",
+    published: "2026-09-16",
+    updated: "2026-09-16",
+    checked: "2026-09-16",
+    readMinutes: 6,
+    title: "Self Assessment countdown: get your records ready before 31 January",
+    description:
+      "A six-week plan for the 2025/26 Self Assessment return: register by 5 October, find your UTR, export a year of business transactions, total them under HMRC's expense headings, check payments on account, and file before 31 January 2027.",
+    h1: "Self Assessment countdown: a six-week plan",
+    tldr:
+      "The online return for the 2025/26 tax year (6 April 2025 to 5 April 2026) is due by 31 January 2027, and any tax owed is due the same day. Six jobs, one a week: register if you are new (deadline 5 October 2026), find your UTR and Government Gateway login, export twelve months of business bank transactions, total income and expenses under HMRC's headings, check whether payments on account apply, and set the money aside. Start in November and January is boring.",
+    sections: [
+      {
+        h: "The dates that matter",
+        table: {
+          head: ["What", "When"],
+          rows: [
+            ["Register for Self Assessment if this is your first return", "5 October 2026"],
+            ["Paper return", "31 October 2026"],
+            ["Online return, and payment of tax owed", "31 January 2027"],
+            ["First payment on account for 2026/27, if it applies", "31 January 2027"],
+            ["Second payment on account", "31 July 2027"],
+          ],
+        },
+        p: [
+          "Miss the filing date and there is an automatic £100 penalty, even if you owe nothing. After three months it becomes £10 a day for up to 90 days, with further penalties at six and twelve months. Late tax attracts interest from 1 February and a 5% surcharge once it is 30 days late.",
+        ],
+      },
+      {
+        h: "Week by week",
+        ol: [
+          "Week 1: register, or find your login. New to Self Assessment? Register on GOV.UK now; the Unique Taxpayer Reference arrives by post and takes up to ten working days. Already registered? Confirm your Government Gateway login works and note your UTR.",
+          "Week 2: export the year. Download transactions from 6 April 2025 to 5 April 2026 from every business account as CSV files. Most banks let you set a custom range; some cap it at 12 or 18 months, so do it now rather than in January.",
+          "Week 3: categorise. Import the files into The Income Tracker and put every business row under one of HMRC's expense headings (below). The app remembers each supplier, so the second pass is fast.",
+          "Week 4: gather the rest. P60 or P45 from any employment, bank interest, dividends, rental income, pension contributions, Gift Aid donations, student loan plan, and any Child Benefit if income is over £60,000.",
+          "Week 5: check payments on account. If last year's bill was over £1,000 and less than 80% of it was collected at source, HMRC expects two advance payments for the next year. Your January payment may be the balance plus half of next year's estimate.",
+          "Week 6: file. Do it in December or early January rather than on the 31st, when the site is slow and mistakes are expensive. Pay by bank transfer, debit card or Direct Debit; card payments take time to clear.",
+        ],
+      },
+      {
+        h: "HMRC's expense headings",
+        p: [
+          "The self-employment pages group expenses under fixed headings. Use the same names as categories in your tracker and the return fills itself in.",
+        ],
+        ul: [
+          "Cost of goods bought for resale or goods used",
+          "Car, van and travel expenses",
+          "Wages, salaries and other staff costs",
+          "Rent, rates, power and insurance costs",
+          "Repairs and maintenance of property and equipment",
+          "Phone, fax, stationery and other office costs",
+          "Advertising and business entertainment costs (entertainment is not allowable)",
+          "Interest on bank and other loans",
+          "Bank, credit card and other financial charges",
+          "Accountancy, legal and other professional fees",
+          "Other business expenses",
+        ],
+      },
+      {
+        h: "Simplified expenses: sometimes easier",
+        p: [
+          "Sole traders can use flat rates instead of actual costs for three things: vehicles (45p a mile for the first 10,000 business miles, 25p after), working from home (£10, £18 or £26 a month depending on hours), and living at your business premises. Flat rates save receipts but are not always the cheaper choice, so work both out once.",
+        ],
+      },
+    ],
+    howto: {
+      name: "Prepare a Self Assessment return in six weeks",
+      steps: [
+        "Register for Self Assessment or confirm your Government Gateway login and UTR.",
+        "Export transactions for 6 April to 5 April from every business account as CSV.",
+        "Import the files and categorise each row under HMRC's expense headings.",
+        "Collect P60s, interest, dividend and pension figures.",
+        "Estimate the bill, including any payments on account, and set the money aside.",
+        "File online before 31 January and pay by a method that clears in time.",
+      ],
+    },
+    sources: [
+      { t: "GOV.UK: Self Assessment deadlines", href: "https://www.gov.uk/self-assessment-tax-returns/deadlines" },
+      { t: "GOV.UK: Self Assessment penalties", href: "https://www.gov.uk/self-assessment-tax-returns/penalties" },
+      { t: "GOV.UK: register for Self Assessment", href: "https://www.gov.uk/register-for-self-assessment" },
+      { t: "GOV.UK: payments on account", href: "https://www.gov.uk/understand-self-assessment-bill/payments-on-account" },
+      { t: "GOV.UK: expenses if you're self-employed", href: "https://www.gov.uk/expenses-if-youre-self-employed" },
+      { t: "GOV.UK: simplified expenses", href: "https://www.gov.uk/simpler-income-tax-simplified-expenses" },
+    ],
+    faqs: [
+      { q: "When is the Self Assessment deadline for the 2025/26 tax year?", a: "Online returns and payment are due by 31 January 2027. Paper returns by 31 October 2026. First-time filers must register by 5 October 2026." },
+      { q: "What is the penalty for filing late?", a: "£100 immediately, then £10 a day after three months for up to 90 days, with further penalties at six and twelve months. Late payment adds interest and a 5% surcharge after 30 days." },
+      { q: "What records do I need for Self Assessment?", a: "Dated records of all business income and expenses with receipts and bank statements, plus P60s, interest, dividend and pension figures. Keep them for at least five years after the filing deadline." },
+      { q: "Can The Income Tracker submit my return?", a: "No. It is a free tracker for seeing income, expenses and what to set aside. You file through HMRC's website or recognised software; the categorised totals from the tracker go straight into the boxes." },
+    ],
+    related: ["self-employed-income-tracker-uk", "self-employed-income-tracker-template", "monzo-business-csv", "starling-business-csv", "tide-csv"],
+  },
+  {
+    slug: "how-to-budget-for-beginners-uk",
+    topic: "Budgeting basics",
+    cardD: "Twenty minutes, one bank statement, three numbers",
+    published: "2026-09-16",
+    updated: "2026-09-16",
+    checked: "2026-09-16",
+    readMinutes: 6,
+    title: "How to budget: a beginner's guide for the UK (2026)",
+    description:
+      "How to make a budget for the first time in the UK: find your take-home pay, pull one month of real transactions, sort them into ten categories, read your three numbers, pick a method, and check it monthly.",
+    h1: "How to budget: a beginner's guide",
+    tldr:
+      "A budget is your income minus your spending, planned before the month starts and checked after it ends. Start with one month of real bank transactions, not estimates. Sort them into about ten categories and you will know your essentials, your flexible spending and your surplus (or deficit) inside twenty minutes. Then decide three things: what to cut, what to save, and when you will look again.",
+    sections: [
+      {
+        h: "Step 1: know what actually lands",
+        p: [
+          "Use take-home pay, after tax, National Insurance, pension and student loan. Add benefits and any regular extra income. If you are paid weekly or four-weekly, convert to a monthly average (weekly times 52, divided by 12) and remember some months will have an extra payday.",
+        ],
+      },
+      {
+        h: "Step 2: get one month of real transactions",
+        p: [
+          "Guessing is where budgets die. Download last month's transactions from your bank as a CSV. Every UK bank can do it and this site has a guide for each. Import the file into The Income Tracker and every line is on screen with its date and amount. Only got a PDF? Copy the rows and paste them in.",
+        ],
+      },
+      {
+        h: "Step 3: ten categories, no more",
+        p: [
+          "Housing, Bills, Groceries, Transport, Debt, Subscriptions, Eating out, Shopping, Health, Savings. Drag each transaction into one. Thirty categories look thorough and get abandoned by week three; ten is enough to see where the money goes.",
+        ],
+      },
+      {
+        h: "Step 4: read your three numbers",
+        table: {
+          head: ["Number", "How to get it", "What it tells you"],
+          rows: [
+            ["Essentials", "Housing + Bills + Groceries + Transport + minimum debt payments", "What the month costs before any choices"],
+            ["Flexible spending", "Everything else except savings", "Where cuts are possible"],
+            ["Surplus", "Income minus everything", "What you can save, or the size of the problem"],
+          ],
+        },
+      },
+      {
+        h: "Step 5: pick a method you will keep",
+        table: {
+          head: ["Method", "In one line", "Suits"],
+          rows: [
+            ["50/30/20", "Half on needs, 30% on wants, 20% to savings and debt", "A simple target with room to move"],
+            ["Zero-based", "Every pound gets a job before the month starts", "People who like control"],
+            ["Pay yourself first", "Move savings on payday, spend what remains", "People who hate tracking"],
+          ],
+        },
+        p: [
+          "None is better in general. The best method is the one you are still doing in March.",
+        ],
+      },
+      {
+        h: "Step 6: the ten-minute monthly check",
+        p: [
+          "On the first weekend of the month, import the new statement, categorise what is new (the app remembers the rest), and compare the three numbers with last month. Adjust one thing. That habit, repeated, is the entire skill.",
+        ],
+      },
+      {
+        h: "If the surplus is negative",
+        p: [
+          "First, pay the priority bills: rent or mortgage, council tax, energy, and anything with a court or licence behind it. Then cut flexible spending and look at subscriptions. If it still does not balance, talk to a free advice service such as StepChange, Citizens Advice or National Debtline before it becomes arrears. A negative number on a budget is information, not a verdict.",
+        ],
+      },
+    ],
+    howto: {
+      name: "Make your first monthly budget",
+      steps: [
+        "Write down your monthly take-home pay and any benefits.",
+        "Download last month's transactions from your bank as a CSV and import them.",
+        "Sort every transaction into one of ten categories.",
+        "Add up essentials, flexible spending and the surplus.",
+        "Choose a method (50/30/20, zero-based or pay yourself first) and set next month's numbers.",
+        "Repeat the check on the first weekend of each month.",
+      ],
+    },
+    sources: [
+      { t: "MoneyHelper: budget planner", href: "https://www.moneyhelper.org.uk/en/everyday-money/budgeting/budget-planner" },
+      { t: "MoneyHelper: beginner's guide to managing your money", href: "https://www.moneyhelper.org.uk/en/everyday-money/budgeting/beginners-guide-to-managing-your-money" },
+      { t: "Citizens Advice: work out your budget", href: "https://www.citizensadvice.org.uk/debt-and-money/budgeting/budgeting/work-out-your-budget/" },
+    ],
+    faqs: [
+      { q: "How do I start a budget with no experience?", a: "Get one month of real bank transactions, sort them into ten categories, and read three numbers: essentials, flexible spending and surplus. That takes about twenty minutes and tells you exactly where you stand." },
+      { q: "What is the easiest budgeting method?", a: "Pay yourself first is the least effort: move savings on payday and spend the rest. 50/30/20 gives a target to aim for. Zero-based is the most control and the most work." },
+      { q: "Do I need an app to budget?", a: "No, but it saves typing. A free tool that reads your bank CSV, such as The Income Tracker, does the sorting and totals so the monthly check takes minutes." },
+      { q: "How often should I check my budget?", a: "Once a month, on a set day, is enough for most people. Weekly checks help in the first two months while the habit forms." },
+    ],
+    related: ["budget-planner-uk", "50-30-20-budget-calculator-uk", "zero-based-budgeting-uk", "monthly-money-review-checklist", "how-to-categorise-bank-transactions"],
+  },
+  {
+    slug: "check-bank-statement-for-errors-and-unknown-charges",
+    topic: "Privacy and safety",
+    cardD: "The monthly sweep, and your rights when something is wrong",
+    published: "2026-09-16",
+    updated: "2026-09-16",
+    checked: "2026-09-16",
+    readMinutes: 6,
+    title: "How to check your bank statement for errors and unknown charges (UK)",
+    description:
+      "A monthly routine for spotting unknown payments, wrong amounts and forgotten subscriptions on a UK bank statement, plus your rights: the Direct Debit Guarantee, chargeback, Section 75, and refunds for unauthorised payments.",
+    h1: "How to check your bank statement for errors and unknown charges",
+    tldr:
+      "Once a month, run down every transaction and ask three questions: do I recognise it, is the amount right, and do I still want it? Unknown card payments can be disputed through your bank by chargeback, credit card purchases over £100 are also covered by Section 75, direct debits are protected by the Direct Debit Guarantee, and a payment you did not authorise must normally be refunded by the end of the next business day unless the bank can show you acted fraudulently or with gross negligence.",
+    sections: [
+      {
+        h: "The monthly sweep",
+        ol: [
+          "Import last month's CSV into The Income Tracker so every transaction is in one list.",
+          "Sort by merchant. New merchants you have not categorised before are the ones to look at first.",
+          "Check the recurring payments against the amount you expect. A subscription that quietly went up is the most common find.",
+          "Look for duplicates on the same day with the same amount, and for small test payments of a pound or two from unfamiliar names.",
+          "Flag anything you cannot place. Do not guess; find out.",
+        ],
+      },
+      {
+        h: "Decoding names you do not recognise",
+        p: [
+          "Statement descriptions are the merchant's legal or processor name, not the shop sign. A restaurant might appear under its holding company, and a lot of online spending shows as PayPal, Amazon, Apple or Google with the real seller hidden. Search the exact descriptor text; it usually resolves in seconds. Check with anyone else who uses the account. Check the date against your calendar. If it still does not fit, it is a dispute.",
+        ],
+      },
+      {
+        h: "Your protections, in one table",
+        table: {
+          head: ["Situation", "Protection", "What to do"],
+          rows: [
+            ["A direct debit taken in error, or the wrong amount", "Direct Debit Guarantee: immediate refund from your bank", "Contact your bank; you do not need to go to the company first"],
+            ["A card payment you did not make", "Payment Services Regulations: refund by the end of the next business day, unless the bank shows fraud or gross negligence", "Report it to the bank immediately and ask for the refund"],
+            ["Goods or services paid by debit or credit card that did not arrive or were not as described", "Chargeback through the card scheme, normally within 120 days", "Ask the bank or card issuer to raise a chargeback"],
+            ["Credit card purchase between £100 and £30,000 that went wrong", "Section 75 of the Consumer Credit Act: the card issuer is jointly liable", "Claim from the card issuer in writing"],
+            ["Tricked into sending a bank transfer (authorised push payment fraud)", "Mandatory reimbursement rules since October 2024, up to £85,000 in most cases", "Report to the bank within 13 months; most claims are settled within five business days"],
+          ],
+        },
+      },
+      {
+        h: "What to do, step by step",
+        ol: [
+          "Ring the number on the back of your card or use the in-app chat. Say clearly whether the payment was unauthorised, wrong, or a purchase that failed.",
+          "Ask the bank to block the card if the details may be compromised, and to stop any continuous payment authority you did not agree to.",
+          "Write down the date, the person you spoke to and what was agreed.",
+          "If the bank refuses and you disagree, ask for a final response, then take it to the Financial Ombudsman Service, which is free.",
+        ],
+      },
+    ],
+    sources: [
+      { t: "Bacs: the Direct Debit Guarantee", href: "https://www.directdebit.co.uk/direct-debit-guarantee/" },
+      { t: "MoneyHelper: how to get your money back after a scam or unauthorised transaction", href: "https://www.moneyhelper.org.uk/en/money-troubles/scams/how-to-get-your-money-back-after-a-scam" },
+      { t: "Which?: Section 75 and chargeback", href: "https://www.which.co.uk/consumer-rights/advice/how-do-i-use-chargeback-abZ2d4z3nT8q" },
+      { t: "Payment Systems Regulator: APP fraud reimbursement", href: "https://www.psr.org.uk/our-work/app-scams/" },
+      { t: "Financial Ombudsman Service: disputed transactions", href: "https://www.financial-ombudsman.org.uk/consumers/complaints-can-help/banking-payments/disputed-transactions" },
+    ],
+    faqs: [
+      { q: "What should I do if I see a payment I do not recognise?", a: "Search the exact descriptor and check with anyone else on the account. If it is still unknown, report it to your bank straight away as unauthorised. The bank must normally refund by the end of the next business day unless it can show you were at fault." },
+      { q: "How far back can I dispute a card payment?", a: "Chargeback claims usually need to be raised within 120 days of the payment or the date goods were due. Section 75 claims on credit cards can go back six years." },
+      { q: "Can my bank refund a direct debit?", a: "Yes. Under the Direct Debit Guarantee your bank refunds an incorrect direct debit immediately, and you do not need the company's permission." },
+      { q: "How often should I check my statement?", a: "Once a month is the minimum. Importing the CSV into a tracker and sorting by merchant makes it a ten-minute job." },
+    ],
+    related: ["find-and-cancel-unused-subscriptions", "monthly-money-review-checklist", "how-to-categorise-bank-transactions", "how-to-read-a-bank-statement-csv"],
+  },
 ];

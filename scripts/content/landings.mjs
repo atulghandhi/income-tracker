@@ -173,4 +173,87 @@ export const LANDINGS = [
     ],
     related: ["free-ynab-alternative-uk", "import", "tools", "monthly-surplus-calculator"],
   },
+  // Added 16 September 2026.
+  {
+    slug: "free-budget-planner-uk",
+    published: "2026-09-16",
+    updated: "2026-09-16",
+    card: "Free budget planner (UK)",
+    cardD: "Real transactions, not estimates",
+    crumb: "Free budget planner",
+    title: "Free budget planner UK (no sign-up, no bank login)",
+    description:
+      "A free UK budget planner that works from your real bank transactions. Import a CSV, see income, bills, spending and what is left month by month. No sign-up, no subscription, no bank login.",
+    h1: "A free UK budget planner built on your real transactions",
+    tldr:
+      "Most budget planners ask you to type estimates into boxes. The Income Tracker builds the plan from what actually happened: import last month's bank CSV, sort it into categories, and your income, essentials, flexible spending and surplus are on screen. Free, private, and nothing connects to your bank.",
+    why: [
+      "Free, with no account, no subscription and no trial clock.",
+      "Planned against real transactions, so the numbers are honest.",
+      "Every UK bank via CSV, or paste a PDF statement.",
+      "Categories that remember each merchant, so month two takes minutes.",
+      "Your data stays in your browser. No bank login, no open banking.",
+    ],
+    steps: [
+      "Download last month's transactions from your bank as a CSV.",
+      "Import the file into The Income Tracker.",
+      "Drag transactions into categories and read your surplus. Set next month's plan from it.",
+    ],
+    sections: [
+      {
+        h: "Prefer to plan first?",
+        p: [
+          "Use the free budget planner calculator to see your surplus and savings rate from figures you type, or download the monthly budget planner template as a CSV. Both are free and both import straight into the tracker when you are ready to switch from estimates to actuals.",
+        ],
+      },
+    ],
+    exportNoteHtml: 'Not sure how to export a CSV? Pick your bank in the <a href="/import/">bank CSV guides</a>.',
+    faqs: [
+      { q: "Is there a free budget planner for the UK?", a: "Yes. The Income Tracker is a free UK budget planner with no sign-up. Import a bank CSV or type entries, and it shows income, spending and surplus month by month." },
+      { q: "Do I need to link my bank?", a: "No. You download a CSV from your bank yourself and import it. There is no open banking connection and no bank login." },
+      { q: "Is it better than a spreadsheet budget planner?", a: "For most people, yes. It reads the bank file directly, remembers your categories and does the totals. A spreadsheet still wins if you want a fully custom layout." },
+    ],
+    related: ["budget-planner-uk", "monthly-budget-planner-template", "how-to-budget-for-beginners-uk", "import"],
+  },
+  {
+    slug: "free-expense-tracker-uk",
+    published: "2026-09-16",
+    updated: "2026-09-16",
+    card: "Free expense tracker (UK)",
+    cardD: "Every card payment, sorted",
+    crumb: "Free expense tracker",
+    title: "Free expense tracker UK (private, no bank login)",
+    description:
+      "A free UK expense tracker that reads your bank CSV and sorts every payment into categories. See where the money goes each month. No sign-up, no subscription, no bank connection.",
+    h1: "A free expense tracker for the UK",
+    tldr:
+      "Import your bank CSV and every expense lands in a monthly list, ready to sort into categories with a drag. Totals per category, recurring payments flagged, transfers between your own accounts skipped. Free, private, works with every UK bank, and nothing connects to your account.",
+    why: [
+      "Free, with no account and no subscription.",
+      "Reads CSV, OFX and QIF from every UK bank, or pasted PDF text.",
+      "Categories that stick: sort a merchant once and it is remembered.",
+      "Recurring bills and subscriptions detected automatically.",
+      "Local-first: your spending never leaves your browser.",
+    ],
+    steps: [
+      "Export a CSV from your bank (there is a guide for each one).",
+      "Import it into The Income Tracker.",
+      "Sort the new merchants, and read the category totals for the month.",
+    ],
+    sections: [
+      {
+        h: "Expense tracking without the typing",
+        p: [
+          "Manual expense apps fail because typing every coffee gets old by week two. A bank CSV already has every payment with its date and amount. The tracker's job is the sorting, and it remembers each merchant so the second month is mostly done before you start. Cash spending is the one thing you still add by hand.",
+        ],
+      },
+    ],
+    exportNoteHtml: 'New to CSV exports? Start with the <a href="/import/">bank CSV guides</a>.',
+    faqs: [
+      { q: "Is there a free expense tracker that works with UK banks?", a: "Yes. The Income Tracker imports standard CSV exports from Barclays, HSBC, Lloyds, NatWest, Nationwide, Monzo, Starling, Revolut and the rest, and has an export guide for each." },
+      { q: "Does it need my bank login?", a: "No. You download the CSV yourself. Nothing connects to your bank and no credentials are entered." },
+      { q: "Can it track expenses across several accounts?", a: "Yes. Import a CSV from each account. Transfers between your own accounts are paired and skipped so they do not count as spending." },
+    ],
+    related: ["how-to-categorise-bank-transactions", "find-and-cancel-unused-subscriptions", "free-budget-planner-uk", "import"],
+  },
 ];

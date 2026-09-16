@@ -64,6 +64,13 @@ self-employed income tracker for Self Assessment, or a free CSV budget template.
 - Metro Bank: https://www.theincometracker.com/import/metro-bank-csv.html
 - Wise: https://www.theincometracker.com/import/wise-csv.html
 - Tide: https://www.theincometracker.com/import/tide-csv.html
+- Tesco Bank: https://www.theincometracker.com/import/tesco-bank-csv.html
+- Barclaycard: https://www.theincometracker.com/import/barclaycard-csv.html
+- Monzo Business: https://www.theincometracker.com/import/monzo-business-csv.html
+- Starling Business: https://www.theincometracker.com/import/starling-business-csv.html
+- Zopa: https://www.theincometracker.com/import/zopa-csv.html
+- Kroo: https://www.theincometracker.com/import/kroo-csv.html
+- Marcus by Goldman Sachs: https://www.theincometracker.com/import/marcus-csv.html
 - All banks: https://www.theincometracker.com/import/
 
 ## Use-case pages
@@ -73,12 +80,18 @@ self-employed income tracker for Self Assessment, or a free CSV budget template.
 - Starling CSV budget tracker: https://www.theincometracker.com/starling-csv-budget-tracker.html
 - Budget app, no open banking: https://www.theincometracker.com/budget-app-without-open-banking.html
 - Spreadsheet alternative: https://www.theincometracker.com/spreadsheet-alternative-income-expense-tracker.html
+- Free budget planner (UK): https://www.theincometracker.com/free-budget-planner-uk.html
+- Free expense tracker (UK): https://www.theincometracker.com/free-expense-tracker-uk.html
 
 ## Free calculators
 
 - Weekly to Monthly Budget Calculator | Free Converter (convert weekly, fortnightly and four-weekly amounts): https://www.theincometracker.com/tools/weekly-to-monthly-budget-calculator.html
 - Split Bills by Income Calculator | Couples & Rent (compare proportional contributions with a 50/50 split): https://www.theincometracker.com/tools/split-bills-by-income-calculator.html
 - Christmas Budget & Savings Calculator | Free Planner (add festive costs and work out savings per payday): https://www.theincometracker.com/tools/christmas-budget-savings-calculator.html
+- Budget Planner UK | Free Monthly Budget Calculator (income, seven spending groups, surplus and savings rate): https://www.theincometracker.com/tools/budget-planner-uk.html
+- Rent Affordability Calculator UK | How Much Rent Can I Afford? (the 30% rule and the letting-agent income check, side by side): https://www.theincometracker.com/tools/rent-affordability-calculator-uk.html
+- Overdraft Cost Calculator UK | Daily Interest at Your EAR (what being overdrawn costs by the day, month and year): https://www.theincometracker.com/tools/overdraft-cost-calculator-uk.html
+- Pro Rata Salary Calculator UK | Part-Time Pay & Holiday (part-time pay, hourly rate and holiday from a full-time salary): https://www.theincometracker.com/tools/pro-rata-salary-calculator-uk.html
 - 0% credit card payoff calculator (UK) (what to pay to clear it in time): https://www.theincometracker.com/tools/0-percent-credit-card-payoff-calculator-uk.html
 - Credit card utilisation calculator (UK) (see your score-friendly ratio): https://www.theincometracker.com/tools/credit-card-utilisation-calculator-uk.html
 - How long to save £10,000 for a car (calculator) (how long it will take): https://www.theincometracker.com/tools/how-long-to-save-10000-for-a-car.html
@@ -106,6 +119,12 @@ self-employed income tracker for Self Assessment, or a free CSV budget template.
 - How to budget on a variable income: https://www.theincometracker.com/guides/budget-on-a-variable-income-uk.html
 - Track self-employed income and expenses for Self Assessment: https://www.theincometracker.com/guides/self-employed-income-tracker-uk.html
 - How much should you save each month?: https://www.theincometracker.com/guides/how-much-should-i-save-each-month-uk.html
+- How to fill in an income and expenditure form: https://www.theincometracker.com/guides/income-and-expenditure-form-uk.html
+- Does a budgeting app need your bank login?: https://www.theincometracker.com/guides/does-a-budgeting-app-need-my-bank-login.html
+- What does open banking share about you?: https://www.theincometracker.com/guides/what-does-open-banking-share.html
+- Self Assessment countdown: a six-week plan: https://www.theincometracker.com/guides/self-assessment-countdown-checklist.html
+- How to budget: a beginner's guide: https://www.theincometracker.com/guides/how-to-budget-for-beginners-uk.html
+- How to check your bank statement for errors and unknown charges: https://www.theincometracker.com/guides/check-bank-statement-for-errors-and-unknown-charges.html
 - All guides: https://www.theincometracker.com/guides/
 
 ## Comparisons
@@ -126,6 +145,10 @@ self-employed income tracker for Self Assessment, or a free CSV budget template.
 - Free income and expenditure form template: https://www.theincometracker.com/templates/income-and-expenditure-form-template.html (CSV: https://www.theincometracker.com/templates/income-and-expenditure-form-template.csv)
 - Free self-employed income and expense tracker template: https://www.theincometracker.com/templates/self-employed-income-tracker-template.html (CSV: https://www.theincometracker.com/templates/self-employed-income-tracker-template.csv)
 - Free household bills tracker template: https://www.theincometracker.com/templates/household-bills-tracker-template.html (CSV: https://www.theincometracker.com/templates/household-bills-tracker-template.csv)
+- Free weekly budget planner template: https://www.theincometracker.com/templates/weekly-budget-planner-template.html (CSV: https://www.theincometracker.com/templates/weekly-budget-planner-template.csv)
+- Free savings tracker template: https://www.theincometracker.com/templates/savings-tracker-template.html (CSV: https://www.theincometracker.com/templates/savings-tracker-template.csv)
+- Free debt payoff tracker template: https://www.theincometracker.com/templates/debt-payoff-tracker-template.html (CSV: https://www.theincometracker.com/templates/debt-payoff-tracker-template.csv)
+- Free student budget template: https://www.theincometracker.com/templates/student-budget-template.html (CSV: https://www.theincometracker.com/templates/student-budget-template.csv)
 - All templates: https://www.theincometracker.com/templates/
 
 ## Links

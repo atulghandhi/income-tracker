@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Budget Planner UK | Free Monthly Budget Calculator</title>
+    <meta name="description" content="A free UK monthly budget planner. Enter take-home pay and seven spending groups to see your surplus, savings rate, essentials share and how you compare with the 50/30/20 guideline. No sign-up." />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+    <meta name="author" content="The Income Tracker" />
+    <meta name="theme-color" content="#051424" />
+    <link rel="canonical" href="https://www.theincometracker.com/tools/budget-planner-uk.html" />
+    <meta name="geo.region" content="GB" />
+    <meta http-equiv="content-language" content="en-GB" />
+    <meta property="og:type" content="article" />
+    <meta property="og:locale" content="en_GB" />
+    <meta property="og:site_name" content="The Income Tracker" />
+    <meta property="og:url" content="https://www.theincometracker.com/tools/budget-planner-uk.html" />
+    <meta property="og:title" content="Budget Planner UK | Free Monthly Budget Calculator" />
+    <meta property="og:description" content="A free UK monthly budget planner. Enter take-home pay and seven spending groups to see your surplus, savings rate, essentials share and how you compare with the 50/30/20 guideline. No sign-up." />
+    <meta property="og:image" content="https://www.theincometracker.com/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="The Income Tracker: free, private, local-first budget tracker for the UK" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Budget Planner UK | Free Monthly Budget Calculator" />
+    <meta name="twitter:description" content="A free UK monthly budget planner. Enter take-home pay and seven spending groups to see your surplus, savings rate, essentials share and how you compare with the 50/30/20 guideline. No sign-up." />
+    <meta name="twitter:image" content="https://www.theincometracker.com/og-image.png" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png" />
+    <link rel="icon" type="image/png" sizes="240x240" href="/icon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="alternate" type="application/rss+xml" title="The Income Tracker: new guides and updates" href="https://www.theincometracker.com/feed.xml" />
+    <style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; padding: 0 24px 96px; background: #051424; color: #d4e4fa;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 16px; line-height: 1.7;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  a { color: #00dfc1; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  header.site { max-width: 980px; margin: 0 auto; padding: 18px 0 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+  header.site .brand { color: #fff; font-weight: 800; letter-spacing: -0.01em; font-size: 1.02rem; margin-right: auto; }
+  header.site .brand:hover { text-decoration: none; color: #00dfc1; }
+  nav.sitenav { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; font-size: 0.88rem; }
+  nav.sitenav a { color: #b8c8e0; padding: 4px 0; }
+  nav.sitenav a:hover { color: #00dfc1; text-decoration: none; }
+  nav.sitenav a.navbtn { background: rgba(0,223,193,0.12); border: 1px solid rgba(0,223,193,0.35); color: #00dfc1; padding: 6px 12px; border-radius: 8px; font-weight: 700; }
+  nav.sitenav a.navbtn:hover { background: rgba(0,223,193,0.2); }
+  header.top { padding: 22px 0 8px; }
+  nav.crumbs { font-size: 0.85rem; color: #9ea8b7; }
+  nav.crumbs a { color: #9ea8b7; }
+  nav.crumbs a:hover { color: #00dfc1; }
+  h1 { font-size: clamp(1.7rem, 4vw, 2.3rem); font-weight: 800; line-height: 1.15; margin: 18px 0 10px; color: #fff; letter-spacing: -0.02em; }
+  .meta { color: #9ea8b7; font-size: 0.85rem; margin-bottom: 24px; }
+  .lede { font-size: 1.12rem; color: #eaf2ff; line-height: 1.65; margin: 0 0 24px; }
+  .tldr { background: rgba(0,223,193,0.07); border: 1px solid rgba(0,223,193,0.22); border-radius: 12px; padding: 16px 20px; margin: 0 0 28px; }
+  .tldr strong { color: #00dfc1; letter-spacing: 0.02em; font-size: 0.8rem; text-transform: uppercase; display: block; margin-bottom: 6px; }
+  .tldr p { margin: 0; color: #d4e4fa; }
+  h2 { font-size: 1.3rem; font-weight: 700; color: #fff; margin: 40px 0 12px; letter-spacing: -0.01em; }
+  h3 { font-size: 1.05rem; font-weight: 650; color: #fff; margin: 28px 0 8px; }
+  p, li { color: #c8d8ee; }
+  ul, ol { padding-left: 22px; }
+  li + li { margin-top: 8px; }
+  ol.steps { counter-reset: step; list-style: none; padding-left: 0; }
+  ol.steps > li { position: relative; padding: 0 0 4px 44px; margin-top: 18px; }
+  ol.steps > li::before {
+    counter-increment: step; content: counter(step);
+    position: absolute; left: 0; top: 0; width: 30px; height: 30px;
+    background: rgba(0,223,193,0.12); border: 1px solid rgba(0,223,193,0.4);
+    color: #00dfc1; border-radius: 50%; display: grid; place-items: center;
+    font-weight: 700; font-size: 0.9rem;
+  }
+  .note { background: rgba(212,228,250,0.05); border-left: 3px solid rgba(212,228,250,0.25); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 20px 0; font-size: 0.95rem; color: #b8c8e0; }
+  .cta { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin: 34px 0; padding: 24px; background: rgba(8,22,38,0.85); border: 1px solid rgba(0,223,193,0.18); border-radius: 14px; }
+  .cta .cta-text { flex: 1; min-width: 220px; }
+  .cta .cta-text strong { color: #fff; display: block; font-size: 1.05rem; margin-bottom: 2px; }
+  .cta .cta-text span { color: #9ea8b7; font-size: 0.9rem; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; background: #00dfc1; color: #051424; font-weight: 700; padding: 13px 22px; border-radius: 10px; white-space: nowrap; border: none; font-size: 1rem; font-family: inherit; cursor: pointer; }
+  .btn:hover { text-decoration: none; filter: brightness(1.06); }
+  .btn.ghost { background: transparent; color: #00dfc1; border: 1px solid rgba(0,223,193,0.4); }
+  .btn.ghost:hover { background: rgba(0,223,193,0.08); }
+  .btnrow { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 18px 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; margin: 24px 0; }
+  .card { display: block; padding: 16px 18px; background: rgba(8,22,38,0.7); border: 1px solid rgba(212,228,250,0.1); border-radius: 12px; transition: border-color 140ms ease, transform 140ms ease; }
+  .card:hover { text-decoration: none; border-color: rgba(0,223,193,0.4); transform: translateY(-2px); }
+  .card .card-t { color: #fff; font-weight: 650; display: block; margin-bottom: 4px; }
+  .card .card-d { color: #9ea8b7; font-size: 0.88rem; }
+  .faq dt { font-weight: 650; color: #fff; margin-top: 22px; }
+  .faq dd { margin: 6px 0 0; color: #c8d8ee; }
+  .tablewrap { overflow-x: auto; margin: 18px 0; border: 1px solid rgba(212,228,250,0.12); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.93rem; min-width: 460px; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid rgba(212,228,250,0.1); vertical-align: top; color: #c8d8ee; }
+  th { color: #fff; font-weight: 700; background: rgba(8,22,38,0.9); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  tr:last-child td { border-bottom: none; }
+  td.hi { color: #00dfc1; font-weight: 600; }
+  .verdict { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin: 20px 0; }
+  .verdict > div { background: rgba(8,22,38,0.7); border: 1px solid rgba(212,228,250,0.1); border-radius: 12px; padding: 16px 18px; }
+  .verdict h3 { margin: 0 0 8px; font-size: 0.98rem; }
+  .verdict ul { margin: 0; padding-left: 18px; }
+  .verdict li { font-size: 0.93rem; }
+  .sources { font-size: 0.86rem; color: #9ea8b7; }
+  .sources ul { padding-left: 18px; }
+  .sources li { color: #9ea8b7; margin-top: 4px; }
+  .sources a { color: #9ea8b7; text-decoration: underline; }
+  .sources a:hover { color: #00dfc1; }
+  .tag { display: inline-block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #00dfc1; background: rgba(0,223,193,0.1); border: 1px solid rgba(0,223,193,0.3); padding: 2px 8px; border-radius: 999px; margin-right: 8px; vertical-align: middle; }
+  .changelog li { margin-top: 14px; }
+  .changelog time { color: #9ea8b7; font-size: 0.82rem; display: block; }
+  .changelog strong { color: #fff; }
+  /* Calculator widget */
+  .calc { background: rgba(8,22,38,0.9); border: 1px solid rgba(0,223,193,0.2); border-radius: 16px; padding: 22px; margin: 0 0 14px; }
+  .calc-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
+  .calc-field { display: flex; flex-direction: column; gap: 6px; }
+  .calc-label { font-size: 0.82rem; color: #9ea8b7; font-weight: 600; }
+  .calc-inwrap { display: flex; align-items: center; background: #06182b; border: 1px solid rgba(212,228,250,0.16); border-radius: 10px; padding: 0 12px; }
+  .calc-inwrap:focus-within { border-color: rgba(0,223,193,0.5); }
+  .calc-inwrap i { color: #9ea8b7; font-style: normal; font-size: 0.95rem; }
+  .calc-inwrap select { min-width: 0; width: 100%; padding: 12px; border: 0; background: #102638; color: #d4e4fa; font: inherit; }
+  .calc-inwrap input { flex: 1; min-width: 0; background: none; border: none; color: #fff; font-size: 1.05rem; font-weight: 600; padding: 11px 6px; outline: none; font-family: inherit; }
+  .calc-inwrap input::-webkit-outer-spin-button, .calc-inwrap input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .calc-out { margin-top: 18px; padding-top: 18px; border-top: 1px solid rgba(212,228,250,0.1); }
+  .calc-out p { margin: 8px 0 0; }
+  .calc-headline { font-size: 2rem; font-weight: 800; color: #00dfc1; line-height: 1.1; letter-spacing: -0.02em; }
+  .calc-headline small { font-size: 0.9rem; font-weight: 600; color: #9ea8b7; letter-spacing: 0; }
+  .calc-hint { color: #9ea8b7; }
+  .calc-good { color: #00dfc1; }
+  .calc-warn { color: #ffd479; }
+  .calc-bad { color: #ff8b8b; }
+  .calc-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 16px; }
+  .calc-actions .btn { padding: 9px 14px; font-size: 0.88rem; }
+  .calc-share-note { font-size: 0.82rem; color: #9ea8b7; }
+  hr { border: none; border-top: 1px solid rgba(212,228,250,0.1); margin: 48px 0 24px; }
+  footer.site { color: #9ea8b7; font-size: 0.85rem; }
+  footer.site .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 18px; margin-bottom: 22px; }
+  footer.site h4 { color: #d4e4fa; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 8px; }
+  footer.site ul { list-style: none; padding: 0; margin: 0; }
+  footer.site li { margin: 0 0 6px; color: #9ea8b7; }
+  footer.site a { color: #9ea8b7; }
+  footer.site a:hover { color: #00dfc1; }
+  footer.site .legal { border-top: 1px solid rgba(212,228,250,0.08); padding-top: 14px; }
+  @media (max-width: 560px) {
+    body { padding: 0 16px 72px; }
+    header.site { padding-top: 14px; }
+    nav.sitenav { font-size: 0.84rem; gap: 2px 12px; }
+    .calc { padding: 16px; }
+  }
+</style>
+    <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://www.theincometracker.com/#website",
+      "url": "https://www.theincometracker.com/",
+      "name": "The Income Tracker",
+      "description": "A free, local-first income and expense tracker for the UK. Import a CSV from your bank. No account, no bank login.",
+      "inLanguage": "en-GB",
+      "publisher": {
+        "@id": "https://www.theincometracker.com/#org"
+      }
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://www.theincometracker.com/#org",
+      "name": "The Income Tracker",
+      "url": "https://www.theincometracker.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.theincometracker.com/icon.png",
+        "width": 240,
+        "height": 240
+      },
+      "email": "hello@theincometracker.com",
+      "areaServed": "GB"
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://www.theincometracker.com/tools/budget-planner-uk.html#webpage",
+      "url": "https://www.theincometracker.com/tools/budget-planner-uk.html",
+      "name": "Budget Planner UK | Free Monthly Budget Calculator",
+      "description": "A free UK monthly budget planner. Enter take-home pay and seven spending groups to see your surplus, savings rate, essentials share and how you compare with the 50/30/20 guideline. No sign-up.",
+      "inLanguage": "en-GB",
+      "isPartOf": {
+        "@id": "https://www.theincometracker.com/#website"
+      },
+      "datePublished": "2026-09-16",
+      "dateModified": "2026-09-16",
+      "primaryImageOfPage": {
+        "@type": "ImageObject",
+        "url": "https://www.theincometracker.com/og-image.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.theincometracker.com/tools/budget-planner-uk.html#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.theincometracker.com/tools/budget-planner-uk.html#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.theincometracker.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Calculators",
+          "item": "https://www.theincometracker.com/tools/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Budget planner",
+          "item": "https://www.theincometracker.com/tools/budget-planner-uk.html"
+        }
+      ]
+    },
+    {
+      "@type": "WebApplication",
+      "name": "Budget Planner UK | Free Monthly Budget Calculator",
+      "description": "A free UK monthly budget planner. Enter take-home pay and seven spending groups to see your surplus, savings rate, essentials share and how you compare with the 50/30/20 guideline. No sign-up.",
+      "applicationCategory": "FinanceApplication",
+      "operatingSystem": "Any (web browser)",
+      "browserRequirements": "Requires JavaScript",
+      "url": "https://www.theincometracker.com/tools/budget-planner-uk.html",
+      "isAccessibleForFree": true,
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "GBP"
+      },
+      "publisher": {
+        "@id": "https://www.theincometracker.com/#org"
+      }
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is a good monthly budget in the UK?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "One where essentials are around half of take-home pay or less, and something is saved every month. The exact figures depend on where you live; the shares matter more than the pounds."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How much should rent be as a percentage of income?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "A common guideline is 30 to 35% of take-home pay. In London and the South East many people pay more, which is why the rest of the budget needs to be tighter."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does this budget planner store my numbers?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. Everything is calculated in your browser and nothing is sent anywhere. A shared link includes the amounts you entered, so only share it if you are happy with that."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is there a downloadable version?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. The free monthly budget planner template on this site is a CSV with the same groups, and it imports straight into The Income Tracker."
+          }
+        }
+      ]
+    }
+  ]
+}
+    </script>
+  </head>
+  <body>
+    <header class="site">
+      <a class="brand" href="/">The Income Tracker</a>
+      <nav class="sitenav" aria-label="Site">
+        <a href="/import/">Bank CSV guides</a>
+        <a href="/guides/">Guides</a>
+        <a href="/tools/">Calculators</a>
+        <a href="/compare/">Compare</a>
+        <a href="/templates/">Templates</a>
+        <a class="navbtn" href="/?ref=nav" data-track="cta_click" data-ref="nav">Open the tracker</a>
+      </nav>
+    </header>
+    <div class="wrap">
+      <header class="top"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> &rsaquo; <a href="/tools/">Calculators</a> &rsaquo; Budget planner</nav></header>
+      <h1>Budget planner (UK)</h1>
+      <p class="meta">By The Income Tracker · Updated 16 September 2026</p>
+      <div class="tldr"><strong>The short answer</strong><p>Enter your monthly take-home pay and what you spend on housing, bills, food, transport, debt, subscriptions and everything else. The planner shows what is left, your savings rate, and how your essentials compare with the 50/30/20 guideline. It works in your browser and stores nothing.</p></div>
+      <div class="calc">
+        <div class="calc-fields">
+          <label class="calc-field"><span class="calc-label">Monthly take-home income</span><span class="calc-inwrap"><i>£</i><input id="income" type="number" inputmode="decimal" step="any" value="2400" min="0" max="1000000000000" required /></span></label>
+          <label class="calc-field"><span class="calc-label">Rent or mortgage</span><span class="calc-inwrap"><i>£</i><input id="housing" type="number" inputmode="decimal" step="any" value="900" min="0" max="1000000000000" required /></span></label>
+          <label class="calc-field"><span class="calc-label">Council tax, energy, water, broadband, phone, insurance</span><span class="calc-inwrap"><i>£</i><input id="bills" type="number" inputmode="decimal" step="any" value="350" min="0" max="1000000000000" required /></span></label>
+          <label class="calc-field"><span class="calc-label">Groceries</span><span class="calc-inwrap"><i>£</i><input id="food" type="number" inputmode="decimal" step="any" value="320" min="0" max="1000000000000" required /></span></label>
+          <label class="calc-field"><span class="calc-label">Transport</span><span class="calc-inwrap"><i>£</i><input id="transport" type="number" inputmode="decimal" step="any" value="150" min="0" max="1000000000000" required /></span></label>
+          <label class="calc-field"><span class="calc-label">Debt repayments</span><span class="calc-inwrap"><i>£</i><input id="debt" type="number" inputmode="decimal" step="any" value="100" min="0" max="1000000000000" required /></span></label>
+          <label class="calc-field"><span class="calc-label">Subscriptions</span><span class="calc-inwrap"><i>£</i><input id="subs" type="number" inputmode="decimal" step="any" value="40" min="0" max="1000000000000" required /></span></label>
+          <label class="calc-field"><span class="calc-label">Everything else (eating out, shopping, fun)</span><span class="calc-inwrap"><i>£</i><input id="other" type="number" inputmode="decimal" step="any" value="300" min="0" max="1000000000000" required /></span></label>
+        </div>
+        <div class="calc-out" id="calc-out" role="status" aria-live="polite" aria-atomic="true"></div>
+        <noscript><p>Enable JavaScript to calculate your own result. The formulas and worked examples below are available without it.</p></noscript>
+        <div class="calc-actions">
+          <button class="btn ghost" type="button" id="calc-share">Share this result</button>
+          <a class="btn" href="/?ref=calc-budget-planner-uk" data-track="cta_click" data-ref="calc-budget-planner-uk">Track it in the app &rarr;</a>
+          <span class="calc-share-note" id="calc-share-note">Calculated on your device. Shared links include the amounts you enter.</span>
+        </div>
+      </div>
+
+      <h2>How to fill it in</h2>
+      <ul>
+        <li>Income: take-home pay after tax, National Insurance, pension and student loan, plus benefits. Weekly amounts times 52 divided by 12.</li>
+        <li>Housing and bills: the direct debits and standing orders on last month’s statement.</li>
+        <li>Groceries, transport, subscriptions and everything else: the card spending from the same statement, averaged over two or three months if it varies.</li>
+        <li>Debt: the payments you actually make, not the minimums you could make.</li>
+      </ul>
+
+      <h2>Example: £2,400 take-home</h2>
+      <p>Housing £900, bills £350, groceries £320, transport £150 and debt £100 make essentials of £1,820, or 76% of income. Subscriptions £40 and everything else £300 bring spending to £2,160, leaving £240, a 10% savings rate. Housing at 37.5% is the number to watch: it is the reason essentials are over the 50% guideline, and it is the hardest line to change quickly.</p>
+
+      <h2>What the guideline numbers mean</h2>
+      <div class="tablewrap"><table><thead><tr><th scope="col">Measure</th><th scope="col">Guideline</th><th scope="col">Why</th></tr></thead><tbody>
+<tr><th scope="row" style="font-weight:600;text-transform:none;letter-spacing:0;font-size:0.93rem;background:none;">Essentials share</th><td>50% of take-home or less</td><td>Leaves room for choices and savings</td></tr>
+<tr><th scope="row" style="font-weight:600;text-transform:none;letter-spacing:0;font-size:0.93rem;background:none;">Housing share</th><td>Around 30 to 35% or less</td><td>Above that, one rent rise or rate change strains everything</td></tr>
+<tr><th scope="row" style="font-weight:600;text-transform:none;letter-spacing:0;font-size:0.93rem;background:none;">Savings rate</th><td>20% is the 50/30/20 target</td><td>Start with any positive number; build to it</td></tr>
+</tbody></table></div>
+
+      <h2>From a one-off plan to a monthly habit</h2>
+      <p>This planner gives you a picture from numbers you typed. The Income Tracker gives you the same picture from your real bank transactions, every month, with the categories remembered. Import a CSV and the surplus, savings rate and category totals update on their own.</p>
+
+      <div class="cta">
+  <div class="cta-text"><strong>The Income Tracker</strong><span>Build the same picture from your real transactions, every month.</span></div>
+  <a class="btn" href="/?ref=calc-budget-planner-uk" data-track="cta_click" data-ref="calc-budget-planner-uk">Open the tracker &rarr;</a>
+</div>
+
+      <h2>Frequently asked questions</h2>
+<dl class="faq">
+<dt>What is a good monthly budget in the UK?</dt>
+<dd>One where essentials are around half of take-home pay or less, and something is saved every month. The exact figures depend on where you live; the shares matter more than the pounds.</dd>
+<dt>How much should rent be as a percentage of income?</dt>
+<dd>A common guideline is 30 to 35% of take-home pay. In London and the South East many people pay more, which is why the rest of the budget needs to be tighter.</dd>
+<dt>Does this budget planner store my numbers?</dt>
+<dd>No. Everything is calculated in your browser and nothing is sent anywhere. A shared link includes the amounts you entered, so only share it if you are happy with that.</dd>
+<dt>Is there a downloadable version?</dt>
+<dd>Yes. The free monthly budget planner template on this site is a CSV with the same groups, and it imports straight into The Income Tracker.</dd>
+</dl>
+
+      
+
+      <h2>Related</h2>
+      <div class="grid">
+        <a class="card" href="/guides/how-to-budget-for-beginners-uk.html"><span class="card-t">How to budget: a beginner's guide</span><span class="card-d">Twenty minutes, one bank statement, three numbers</span></a>
+        <a class="card" href="/tools/50-30-20-budget-calculator-uk.html"><span class="card-t">50/30/20 budget</span><span class="card-d">Needs, wants and savings from your take-home pay</span></a>
+        <a class="card" href="/templates/monthly-budget-planner-template.html"><span class="card-t">Monthly budget planner</span><span class="card-d">Income, bills, spending and savings in one sheet</span></a>
+        <a class="card" href="/tools/monthly-surplus-calculator.html"><span class="card-t">Monthly surplus</span><span class="card-d">What is left after spending</span></a>
+        <a class="card" href="/tools/rent-affordability-calculator-uk.html"><span class="card-t">Rent affordability (UK)</span><span class="card-d">The 30% rule and the letting-agent income check, side by side</span></a>
+      </div>
+      <hr />
+      <footer class="site">
+        <div class="cols">
+          <div>
+            <h4>Use it</h4>
+            <ul>
+              <li><a href="/?ref=footer" data-track="cta_click" data-ref="footer">Open the tracker</a></li>
+              <li><a href="/import/">Bank CSV guides</a></li>
+              <li><a href="/templates/">Budget templates</a></li>
+              <li><a href="/tools/">Calculators</a></li>
+            </ul>
+          </div>
+          <div>
+            <h4>Learn</h4>
+            <ul>
+              <li><a href="/guides/">Budgeting guides</a></li>
+              <li><a href="/compare/">Compare apps</a></li>
+              <li><a href="/compare/best-free-budgeting-apps-uk.html">Best free budgeting apps (UK)</a></li>
+              <li><a href="/whats-new.html">What&rsquo;s new</a></li>
+            </ul>
+          </div>
+          <div>
+            <h4>About</h4>
+            <ul>
+              <li><a href="/about.html">About</a></li>
+              <li><a href="/?feedback=1">Contact us</a></li>
+              <li><a href="/privacy.html">Privacy</a></li>
+              <li><a href="/tos.html">Terms</a></li>
+              <li><a href="/feed.xml">RSS feed</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="legal">&copy; 2026 The Income Tracker. Free, private, local-first budgeting for the UK. No account, no bank login.</div>
+      </footer>
+    </div>
+<script>
+window.va=window.va||function(){(window.vaq=window.vaq||[]).push(arguments)};
+(function(){
+  var PH_KEY="",PH_HOST="https://us.i.posthog.com";
+  var dnt=typeof navigator!=="undefined"&&navigator.doNotTrack==="1";
+  function id(){try{var k="it_analytics_id",v=localStorage.getItem(k);if(!v){v="anon-"+(window.crypto&&crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2));localStorage.setItem(k,v);}return v;}catch(e){return "anon-ephemeral";}}
+  function track(name,props){
+    props=props||{};props.page=location.pathname;
+    try{window.va("event",{name:name,data:props});}catch(e){}
+    if(!PH_KEY||dnt)return;
+    try{fetch(PH_HOST+"/capture/",{method:"POST",keepalive:true,headers:{"content-type":"application/json"},body:JSON.stringify({api_key:PH_KEY,event:name,distinct_id:id(),properties:Object.assign({app:"income-tracker-web",surface:"static"},props),timestamp:new Date().toISOString()})}).catch(function(){});}catch(e){}
+  }
+  window.itTrack=track;
+  document.addEventListener("click",function(ev){
+    var t=ev.target;if(!t||!t.closest)return;var el=t.closest("[data-track]");if(!el)return;
+    track(el.getAttribute("data-track"),{ref:el.getAttribute("data-ref")||"",href:el.getAttribute("href")||""});
+  });
+  if(PH_KEY&&!dnt)track("static_pageview",{});
+})();
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
+<script>
+(function(){
+  var IDS=["income","housing","bills","food","transport","debt","subs","other"],SLUG="budget-planner-uk",used=false;
+  function n(id){var el=document.getElementById(id);if(!el)return 0;var v=Number(el.value);return Number.isFinite(v)?v:0;}
+  function gbp(x){return '£'+(Math.round(x*100)/100).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});}
+  function pct(x){return (Math.round(x*10)/10)+'%';}
+  var out=document.getElementById('calc-out');
+  function render(){
+    if(IDS.some(function(id){var el=document.getElementById(id);return !el||!el.value||!el.checkValidity()||!Number.isFinite(Number(el.value));})){
+      out.innerHTML='<p class="calc-hint">Enter a valid non-negative number in each field. Payment counts must be whole numbers.</p>';return;
+    }
+    var income=n('income'),housing=n('housing'),bills=n('bills'),food=n('food'),transport=n('transport'),debt=n('debt'),subs=n('subs'),other=n('other');
+    if(income<=0){out.innerHTML='<p class="calc-hint">Enter your monthly take-home income to start.</p>';return;}
+    var essentials=housing+bills+food+transport+debt,flexible=subs+other,spend=essentials+flexible,surplus=income-spend;
+    var rate=surplus/income*100,essPct=essentials/income*100,flexPct=flexible/income*100,housePct=housing/income*100;
+    var cls=surplus>0?'calc-good':(surplus<0?'calc-bad':'calc-warn');
+    var html='<div class="calc-headline '+cls+'">'+(surplus<0?'-':'')+gbp(Math.abs(surplus))+' <small>'+(surplus<0?'short each month':'left each month')+'</small></div>';
+    html+='<p>Income '+gbp(income)+' minus spending '+gbp(spend)+'. '+(surplus>=0?'Savings rate <strong>'+pct(rate)+'</strong>.':'Spending exceeds income by <strong>'+pct(-rate)+'</strong>.')+'</p>';
+    html+='<p>Essentials '+gbp(essentials)+' ('+pct(essPct)+' of income). Flexible spending '+gbp(flexible)+' ('+pct(flexPct)+'). Housing alone is '+pct(housePct)+'.</p>';
+    var note='';
+    if(essPct>50)note='Essentials are above the 50% guideline. Housing and bills are the lines to negotiate, switch or, over time, change.';
+    else if(rate<20&&surplus>=0)note='Under the 50/30/20 guideline the target for savings and extra debt payments is 20%. Flexible spending is the quickest place to find the difference.';
+    else if(surplus>=0)note='This meets the 50/30/20 guideline. Move the surplus on payday so it does not get spent.';
+    if(surplus<0)note='Pay priority bills first (rent, council tax, energy), then cut flexible spending. If it still does not balance, free advice from StepChange or Citizens Advice is the next step.';
+    if(note)html+='<p class="calc-hint">'+note+'</p>';
+    out.innerHTML=html;
+  }
+  try{var q=new URLSearchParams(location.search);IDS.forEach(function(id){if(q.has(id)){var el=document.getElementById(id);var v=Number(q.get(id));if(el&&Number.isFinite(v))el.value=String(v);}});}catch(e){}
+  IDS.forEach(function(id){var el=document.getElementById(id);if(el)el.addEventListener('input',function(){render();if(!used){used=true;if(window.itTrack)window.itTrack('calc_used',{calc:SLUG});}});});
+  var share=document.getElementById('calc-share'),note=document.getElementById('calc-share-note');
+  if(share){share.addEventListener('click',function(){
+    if(IDS.some(function(id){return !document.getElementById(id).checkValidity();})){note.textContent="Check the inputs before sharing.";return;}
+    var q=new URLSearchParams();IDS.forEach(function(id){q.set(id,String(n(id)));});
+    var url=location.origin+location.pathname+'?'+q.toString();
+    if(window.itTrack)window.itTrack('calc_shared',{calc:SLUG});
+    if(navigator.share){navigator.share({title:document.title,url:url}).catch(function(){});return;}
+    if(navigator.clipboard){navigator.clipboard.writeText(url).then(function(){note.textContent='Link copied. Paste it anywhere.';}).catch(function(){note.textContent=url;});}
+    else{note.textContent=url;}
+  });}
+  render();
+})();
+</script>
+  </body>
+</html>

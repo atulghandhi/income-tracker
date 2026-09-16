@@ -89,6 +89,84 @@ const BILLS_ROWS = [
   ["2026-09-25", "Savings transfer", "Savings", "300.00", "25", "Standing order"],
 ];
 
+const WEEKLY_ROWS = [
+  ["Date", "Description", "Category", "Money in", "Money out", "Week"],
+  ["2026-09-04", "Wages (weekly, take-home)", "Income", "480.00", "", "Week 1"],
+  ["2026-09-04", "Rent (weekly share)", "Housing", "", "185.00", "Week 1"],
+  ["2026-09-05", "Food shop", "Groceries", "", "58.40", "Week 1"],
+  ["2026-09-07", "Bus pass (weekly)", "Transport", "", "22.00", "Week 1"],
+  ["2026-09-08", "Phone (monthly, paid this week)", "Bills", "", "15.00", "Week 1"],
+  ["2026-09-10", "Takeaway", "Eating out", "", "18.50", "Week 1"],
+  ["2026-09-11", "Wages (weekly, take-home)", "Income", "480.00", "", "Week 2"],
+  ["2026-09-11", "Rent (weekly share)", "Housing", "", "185.00", "Week 2"],
+  ["2026-09-12", "Food shop", "Groceries", "", "61.20", "Week 2"],
+  ["2026-09-14", "Bus pass (weekly)", "Transport", "", "22.00", "Week 2"],
+  ["2026-09-15", "Energy (monthly, paid this week)", "Bills", "", "95.00", "Week 2"],
+  ["2026-09-18", "Wages (weekly, take-home)", "Income", "480.00", "", "Week 3"],
+  ["2026-09-18", "Rent (weekly share)", "Housing", "", "185.00", "Week 3"],
+  ["2026-09-19", "Food shop", "Groceries", "", "55.90", "Week 3"],
+  ["2026-09-21", "Bus pass (weekly)", "Transport", "", "22.00", "Week 3"],
+  ["2026-09-22", "Savings transfer", "Savings", "", "40.00", "Week 3"],
+  ["2026-09-25", "Wages (weekly, take-home)", "Income", "480.00", "", "Week 4"],
+  ["2026-09-25", "Rent (weekly share)", "Housing", "", "185.00", "Week 4"],
+  ["2026-09-26", "Food shop", "Groceries", "", "63.75", "Week 4"],
+  ["2026-09-28", "Bus pass (weekly)", "Transport", "", "22.00", "Week 4"],
+  ["2026-09-29", "Council tax (monthly, paid this week)", "Bills", "", "120.00", "Week 4"],
+  ["2026-09-30", "Savings transfer", "Savings", "", "40.00", "Week 4"],
+];
+
+const SAVINGS_ROWS = [
+  ["Date", "Description", "Category", "Money in", "Money out", "Goal"],
+  ["2026-09-01", "Opening balance, emergency fund", "Savings", "1250.00", "", "Emergency fund (target 3000)"],
+  ["2026-09-01", "Opening balance, holiday", "Savings", "320.00", "", "Holiday (target 1200)"],
+  ["2026-09-25", "Payday transfer", "Savings", "200.00", "", "Emergency fund (target 3000)"],
+  ["2026-09-25", "Payday transfer", "Savings", "100.00", "", "Holiday (target 1200)"],
+  ["2026-09-30", "Interest", "Interest", "4.85", "", "Emergency fund (target 3000)"],
+  ["2026-10-12", "Boiler repair, paid from fund", "Savings", "", "180.00", "Emergency fund (target 3000)"],
+  ["2026-10-25", "Payday transfer", "Savings", "200.00", "", "Emergency fund (target 3000)"],
+  ["2026-10-25", "Payday transfer", "Savings", "100.00", "", "Holiday (target 1200)"],
+  ["2026-10-31", "Interest", "Interest", "4.92", "", "Emergency fund (target 3000)"],
+  ["2026-11-25", "Payday transfer", "Savings", "200.00", "", "Emergency fund (target 3000)"],
+  ["2026-11-25", "Payday transfer", "Savings", "150.00", "", "Holiday (target 1200)"],
+];
+
+const DEBT_ROWS = [
+  ["Date", "Description", "Category", "Money out", "Balance after", "APR"],
+  ["2026-09-01", "Credit card A, opening balance", "Debt", "0.00", "2400.00", "24.9"],
+  ["2026-09-01", "Credit card B (0% until 2027-06), opening balance", "Debt", "0.00", "1800.00", "0"],
+  ["2026-09-01", "Car loan, opening balance", "Debt", "0.00", "5200.00", "8.9"],
+  ["2026-09-05", "Credit card A payment", "Debt", "250.00", "2199.80", "24.9"],
+  ["2026-09-10", "Credit card B payment", "Debt", "100.00", "1700.00", "0"],
+  ["2026-09-15", "Car loan repayment", "Debt", "180.00", "5058.55", "8.9"],
+  ["2026-10-05", "Credit card A payment", "Debt", "250.00", "1995.44", "24.9"],
+  ["2026-10-10", "Credit card B payment", "Debt", "100.00", "1600.00", "0"],
+  ["2026-10-15", "Car loan repayment", "Debt", "180.00", "4916.06", "8.9"],
+  ["2026-11-05", "Credit card A payment", "Debt", "250.00", "1786.85", "24.9"],
+  ["2026-11-10", "Credit card B payment", "Debt", "100.00", "1500.00", "0"],
+  ["2026-11-15", "Car loan repayment", "Debt", "180.00", "4772.52", "8.9"],
+];
+
+const STUDENT_ROWS = [
+  ["Date", "Description", "Category", "Money in", "Money out", "Term"],
+  ["2026-09-21", "Maintenance loan instalment", "Income", "3150.00", "", "Autumn"],
+  ["2026-09-21", "Part-time job (monthly)", "Income", "320.00", "", "Autumn"],
+  ["2026-09-22", "Halls rent (term)", "Housing", "", "2100.00", "Autumn"],
+  ["2026-09-23", "Phone", "Bills", "", "12.00", "Autumn"],
+  ["2026-09-24", "Food shop", "Groceries", "", "42.30", "Autumn"],
+  ["2026-09-26", "Course books", "Study", "", "65.00", "Autumn"],
+  ["2026-09-27", "Night out", "Going out", "", "35.00", "Autumn"],
+  ["2026-10-01", "Food shop", "Groceries", "", "38.90", "Autumn"],
+  ["2026-10-03", "Train home (railcard)", "Transport", "", "24.50", "Autumn"],
+  ["2026-10-05", "Streaming (student plan)", "Subscriptions", "", "5.99", "Autumn"],
+  ["2026-10-08", "Food shop", "Groceries", "", "44.10", "Autumn"],
+  ["2026-10-10", "Sports club membership", "Health", "", "40.00", "Autumn"],
+  ["2026-10-12", "Laundry", "Bills", "", "8.00", "Autumn"],
+  ["2026-10-15", "Food shop", "Groceries", "", "41.60", "Autumn"],
+  ["2026-10-21", "Part-time job (monthly)", "Income", "320.00", "", "Autumn"],
+  ["2026-10-22", "Society membership", "Going out", "", "15.00", "Autumn"],
+  ["2026-10-25", "Savings for January", "Savings", "", "100.00", "Autumn"],
+];
+
 export const TEMPLATES = [
   {
     slug: "monthly-budget-planner-template",
@@ -288,5 +366,200 @@ export const TEMPLATES = [
       { q: "Is it free?", a: "Yes. A plain CSV with no sign-up, usable in any spreadsheet or in The Income Tracker." },
     ],
     related: ["find-and-cancel-unused-subscriptions", "monthly-budget-planner-template", "subscription-cost-calculator", "import"],
+  },
+  // Added 16 September 2026.
+  {
+    slug: "weekly-budget-planner-template",
+    card: "Weekly budget planner",
+    cardD: "For weekly pay, with the monthly bills spread across weeks",
+    crumb: "Weekly budget planner",
+    title: "Free weekly budget planner template (UK, CSV)",
+    description:
+      "A free UK weekly budget planner template for people paid weekly. Four weeks in one sheet, monthly bills placed in the week they fall, and a running view of what is left. Excel, Sheets, or import into the app.",
+    h1: "Free weekly budget planner template",
+    tldr:
+      "If you are paid weekly, a monthly budget never quite fits. This template runs week by week: wages in, rent share and weekly food out, and the monthly bills placed in the week they are actually collected. Download the CSV, replace the example rows, and see which week is the tight one.",
+    published: "2026-09-16",
+    updated: "2026-09-16",
+    file: { name: "weekly-budget-planner-template.csv", rows: WEEKLY_ROWS },
+    columns: [
+      { name: "Date", meaning: "The day the money moves. Keep it accurate; the whole point is seeing which week the bills land in." },
+      { name: "Description", meaning: "What it was. Note monthly bills as monthly so you remember they do not repeat next week." },
+      { name: "Category", meaning: "Income, Housing, Bills, Groceries, Transport, Eating out, Savings. Keep it short." },
+      { name: "Money in / Money out", meaning: "Two columns, which import cleanly and are easy to total." },
+      { name: "Week", meaning: "Week 1 to Week 4 (or 5). Filter by this column to see one week at a time." },
+    ],
+    howto: [
+      "Download the CSV and open it in Excel, Google Sheets or Numbers.",
+      "Put your weekly take-home on each payday and your rent share against it.",
+      "Add the monthly bills in the week they are collected. Council tax, energy and phone rarely land in the same week.",
+      "Add weekly food and transport, then filter by week. The week with the most bills is the one to plan around.",
+      "Or import the file into The Income Tracker for totals and a monthly view alongside the weekly one.",
+    ],
+    sections: [
+      {
+        h: "Why weekly pay needs its own template",
+        p: [
+          "Fifty-two weekly paydays do not divide into twelve months. Some months have five paydays, and monthly bills hit in whichever week they like. A monthly budget hides that; a weekly one shows it. The trick is to spread monthly bills across the weeks so that no single payday is wiped out.",
+        ],
+      },
+      {
+        h: "The fifth payday",
+        p: [
+          "Four months a year have five Fridays. That fifth wage is the easiest savings you will ever make, because no bill is expecting it. Mark those weeks in advance and decide now where the money goes.",
+        ],
+      },
+    ],
+    faqs: [
+      { q: "Can I use this if I am paid fortnightly?", a: "Yes. Put wages on every other week and keep the bills where they fall. The weekly to monthly calculator converts fortnightly pay to a monthly average if you need one." },
+      { q: "Does it import into The Income Tracker?", a: "Yes. The column headers match the importer, so the file imports in one step and the Week column is kept as a note." },
+      { q: "Is it free?", a: "Yes. A plain CSV with no sign-up, no macros and no locked cells." },
+    ],
+    related: ["weekly-to-monthly-budget-calculator", "spend-per-day-until-payday-calculator", "monthly-budget-planner-template", "budget-on-a-variable-income-uk"],
+  },
+  {
+    slug: "savings-tracker-template",
+    card: "Savings tracker",
+    cardD: "Several goals in one sheet, with interest and withdrawals",
+    crumb: "Savings tracker",
+    title: "Free savings tracker template (UK, CSV)",
+    description:
+      "A free UK savings tracker template: log transfers, interest and withdrawals against named goals with targets. Open in Excel or Sheets, or import into The Income Tracker for projected dates.",
+    h1: "Free savings tracker template",
+    tldr:
+      "One row per movement, one goal per name. Log every payday transfer, every bit of interest and every withdrawal, and the running total for each goal is one filter away. Import it into The Income Tracker and each goal gets a projected finish date.",
+    published: "2026-09-16",
+    updated: "2026-09-16",
+    file: { name: "savings-tracker-template.csv", rows: SAVINGS_ROWS },
+    columns: [
+      { name: "Date", meaning: "When the money moved." },
+      { name: "Description", meaning: "Payday transfer, interest, or what a withdrawal paid for." },
+      { name: "Category", meaning: "Savings for transfers and withdrawals, Interest for interest. Keeping interest separate shows how much the account is earning." },
+      { name: "Money in / Money out", meaning: "Money in for deposits and interest, money out for withdrawals." },
+      { name: "Goal", meaning: "The goal name with its target in brackets, so filtering by goal gives the balance and the gap." },
+    ],
+    howto: [
+      "Download the CSV and add an opening balance row for each goal you already have.",
+      "Each payday, add a transfer row per goal. Set up standing orders and the rows write themselves from your statement.",
+      "Add interest when it is paid and withdrawals when you use the money.",
+      "Filter by goal and sum Money in minus Money out for the balance. Or import into The Income Tracker, where goals show a balance and a projected completion date.",
+    ],
+    sections: [
+      {
+        h: "Name the goals, and the order",
+        p: [
+          "An emergency fund first, then the specific goals. MoneyHelper's guideline is three to six months of essential outgoings for emergencies, and the emergency fund calculator on this site turns that into a monthly amount. Once it is there, the rest is choice: holiday, car, deposit, Christmas.",
+        ],
+      },
+      {
+        h: "Log the withdrawals too",
+        p: [
+          "Savings you spend are still savings that did their job. Logging the boiler repair against the emergency fund shows the fund working, and shows how much needs rebuilding. That is more motivating than a balance that only ever goes up until it suddenly does not.",
+        ],
+      },
+    ],
+    faqs: [
+      { q: "Can I track more than one savings goal?", a: "Yes. Put the goal name in the Goal column and filter by it. The Income Tracker shows each goal separately with a projected date." },
+      { q: "Should I include interest?", a: "Yes, as a separate Interest category. Over a year it shows what the account is actually paying, which is useful when comparing accounts." },
+      { q: "Is it free?", a: "Yes. A plain CSV file with no sign-up." },
+    ],
+    related: ["emergency-fund-calculator-uk", "how-much-should-i-save-each-month-uk", "how-long-to-save-10000-for-a-car", "monthly-budget-planner-template"],
+  },
+  {
+    slug: "debt-payoff-tracker-template",
+    card: "Debt payoff tracker",
+    cardD: "Every balance, payment and rate in one place",
+    crumb: "Debt payoff tracker",
+    title: "Free debt payoff tracker template (UK, CSV)",
+    description:
+      "A free UK debt payoff tracker template: list each card, loan and overdraft with its balance, rate and payments, and watch the balances fall. Works with the snowball or avalanche method.",
+    h1: "Free debt payoff tracker template",
+    tldr:
+      "One row per payment, with the balance after it and the rate on that debt. Sort by APR for the avalanche order or by balance for the snowball, and the sheet shows which debt to overpay next. Download the CSV, list what you owe today, and update it every payday.",
+    published: "2026-09-16",
+    updated: "2026-09-16",
+    file: { name: "debt-payoff-tracker-template.csv", rows: DEBT_ROWS },
+    columns: [
+      { name: "Date", meaning: "Payment date. Start with an opening balance row for each debt dated today." },
+      { name: "Description", meaning: "Which debt. Note any 0% end date in the name so it is impossible to forget." },
+      { name: "Category", meaning: "Debt. One category keeps the sheet simple; the description does the rest." },
+      { name: "Money out", meaning: "The payment made." },
+      { name: "Balance after", meaning: "What is left on that debt after the payment, from the statement. Interest is already in this number." },
+      { name: "APR", meaning: "The rate on that debt. Sort by it to see the most expensive one." },
+    ],
+    howto: [
+      "Download the CSV and replace the example rows with an opening balance for every debt you have, including overdrafts and buy-now-pay-later.",
+      "Decide the order: highest APR first (avalanche) saves the most money; smallest balance first (snowball) gives the quickest wins. The calculator on this site compares them for your numbers.",
+      "Pay minimums on everything and put every spare pound on the first debt in the order.",
+      "Each payday, add a row per payment with the new balance. When one hits zero, its payment rolls onto the next.",
+    ],
+    sections: [
+      {
+        h: "The one rule for 0% cards",
+        p: [
+          "A 0% balance is free only until the promotional period ends. Put the end date in the description and work out the monthly payment that clears it in time. Below the minimum for that, the 0% card should still get its share, whatever the payoff order says.",
+        ],
+      },
+      {
+        h: "When the numbers do not work",
+        p: [
+          "If minimum payments alone are more than you can afford, the tracker has done its job by showing you that early. StepChange, Citizens Advice and National Debtline give free, confidential advice and can set up a plan with creditors. The income and expenditure form guide on this site explains what they will ask for.",
+        ],
+      },
+    ],
+    faqs: [
+      { q: "Snowball or avalanche?", a: "Avalanche (highest rate first) costs less in interest. Snowball (smallest balance first) clears an account sooner, which many people find easier to stick to. The difference in pounds is often small; pick the one you will keep doing." },
+      { q: "Does the template calculate interest?", a: "No. Take the balance after each payment from your statement, which already includes interest. The debt snowball vs avalanche calculator does the projections." },
+      { q: "Is it free?", a: "Yes. A plain CSV file with no sign-up, no macros and no locked cells." },
+    ],
+    related: ["debt-snowball-vs-avalanche-calculator", "0-percent-credit-card-payoff-calculator-uk", "income-and-expenditure-form-uk", "overdraft-cost-calculator-uk"],
+  },
+  {
+    slug: "student-budget-template",
+    card: "Student budget",
+    cardD: "Term-by-term, built around the maintenance loan",
+    crumb: "Student budget",
+    title: "Free student budget template (UK, CSV)",
+    description:
+      "A free UK student budget template built around termly maintenance loan instalments: rent, food, travel, study costs and going out, with a term column so the loan lasts until the next one arrives.",
+    h1: "Free student budget template",
+    tldr:
+      "The maintenance loan arrives three times a year and has to last until the next instalment. This template works by term: loan and any job income in, halls or rent out first, then the weekly costs. Download the CSV, put in your own figures, and divide what is left by the weeks until the next payment.",
+    published: "2026-09-16",
+    updated: "2026-09-16",
+    file: { name: "student-budget-template.csv", rows: STUDENT_ROWS },
+    columns: [
+      { name: "Date", meaning: "When it happened. The loan instalment date is the anchor for each term." },
+      { name: "Description", meaning: "What it was. Keep names consistent so the same shop is easy to spot." },
+      { name: "Category", meaning: "Income, Housing, Bills, Groceries, Transport, Study, Going out, Subscriptions, Health, Savings." },
+      { name: "Money in / Money out", meaning: "Two columns for easy totals." },
+      { name: "Term", meaning: "Autumn, Spring, Summer. Filter by term to see whether the loan will last." },
+    ],
+    howto: [
+      "Download the CSV and enter your maintenance loan instalment and any regular job income for the term.",
+      "Put rent for the term at the top. What remains is the money for everything else until the next instalment.",
+      "Divide that by the number of weeks in the term. That is your weekly number, and the spend-per-day calculator can break it down further.",
+      "Add spending as it happens, or import your bank CSV into The Income Tracker each month and let it do the sorting.",
+    ],
+    sections: [
+      {
+        h: "The January problem",
+        p: [
+          "The autumn instalment has to cover Freshers' Week, Christmas and the gap until January. Most students run short in December. The fix is boring and works: set the weekly figure in September, move a little to a savings pot each week, and treat December as two months.",
+        ],
+      },
+      {
+        h: "Discounts that change the numbers",
+        p: [
+          "A 16-25 Railcard, student bank account overdrafts at 0%, student plans on streaming and software, and council tax exemption for full-time students all shift the budget. Put the real figures in the template rather than the headline prices.",
+        ],
+      },
+    ],
+    faqs: [
+      { q: "How do I budget a maintenance loan?", a: "Subtract rent for the term from the instalment, divide what is left by the weeks until the next payment, and spend to that weekly figure. The template and the spend-per-day calculator do the arithmetic." },
+      { q: "Should I include my student overdraft?", a: "Track it as a debt with a 0% rate and note when the interest-free period ends after graduation. It is a useful buffer and an expensive habit." },
+      { q: "Is it free?", a: "Yes. A plain CSV, no sign-up, usable in any spreadsheet or in The Income Tracker." },
+    ],
+    related: ["spend-per-day-until-payday-calculator", "weekly-budget-planner-template", "how-to-budget-for-beginners-uk", "import"],
   },
 ];

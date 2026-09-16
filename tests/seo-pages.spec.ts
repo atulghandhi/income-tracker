@@ -42,6 +42,46 @@ test.describe("Static content pages", () => {
     expect(text.split("\n")[0].trim()).toBe("Date,Description,Category,Money in,Money out,Notes");
   });
 
+  test("budget planner, rent affordability, overdraft and pro rata calculators compute the worked examples", async ({ page }) => {
+    await page.goto("/tools/budget-planner-uk.html");
+    await expect(page.locator("h1")).toHaveText("Budget planner (UK)");
+    await expect(page.locator("#calc-out")).toContainText("£240.00");
+    await expect(page.locator("#calc-out")).toContainText("10%");
+    await page.fill("#income", "2000");
+    await expect(page.locator("#calc-out")).toContainText("short each month");
+
+    await page.goto("/tools/rent-affordability-calculator-uk.html");
+    await expect(page.locator("#calc-out")).toContainText("43.2%");
+    await expect(page.locator("#calc-out")).toContainText("£660.00");
+    await expect(page.locator("#calc-out")).toContainText("passes");
+
+    await page.goto("/tools/overdraft-cost-calculator-uk.html");
+    await expect(page.locator("#calc-out")).toContainText("£6.4");
+    await page.fill("#days", "0");
+    await expect(page.locator("#calc-out")).toContainText("Enter a valid non-negative number");
+
+    await page.goto("/tools/pro-rata-salary-calculator-uk.html?salary=30000&fthours=37.5&hours=22.5");
+    await expect(page.locator("#calc-out")).toContainText("£18,000.00");
+    await expect(page.locator("#calc-out")).toContainText("126 hours");
+  });
+
+  test("PDF-only bank pages never promise a CSV and the hub labels them", async ({ page, request }) => {
+    await page.goto("/import/zopa-csv.html");
+    await expect(page.locator("h1")).toContainText("download your Zopa statement");
+    await expect(page.locator(".tldr")).toContainText("does not offer a CSV export");
+    const ld = await page.locator('script[type="application/ld+json"]').first().textContent();
+    const graph = JSON.parse(ld ?? "{}");
+    const howto = graph["@graph"].find((node: { "@type": string }) => node["@type"] === "HowTo");
+    expect(howto.name).toContain("download your Zopa statement");
+    const hub = await (await request.get("/import/")).text();
+    expect(hub).toContain("Zopa &rarr; PDF");
+    expect(hub).toContain("Tesco Bank &rarr; CSV");
+    for (const path of ["/templates/weekly-budget-planner-template.csv", "/templates/student-budget-template.csv"]) {
+      const csv = await (await request.get(path)).text();
+      expect(csv.split("\n")[0]).toMatch(/^Date,Description,Category,Money in,Money out,/);
+    }
+  });
+
   test("sitemap, feed and llms files list the new sections", async ({ request }) => {
     const sitemap = await (await request.get("/sitemap.xml")).text();
     for (const path of ["/import/halifax-csv.html", "/compare/best-free-budgeting-apps-uk.html", "/templates/", "/guides/self-employed-income-tracker-uk.html", "/tools/emergency-fund-calculator-uk.html", "/about.html", "/whats-new.html"]) {

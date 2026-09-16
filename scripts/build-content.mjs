@@ -63,7 +63,8 @@ export function humanDate(iso) {
 const UPDATED_HUMAN = humanDate(UPDATED);
 
 const PAGE_UPDATES = new Map([
-  ["/", "2026-09-14"], ["/tools/", "2026-09-14"], ["/whats-new.html", "2026-09-14"],
+  ["/", "2026-09-16"], ["/tools/", "2026-09-16"], ["/whats-new.html", "2026-09-16"],
+  ["/import/", "2026-09-16"], ["/guides/", "2026-09-16"], ["/templates/", "2026-09-16"],
   ...BANKS.map(p => [`/import/${p.slug}.html`, p.updated || UPDATED]),
   ...GUIDES.map(p => [`/guides/${p.slug}.html`, p.updated || UPDATED]),
   // All calculator pages received input validation and accessible result updates.
@@ -504,18 +505,32 @@ const BANK_GROUPS = ["High street banks", "App-based banks and fintechs", "Credi
 
 function bankPage(bank) {
   const path = `/import/${bank.slug}.html`;
-  const title = pageTitle(`How to export your ${bank.name} statement to CSV (free, 2026)`);
-  const description = `Step-by-step: download your ${bank.name} transactions as a CSV file and track your income and spending free. No account and no bank login required.`;
+  // Some providers only issue PDF statements. Their page is honest about that
+  // and leads with the paste route instead of promising a CSV that does not exist.
+  const pdfOnly = !!bank.pdfOnly;
+  const title = pageTitle(
+    pdfOnly
+      ? `How to download your ${bank.name} statement and track it free (2026)`
+      : `How to export your ${bank.name} statement to CSV (free, 2026)`,
+  );
+  const description = pdfOnly
+    ? `${bank.name} only issues PDF statements. Here is where to download one and how to paste it into a free income and expense tracker. No account and no bank login required.`
+    : `Step-by-step: download your ${bank.name} transactions as a CSV file and track your income and spending free. No account and no bank login required.`;
   const trail = [
     { name: "Home", path: "/" },
     { name: "Bank CSV guides", path: "/import/" },
     { name: bank.name, path },
   ];
   const faqs = [
-    {
-      q: `Can I export ${bank.name} transactions to CSV for free?`,
-      a: `Yes. ${bank.name} lets you download your own transactions as a file at no cost from ${bank.where}. You then import that file into a budgeting tool such as The Income Tracker.`,
-    },
+    pdfOnly
+      ? {
+          q: `Can I export ${bank.name} transactions to CSV?`,
+          a: `Not directly. ${bank.name} provides PDF statements from ${bank.where}, with no CSV, OFX or QIF option at the time of checking. Download the PDF, copy the transaction rows and paste them into The Income Tracker, which reads the dates, descriptions and amounts from the text.`,
+        }
+      : {
+          q: `Can I export ${bank.name} transactions to CSV for free?`,
+          a: `Yes. ${bank.name} lets you download your own transactions as a file at no cost from ${bank.where}. You then import that file into a budgeting tool such as The Income Tracker.`,
+        },
     {
       q: `Do I need to connect or log in to my bank to use The Income Tracker?`,
       a: `No. There is no open-banking connection and you never enter bank credentials into The Income Tracker. You download the file from ${bank.name} yourself and drop it into the app, which runs entirely in your browser.`,
@@ -531,12 +546,16 @@ function bankPage(bank) {
     ? `<p class="note">${esc(bank.pdfOnlyNote)} See <a href="/guides/import-pdf-bank-statement.html">how to import a PDF bank statement</a>.</p>`
     : `<p class="note">Only got a PDF? You can still import it. See <a href="/guides/import-pdf-bank-statement.html">how to import a PDF bank statement</a>.</p>`;
   const landing = bank.landing ? `<p>Want the use-case view? See the <a href="/${bank.landing}.html">${esc(RELATED_INDEX[bank.landing].t)}</a> page.</p>` : "";
+  const h1 = pdfOnly ? `How to download your ${bank.name} statement (and track it free)` : `How to export your ${bank.name} statement to CSV`;
+  const tldr = pdfOnly
+    ? `${esc(bank.name)} does not offer a CSV export. Download the <strong>PDF statement</strong> from ${esc(bank.where)}, copy the transaction rows, and paste them into ${BRAND}. It reads the dates and amounts for you. Free, no bank login.`
+    : `Log in to ${esc(bank.where)}, open the account, pick a date range and export as <strong>CSV</strong>. Then import that file into ${BRAND} and track your money for free, with no bank login.`;
   const body = `      <header class="top">${breadcrumbHtml(trail)}</header>
-      <h1>How to export your ${esc(bank.name)} statement to CSV</h1>
+      <h1>${esc(h1)}</h1>
       <p class="meta">By ${BRAND} · Updated ${UPDATED_HUMAN}</p>
-      <div class="tldr"><strong>In short</strong><p>Log in to ${esc(bank.where)}, open the account, pick a date range and export as <strong>CSV</strong>. Then import that file into ${BRAND} and track your money for free, with no bank login.</p></div>
+      <div class="tldr"><strong>In short</strong><p>${tldr}</p></div>
 
-      <h2>Export ${esc(bank.name)} transactions as CSV</h2>
+      <h2>${pdfOnly ? `Download your ${esc(bank.name)} statement` : `Export ${esc(bank.name)} transactions as CSV`}</h2>
       <ol class="steps">
 ${bank.steps.map((s) => `        <li>${s}</li>`).join("\n")}
       </ol>
@@ -573,7 +592,7 @@ ${BANKS.filter((b) => b.slug !== bank.slug)
       jsonLd: [
         {
           "@type": "HowTo",
-          name: `How to export your ${bank.name} statement to CSV`,
+          name: h1,
           description,
           totalTime: "PT3M",
           step: bank.steps.map((s, i) => ({
@@ -607,7 +626,7 @@ ${groups
   .map(
     (x) => `      <h2>${esc(x.g)}</h2>
       <div class="grid">
-${x.banks.map((b) => `        <a class="card" href="/import/${b.slug}.html"><span class="card-t">${esc(b.name)} &rarr; CSV</span><span class="card-d">How to export ${esc(b.name)} transactions</span></a>`).join("\n")}
+${x.banks.map((b) => `        <a class="card" href="/import/${b.slug}.html"><span class="card-t">${esc(b.name)} &rarr; ${b.pdfOnly ? "PDF" : "CSV"}</span><span class="card-d">${b.pdfOnly ? `How to download and paste ${esc(b.name)} statements` : `How to export ${esc(b.name)} transactions`}</span></a>`).join("\n")}
       </div>`,
   )
   .join("\n")}
