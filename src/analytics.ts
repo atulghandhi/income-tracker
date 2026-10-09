@@ -25,6 +25,7 @@ export type AnalyticsEvent =
   | "import_row_corrected" // { source }
   | "import_committed" // { source, imported, transfers }
   | "rule_learned" // { retro_applied }
+  | "rename_all" // { renamed: bucket }
   | "recurring_marked" // { cadence }
   | "ai_suggestions_applied" // { count }
   | "feed_connected"

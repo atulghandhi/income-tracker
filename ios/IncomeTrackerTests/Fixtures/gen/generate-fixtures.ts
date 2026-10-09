@@ -58,6 +58,7 @@ function makeState(partial: Partial<LedgerState> = {}): LedgerState {
     accounts: [],
     assumedInvestmentReturn: DEFAULT_INVESTMENT_RETURN,
     categoryRules: [],
+    nameRules: [],
     importBatches: [],
     privacyMode: false,
     lastSavedAt: "2025-06-01T00:00:00.000Z",

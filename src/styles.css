@@ -4363,6 +4363,8 @@ hr {
 /* ─── Merge conflict modal ──────────────────────────── */
 .mergeModal {
   width: min(480px, 100%);
+  /* Phones stretch modal backdrops to full height; this dialog stays compact. */
+  align-self: center;
   display: grid;
   gap: 18px;
   padding: 32px;
@@ -4376,6 +4378,7 @@ hr {
 
 .mergeModal h2 {
   margin: 0;
+  overflow-wrap: anywhere;
   font-size: 22px;
   font-weight: 640;
   color: var(--ink);
@@ -4428,6 +4431,7 @@ hr {
 }
 
 .mergeOption strong {
+  overflow-wrap: anywhere;
   font-size: 14px;
   color: var(--ink);
   font-weight: 620;

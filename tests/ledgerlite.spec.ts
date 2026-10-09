@@ -217,6 +217,39 @@ test.describe("Ledger", () => {
     await expect(order).toHaveValue("custom");
   });
 
+  test("renaming one of several same-named transactions offers to rename them all", async ({ page }) => {
+    await openLedger(page);
+    await addExpense(page, "Coffee", 3);
+    await addExpense(page, "Coffee", 4);
+    await addExpense(page, "Lunch", 9);
+    const expenseNames = () => inputValues(page, "input[aria-label='Expense name']");
+
+    const first = page.locator("input[aria-label='Expense name']").first();
+    await first.fill("Costa");
+    await first.press("Enter");
+    const prompt = page.getByRole("dialog", { name: "Rename every “Coffee”?" });
+    await expect(prompt).toContainText("1 other expense across 1 month is also called “Coffee”.");
+    await prompt.getByRole("button", { name: /Just this one/ }).click();
+    await expect(prompt).toHaveCount(0);
+    await expect.poll(expenseNames).toEqual(expect.arrayContaining(["Costa", "Coffee", "Lunch"]));
+
+    const second = page.locator("input[aria-label='Expense name']").nth(1);
+    await expect(second).toHaveValue("Coffee");
+    await second.fill("Costa");
+    await second.blur();
+    // Only one other "Coffee" existed and it was renamed by hand, so nothing else to offer.
+    await expect(page.getByRole("dialog", { name: /Rename every/ })).toHaveCount(0);
+
+    await page.locator("input[aria-label='Expense name']").first().fill("Costa Coffee");
+    await page.locator("input[aria-label='Expense name']").first().press("Enter");
+    const again = page.getByRole("dialog", { name: "Rename every “Costa”?" });
+    await again.getByRole("button", { name: /Rename all to “Costa Coffee”/ }).click();
+    await expect.poll(expenseNames).toEqual(expect.arrayContaining(["Costa Coffee", "Costa Coffee", "Lunch"]));
+
+    await openView(page, "Settings");
+    await expect(page.getByRole("button", { name: "Remove rename rule Costa" })).toBeVisible();
+  });
+
   test("sorts category sections by total and category items by amount", async ({ page }) => {
     await openLedger(page);
     await addExpense(page, "Food low", 10);
