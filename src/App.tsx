@@ -32,6 +32,7 @@ import {
   LogIn,
   LogOut,
   Moon,
+  PenLine,
   PiggyBank,
   Plus,
   ReceiptText,
@@ -81,6 +82,7 @@ import {
 import { INCOME_SORT_OPTIONS, isIncomeSortMode, moveEntry, orderIncomes, type IncomeSortMode } from "./ledgerOrder";
 import { buildRulePattern, canonicalizeMerchant, descriptionMatchesPattern, isTransferDescription, normalizeMerchant, parseBankText, sortImportRows, tidyImportedNames, type CsvImportRow } from "./importer";
 import { buildMerchantMemory } from "./merchantMemory";
+import { countSameName, findRuleTargeting, normalizeNameRules, renameEverywhere, type NameKind } from "./nameRules";
 import { parseQuickAdd } from "./quickAdd";
 import { applyRecurringFlag, detectSubscriptions, findMissedRecurring, reconcileSeededEntries, suggestRecurringFlags, type RecurrenceCandidate } from "./recurrence";
 import { aiCategorizeRows, applyAiSuggestions, isAiCategorizationAvailable, testAiConnection } from "./aiCategorize";
@@ -343,6 +345,7 @@ type ExpenseDropPreview =
   | null;
 type ExpenseDropState = "before" | "after" | "combine";
 type CategoryMenuState = { expenseId: string; x: number; y: number };
+type RenamePrompt = { kind: NameKind; entryId: string; from: string; to: string; others: number; months: number };
 type CategoryOption = { name: string; color: string; count: number; total: number };
 type ImportReviewState = {
   fileName: string;
@@ -515,6 +518,7 @@ function App() {
   const [draggingIncomeId, setDraggingIncomeId] = useState<string | null>(null);
   const [incomeDropPreview, setIncomeDropPreview] = useState<{ targetId: string; edge: "before" | "after" } | null>(null);
   const [categoryMenu, setCategoryMenu] = useState<CategoryMenuState | null>(null);
+  const [renamePrompt, setRenamePrompt] = useState<RenamePrompt | null>(null);
   const [importReview, setImportReview] = useState<ImportReviewState | null>(null);
   const [lastImportAction, setLastImportAction] = useState<LastImportAction | null>(null);
   const [quickAddInput, setQuickAddInput] = useState("");
@@ -1235,6 +1239,42 @@ function App() {
       ...month,
       expenses: month.expenses.map((expense) => (expense.id === id ? { ...expense, ...patch } : expense)),
     }));
+  }
+
+  // Called when a name edit is committed (blur or Enter). If other transactions
+  // carry the old name, or a rename rule produces it, offer to rename them all.
+  function offerRenameAll(kind: NameKind, entryId: string, previousName: string) {
+    const entry =
+      kind === "income"
+        ? currentMonth.incomes.find((income) => income.id === entryId)
+        : currentMonth.expenses.find((expense) => expense.id === entryId);
+    if (!entry) return;
+    const from = previousName.trim();
+    const to = ("source" in entry ? entry.source : entry.name).trim();
+    if (!from || !to || from === to) return;
+
+    const others = countSameName(ledger, kind, from, entryId);
+    const hasRule = Boolean(findRuleTargeting(ledger.nameRules, kind, from));
+    if (!others.count && !hasRule) return;
+    setRenamePrompt({ kind, entryId, from, to, others: others.count, months: others.months });
+  }
+
+  function confirmRenameAll(prompt: RenamePrompt) {
+    const preview = renameEverywhere(ledger, prompt.kind, prompt.from, prompt.to);
+    updateLedger((current) => renameEverywhere(current, prompt.kind, prompt.from, prompt.to).state);
+    setRenamePrompt(null);
+    const others = Math.max(0, preview.renamed - 1);
+    setToast(
+      others
+        ? `Renamed ${others} more to “${prompt.to.trim()}” — new imports will match`
+        : `New “${prompt.from}” imports will be named “${prompt.to.trim()}”`,
+    );
+    track("rename_all", { renamed: bucketCount(preview.renamed) });
+  }
+
+  function removeNameRule(id: string) {
+    updateLedger((current) => ({ ...current, nameRules: current.nameRules.filter((rule) => rule.id !== id) }));
+    setToast("Rename rule removed — new imports keep their bank name");
   }
 
   function removeIncome(id: string) {
@@ -2800,6 +2840,7 @@ function App() {
                           onDrop={() => dropOnIncome(income)}
                           onMove={(direction) => moveIncomeByKeyboard(income.id, direction)}
                           onChange={(patch) => updateIncome(income.id, patch)}
+                          onRenamed={(previousName) => offerRenameAll("income", income.id, previousName)}
                           onRemove={() => removeIncome(income.id)}
                         />
                       ))
@@ -2959,6 +3000,7 @@ function App() {
                                     }
                                   }}
                                   onChange={(patch) => updateExpense(expense.id, patch)}
+                                  onRenamed={(previousName) => offerRenameAll("expense", expense.id, previousName)}
                                   onRemove={() => removeExpense(expense.id)}
                                 />
                               );
@@ -3677,6 +3719,37 @@ function App() {
                 )}
               </article>
 
+              <article className="settingsPanel learnedRulesPanel">
+                <PanelTitle title="Rename rules" icon={<PenLine size={17} />} />
+                <p className="panelSubcopy">
+                  Created when you rename a transaction and choose “Rename all”. Future imports with the old name arrive with your
+                  name instead. Renaming again updates the rule.
+                </p>
+                {ledger.nameRules.length ? (
+                  <ul className="transferRuleList">
+                    {ledger.nameRules.map((rule) => (
+                      <li key={rule.id}>
+                        <code>{rule.from}</code>
+                        <span className="learnedRuleTarget">
+                          → {rule.to}
+                          {rule.kind === "income" ? " (income)" : ""}
+                        </span>
+                        <button
+                          className="iconButton"
+                          type="button"
+                          aria-label={`Remove rename rule ${rule.from}`}
+                          onClick={() => removeNameRule(rule.id)}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="transferRuleEmpty">No rename rules yet — rename a transaction that shares its name with others to create one.</p>
+                )}
+              </article>
+
               <article className="dangerPanel">
                 <div>
                   <h3>Danger Zone</h3>
@@ -3791,6 +3864,14 @@ function App() {
           conflict={syncConflict}
           onKeepLocal={() => { void handleKeepLocal(); }}
           onUseCloud={handleUseCloud}
+        />
+      )}
+
+      {renamePrompt && (
+        <RenameAllModal
+          prompt={renamePrompt}
+          onRenameAll={() => confirmRenameAll(renamePrompt)}
+          onJustThisOne={() => setRenamePrompt(null)}
         />
       )}
 
@@ -4823,6 +4904,7 @@ function IncomeRow({
   onDrop,
   onMove,
   onChange,
+  onRenamed,
   onRemove,
 }: {
   income: IncomeEntry;
@@ -4836,8 +4918,10 @@ function IncomeRow({
   onDrop: () => void;
   onMove: (direction: -1 | 1) => void;
   onChange: (patch: Partial<IncomeEntry>) => void;
+  onRenamed: (previousName: string) => void;
   onRemove: () => void;
 }) {
+  const renameTracking = useRenameTracking(onRenamed);
   // A custom MIME type keeps income drags out of the expense column's drop targets.
   function handleDragStart(event: DragEvent<HTMLElement>) {
     event.stopPropagation();
@@ -4888,7 +4972,13 @@ function IncomeRow({
         onClick={() => onChange({ color: nextColor(income.color) })}
         aria-label="Cycle income color"
       />
-      <input value={income.source} onChange={(event) => onChange({ source: capitalizeFirst(event.target.value) })} onKeyDown={blurOnEnter} aria-label="Income source" />
+      <input
+        value={income.source}
+        onChange={(event) => onChange({ source: capitalizeFirst(event.target.value) })}
+        onKeyDown={blurOnEnter}
+        {...renameTracking}
+        aria-label="Income source"
+      />
       <MoneyInput
         ariaLabel="Income amount"
         value={String(income.amount)}
@@ -4906,6 +4996,80 @@ function IncomeRow({
         <button className="iconButton rowAction" type="button" onClick={onRemove} aria-label="Remove income">
           <Trash2 size={17} />
         </button>
+      </div>
+    </div>
+  );
+}
+
+// Remembers a name field's value on focus and reports the old value when the
+// edit is committed with a different name, so the ledger can offer "rename all".
+function useRenameTracking(onRenamed: (previousName: string) => void) {
+  const nameAtFocusRef = useRef<string | null>(null);
+  return {
+    onFocus: (event: { currentTarget: HTMLInputElement }) => {
+      nameAtFocusRef.current = event.currentTarget.value;
+    },
+    onBlur: (event: { currentTarget: HTMLInputElement }) => {
+      const previousName = nameAtFocusRef.current;
+      nameAtFocusRef.current = null;
+      if (previousName !== null && previousName.trim() !== event.currentTarget.value.trim()) onRenamed(previousName);
+    },
+  };
+}
+
+function RenameAllModal({
+  prompt,
+  onRenameAll,
+  onJustThisOne,
+}: {
+  prompt: RenamePrompt;
+  onRenameAll: () => void;
+  onJustThisOne: () => void;
+}) {
+  const renameAllRef = useRef<HTMLButtonElement>(null);
+  const dismissRef = useRef(onJustThisOne);
+  dismissRef.current = onJustThisOne;
+  useEffect(() => {
+    renameAllRef.current?.focus();
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") dismissRef.current();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  const { from, to, others, months } = prompt;
+  const noun = prompt.kind === "income" ? "income" : "expense";
+  return (
+    <div
+      className="modalBackdrop mergeBackdrop"
+      role="presentation"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onJustThisOne();
+      }}
+    >
+      <div className="mergeModal" role="dialog" aria-modal="true" aria-labelledby="rename-all-title">
+        <div className="mergeModalIcon">
+          <PenLine size={24} />
+        </div>
+        <h2 id="rename-all-title">Rename every “{from}”?</h2>
+        <p>
+          {others
+            ? `${others} other ${noun}${others === 1 ? "" : "s"} across ${months} month${months === 1 ? "" : "s"} ${others === 1 ? "is" : "are"} also called “${from}”.`
+            : `New imports are named “${from}” because of an earlier rename.`}
+        </p>
+        <div className="mergeOptions">
+          <button ref={renameAllRef} className="mergeOption" type="button" onClick={onRenameAll}>
+            <strong>{others ? `Rename all to “${to}”` : `Use “${to}” from now on`}</strong>
+            <span>{others ? `${others + 1} transactions` : "Future imports"}</span>
+            <small>Future imports with this name will be called “{to}” too.</small>
+          </button>
+          <button className="mergeOption" type="button" onClick={onJustThisOne}>
+            <strong>Just this one</strong>
+            <span>1 transaction</span>
+            <small>{others ? `The others stay “${from}”.` : "Future imports keep the old name."}</small>
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -4953,6 +5117,7 @@ function ExpenseRow({
   onOpenCategoryMenu,
   onSelectForGroup,
   onChange,
+  onRenamed,
   onRemove,
 }: {
   expense: ExpenseEntry;
@@ -4970,8 +5135,10 @@ function ExpenseRow({
   onOpenCategoryMenu: (event: ReactMouseEvent<HTMLDivElement>) => void;
   onSelectForGroup: () => void;
   onChange: (patch: Partial<ExpenseEntry>) => void;
+  onRenamed: (previousName: string) => void;
   onRemove: () => void;
 }) {
+  const renameTracking = useRenameTracking(onRenamed);
   function handleDragStart(event: DragEvent<HTMLElement>) {
     event.stopPropagation();
     event.dataTransfer.effectAllowed = "move";
@@ -5014,7 +5181,13 @@ function ExpenseRow({
       >
         ::
       </button>
-      <input value={expense.name} onChange={(event) => onChange({ name: capitalizeFirst(event.target.value) })} onKeyDown={blurOnEnter} aria-label="Expense name" />
+      <input
+        value={expense.name}
+        onChange={(event) => onChange({ name: capitalizeFirst(event.target.value) })}
+        onKeyDown={blurOnEnter}
+        {...renameTracking}
+        aria-label="Expense name"
+      />
       <MoneyInput
         ariaLabel="Expense amount"
         value={String(expense.amount)}
@@ -6511,6 +6684,7 @@ function normalizeState(rawState: Partial<LedgerState>): LedgerState {
       ? Math.max(-50, Math.min(50, state.assumedInvestmentReturn as number))
       : fallback.assumedInvestmentReturn,
     categoryRules: normalizeCategoryRules(state.categoryRules),
+    nameRules: normalizeNameRules(state.nameRules),
     importBatches: normalizeImportBatches(state.importBatches),
     privacyMode: Boolean(state.privacyMode),
     aiCategorizationEnabled: Boolean(state.aiCategorizationEnabled),

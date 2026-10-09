@@ -115,6 +115,7 @@ export function createInitialState(): LedgerState {
     accounts: [],
     assumedInvestmentReturn: DEFAULT_INVESTMENT_RETURN,
     categoryRules: [],
+    nameRules: [],
     importBatches: [],
     privacyMode: false,
     lastSavedAt: new Date().toISOString(),

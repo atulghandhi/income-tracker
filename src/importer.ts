@@ -1,4 +1,5 @@
 import { colors, getMonthKey } from "./finance";
+import { applyNameRules } from "./nameRules";
 import type { CategoryRule, CategorySource, LedgerState, MonthBudget, TransactionKind } from "./types";
 
 export type CsvImportRow = {
@@ -203,6 +204,9 @@ export function buildImportRow({
   const fallbackHash = createTransactionHash(date, description, amount);
   const duplicate = existingHashes.has(hash) || existingHashes.has(fallbackHash);
   const kind = suggestion.kind;
+  // A name the user renamed everywhere wins over the cleaned bank text.
+  const cleanName = cleanMerchantName(description) || description;
+  const name = applyNameRules(state.nameRules ?? [], kind === "income" ? "income" : "expense", cleanName, description) ?? cleanName;
 
   return {
     id: `draft-${rowNumber}-${hash}`,
@@ -210,7 +214,7 @@ export function buildImportRow({
     date,
     monthKey: date.slice(0, 7),
     description,
-    name: cleanMerchantName(description) || description,
+    name,
     amount,
     rawAmount: amount.toFixed(2),
     kind,

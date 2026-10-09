@@ -473,6 +473,42 @@ public struct CategoryRule: Codable, Identifiable, Hashable, Sendable {
     }
 }
 
+/// Mirrors `NameRule` in types.ts: after a "rename all", future imports named
+/// `from` (ignoring case and spacing) arrive as `to`. iOS only round-trips these
+/// today so a save from the app doesn't drop rules made on the web.
+public struct NameRule: Codable, Identifiable, Hashable, Sendable {
+    public var id: String
+    /// "income" or "expense".
+    public var kind: String
+    public var from: String
+    public var to: String
+    public var createdAt: String
+    public var updatedAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, kind, from, to, createdAt, updatedAt
+    }
+
+    /// Mirrors `normalizeNameRules`: rules without both names, or that map a
+    /// name to itself, are dropped.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let from = (c.lenientString(.from) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let to = (c.lenientString(.to) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !from.isEmpty, !to.isEmpty, from != to else {
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath,
+                                                   debugDescription: "Name rule without two different names"))
+        }
+        id = c.lenientNonEmptyString(.id) ?? createId(prefix: "name-rule")
+        kind = c.lenientString(.kind) == "income" ? "income" : "expense"
+        self.from = from
+        self.to = to
+        let now = isoTimestampNow()
+        createdAt = c.lenientNonEmptyString(.createdAt) ?? now
+        updatedAt = c.lenientNonEmptyString(.updatedAt) ?? now
+    }
+}
+
 // MARK: - Account types
 
 /// High-level class: determines how the balance affects net worth and which fields are relevant.
@@ -633,6 +669,7 @@ public struct LedgerState: Codable, Hashable, Sendable {
     public var accounts: [Account]
     public var assumedInvestmentReturn: Double
     public var categoryRules: [CategoryRule]
+    public var nameRules: [NameRule]
     public var importBatches: [ImportBatch]
     public var privacyMode: Bool
     /// Stage C opt-in (web-controlled today); optional so Codable round-trips it.
@@ -652,6 +689,7 @@ public struct LedgerState: Codable, Hashable, Sendable {
         accounts: [Account],
         assumedInvestmentReturn: Double,
         categoryRules: [CategoryRule],
+        nameRules: [NameRule] = [],
         importBatches: [ImportBatch],
         privacyMode: Bool,
         aiCategorizationEnabled: Bool? = nil,
@@ -669,6 +707,7 @@ public struct LedgerState: Codable, Hashable, Sendable {
         self.accounts = accounts
         self.assumedInvestmentReturn = assumedInvestmentReturn
         self.categoryRules = categoryRules
+        self.nameRules = nameRules
         self.importBatches = importBatches
         self.privacyMode = privacyMode
         self.aiCategorizationEnabled = aiCategorizationEnabled
@@ -736,7 +775,7 @@ public struct LedgerState: Codable, Hashable, Sendable {
     enum CodingKeys: String, CodingKey {
         case schemaVersion, currency, selectedMonth, months, goals, goalPlannerSurplus,
              goalsHorizonMonths, ledgerGoalId, savingsTarget, accounts, assumedInvestmentReturn,
-             categoryRules, importBatches, privacyMode, aiCategorizationEnabled, lastSavedAt
+             categoryRules, nameRules, importBatches, privacyMode, aiCategorizationEnabled, lastSavedAt
     }
 
     /// Keys written by schema < 7 (`goal`) and < 5 (`debts`).
@@ -829,6 +868,7 @@ public struct LedgerState: Codable, Hashable, Sendable {
         assumedInvestmentReturn = c.lenientOptionalDouble(.assumedInvestmentReturn)
             .map { max(-50, min(50, $0)) } ?? DEFAULT_INVESTMENT_RETURN
         categoryRules = c.lenientArray(CategoryRule.self, .categoryRules)
+        nameRules = c.lenientArray(NameRule.self, .nameRules)
         importBatches = c.lenientArray(ImportBatch.self, .importBatches)
         privacyMode = c.lenientBool(.privacyMode, default: false)
         aiCategorizationEnabled = c.lenientOptionalBool(.aiCategorizationEnabled) ?? false

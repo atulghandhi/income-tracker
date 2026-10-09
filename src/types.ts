@@ -104,7 +104,19 @@ export type CategoryRule = {
   updatedAt: string;
 };
 
-export type DebtAccountType = "credit-card" | "loan" | "overdraft" | "other";
+// Saved when the user renames every transaction called `from` to `to`. Future
+// imports whose name (or raw bank text) is `from` arrive as `to`. Matching
+// ignores case and spacing; `from` keeps the text the user saw.
+export type NameRule = {
+  id: string;
+  kind: "income" | "expense";
+  from: string;
+  to: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type DebtAccountType ="credit-card" | "loan" | "overdraft" | "other";
 
 // Asset sub-types (for the savings/debit/investment side)
 export type AssetAccountType = "current" | "savings" | "isa" | "investment" | "pension" | "other-asset";
@@ -166,6 +178,7 @@ export type LedgerState = {
   accounts: Account[];
   assumedInvestmentReturn: number;
   categoryRules: CategoryRule[];
+  nameRules: NameRule[];
   importBatches: ImportBatch[];
   privacyMode: boolean;
   // Stage C opt-in: allow sending transaction descriptions (never amounts or
