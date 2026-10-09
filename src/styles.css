@@ -2395,27 +2395,23 @@ textarea:focus,
 
 .healthPanel {
   min-height: 340px;
-  /* Featured card: stays solidly in "ink" territory end to end so the
-     --on-ink text keeps contrast in both themes. */
-  background:
-    linear-gradient(105deg, rgba(var(--ink-rgb), 0.97), rgba(var(--ink-rgb), 0.8)),
-    var(--glass);
-  color: var(--on-ink);
 }
 
-.healthPanel .ruleTrack {
-  background: rgba(var(--on-ink-rgb), 0.22);
+/* Toned like the stat cards: a tinted hairline and a soft glow in the score's
+   band colour, on the same glass surface as every other panel. */
+.healthPanel.good {
+  border-color: rgba(var(--mint-rgb), 0.3);
+  box-shadow: 0 0 0 3px rgba(var(--mint-rgb), 0.05), 0 12px 28px -12px rgba(var(--mint-rgb), 0.3), var(--shadow-sm);
 }
 
-.healthPanel .progressRule.neutral .ruleTrack strong {
-  background: rgba(var(--on-ink-rgb), 0.45);
+.healthPanel.warn {
+  border-color: rgba(var(--amber-rgb), 0.3);
+  box-shadow: 0 0 0 3px rgba(var(--amber-rgb), 0.05), 0 12px 28px -12px rgba(var(--amber-rgb), 0.28), var(--shadow-sm);
 }
 
-.healthPanel .panelTitle,
-.healthPanel .progressRule span,
-.healthPanel .progressRule b,
-.healthPanel .scoreCaption {
-  color: rgba(var(--on-ink-rgb), 0.58);
+.healthPanel.bad {
+  border-color: rgba(var(--red-rgb), 0.28);
+  box-shadow: 0 0 0 3px rgba(var(--red-rgb), 0.05), 0 12px 28px -12px rgba(var(--red-rgb), 0.28), var(--shadow-sm);
 }
 
 .panelTitle {
@@ -2437,10 +2433,6 @@ textarea:focus,
   color: var(--ink);
   font-size: 17px;
   font-weight: 620;
-}
-
-.healthPanel .panelTitle h3 {
-  color: rgba(var(--on-ink-rgb), 0.72);
 }
 
 .infoHint {
@@ -2524,16 +2516,6 @@ textarea:focus,
 [data-tip]:focus-visible::after {
   opacity: 1;
   transform: translate(-50%, 0);
-}
-
-.healthPanel .infoHint {
-  color: rgba(var(--on-ink-rgb), 0.62);
-}
-
-.healthPanel .infoHint > span {
-  border-color: rgba(var(--on-ink-rgb), 0.16);
-  background: rgba(var(--surface-rgb), 0.98);
-  color: rgba(var(--on-ink-rgb), 0.82);
 }
 
 .factList {
@@ -2914,15 +2896,72 @@ hr {
   text-align: right;
 }
 
+.scoreHeadline {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 22px;
+}
+
 .scoreNumber {
-  margin-top: 26px;
-  color: rgba(var(--on-ink-rgb), 0.85);
-  font-size: 68px;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 56px;
+  font-weight: 620;
+  letter-spacing: -0.02em;
   line-height: 1;
 }
 
-.scoreCaption {
+.scoreNumber small {
   margin-left: 4px;
+  color: var(--faint);
+  font-size: 18px;
+  font-weight: 620;
+  letter-spacing: 0;
+}
+
+.healthPanel.good .scoreNumber {
+  color: var(--mint);
+}
+
+.healthPanel.warn .scoreNumber {
+  color: var(--amber);
+}
+
+.healthPanel.bad .scoreNumber {
+  color: var(--red);
+}
+
+.scoreBadge {
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: var(--well-strong);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.healthPanel.good .scoreBadge {
+  background: var(--mint-soft);
+  color: var(--mint);
+}
+
+.healthPanel.warn .scoreBadge {
+  background: rgba(var(--amber-rgb), 0.14);
+  color: var(--amber);
+}
+
+.healthPanel.bad .scoreBadge {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.scoreCaption {
+  display: block;
+  margin-top: 8px;
 }
 
 .creditEstimate {
@@ -2932,34 +2971,42 @@ hr {
   gap: 12px;
   margin-top: 22px;
   padding: 12px 14px;
-  border: 1px solid rgba(var(--bg-deep-rgb), 0.12);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.18);
-  color: rgba(var(--on-ink-rgb), 0.62);
+  background: var(--well);
+  color: var(--muted);
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
   font-size: 12px;
-  font-weight: 720;
+  font-weight: 700;
 }
 
 .creditEstimate strong {
-  color: rgba(var(--on-ink-rgb), 0.78);
+  color: var(--ink);
   font-size: 18px;
 }
 
 .ruleList {
   display: grid;
-  gap: 12px;
-  margin-top: 20px;
+  gap: 14px;
+  margin-top: 22px;
 }
 
 .progressRule {
   display: grid;
-  gap: 9px;
+  gap: 8px;
 }
 
 .progressRule > div {
   justify-content: space-between;
+}
+
+.progressRule b {
+  color: var(--ink);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .ruleTrack {
@@ -2977,16 +3024,22 @@ hr {
   background: var(--mint);
 }
 
-.progressRule.neutral .ruleTrack strong {
-  background: rgba(var(--ink-rgb), 0.4);
+.progressRule.warn .ruleTrack strong {
+  background: var(--amber);
 }
 
+.progressRule.bad .ruleTrack strong {
+  background: var(--red);
+}
+
+/* Target tick: a hairline in the ink colour so it reads on both the empty
+   track and a filled bar, in either theme. */
 .ruleTrack i {
   position: absolute;
-  top: -2px;
+  top: 0;
   width: 2px;
-  height: 10px;
-  background: var(--surface);
+  height: 100%;
+  background: rgba(var(--ink-rgb), 0.45);
 }
 
 .lineGraph {
