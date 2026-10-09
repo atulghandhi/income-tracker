@@ -3195,16 +3195,20 @@ function App() {
               </section>
 
               <section className="insightsGrid">
-                <article className="miniPanel healthPanel">
+                <article className={`miniPanel healthPanel ${healthScore.noData ? "" : healthTone(healthScore.score)}`}>
                   <PanelTitle
                     title="Health score"
                     icon={<Gauge size={16} />}
                     action={<InfoHint label="How health score is calculated" text={healthScore.detail} />}
                   />
-                  <div className="scoreNumber">{healthScore.noData ? "N/A" : formatDecimal(healthScore.score)}</div>
-                  <span className="scoreCaption">
-                    {healthScore.noData ? "Add data to generate a score" : `/10 · ${healthScore.summary}`}
-                  </span>
+                  <div className="scoreHeadline">
+                    <div className="scoreNumber">
+                      {healthScore.noData ? "N/A" : formatDecimal(healthScore.score)}
+                      {!healthScore.noData && <small>/10</small>}
+                    </div>
+                    {!healthScore.noData && <span className="scoreBadge">{healthScore.summary}</span>}
+                  </div>
+                  {healthScore.noData && <span className="scoreCaption">Add data to generate a score</span>}
                   {!healthScore.noData && (
                     <>
                       <div className="creditEstimate">
@@ -3212,11 +3216,11 @@ function App() {
                         <strong>{healthScore.estimatedCreditScore}</strong>
                       </div>
                       <div className="ruleList">
-                        <ProgressRule label="Cash flow" value={healthScore.cashFlowScore} target={75} tone="good" />
-                        <ProgressRule label="Debt load" value={healthScore.debtLoadScore} target={75} tone="neutral" />
-                        <ProgressRule label="Payments" value={healthScore.paymentPressureScore} target={75} tone="neutral" />
-                        <ProgressRule label="Card headroom" value={healthScore.utilizationScore} target={75} tone="neutral" />
-                        <ProgressRule label="Savings" value={healthScore.savingsScore} target={75} tone="good" />
+                        <ProgressRule label="Cash flow" value={healthScore.cashFlowScore} target={75} />
+                        <ProgressRule label="Debt load" value={healthScore.debtLoadScore} target={75} />
+                        <ProgressRule label="Payments" value={healthScore.paymentPressureScore} target={75} />
+                        <ProgressRule label="Card headroom" value={healthScore.utilizationScore} target={75} />
+                        <ProgressRule label="Savings" value={healthScore.savingsScore} target={75} />
                       </div>
                     </>
                   )}
@@ -6338,9 +6342,16 @@ function NetWorthChart({
   );
 }
 
-function ProgressRule({ label, value, target, tone }: { label: string; value: number; target: number; tone: "good" | "neutral" }) {
+// Same bands as the score summary in calculateHealthScore (Strong/Stable,
+// Tight, At risk) so the card's accent matches the word it shows.
+function healthTone(score: number): "good" | "warn" | "bad" {
+  return score >= 5.8 ? "good" : score >= 3.8 ? "warn" : "bad";
+}
+
+function ProgressRule({ label, value, target }: { label: string; value: number; target: number }) {
   const width = clampPercent(value);
   const targetPosition = clampPercent(target);
+  const tone = value >= target ? "good" : value >= 40 ? "warn" : "bad";
 
   return (
     <div className={`progressRule ${tone}`}>
@@ -6349,8 +6360,8 @@ function ProgressRule({ label, value, target, tone }: { label: string; value: nu
         <b>{formatDecimal(value)}%</b>
       </div>
       <div className="ruleTrack">
-        <i style={{ left: `${targetPosition}%` }} />
         <strong style={{ width: `${width}%` }} />
+        <i style={{ left: `${targetPosition}%` }} />
       </div>
     </div>
   );
