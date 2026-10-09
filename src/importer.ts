@@ -1,5 +1,5 @@
 import { colors, getMonthKey } from "./finance";
-import type { CategoryRule, CategorySource, LedgerState, TransactionKind } from "./types";
+import type { CategoryRule, CategorySource, LedgerState, MonthBudget, TransactionKind } from "./types";
 
 export type CsvImportRow = {
   id: string;
@@ -7,6 +7,9 @@ export type CsvImportRow = {
   date: string;
   monthKey: string;
   description: string;
+  // Short, human label shown in review and saved as the entry name. `description`
+  // keeps the raw bank text for dedupe, rules and AI categorisation.
+  name: string;
   amount: number;
   rawAmount: string;
   kind: TransactionKind;
@@ -207,6 +210,7 @@ export function buildImportRow({
     date,
     monthKey: date.slice(0, 7),
     description,
+    name: cleanMerchantName(description) || description,
     amount,
     rawAmount: amount.toFixed(2),
     kind,
@@ -731,6 +735,204 @@ function categoryColor(category: string): string {
   const normalized = category.trim().toLowerCase();
   const categoryIndex = ["home", "food", "bills", "travel", "health", "personal", "work", "subscriptions", "income", "debt payments", "transfers", "unsorted"].indexOf(normalized);
   return colors[(categoryIndex >= 0 ? categoryIndex : normalized.length) % colors.length];
+}
+
+// ─── Display names ───────────────────────────────────────────────────────────
+// Bank descriptors are written for the bank: card numbers, dates, branch towns,
+// store numbers and transaction-type codes. cleanMerchantName keeps the part a
+// person recognises ("4332 07OCT26 , BARCLAYCARD , LONDON GB" → "Barclaycard").
+// It only shapes the label; the raw text stays on the row (and on
+// imported.originalDescription) for dedupe, rules and recurrence matching.
+
+const DISPLAY_NAME_MAX_LENGTH = 28;
+
+// Card number + transaction date that Barclays, NatWest and RBS lead with ("4332 07OCT26", "4332 07OCT26 CD").
+const CARD_DATE_PREFIX = /^\d{4}\s+\d{1,2}[a-z]{3}\d{2,4}(?:\s+(?:c|cd|d))?(?:\s+|$)/i;
+const LEADING_TYPE_WORDS =
+  /^(?:card payment to|card purchase(?: at)?|contactless payment(?: to)?|contactless|direct debit(?: payment)?(?: to)?|standing order(?: to)?|bill payment(?: to)?|faster payments?(?: receipt| payment)?(?: from| to)?|payment (?:to|from)|debit card(?: payment)?(?: to)?|purchase at|pos|visa)\b[\s:-]*/i;
+const TRAILING_ON_DATE = /\s+on\s+\d{1,2}(?:[\s-]?[a-z]{3}|[-/.]\d{1,2})\b.*$/i;
+const TRAILING_REFERENCE = /\s+(?:ref|reference|mandate(?: no)?)\b.*$/i;
+const TRAILING_TYPE_CODE = /\s+(?:bcc|cpm|clp|ddr|bgc|dd|ft|so|sto|deb|tfr|chg|obp|bbp|fpi|fpo|bac|vis|pymts?|payments?)$/i;
+const TRAILING_SUFFIX = /\s+(?:gb|gbr|uk|irl|ie|usa|us|ltd|limited|plc|llp|inc|llc)\.?$/i;
+const LOCATION_SEGMENT = /^[a-z .'-]+\s(?:gb|gbr|uk|irl|ie|us|usa|fr|de|es|nl|lu)$/i;
+const NOISE_SEGMENT = /^(?:[\d\s.,/-]*(?:gbp|eur|usd)?|rate\b.*|mandate\b.*|ref\b.*|reference\b.*)$/i;
+// Card processors that prefix the real merchant: "SQ *COFFEE SHOP", "PAYPAL *EBAY".
+const PROCESSOR_PREFIX = /^(?:paypal|pp|sq|sumup|zettle|ztl|iz|izettle|sp|crv|tst|lul|nyx)$/i;
+
+// Descriptors that title-casing alone would leave cryptic, tested against the
+// normalized merchant ("amzn mktp uk ab12cd", "sainsburys s mkts").
+const DISPLAY_BRANDS: [RegExp, string][] = [
+  [/^(?:amzn ?prime|amazon prime|prime video)\b/, "Amazon Prime"],
+  [/^(?:amzn|amazon)\b/, "Amazon"],
+  [/^sainsbury/, "Sainsbury's"],
+  [/^mcdonald/, "McDonald's"],
+  [/^(?:m s|marks (?:and )?spencer)\b/, "M&S"],
+  [/^tfl\b/, "TfL"],
+  [/^apple com\b/, "Apple"],
+  [/^uber ?eats\b/, "Uber Eats"],
+  [/^uber\b/, "Uber"],
+  [/^(?:google )?youtube\b/, "YouTube"],
+];
+
+const DISPLAY_CASING: Record<string, string> = {
+  paypal: "PayPal",
+  ebay: "eBay",
+  ikea: "IKEA",
+  youtube: "YouTube",
+  tfl: "TfL",
+  hmrc: "HMRC",
+  dvla: "DVLA",
+  nhs: "NHS",
+  bt: "BT",
+  ee: "EE",
+  o2: "O2",
+  atm: "ATM",
+  kfc: "KFC",
+  hsbc: "HSBC",
+  tsb: "TSB",
+  rac: "RAC",
+  aa: "AA",
+  bp: "BP",
+  tv: "TV",
+  uk: "UK",
+  sse: "SSE",
+  edf: "EDF",
+  dpd: "DPD",
+  dhl: "DHL",
+  ups: "UPS",
+  jd: "JD",
+  asos: "ASOS",
+  sa: "SA",
+};
+const DISPLAY_SMALL_WORDS = new Set(["and", "of", "the", "to", "for", "at", "on", "in", "by"]);
+
+export function cleanMerchantName(description: string): string {
+  const raw = description.replace(/\s+/g, " ").trim();
+  if (!raw) return "";
+
+  let name = pickMerchantSegment(raw.replace(CARD_DATE_PREFIX, (match) => `${match.trim()} , `));
+  name = stripRepeatedly(name, [LEADING_TYPE_WORDS], "");
+  const segmentKey = normalizeMerchant(name);
+  name = name.replace(TRAILING_ON_DATE, "").replace(TRAILING_REFERENCE, "");
+  name = stripRepeatedly(name, [TRAILING_TYPE_CODE, TRAILING_SUFFIX], "");
+  name = resolveProcessorStar(name);
+  // A store number or reference ends the merchant name: "TESCO STORES 3412 LONDON".
+  name = name.replace(/^(.*?[a-z].*?)\s+#?\d{4,}\b.*$/i, "$1");
+  name = name.replace(/\s+(?=[a-z0-9]*\d)(?=[a-z0-9]*[a-z])[a-z0-9]{6,}$/i, "");
+  name = name.replace(/\s+gov\.uk\b/gi, "").replace(/\.(?:com|co\.uk|org\.uk|net|org|io)\b/gi, "");
+  name = name.replace(/\b(?:ltd|limited|plc)\b\.?/gi, " ");
+  name = stripRepeatedly(name.replace(/\s+/g, " ").trim(), [TRAILING_TYPE_CODE, TRAILING_SUFFIX], "");
+  name = name.replace(/^[\s,*.:/-]+|[\s,*.:/-]+$/g, "");
+
+  if (!/[a-z].*[a-z]/i.test(name)) name = raw;
+
+  const nameKey = normalizeMerchant(name);
+  const brand = DISPLAY_BRANDS.find(([pattern]) => pattern.test(nameKey) || pattern.test(segmentKey));
+  if (brand) return brand[1];
+
+  return truncateWords(recaseShouting(name), DISPLAY_NAME_MAX_LENGTH);
+}
+
+// Retroactive tidy for entries imported before display names existed. Only
+// entries still carrying the raw bank text are renamed: an imported row whose
+// name equals its originalDescription, or a recurring copy seeded from one.
+// Anything the user renamed is left alone, and a second pass is a no-op.
+export function tidyImportedNames(months: Record<string, MonthBudget>): Record<string, MonthBudget> {
+  const rawLabels = new Set<string>();
+  for (const month of Object.values(months)) {
+    for (const income of month.incomes) {
+      if (income.imported?.originalDescription && income.source === income.imported.originalDescription) rawLabels.add(income.source);
+    }
+    for (const expense of month.expenses) {
+      if (expense.imported?.originalDescription && expense.name === expense.imported.originalDescription) rawLabels.add(expense.name);
+    }
+  }
+  if (!rawLabels.size) return months;
+
+  const cleaned = new Map<string, string>();
+  for (const label of rawLabels) {
+    const name = cleanMerchantName(label);
+    if (name && name !== label) cleaned.set(label, name);
+  }
+  if (!cleaned.size) return months;
+
+  const rename = (label: string, eligible: boolean) => (eligible ? cleaned.get(label) : undefined);
+  return Object.fromEntries(
+    Object.entries(months).map(([monthKey, month]) => {
+      let changed = false;
+      const incomes = month.incomes.map((income) => {
+        const eligible = Boolean(income.seededFrom || income.imported?.originalDescription === income.source);
+        const source = rename(income.source, eligible);
+        if (!source) return income;
+        changed = true;
+        return { ...income, source };
+      });
+      const expenses = month.expenses.map((expense) => {
+        const eligible = Boolean(expense.seededFrom || expense.imported?.originalDescription === expense.name);
+        const name = rename(expense.name, eligible);
+        if (!name) return expense;
+        changed = true;
+        return { ...expense, name };
+      });
+      return [monthKey, changed ? { ...month, incomes, expenses } : month];
+    }),
+  );
+}
+
+function pickMerchantSegment(value: string): string {
+  if (!value.includes(",")) return value;
+  const segments = value.split(/\s*,\s*/).filter(Boolean);
+  // "4332 07OCT26 , MERCHANT , TOWN GB" — the merchant always follows the card/date block.
+  if (segments.length > 1 && CARD_DATE_PREFIX.test(`${segments[0]} `)) {
+    const merchant = segments.slice(1).find((segment) => !NOISE_SEGMENT.test(segment));
+    return merchant ?? value;
+  }
+  const meaningful = segments.filter((segment) => !NOISE_SEGMENT.test(segment));
+  if (meaningful.length > 1 && LOCATION_SEGMENT.test(meaningful[meaningful.length - 1])) meaningful.pop();
+  return meaningful.length ? meaningful.join(", ") : value;
+}
+
+function stripRepeatedly(value: string, patterns: RegExp[], replacement: string): string {
+  let current = value;
+  for (let pass = 0; pass < 6; pass += 1) {
+    const next = patterns.reduce((text, pattern) => text.replace(pattern, replacement).trim(), current);
+    if (next === current || !next) return next || current;
+    current = next;
+  }
+  return current;
+}
+
+function resolveProcessorStar(value: string): string {
+  const match = value.match(/^([^*]+?)\s*\*\s*(.+)$/);
+  if (!match) return value;
+  const [, left, right] = match;
+  if (PROCESSOR_PREFIX.test(left.trim())) return right;
+  // "AMZN MKTP UK*AB12CD3": the right side is an order reference, not a name.
+  if (!/\s/.test(right) && /\d/.test(right)) return left;
+  return `${left} ${right}`;
+}
+
+// Bank exports shout ("TESCO STORES"); mixed-case text already carries the
+// merchant's own casing ("Pret A Manger") and is left as written.
+function recaseShouting(value: string): string {
+  if (/[a-z]/.test(value)) return value;
+  return value
+    .toLowerCase()
+    .split(" ")
+    .map((word, index) => {
+      if (DISPLAY_CASING[word]) return DISPLAY_CASING[word];
+      if (word.includes("&") && word.length <= 4) return word.toUpperCase();
+      if (index > 0 && DISPLAY_SMALL_WORDS.has(word)) return word;
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(" ");
+}
+
+function truncateWords(value: string, maxLength: number): string {
+  if (value.length <= maxLength) return value;
+  const cut = value.slice(0, maxLength + 1);
+  const lastSpace = cut.lastIndexOf(" ");
+  return (lastSpace > maxLength / 2 ? cut.slice(0, lastSpace) : value.slice(0, maxLength)).replace(/[\s,&-]+$/, "");
 }
 
 // ─── Multi-format entry point ────────────────────────────────────────────────

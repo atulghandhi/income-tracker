@@ -3559,6 +3559,19 @@ hr {
   display: block;
 }
 
+.importTable td:nth-child(3) input.importNameInput {
+  width: 100%;
+  max-width: 240px;
+  font-weight: 650;
+}
+
+.importTable td:nth-child(3) span {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .importTable td:nth-child(3) span,
 .importTable td:nth-child(7) em {
   margin-top: 3px;

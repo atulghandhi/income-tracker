@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { createInitialState } from "../src/finance";
-import { buildRulePattern, createTransactionHash, parseBankCsv, parseLooseLines } from "../src/importer";
+import { buildRulePattern, cleanMerchantName, createTransactionHash, parseBankCsv, parseLooseLines, tidyImportedNames } from "../src/importer";
 
 test.describe("CSV bank importer", () => {
   test("parses quoted debit and credit rows, categorizes them, and warns on duplicates", () => {
@@ -133,5 +133,78 @@ test.describe("Pasted statement lines (PDF copy and paste)", () => {
     expect(result.errors).toEqual([]);
     expect(result.rows.find((row) => row.description.includes("PRET"))).toMatchObject({ amount: -8.4, date: "2026-09-12" });
     expect(result.rows.find((row) => row.description.includes("SALARY"))).toMatchObject({ amount: 2100, date: "2026-09-01" });
+  });
+});
+
+test.describe("Display names for bank descriptors", () => {
+  test("shortens raw bank text to the merchant a person recognises", () => {
+    const cases: [string, string][] = [
+      ["4332 07OCT26 , BARCLAYCARD , LONDON GB", "Barclaycard"],
+      ["BARCLAYS BANK UK", "Barclays Bank"],
+      ["4332 07OCT26 CD , TESCO STORES 3412 , LONDON GB", "Tesco Stores"],
+      ["SAINSBURYS S/MKTS ON 12 MAR CLP", "Sainsbury's"],
+      ["NETFLIX.COM ON 01 MAY BCC", "Netflix"],
+      ["BRITISH GAS 23876281 DDR", "British Gas"],
+      ["CARD PAYMENT TO TESCO STORES 3412,12.34 GBP, RATE 1.00/GBP ON 02-10-2026", "Tesco Stores"],
+      ["DIRECT DEBIT PAYMENT TO OCTOPUS ENERGY REF 123456, MANDATE NO 0012", "Octopus Energy"],
+      ["AMZN MKTP UK*AB12CD3", "Amazon"],
+      ["PAYPAL *EBAY", "eBay"],
+      ["4332 07OCT26 , SQ *FLAT WHITE COFFEE , MANCHESTER GB", "Flat White Coffee"],
+      ["HMRC GOV.UK SA", "HMRC SA"],
+    ];
+    for (const [raw, expected] of cases) expect(cleanMerchantName(raw), raw).toBe(expected);
+  });
+
+  test("leaves names that already read well untouched", () => {
+    for (const name of ["Pret A Manger", "ACME Payroll", "Transfer to savings", "Tesco, Express"]) {
+      expect(cleanMerchantName(name)).toBe(name);
+    }
+  });
+
+  test("keeps the raw description for matching while the row carries the short name", () => {
+    const result = parseBankCsv({
+      fileName: "barclays.csv",
+      state: createInitialState(),
+      text: ["Date,Memo,Amount", "07/10/2026,\"4332 07OCT26 , BARCLAYCARD , LONDON GB\",-120.00"].join("\n"),
+    });
+    expect(result.rows[0]).toMatchObject({
+      description: "4332 07OCT26 , BARCLAYCARD , LONDON GB",
+      name: "Barclaycard",
+    });
+  });
+
+  test("retroactively renames untouched imports and their seeded copies, not user edits", () => {
+    const raw = "4332 07OCT26 , BARCLAYCARD , LONDON GB";
+    const imported = (originalDescription: string) => ({
+      batchId: "b",
+      fileName: "f.csv",
+      rowNumber: 1,
+      hash: "h",
+      originalDescription,
+      importedAt: "2026-10-07T00:00:00.000Z",
+    });
+    const months = {
+      "2026-10": {
+        incomes: [{ id: "i1", source: "ACME LTD SALARY BGC", amount: 2500, color: "#000", date: "2026-10-01", imported: imported("ACME LTD SALARY BGC") }],
+        expenses: [
+          { id: "e1", name: raw, amount: 120, category: "Debt payments", color: "#000", date: "2026-10-07", imported: imported(raw) },
+          { id: "e2", name: "My card bill", amount: 50, category: "Bills", color: "#000", date: "2026-10-08", imported: imported("BARCLAYS BANK UK") },
+          { id: "e3", name: "BARCLAYS BANK UK", amount: 9, category: "Bills", color: "#000" },
+        ],
+        note: "",
+      },
+      "2026-11": {
+        incomes: [],
+        expenses: [{ id: "e4", name: raw, amount: 120, category: "Debt payments", color: "#000", seededFrom: { monthKey: "2026-10", entryId: "e1" } }],
+        note: "",
+      },
+    };
+
+    const tidied = tidyImportedNames(months);
+    expect(tidied["2026-10"].incomes[0].source).toBe("Acme Salary");
+    expect(tidied["2026-10"].expenses.map((expense) => expense.name)).toEqual(["Barclaycard", "My card bill", "BARCLAYS BANK UK"]);
+    expect(tidied["2026-10"].expenses[0].imported?.originalDescription).toBe(raw);
+    expect(tidied["2026-11"].expenses[0].name).toBe("Barclaycard");
+    expect(tidyImportedNames(tidied)).toEqual(tidied);
   });
 });

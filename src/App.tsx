@@ -77,7 +77,7 @@ import {
   seedMonthFromPrevious,
   shiftMonth,
 } from "./finance";
-import { buildRulePattern, canonicalizeMerchant, descriptionMatchesPattern, isTransferDescription, normalizeMerchant, parseBankText, sortImportRows, type CsvImportRow } from "./importer";
+import { buildRulePattern, canonicalizeMerchant, descriptionMatchesPattern, isTransferDescription, normalizeMerchant, parseBankText, sortImportRows, tidyImportedNames, type CsvImportRow } from "./importer";
 import { buildMerchantMemory } from "./merchantMemory";
 import { parseQuickAdd } from "./quickAdd";
 import { applyRecurringFlag, detectSubscriptions, findMissedRecurring, reconcileSeededEntries, suggestRecurringFlags, type RecurrenceCandidate } from "./recurrence";
@@ -1953,7 +1953,7 @@ function App() {
         if (row.kind === "income") {
           const entry: IncomeEntry = {
             id: createId("income"),
-            source: row.description,
+            source: row.name.trim() || row.description,
             amount: Math.abs(row.amount),
             color: row.color || colors[index % colors.length],
             // Imported bank rows are historical actuals — one-off by default, not run-rate.
@@ -1972,7 +1972,7 @@ function App() {
 
         const entry: ExpenseEntry = {
           id: createId("expense"),
-          name: row.description,
+          name: row.name.trim() || row.description,
           amount: Math.abs(row.amount),
           category: row.category.trim() || (row.kind === "debt-payment" ? "Debt payments" : "Unsorted"),
           color: row.color || colors[(index + 2) % colors.length],
@@ -4358,8 +4358,13 @@ function ImportReviewTableRow({
       </td>
       <td>{formatShortDate(row.date)}</td>
       <td>
-        <strong>{row.description}</strong>
-        <span>Row {row.rowNumber}</span>
+        <input
+          className="importNameInput"
+          value={row.name}
+          aria-label={`Name for ${row.description}`}
+          onChange={(event) => onChange({ name: event.target.value })}
+        />
+        <span title={row.description}>{row.name === row.description ? `Row ${row.rowNumber}` : row.description}</span>
       </td>
       <td className={row.amount >= 0 ? "positiveText" : "negativeText"}>{formatter.format(row.amount)}</td>
       <td>
@@ -6319,7 +6324,7 @@ function normalizeState(rawState: Partial<LedgerState>): LedgerState {
   // user last worked in, same as navigating forward in the ledger.
   const storedMonth = typeof state.selectedMonth === "string" && state.selectedMonth ? state.selectedMonth : fallback.selectedMonth;
   const selectedMonth = getMonthKey();
-  const months = normalizeMonths(state.months, fallback.months);
+  const months = tidyImportedNames(normalizeMonths(state.months, fallback.months));
   const normalizedMonths = months[selectedMonth]
     ? months
     : {
