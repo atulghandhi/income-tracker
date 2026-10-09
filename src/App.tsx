@@ -7,6 +7,7 @@ import {
   AlertCircle,
   ArrowDown,
   ArrowUp,
+  ArrowUpDown,
   BarChart3,
   Check,
   ChevronDown,
@@ -77,7 +78,8 @@ import {
   seedMonthFromPrevious,
   shiftMonth,
 } from "./finance";
-import { buildRulePattern, canonicalizeMerchant, descriptionMatchesPattern, isTransferDescription, normalizeMerchant, parseBankText, sortImportRows, type CsvImportRow } from "./importer";
+import { INCOME_SORT_OPTIONS, isIncomeSortMode, moveEntry, orderIncomes, type IncomeSortMode } from "./ledgerOrder";
+import { buildRulePattern, canonicalizeMerchant, descriptionMatchesPattern, isTransferDescription, normalizeMerchant, parseBankText, sortImportRows, tidyImportedNames, type CsvImportRow } from "./importer";
 import { buildMerchantMemory } from "./merchantMemory";
 import { parseQuickAdd } from "./quickAdd";
 import { applyRecurringFlag, detectSubscriptions, findMissedRecurring, reconcileSeededEntries, suggestRecurringFlags, type RecurrenceCandidate } from "./recurrence";
@@ -170,6 +172,20 @@ function readStoredTheme(): ThemeMode {
   return typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches
     ? "dark"
     : "light";
+}
+
+// Income column order is a per-device view preference, like the theme, so it
+// lives in localStorage rather than in the synced ledger.
+const INCOME_SORT_KEY = "it_income_sort";
+
+function readStoredIncomeSort(): IncomeSortMode {
+  try {
+    const stored = localStorage.getItem(INCOME_SORT_KEY);
+    if (isIncomeSortMode(stored)) return stored;
+  } catch {
+    // localStorage unavailable — fall back to the user's own order.
+  }
+  return "custom";
 }
 
 type TutorialStep = { heading: string; bullets: string[] };
@@ -495,6 +511,9 @@ function App() {
   const [draggingExpenseId, setDraggingExpenseId] = useState<string | null>(null);
   const [groupingSourceId, setGroupingSourceId] = useState<string | null>(null);
   const [dropPreview, setDropPreview] = useState<ExpenseDropPreview>(null);
+  const [incomeSort, setIncomeSort] = useState<IncomeSortMode>(readStoredIncomeSort);
+  const [draggingIncomeId, setDraggingIncomeId] = useState<string | null>(null);
+  const [incomeDropPreview, setIncomeDropPreview] = useState<{ targetId: string; edge: "before" | "after" } | null>(null);
   const [categoryMenu, setCategoryMenu] = useState<CategoryMenuState | null>(null);
   const [importReview, setImportReview] = useState<ImportReviewState | null>(null);
   const [lastImportAction, setLastImportAction] = useState<LastImportAction | null>(null);
@@ -580,9 +599,10 @@ function App() {
   );
   const normalizedQuery = query.trim().toLowerCase();
   const visibleIncomes = useMemo(() => {
-    if (!normalizedQuery) return currentMonth.incomes;
-    return currentMonth.incomes.filter((income) => income.source.toLowerCase().includes(normalizedQuery));
-  }, [currentMonth.incomes, normalizedQuery]);
+    const ordered = orderIncomes(currentMonth.incomes, incomeSort);
+    if (!normalizedQuery) return ordered;
+    return ordered.filter((income) => income.source.toLowerCase().includes(normalizedQuery));
+  }, [currentMonth.incomes, incomeSort, normalizedQuery]);
   const visibleExpenseGroups = useMemo(() => {
     if (!normalizedQuery) return expenseGroups;
     return buildExpenseGroups(
@@ -815,6 +835,14 @@ function App() {
 
     return () => window.clearTimeout(timeout);
   }, [ledger, hydrated, authLoading, cloudHydrated, user?.id]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(INCOME_SORT_KEY, incomeSort);
+    } catch {
+      // localStorage unavailable — the order simply won't persist.
+    }
+  }, [incomeSort]);
 
   // Apply the theme to <html> so every surface (landing, auth gate, modals) picks
   // it up, persist the choice, and keep the browser chrome colour in step.
@@ -1415,6 +1443,50 @@ function App() {
     setGroupingSourceId(null);
   }
 
+  // Dragging while an automatic order is showing adopts what's on screen as the
+  // custom order first, so the row lands where it was dropped and stays there.
+  function reorderIncome(sourceId: string, targetId: string, edge: "before" | "after") {
+    if (sourceId === targetId) return;
+    updateCurrentMonth((month) => ({ ...month, incomes: moveEntry(orderIncomes(month.incomes, incomeSort), sourceId, targetId, edge) }));
+    setToast(incomeSort === "custom" ? "Income reordered" : "Income reordered · now using your order");
+    setIncomeSort("custom");
+  }
+
+  function moveIncomeByKeyboard(id: string, direction: -1 | 1) {
+    const index = visibleIncomes.findIndex((income) => income.id === id);
+    const neighbour = visibleIncomes[index + direction];
+    if (index === -1 || !neighbour) return;
+    reorderIncome(id, neighbour.id, direction === -1 ? "before" : "after");
+    // React moves the row's DOM node, which drops focus; put it back on the handle.
+    requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-income-id="${id}"] .dragHandle`)?.focus());
+  }
+
+  function previewIncomeDrop(event: DragEvent<HTMLDivElement>, target: IncomeEntry) {
+    if (!draggingIncomeId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = "move";
+    if (draggingIncomeId === target.id) {
+      setIncomeDropPreview(null);
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    const edge = event.clientY - rect.top < rect.height / 2 ? "before" : "after";
+    setIncomeDropPreview((current) => (current?.targetId === target.id && current.edge === edge ? current : { targetId: target.id, edge }));
+  }
+
+  function dropOnIncome(target: IncomeEntry) {
+    if (draggingIncomeId && incomeDropPreview?.targetId === target.id) {
+      reorderIncome(draggingIncomeId, target.id, incomeDropPreview.edge);
+    }
+    clearIncomeDragState();
+  }
+
+  function clearIncomeDragState() {
+    setDraggingIncomeId(null);
+    setIncomeDropPreview(null);
+  }
+
   function reorderExpense(sourceId: string, targetId: string, edge: "before" | "after") {
     if (sourceId === targetId) return;
 
@@ -1953,7 +2025,7 @@ function App() {
         if (row.kind === "income") {
           const entry: IncomeEntry = {
             id: createId("income"),
-            source: row.description,
+            source: row.name.trim() || row.description,
             amount: Math.abs(row.amount),
             color: row.color || colors[index % colors.length],
             // Imported bank rows are historical actuals — one-off by default, not run-rate.
@@ -1972,7 +2044,7 @@ function App() {
 
         const entry: ExpenseEntry = {
           id: createId("expense"),
-          name: row.description,
+          name: row.name.trim() || row.description,
           amount: Math.abs(row.amount),
           category: row.category.trim() || (row.kind === "debt-payment" ? "Debt payments" : "Unsorted"),
           color: row.color || colors[(index + 2) % colors.length],
@@ -2692,6 +2764,20 @@ function App() {
                   count={currentMonth.incomes.length}
                   privacy={ledger.privacyMode}
                   formatter={moneyFormatter}
+                  action={
+                    currentMonth.incomes.length > 1 ? (
+                      <label className="panelSort">
+                        <ArrowUpDown size={13} aria-hidden="true" />
+                        <select value={incomeSort} aria-label="Order income by" onChange={(event) => setIncomeSort(event.target.value as IncomeSortMode)}>
+                          {INCOME_SORT_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : undefined
+                  }
                 >
                   <div className="tableHeader incomeHeader">
                     <span>Source</span>
@@ -2706,6 +2792,13 @@ function App() {
                           income={income}
                           privacy={ledger.privacyMode}
                           symbol={currencySymbol}
+                          dragging={draggingIncomeId === income.id}
+                          dropState={incomeDropPreview?.targetId === income.id ? incomeDropPreview.edge : undefined}
+                          onDragStart={() => setDraggingIncomeId(income.id)}
+                          onDragOver={(event) => previewIncomeDrop(event, income)}
+                          onDragEnd={clearIncomeDragState}
+                          onDrop={() => dropOnIncome(income)}
+                          onMove={(direction) => moveIncomeByKeyboard(income.id, direction)}
                           onChange={(patch) => updateIncome(income.id, patch)}
                           onRemove={() => removeIncome(income.id)}
                         />
@@ -4358,8 +4451,13 @@ function ImportReviewTableRow({
       </td>
       <td>{formatShortDate(row.date)}</td>
       <td>
-        <strong>{row.description}</strong>
-        <span>Row {row.rowNumber}</span>
+        <input
+          className="importNameInput"
+          value={row.name}
+          aria-label={`Name for ${row.description}`}
+          onChange={(event) => onChange({ name: event.target.value })}
+        />
+        <span title={row.description}>{row.name === row.description ? `Row ${row.rowNumber}` : row.description}</span>
       </td>
       <td className={row.amount >= 0 ? "positiveText" : "negativeText"}>{formatter.format(row.amount)}</td>
       <td>
@@ -4673,6 +4771,7 @@ function Panel({
   count,
   privacy,
   formatter,
+  action,
   children,
 }: {
   title: string;
@@ -4681,6 +4780,7 @@ function Panel({
   count: number;
   privacy: boolean;
   formatter: Intl.NumberFormat;
+  action?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -4693,7 +4793,10 @@ function Panel({
             </span>
             {title}
           </h2>
-          <span>{count} {count === 1 ? "item" : "items"}</span>
+          <span className="panelMeta">
+            {count} {count === 1 ? "item" : "items"}
+            {action}
+          </span>
         </div>
         <strong className={privacy ? "masked" : ""}>
           <AnimatedCurrency value={total} formatter={formatter} />
@@ -4708,20 +4811,72 @@ function IncomeRow({
   income,
   privacy,
   symbol,
+  dragging,
+  dropState,
+  onDragStart,
+  onDragOver,
+  onDragEnd,
+  onDrop,
+  onMove,
   onChange,
   onRemove,
 }: {
   income: IncomeEntry;
   privacy: boolean;
   symbol: string;
+  dragging: boolean;
+  dropState?: "before" | "after";
+  onDragStart: () => void;
+  onDragOver: (event: DragEvent<HTMLDivElement>) => void;
+  onDragEnd: () => void;
+  onDrop: () => void;
+  onMove: (direction: -1 | 1) => void;
   onChange: (patch: Partial<IncomeEntry>) => void;
   onRemove: () => void;
 }) {
+  // A custom MIME type keeps income drags out of the expense column's drop targets.
+  function handleDragStart(event: DragEvent<HTMLElement>) {
+    event.stopPropagation();
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("application/x-income-id", income.id);
+    onDragStart();
+  }
+
+  function handleDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    onDrop();
+  }
+
+  const dropClass = dropState === "before" ? "dropBefore" : dropState === "after" ? "dropAfter" : "";
+
   return (
-    <div className="financeRow incomeRow">
-      <span className="dragDots" aria-hidden="true">
+    <div
+      className={`financeRow incomeRow ${dragging ? "dragging" : ""} ${dropClass}`}
+      data-income-id={income.id}
+      draggable
+      onDragStart={handleDragStart}
+      onDragOver={onDragOver}
+      onDragEnd={onDragEnd}
+      onDrop={handleDrop}
+    >
+      <button
+        className="dragHandle"
+        type="button"
+        draggable
+        onDragStart={handleDragStart}
+        onDragEnd={onDragEnd}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+            event.preventDefault();
+            onMove(event.key === "ArrowUp" ? -1 : 1);
+          }
+        }}
+        aria-label={`Move ${income.source || "income"}`}
+        data-tip="Drag to reorder, or focus and use the arrow keys"
+      >
         ::
-      </span>
+      </button>
       <button
         className="swatch"
         type="button"
@@ -6319,7 +6474,7 @@ function normalizeState(rawState: Partial<LedgerState>): LedgerState {
   // user last worked in, same as navigating forward in the ledger.
   const storedMonth = typeof state.selectedMonth === "string" && state.selectedMonth ? state.selectedMonth : fallback.selectedMonth;
   const selectedMonth = getMonthKey();
-  const months = normalizeMonths(state.months, fallback.months);
+  const months = tidyImportedNames(normalizeMonths(state.months, fallback.months));
   const normalizedMonths = months[selectedMonth]
     ? months
     : {

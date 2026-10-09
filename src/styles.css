@@ -1027,6 +1027,38 @@ textarea::placeholder {
   background: rgba(var(--surface-higher-rgb), 0.18);
 }
 
+.panelMeta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.panelHeader .panelSort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-left: 10px;
+  border-left: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.panelSort select {
+  width: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.panelSort select:hover,
+.panelSort select:focus-visible {
+  color: var(--ink);
+  outline: none;
+}
+
 .panelHeader h2 {
   display: flex;
   align-items: center;
@@ -1073,7 +1105,7 @@ textarea::placeholder {
 
 .incomeHeader {
   grid-template-columns: minmax(150px, 1fr) 150px 40px;
-  padding-left: 78px;
+  padding-left: 80px;
 }
 
 .expenseHeader {
@@ -1157,7 +1189,7 @@ textarea::placeholder {
 }
 
 .incomeRow {
-  grid-template-columns: 22px 42px minmax(140px, 1fr) 150px auto;
+  grid-template-columns: 24px 42px minmax(140px, 1fr) 150px auto;
 }
 
 .expenseRow {
@@ -3557,6 +3589,19 @@ hr {
 .importTable td:nth-child(3) span,
 .importTable td:nth-child(7) em {
   display: block;
+}
+
+.importTable td:nth-child(3) input.importNameInput {
+  width: 100%;
+  max-width: 240px;
+  font-weight: 650;
+}
+
+.importTable td:nth-child(3) span {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .importTable td:nth-child(3) span,

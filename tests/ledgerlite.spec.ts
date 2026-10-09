@@ -184,6 +184,39 @@ test.describe("Ledger", () => {
     );
   });
 
+  test("reorders income by drag, keyboard and the automatic orders", async ({ page }) => {
+    await openLedger(page);
+    await addIncome(page, "Amazon refund", 12);
+    await addIncome(page, "Salary", 2400);
+    await addIncome(page, "Amazon refund", 30);
+    await addIncome(page, "Side gig", 50);
+    const sources = () => inputValues(page, "input[aria-label='Income source']");
+    const amounts = () => inputValues(page, ".incomeRow input[aria-label='Income amount']");
+
+    await page.locator(".incomeRow").nth(1).locator(".dragHandle").dragTo(page.locator(".incomeRow").nth(0), { targetPosition: { x: 200, y: 4 } });
+    await expect.poll(sources).toEqual(["Salary", "Amazon refund", "Amazon refund", "Side gig"]);
+
+    await page.locator(".incomeRow").nth(3).locator(".dragHandle").focus();
+    await page.keyboard.press("ArrowUp");
+    await expect.poll(sources).toEqual(["Salary", "Amazon refund", "Side gig", "Amazon refund"]);
+    await expect(page.locator(".incomeRow").nth(2).locator(".dragHandle")).toBeFocused();
+
+    const order = page.getByLabel("Order income by");
+    await order.selectOption("amount");
+    await expect.poll(amounts).toEqual(["2400", "50", "30", "12"]);
+    await order.selectOption("name");
+    await expect.poll(sources).toEqual(["Salary", "Side gig", "Amazon refund", "Amazon refund"]);
+
+    // Dragging from an automatic order keeps what was on screen, applies the move, and switches to custom.
+    // Moved rows replay their entry animation; let them settle before dragging.
+    await page.evaluate(() => Promise.all(document.getAnimations().map((animation) => animation.finished)));
+    const lastRow = page.locator(".incomeRow").nth(3);
+    const lastBox = await lastRow.boundingBox();
+    await page.locator(".incomeRow").nth(1).locator(".dragHandle").dragTo(lastRow, { targetPosition: { x: 200, y: (lastBox?.height ?? 40) - 4 } });
+    await expect.poll(sources).toEqual(["Salary", "Amazon refund", "Amazon refund", "Side gig"]);
+    await expect(order).toHaveValue("custom");
+  });
+
   test("sorts category sections by total and category items by amount", async ({ page }) => {
     await openLedger(page);
     await addExpense(page, "Food low", 10);

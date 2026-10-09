@@ -100,5 +100,6 @@ test("CSV import triages rows into confidence buckets and imports them", async (
 
   await expect(page.locator("input[aria-label='Expense name']").first()).toBeVisible();
   const names = await page.locator("input[aria-label='Expense name']").evaluateAll((inputs) => inputs.map((input) => (input as HTMLInputElement).value));
-  expect(names.join(" ")).toContain("TESCO");
+  // Imports land under the short display name, not the raw bank descriptor.
+  expect(names).toContain("Tesco Extra");
 });
