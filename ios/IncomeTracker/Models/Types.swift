@@ -165,6 +165,9 @@ public struct ExpenseEntry: Codable, Identifiable, Hashable, Sendable {
     /// Links this payment to a debt account. For any month that has linked payments, their sum
     /// replaces that account's scheduled monthly payment in the balance roll-forward.
     public var debtAccountId: String?
+    /// Set on the row the web app adds each month from a debt account's scheduled payment; the
+    /// real (imported or typed) payment replaces it. Kept here so saving from iOS round-trips it.
+    public var scheduledPayment: Bool?
     public var seededFrom: SeededFromRef?
     /// See IncomeEntry.categorySource.
     public var categorySource: String?
@@ -179,6 +182,7 @@ public struct ExpenseEntry: Codable, Identifiable, Hashable, Sendable {
         date: String? = nil,
         imported: ImportedTransactionMeta? = nil,
         debtAccountId: String? = nil,
+        scheduledPayment: Bool? = nil,
         seededFrom: SeededFromRef? = nil,
         categorySource: String? = nil
     ) {
@@ -191,12 +195,13 @@ public struct ExpenseEntry: Codable, Identifiable, Hashable, Sendable {
         self.date = date
         self.imported = imported
         self.debtAccountId = debtAccountId
+        self.scheduledPayment = scheduledPayment
         self.seededFrom = seededFrom
         self.categorySource = categorySource
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, name, category, amount, color, recurring, date, imported, debtAccountId, seededFrom, categorySource
+        case id, name, category, amount, color, recurring, date, imported, debtAccountId, scheduledPayment, seededFrom, categorySource
     }
 
     public init(from decoder: Decoder) throws {
@@ -209,6 +214,7 @@ public struct ExpenseEntry: Codable, Identifiable, Hashable, Sendable {
         date = c.lenientNonEmptyString(.date)
         imported = c.lenientValue(ImportedTransactionMeta.self, .imported)
         debtAccountId = c.lenientNonEmptyString(.debtAccountId)
+        scheduledPayment = c.lenientOptionalBool(.scheduledPayment)
         seededFrom = c.lenientValue(SeededFromRef.self, .seededFrom)
         categorySource = c.lenientNonEmptyString(.categorySource)
         recurring = c.lenientOptionalBool(.recurring) ?? (imported == nil)
@@ -558,6 +564,9 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
     /// Month key ("yyyy-MM") `promoMonths` was entered in. The live months-left figure counts
     /// down from this anchor (`FinanceEngine.promoMonthsRemaining`). nil means "entered now".
     public var promoAsOf: String?
+    /// Debt only: months ("yyyy-MM") the user skipped the scheduled payment. The roll-forward
+    /// charges no payment for them.
+    public var skippedPaymentMonths: [String]?
     /// Assets only: monthly surplus routed into this account.
     public var monthlyContribution: Double
     /// Debt only.
@@ -587,6 +596,7 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
         dueDay: Int,
         balanceAsOf: String? = nil,
         promoAsOf: String? = nil,
+        skippedPaymentMonths: [String]? = nil,
         includeInNetWorth: Bool,
         color: String,
         note: String
@@ -605,6 +615,7 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
         self.dueDay = dueDay
         self.balanceAsOf = balanceAsOf
         self.promoAsOf = promoAsOf
+        self.skippedPaymentMonths = skippedPaymentMonths
         self.includeInNetWorth = includeInNetWorth
         self.color = color
         self.note = note
@@ -613,7 +624,7 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
     enum CodingKeys: String, CodingKey {
         case id, name, accountClass, type, balance, rate, promoRate, promoMonths,
              monthlyContribution, creditLimit, minimumPayment, dueDay, balanceAsOf, promoAsOf,
-             includeInNetWorth, color, note
+             skippedPaymentMonths, includeInNetWorth, color, note
     }
 
     /// Keys written by schema < 5 (`debts[]` entries) that still need to load.
@@ -650,6 +661,8 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
         // Promo counts saved before they ticked down start counting from the month this loads.
         let storedPromoAsOf = c.lenientString(.promoAsOf)
         promoAsOf = isValidMonthKey(storedPromoAsOf) ? storedPromoAsOf : getMonthKey()
+        let skipped = c.lenientValue([String].self, .skippedPaymentMonths)?.filter { isValidMonthKey($0) }
+        skippedPaymentMonths = (skipped?.isEmpty ?? true) ? nil : skipped
         includeInNetWorth = c.lenientOptionalBool(.includeInNetWorth) ?? true
         color = c.lenientString(.color) ?? ""
         note = c.lenientString(.note) ?? ""

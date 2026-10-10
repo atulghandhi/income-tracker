@@ -246,7 +246,8 @@ enum FinanceEngine {
                 guard balance > 0 else { break }
                 let monthKey = shiftMonth(anchor, by: step)
                 let linkedTotal = paymentsByMonth?[monthKey] ?? 0
-                let payment = linkedTotal > 0 ? linkedTotal : scheduledPayment
+                let skipped = account.skippedPaymentMonths?.contains(monthKey) ?? false
+                let payment = linkedTotal > 0 ? linkedTotal : (skipped ? 0 : scheduledPayment)
                 guard payment > 0 else { continue }
 
                 // Each elapsed month is priced at the rate in force that month, so a 0% window
@@ -317,12 +318,31 @@ enum FinanceEngine {
     /// Only three things move it — fresh surplus in, asset growth, and debt interest.
     /// Contributions and debt payments are modelled as transfers out of an "unallocated cash" bucket,
     /// never as extra inflows/outflows. Leftover surplus collects in that bucket (may go negative).
+    /// Port of `recurringDebtPaymentsByAccount`: recurring ledger rows linked to a debt account,
+    /// summed per account — the same money as that account's monthly payment.
+    nonisolated static func recurringDebtPaymentsByAccount(_ month: MonthBudget) -> [String: Double] {
+        var byAccount: [String: Double] = [:]
+        for expense in month.expenses where expense.recurring {
+            guard let id = expense.debtAccountId else { continue }
+            byAccount[id, default: 0] += max(0.0, expense.amount)
+        }
+        return byAccount
+    }
+
+    /// `linkedDebtPayments` (from `recurringDebtPaymentsByAccount`): a debt payment in the ledger
+    /// already lowers the recurring surplus, so linked accounts pay the ledger amount and that
+    /// amount is added back, instead of taking the same money out of cash twice.
     nonisolated static func netWorthOutlook(
         accounts: [Account],
         recurringMonthlySurplus: Double,
         horizonMonths: Int,
-        assumedInvestmentReturn: Double
+        assumedInvestmentReturn: Double,
+        linkedDebtPayments: [String: Double] = [:]
     ) -> [NetWorthPoint] {
+        let debtIds = Set(accounts.filter { $0.accountClass == .debt }.map(\.id))
+        let linkedBack = linkedDebtPayments
+            .filter { debtIds.contains($0.key) }
+            .reduce(0.0) { $0 + max(0.0, $1.value) }
         // Working copy — plain struct so mutations are clean value-type operations.
         struct WorkingAccount {
             var accountClass: AccountClass
@@ -343,7 +363,9 @@ enum FinanceEngine {
                 promoRate: a.promoRate,
                 promoMonths: max(0, a.promoMonths),
                 contribution: max(0.0, a.monthlyContribution),
-                payment: max(0.0, a.minimumPayment),
+                payment: a.accountClass == .debt && linkedDebtPayments[a.id] != nil
+                    ? max(0.0, linkedDebtPayments[a.id]!)
+                    : max(0.0, a.minimumPayment),
                 includeInNetWorth: a.includeInNetWorth
             )
         }
@@ -366,7 +388,7 @@ enum FinanceEngine {
 
             if monthIndex > 0 {
                 // 1. Fresh recurring surplus arrives.
-                unallocatedCash += recurringMonthlySurplus
+                unallocatedCash += recurringMonthlySurplus + linkedBack
 
                 // 2. Route contributions into asset accounts (transfer from unallocated cash).
                 for i in working.indices {

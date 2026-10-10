@@ -387,6 +387,71 @@ test.describe("Ledger", () => {
     await expect(page.locator(".summaryStrip").getByText("35%")).toBeVisible();
   });
 
+  test("debt payments appear in the ledger and a statement import replaces them without duplicates", async ({ page }) => {
+    await page.clock.install({ time: new Date(2026, 9, 10) });
+    await page.goto("/");
+    await addDebtAccount(page, { name: "HSBC credit card", balance: 1200, limit: 3000, apr: 22.9, promoMonths: 0, payment: 100, dueDay: 12 });
+    const editor = page.locator(".accountEditorPanel");
+    await editor.getByLabel("Account kind").selectOption("debt");
+    await editor.getByLabel("Account type").selectOption("loan");
+    await editor.getByLabel("Account name").fill("Car loan");
+    await editor.getByLabel("Current balance").fill("8000");
+    await editor.getByLabel("Interest rate (APR) %").fill("6.9");
+    await editor.getByLabel("Monthly payment").fill("500");
+    await editor.getByLabel("Payment due day").fill("5");
+    await editor.getByRole("button", { name: "Add account" }).click();
+    await expect(page.getByLabel("Balance for Car loan")).toHaveValue("8000");
+
+    // Both reminders are offered from the accounts themselves.
+    await expect(page.getByRole("link", { name: "Add Car loan to Google Calendar" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Add HSBC credit card to Google Calendar" })).toBeVisible();
+
+    await openView(page, "Ledger");
+    await expect.poll(() => inputValues(page, "input[aria-label='Expense name']")).toEqual(
+      expect.arrayContaining(["HSBC credit card payment", "Car loan payment"]),
+    );
+    await expect(page.locator(".plannedBadge")).toHaveCount(2);
+
+    await uploadCsv(
+      page,
+      [
+        "Date,Description,Debit,Credit",
+        "05/10/2026,BLACK HORSE FINANCE,500.00,",
+        "13/10/2026,223231 HSBCBANKPLC,101.34,",
+        "14/10/2026,Tesco Express,40.00,",
+      ].join("\r\n"),
+    );
+    const dialog = page.getByRole("dialog", { name: "bank.csv" });
+    await expect(dialog.getByText(/Your Car loan payment/)).toBeVisible();
+    // Name, amount and due date all agree, so the card payment is confident enough to skip review.
+    await dialog.getByRole("button", { name: /matched your rules/ }).click();
+    await expect(dialog.getByText(/Your HSBC credit card payment/)).toBeVisible();
+    await dialog.getByRole("button", { name: /^Import \d/ }).click();
+    await expect(dialog).toHaveCount(0);
+
+    // The planned rows gave way to the real payments: no doubles, and the card shows what was paid.
+    await expect(page.locator(".plannedBadge")).toHaveCount(0);
+    const names = await inputValues(page, "input[aria-label='Expense name']");
+    expect(names).not.toContain("Car loan payment");
+    expect(names).not.toContain("HSBC credit card payment");
+    expect(names.length).toBe(3);
+    await expect(page.getByLabel("Counts as a payment towards HSBC credit card")).toHaveCount(1);
+    await expect(page.getByLabel("Counts as a payment towards Car loan")).toHaveCount(1);
+
+    // Next month: the planned rows are back at the planned amounts, and the same bank text now
+    // links by the rule the first import learned, even for a much bigger card payment.
+    await page.clock.runFor(2000);
+    await page.clock.setSystemTime(new Date(2026, 10, 10));
+    await page.reload();
+    await openView(page, "Ledger");
+    await expect(page.locator(".plannedBadge")).toHaveCount(2);
+    await uploadCsv(page, ["Date,Description,Debit,Credit", "12/11/2026,223231 HSBCBANKPLC,250.00,"].join("\r\n"));
+    await page.getByRole("dialog", { name: "bank.csv" }).getByRole("button", { name: /^Import \d/ }).click();
+    await expect(page.locator(".plannedBadge")).toHaveCount(1);
+    await expect.poll(() => inputValues(page, "input[aria-label='Expense name']")).toContain("Car loan payment");
+    await expect.poll(async () => (await inputValues(page, "input[aria-label='Expense name']")).length).toBe(2);
+  });
+
   test("explains health score, flags financial anomalies, and switches insight charts", async ({ page }) => {
     await openLedger(page);
     await addIncome(page, "Salary", 2000);

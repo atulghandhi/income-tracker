@@ -162,6 +162,100 @@ export function googleCalendarReminderUrl({ dayOfMonth, bankSlug, today = new Da
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
+// ── Debt payment reminders ───────────────────────────────────────────────────
+//
+// One repeating event per debt on its due day, with an alert at 9am two days before so there is
+// time to move money. Due days past the 28th use "the last of these days that exists", so a
+// payment due on the 30th lands on the 28th/29th in February instead of skipping the month.
+
+export type DebtReminder = { id: string; name: string; dueDay: number; amountLabel: string | null };
+
+function dueDayRule(dueDay: number): string {
+  const day = Math.min(Math.max(1, Math.round(dueDay)), 31);
+  if (day <= 28) return `FREQ=MONTHLY;BYMONTHDAY=${day}`;
+  const days = Array.from({ length: day - 27 }, (_, index) => 28 + index).join(",");
+  return `FREQ=MONTHLY;BYMONTHDAY=${days};BYSETPOS=-1`;
+}
+
+// Next due date on or after today (clamped to the month's length).
+export function nextDueDate(dueDay: number, today = new Date()): Date {
+  const day = Math.min(Math.max(1, Math.round(dueDay)), 31);
+  const atMonth = (offset: number) => {
+    const last = new Date(today.getFullYear(), today.getMonth() + offset + 1, 0).getDate();
+    return new Date(today.getFullYear(), today.getMonth() + offset, Math.min(day, last));
+  };
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const candidate = atMonth(0);
+  return candidate >= startOfToday ? candidate : atMonth(1);
+}
+
+function ordinal(day: number) {
+  const mod100 = day % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${day}th`;
+  return `${day}${day % 10 === 1 ? "st" : day % 10 === 2 ? "nd" : day % 10 === 3 ? "rd" : "th"}`;
+}
+
+function debtReminderText(reminder: DebtReminder) {
+  const amount = reminder.amountLabel ? ` (${reminder.amountLabel})` : "";
+  return {
+    summary: `${reminder.name} payment due${amount}`,
+    description: `Your ${reminder.name} payment${amount} is due on the ${ordinal(reminder.dueDay)} of each month.\nOpen the tracker: ${SITE_URL}/?ref=debt-reminder`,
+  };
+}
+
+export function buildDebtRemindersIcs({ reminders, today = new Date() }: { reminders: DebtReminder[]; today?: Date }): string {
+  const stamp = `${ymd(new Date(today.getTime() - today.getTimezoneOffset() * 60000))}T${pad(today.getUTCHours())}${pad(today.getUTCMinutes())}00Z`;
+  const events = reminders.flatMap((reminder) => {
+    const start = nextDueDate(reminder.dueDay, today);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+    const { summary, description } = debtReminderText(reminder);
+    return [
+      "BEGIN:VEVENT",
+      // Stable per account, so re-importing the file updates the event instead of duplicating it.
+      `UID:debt-${reminder.id}@theincometracker.com`,
+      `DTSTAMP:${stamp}`,
+      `DTSTART;VALUE=DATE:${ymd(start)}`,
+      `DTEND;VALUE=DATE:${ymd(end)}`,
+      `RRULE:${dueDayRule(reminder.dueDay)}`,
+      `SUMMARY:${icsEscape(summary)}`,
+      `DESCRIPTION:${icsEscape(description)}`,
+      `URL:${SITE_URL}/?ref=debt-reminder`,
+      "BEGIN:VALARM",
+      "TRIGGER:-P1DT15H",
+      "ACTION:DISPLAY",
+      `DESCRIPTION:${icsEscape(summary)}`,
+      "END:VALARM",
+      "END:VEVENT",
+    ];
+  });
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//The Income Tracker//Debt payment reminders//EN",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    ...events,
+    "END:VCALENDAR",
+  ];
+  return `${lines.map(icsFold).join("\r\n")}\r\n`;
+}
+
+export function googleCalendarDebtReminderUrl({ reminder, today = new Date() }: { reminder: DebtReminder; today?: Date }): string {
+  const start = nextDueDate(reminder.dueDay, today);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  const { summary, description } = debtReminderText(reminder);
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: summary,
+    details: description,
+    dates: `${ymd(start)}/${ymd(end)}`,
+    recur: `RRULE:${dueDayRule(reminder.dueDay)}`,
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
 // ── Install prompt ───────────────────────────────────────────────────────────
 
 export function isStandalone(): boolean {

@@ -39,6 +39,11 @@ export type ExpenseEntry = {
   // replaces that account's scheduled monthly payment in the balance roll-forward — so an
   // imported overpayment reduces the debt by the real amount instead of the scheduled one.
   debtAccountId?: string;
+  // Set on the row the app adds each month from a debt account's scheduled payment. It is a
+  // placeholder for the real payment: the first actual payment linked to the same account in
+  // that month (an import, or a row the user typed) replaces it. Editing its amount confirms it
+  // as the actual payment. See syncScheduledDebtPayments.
+  scheduledPayment?: boolean;
   seededFrom?: SeededFromRef;
   categorySource?: CategorySource;
 };
@@ -155,6 +160,10 @@ export type Account = {
   // monthly payment (or that month's linked ledger payments) and charging interest along the
   // way. Editing the balance re-anchors to the current month.
   balanceAsOf: string;
+  // Debt only: months ("YYYY-MM") the user removed the scheduled payment row from the ledger,
+  // meaning "not paying this one". The roll-forward charges no payment for them and the ledger
+  // does not re-add the row.
+  skippedPaymentMonths?: string[];
   // Shared.
   includeInNetWorth: boolean;
   color: string;

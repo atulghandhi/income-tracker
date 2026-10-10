@@ -166,12 +166,15 @@ struct DashboardScreen: View {
         let horizon = selectedHorizon
         let points = await Task.detached(priority: .userInitiated) {
             FinanceEngine.netWorthOutlook(
-                accounts: FinanceEngine.rollForwardDebtBalances(accounts: state.accounts, months: state.months),
+                accounts: FinanceEngine.deriveLiveAccounts(accounts: state.accounts, months: state.months),
                 recurringMonthlySurplus: FinanceEngine.projection(
                     for: state.months[state.selectedMonth] ?? .empty
                 ).recurringMonthlySurplus,
                 horizonMonths: horizon,
-                assumedInvestmentReturn: state.assumedInvestmentReturn
+                assumedInvestmentReturn: state.assumedInvestmentReturn,
+                linkedDebtPayments: FinanceEngine.recurringDebtPaymentsByAccount(
+                    state.months[state.selectedMonth] ?? .empty
+                )
             )
         }.value
         guard !Task.isCancelled else { return }

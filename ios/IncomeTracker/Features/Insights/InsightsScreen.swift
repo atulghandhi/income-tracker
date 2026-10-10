@@ -143,7 +143,7 @@ struct InsightsScreen: View {
         let todayIso = isoDateString(Date())
 
         let result = await Task.detached(priority: .userInitiated) {
-            let accounts = FinanceEngine.rollForwardDebtBalances(accounts: state.accounts, months: state.months)
+            let accounts = FinanceEngine.deriveLiveAccounts(accounts: state.accounts, months: state.months)
             let proj = FinanceEngine.projection(for: month)
             let h = FinanceEngine.healthScore(
                 month: month,
@@ -162,7 +162,8 @@ struct InsightsScreen: View {
                 accounts: accounts,
                 recurringMonthlySurplus: proj.recurringMonthlySurplus,
                 horizonMonths: horizon,
-                assumedInvestmentReturn: state.assumedInvestmentReturn
+                assumedInvestmentReturn: state.assumedInvestmentReturn,
+                linkedDebtPayments: FinanceEngine.recurringDebtPaymentsByAccount(month)
             )
             let subs = Recurrence.detectSubscriptions(state)
             let missedNow = Recurrence.findMissed(state, todayIso: todayIso)

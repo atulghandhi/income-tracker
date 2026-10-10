@@ -661,6 +661,33 @@ final class DebtRollForwardTests: XCTestCase {
         XCTAssertEqual(live[0].promoAsOf, "2026-04")
     }
 
+    func testSkippedMonthChargesNoPayment() {
+        var loan = debtAccount(type: .loan, creditLimit: 0)
+        loan.skippedPaymentMonths = ["2026-02"]
+        let rolled = FinanceEngine.rollForwardDebtBalances(
+            accounts: [loan], months: [:], currentMonthKey: "2026-03"
+        )
+        // Feb skipped, Mar paid: 1000 - 100.
+        XCTAssertEqual(rolled[0].balance, 900, accuracy: 0.001)
+    }
+
+    func testOutlookDoesNotTakeLinkedLedgerPaymentTwice() {
+        let loan = debtAccount(balance: 6000, minimumPayment: 500, type: .loan, creditLimit: 0)
+        let month = MonthBudget(expenses: [
+            ExpenseEntry(id: "e", name: "Loan", category: "Debt payments", amount: 500, color: "#000",
+                         recurring: true, debtAccountId: loan.id, scheduledPayment: true),
+        ])
+        let points = FinanceEngine.netWorthOutlook(
+            accounts: [loan],
+            recurringMonthlySurplus: 2000 - 500,
+            horizonMonths: 1,
+            assumedInvestmentReturn: 0,
+            linkedDebtPayments: FinanceEngine.recurringDebtPaymentsByAccount(month)
+        )
+        XCTAssertEqual(points[1].netWorth, -6000 + 2000, accuracy: 0.01)
+        XCTAssertEqual(points[1].debtBalance, 5500, accuracy: 0.01)
+    }
+
     func testRollForwardChargesAprOnceWindowEnds() {
         // 2 months of 0% entered in January: Feb and Mar are free, Apr is charged.
         let card = debtAccount(rate: 12, promoMonths: 2, promoAsOf: "2026-01")

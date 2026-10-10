@@ -4,6 +4,7 @@ import LandingPage from "./LandingPage";
 import Onboarding, { type OnboardingResult } from "./Onboarding";
 import type { CSSProperties, Dispatch, DragEvent, FormEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode, Ref, SetStateAction } from "react";
 import {
+  Clock3,
   AlertCircle,
   ArrowDown,
   ArrowUp,
@@ -76,6 +77,7 @@ import {
   isValidMonthKey,
   deriveLiveAccounts,
   estimateDebtPayoff,
+  recurringDebtPaymentsByAccount,
   runGoalSequence,
   seedMonthFromPrevious,
   shiftMonth,
@@ -85,10 +87,11 @@ import { buildRulePattern, canonicalizeMerchant, descriptionMatchesPattern, isTr
 import { buildMerchantMemory } from "./merchantMemory";
 import { countSameName, findRuleTargeting, normalizeNameRules, renameEverywhere, type NameKind } from "./nameRules";
 import { parseQuickAdd } from "./quickAdd";
+import { matchDebtPaymentRows, skipScheduledPayment, syncScheduledDebtPayments } from "./debtSync";
 import { applyRecurringFlag, detectSubscriptions, findMissedRecurring, reconcileSeededEntries, suggestRecurringFlags, type RecurrenceCandidate } from "./recurrence";
 import { aiCategorizeRows, applyAiSuggestions, isAiCategorizationAvailable, testAiConnection } from "./aiCategorize";
 import { bucketCount, identifyAnalytics, track } from "./analytics";
-import { InstallBanner, MonthlyReminderPanel, NewMonthNudge } from "./RetentionPanels";
+import { DebtRemindersPanel, InstallBanner, MonthlyReminderPanel, NewMonthNudge } from "./RetentionPanels";
 import {
   INSTALL_DISMISSED_KEY,
   NUDGE_DISMISSED_KEY,
@@ -567,8 +570,9 @@ function App() {
         accounts: effectiveAccounts,
         projection,
         months: netWorthHorizon,
+        linkedDebtPayments: recurringDebtPaymentsByAccount(currentMonth),
       }),
-    [effectiveAccounts, netWorthHorizon, projection],
+    [effectiveAccounts, netWorthHorizon, projection, currentMonth],
   );
   const categoryRows = useMemo(() => buildCategoryRows(currentMonth, projection), [currentMonth, projection]);
   const expenseGroups = useMemo(() => buildExpenseGroups(currentMonth.expenses), [currentMonth.expenses]);
@@ -1066,8 +1070,10 @@ function App() {
   }, [categoryMenu]);
 
   function updateLedger(updater: (current: LedgerState) => LedgerState) {
+    // Every change re-syncs scheduled debt payments, so an account edit, a new month, or an
+    // import that brings in the real payment all leave exactly one payment row per debt.
     setLedger((current) => ({
-      ...updater(current),
+      ...syncScheduledDebtPayments(updater(current)),
       lastSavedAt: new Date().toISOString(),
     }));
   }
@@ -1240,7 +1246,12 @@ function App() {
   function updateExpense(id: string, patch: Partial<ExpenseEntry>) {
     updateCurrentMonth((month) => ({
       ...month,
-      expenses: month.expenses.map((expense) => (expense.id === id ? { ...expense, ...patch } : expense)),
+      expenses: month.expenses.map((expense) => {
+        if (expense.id !== id) return expense;
+        // Typing a different amount into a planned debt payment confirms what was actually paid.
+        const confirms = expense.scheduledPayment && "amount" in patch && patch.amount !== expense.amount;
+        return { ...expense, ...patch, ...(confirms ? { scheduledPayment: false } : {}) };
+      }),
     }));
   }
 
@@ -1292,6 +1303,23 @@ function App() {
 
   function removeExpense(id: string) {
     const entry = currentMonth.expenses.find((expense) => expense.id === id);
+    if (entry?.scheduledPayment && entry.debtAccountId) {
+      // A planned debt payment comes from the account, not from last month's row. Removing it
+      // means "not paying this one this month"; the account's monthly payment stays as it was.
+      const accountId = entry.debtAccountId;
+      const accountName = ledger.accounts.find((account) => account.id === accountId)?.name ?? "this account";
+      updateLedger((current) => {
+        const skipped = skipScheduledPayment(current, accountId, current.selectedMonth);
+        const month = skipped.months[current.selectedMonth];
+        if (!month) return skipped;
+        return {
+          ...skipped,
+          months: { ...skipped.months, [current.selectedMonth]: { ...month, expenses: month.expenses.filter((expense) => expense.id !== id) } },
+        };
+      });
+      setToast(`Skipped ${accountName} for ${formatMonth(ledger.selectedMonth)}. Set its monthly payment to 0 on Accounts to stop it.`);
+      return;
+    }
     updateLedger((current) => stopSeededRepeat(current, entry?.seededFrom, "expense"));
     updateCurrentMonth((month) => ({
       ...month,
@@ -1834,7 +1862,7 @@ function App() {
     });
     setImportReview({
       fileName: BANK_FEED_SOURCE_NAME,
-      rows: review.rows,
+      rows: matchDebtPaymentRows(review.rows, effectiveAccounts, moneyFormatter),
       errors: [],
       totalRows: review.total,
       signInverted: false,
@@ -1886,7 +1914,7 @@ function App() {
     });
     setImportReview({
       fileName: sourceName,
-      rows: result.rows,
+      rows: matchDebtPaymentRows(result.rows, effectiveAccounts, moneyFormatter),
       errors: result.errors,
       totalRows: result.totalRows,
       signInverted: Boolean(result.signInverted),
@@ -3167,6 +3195,22 @@ function App() {
                     )}
                   </div>
                 </article>
+
+                <DebtRemindersPanel
+                  reminders={effectiveAccounts
+                    .filter((account) => account.accountClass === "debt" && account.balance > 0)
+                    .map((account) => ({
+                      id: account.id,
+                      name: account.name,
+                      dueDay: clampDueDay(account.dueDay),
+                      amountLabel: !ledger.privacyMode && account.minimumPayment > 0 ? moneyFormatter.format(account.minimumPayment) : null,
+                    }))}
+                  onDownloadIcs={(name, contents) => {
+                    downloadFile(name, contents, "text/calendar");
+                    setToast("Reminders saved. Open the file to add them to your calendar.");
+                  }}
+                  onReminderAdded={(method) => track("reminder_added", { method, kind: "debt" })}
+                />
 
                 <AccountEditor
                   draft={accountDraft}
@@ -5166,7 +5210,7 @@ function ExpenseRow({
 
   return (
     <div
-      className={`financeRow expenseRow ${dragging ? "dragging" : ""} ${grouping ? "groupingSource" : ""} ${dropClass}`}
+      className={`financeRow expenseRow ${expense.scheduledPayment ? "isPlanned" : ""} ${dragging ? "dragging" : ""} ${grouping ? "groupingSource" : ""} ${dropClass}`}
       data-expense-name={expense.name}
       data-expense-id={expense.id}
       draggable
@@ -5205,7 +5249,18 @@ function ExpenseRow({
       />
       <span className={privacy ? "rowTotal masked" : "rowTotal"}>{formatter.format(expense.amount)}</span>
       <div className="rowActions">
-        {linkedAccountName && (
+        {expense.scheduledPayment && (
+          <span
+            className="plannedBadge"
+            aria-label={`Planned from ${linkedAccountName ?? "your debt account"}. Your real payment replaces it when you import your statement, or type the amount you paid.`}
+            data-tip={`Planned from ${linkedAccountName ?? "your debt account"}. Your real payment replaces it when you import your statement, or type the amount you paid.`}
+          >
+            <Clock3 size={15} />
+          </span>
+        )}
+        {/* A planned row always repeats (it comes from the account), and its clock already names
+            the account, so it shows neither the link badge nor the repeat toggle. */}
+        {linkedAccountName && !expense.scheduledPayment && (
           <span
             className="debtLinkBadge"
             aria-label={`Counts as a payment towards ${linkedAccountName}`}
@@ -5214,11 +5269,13 @@ function ExpenseRow({
             <CreditCard size={15} />
           </span>
         )}
-        <RecurringToggle
-          recurring={expense.recurring}
-          kind="expense"
-          onToggle={() => onChange({ recurring: !expense.recurring })}
-        />
+        {!expense.scheduledPayment && (
+          <RecurringToggle
+            recurring={expense.recurring}
+            kind="expense"
+            onToggle={() => onChange({ recurring: !expense.recurring })}
+          />
+        )}
         <button className="iconButton rowAction" type="button" onClick={onRemove} aria-label="Remove expense">
           <Trash2 size={17} />
         </button>
@@ -5328,11 +5385,11 @@ function AccountRow({
         <InfoHint label={`Rate help for ${account.name}`} text={rateHelp(account.accountClass)} />
       </label>
       <label className="numberField compact hintField interestFreeField">
-        <span className="fieldLabel">{isDebt ? "0% months" : "Intro months"}</span>
+        <span className="fieldLabel">{isDebt ? "Promo months" : "Intro months"}</span>
         <input
           value={String(account.promoMonths)}
           inputMode="numeric"
-          placeholder={isDebt ? "0% months left" : "Intro months left"}
+          placeholder={isDebt ? "Promo months left" : "Intro months left"}
           onChange={(event) => onChange({ promoMonths: clampWholeNumber(Number(event.target.value) || 0, 120) })}
           aria-label={`Promo months for ${account.name}`}
         />
@@ -5340,7 +5397,7 @@ function AccountRow({
           label={`Promo period help for ${account.name}`}
           text={
             isDebt
-              ? "Months left before APR starts applying. It counts down by itself each month, and the forecast delays interest until then."
+              ? "Months left on a 0% or balance-transfer rate before the APR applies. It counts down by itself each month, and the forecast uses the promo rate until then."
               : "Months left on an intro rate before the standard rate takes over. It counts down by itself each month. Leave blank if none."
           }
         />
@@ -5359,6 +5416,20 @@ function AccountRow({
               onChange={(value) => onChange({ minimumPayment: Math.max(0, Number(value) || 0) })}
             />
           </div>
+          <label className="numberField compact hintField debtPromoRateField">
+            <span className="fieldLabel">Promo rate %</span>
+            <input
+              value={String(account.promoRate)}
+              inputMode="decimal"
+              placeholder="Promo rate %"
+              onChange={(event) => onChange({ promoRate: Math.max(0, Number(event.target.value) || 0) })}
+              aria-label={`Promo rate for ${account.name}`}
+            />
+            <InfoHint
+              label={`Promo rate help for ${account.name}`}
+              text="The rate during the promo months: 0 for an interest-free card, or the deal rate for a balance transfer (e.g. 2.9)."
+            />
+          </label>
           <label className="numberField compact hintField dueField">
             <span className="fieldLabel">Due day</span>
             <input value={String(account.dueDay)} inputMode="numeric" placeholder="Due day (1-31)" onChange={(event) => onChange({ dueDay: clampDueDay(Number(event.target.value) || 1) })} aria-label={`Due day for ${account.name}`} />
@@ -5476,7 +5547,7 @@ function AccountEditor({
           <input
             value={draft.promoMonths}
             inputMode="numeric"
-            placeholder={isDebt ? "Interest-free months left" : "Intro rate months (optional)"}
+            placeholder={isDebt ? "Promo months left (0% or balance transfer)" : "Intro rate months (optional)"}
             onChange={(event) => setDraft((current) => ({ ...current, promoMonths: event.target.value }))}
             aria-label="Promo months"
           />
@@ -5492,6 +5563,16 @@ function AccountEditor({
 
         {isDebt ? (
           <>
+            <label className="numberField hintField">
+              <input
+                value={draft.promoRate}
+                inputMode="decimal"
+                placeholder="Promo rate % (0 if interest-free)"
+                onChange={(event) => setDraft((current) => ({ ...current, promoRate: event.target.value }))}
+                aria-label="Promo rate"
+              />
+              <InfoHint label="Promo rate help" text="The rate during the promo months: 0 for an interest-free card, or the deal rate for a balance transfer (e.g. 2.9)." />
+            </label>
             {draft.type !== "loan" && (
               <MoneyInput
                 ariaLabel="Credit limit"
@@ -6671,7 +6752,13 @@ function useAnimatedNumber(value: number) {
   return display;
 }
 
+// Loaded state gets the same scheduled-debt-payment sync as every edit, so a new month opened
+// on load already carries this month's planned payments.
 function normalizeState(rawState: Partial<LedgerState>): LedgerState {
+  return syncScheduledDebtPayments(normalizeStateFields(rawState));
+}
+
+function normalizeStateFields(rawState: Partial<LedgerState>): LedgerState {
   const fallback = createInitialState();
 
   // ── v6 → v7 migration: single `goal` → `goals[]` ──
@@ -6925,6 +7012,7 @@ function normalizeAccounts(state: Partial<LedgerState>): Account[] {
       balanceAsOf: isValidMonthKey(item?.balanceAsOf) ? item.balanceAsOf : getMonthKey(),
       // Promo counts saved before they ticked down start counting from the month this loads.
       promoAsOf: isValidMonthKey(item?.promoAsOf) ? item.promoAsOf : getMonthKey(),
+      skippedPaymentMonths: Array.isArray(item?.skippedPaymentMonths) ? item.skippedPaymentMonths.filter(isValidMonthKey) : undefined,
       includeInNetWorth: item?.includeInNetWorth !== false,
       color: item?.color || colors[index % colors.length],
       note: item?.note ?? "",

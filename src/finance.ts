@@ -373,7 +373,8 @@ export function rollForwardDebtBalances({
     for (let step = 1; step <= steps && balance > 0; step += 1) {
       const monthKey = shiftMonth(anchor, step);
       const linkedTotal = paymentsByMonth?.get(monthKey) ?? 0;
-      const payment = linkedTotal > 0 ? linkedTotal : scheduledPayment;
+      const skipped = account.skippedPaymentMonths?.includes(monthKey) ?? false;
+      const payment = linkedTotal > 0 ? linkedTotal : skipped ? 0 : scheduledPayment;
       if (payment <= 0) continue;
 
       // Each elapsed month is priced at the rate in force that month, so a 0% window that ran
@@ -472,17 +473,37 @@ export function estimateDebtPayoff(account: Account): {
 // So contributions and debt payments are modelled as transfers out of a "cash" bucket, never as
 // extra inflows/outflows. Leftover surplus collects in that cash bucket (which may go negative,
 // representing drawing down reserves).
+// Recurring ledger rows linked to a debt account, summed per account. These are the same money
+// as the account's monthly payment, seen from the ledger side.
+export function recurringDebtPaymentsByAccount(month: MonthBudget): Record<string, number> {
+  const byAccount: Record<string, number> = {};
+  month.expenses.forEach((expense) => {
+    if (!expense.debtAccountId || !isRecurring(expense)) return;
+    byAccount[expense.debtAccountId] = (byAccount[expense.debtAccountId] ?? 0) + Math.max(0, Number(expense.amount) || 0);
+  });
+  return byAccount;
+}
+
 export function buildNetWorthOutlook({
   accounts,
   projection,
   months,
   startDate = new Date(),
+  linkedDebtPayments = {},
 }: {
   accounts: Account[];
   projection: Projection;
   months: number;
   startDate?: Date;
+  // From recurringDebtPaymentsByAccount(month). A debt payment in the ledger already lowers the
+  // recurring surplus; without this the forecast would also pay the debt out of cash, taking the
+  // same money twice. Linked accounts pay the ledger amount, and that amount is added back.
+  linkedDebtPayments?: Record<string, number>;
 }): NetWorthPoint[] {
+  const debtIds = new Set(accounts.filter((account) => account.accountClass === "debt").map((account) => account.id));
+  const linkedBack = Object.entries(linkedDebtPayments)
+    .filter(([id]) => debtIds.has(id))
+    .reduce((sum, [, amount]) => sum + Math.max(0, amount), 0);
   const working = accounts.map((account) => ({
     accountClass: account.accountClass,
     balance: Math.max(0, Number(account.balance || 0)),
@@ -490,7 +511,10 @@ export function buildNetWorthOutlook({
     promoRate: Number(account.promoRate || 0),
     promoMonths: Math.max(0, Math.round(Number(account.promoMonths || 0))),
     contribution: Math.max(0, Number(account.monthlyContribution || 0)),
-    payment: Math.max(0, Number(account.minimumPayment || 0)),
+    payment:
+      account.accountClass === "debt" && account.id in linkedDebtPayments
+        ? Math.max(0, linkedDebtPayments[account.id])
+        : Math.max(0, Number(account.minimumPayment || 0)),
     includeInNetWorth: account.includeInNetWorth !== false,
   }));
 
@@ -505,7 +529,7 @@ export function buildNetWorthOutlook({
     if (monthIndex > 0) {
       // 1. Fresh surplus arrives. Only the recurring run rate repeats month to month — a one-off
       //    expense or windfall this month should not be extrapolated across the whole forecast.
-      unallocatedCash += projection.recurringMonthlySurplus;
+      unallocatedCash += projection.recurringMonthlySurplus + linkedBack;
 
       // 2. Route contributions into asset accounts (transfer out of cash — net worth unchanged).
       working.forEach((account) => {

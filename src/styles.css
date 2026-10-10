@@ -1214,6 +1214,21 @@ textarea::placeholder {
   opacity: 0.8;
 }
 
+/* A debt payment the ledger added from the account's schedule, waiting for the real one. */
+.plannedBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--muted);
+}
+
+.expenseRow.isPlanned .rowTotal {
+  color: var(--muted);
+  font-style: italic;
+}
+
 .importDebtAccountSelect {
   display: block;
   width: 100%;
@@ -1445,6 +1460,8 @@ textarea:focus,
 }
 
 .expenseGroup:not(.ungrouped) .expenseRow {
+  /* The extra indent comes out of the name column, so the row actions never clip at narrow widths. */
+  grid-template-columns: 24px minmax(120px, 1fr) 132px 98px auto;
   padding-left: 40px;
   border-bottom-color: rgba(var(--line-rgb), 0.055);
   background:
@@ -2048,6 +2065,18 @@ textarea:focus,
 
 .dueField {
   grid-area: due;
+}
+
+/* Debt rows split the promo row: months on the left, the promo (or balance-transfer) rate beside it. */
+.debtAccountRow.isDebt {
+  grid-template-areas:
+    "swatch main balance minimum remove"
+    "swatch meta limit apr due"
+    "swatch meta interest promo due";
+}
+
+.debtPromoRateField {
+  grid-area: promo;
 }
 
 /* Asset rows reuse the debt grid; the promo-rate input sits where a debt's due-day would. */
@@ -4210,6 +4239,19 @@ hr {
     row-gap: 12px;
   }
 
+  .debtAccountRow.isDebt {
+    grid-template-areas:
+      "swatch main remove"
+      "meta meta meta"
+      "balance balance balance"
+      "limit limit limit"
+      "minimum minimum minimum"
+      "apr apr apr"
+      "interest interest interest"
+      "promo promo promo"
+      "due due due";
+  }
+
   /* Each stacked field gets a label above a full-width control on phones,
      instead of the cramped label-beside-input used on wide screens. */
   .debtAccountRow .debtField,
@@ -4276,6 +4318,7 @@ hr {
   }
 
   .expenseGroup:not(.ungrouped) .expenseRow {
+    grid-template-columns: 1fr;
     padding: 14px 14px 14px 24px;
   }
 
@@ -6175,4 +6218,63 @@ hr {
   font-variant-numeric: tabular-nums;
   font-size: 14px;
   padding-top: 6px;
+}
+
+/* Accounts page: one row per debt, with its own Google Calendar link. */
+.debtRemindersPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.debtRemindersPanel .panelTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.debtRemindersPanel .panelTitleRow h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.debtRemindersPanel p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.debtRemindersPanel .commandButton {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.debtReminderList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.debtReminderList li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.debtReminderList li > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.debtReminderList small {
+  color: var(--muted);
+  font-size: 12px;
 }
