@@ -1189,7 +1189,7 @@ textarea::placeholder {
 }
 
 .incomeRow {
-  grid-template-columns: 24px 42px minmax(140px, 1fr) 150px auto;
+  grid-template-columns: 24px 22px minmax(140px, 1fr) 150px auto;
 }
 
 .expenseRow {
@@ -4318,7 +4318,6 @@ hr {
   }
 
   .expenseGroup:not(.ungrouped) .expenseRow {
-    grid-template-columns: 1fr;
     padding: 14px 14px 14px 24px;
   }
 
@@ -4331,7 +4330,12 @@ hr {
   }
 
   .incomeRow {
-    grid-template-columns: 28px 40px 1fr;
+    grid-template-columns: 28px 22px 1fr;
+  }
+
+  .expenseRow,
+  .expenseGroup:not(.ungrouped) .expenseRow {
+    padding-left: 30px;
   }
 
   .incomeRow .moneyInput,
@@ -6287,4 +6291,172 @@ hr {
 .debtReminderList small {
   color: var(--muted);
   font-size: 12px;
+}
+
+/* ─── Accounts in the ledger ──────────────────────────────────────────────── */
+
+/* A transaction's account, as a dot in the account's colour. Click to move it to the next one. */
+.accountDot {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 2px solid rgba(var(--surface-rgb), 0.9);
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px rgba(var(--ink-rgb), 0.14);
+  cursor: pointer;
+  justify-self: center;
+  transition: transform 120ms ease;
+}
+
+.accountDot:hover {
+  transform: scale(1.18);
+}
+
+.accountDot.empty {
+  background: transparent;
+  box-shadow: none;
+  border: 0;
+  cursor: default;
+}
+
+.accountDot.static {
+  cursor: inherit;
+  flex: 0 0 auto;
+}
+
+.motion-off .accountDot {
+  transition: none;
+}
+
+.accountToast {
+  /* Sits above the sticky annual summary bar rather than over it. */
+  bottom: 72px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 650;
+}
+
+.accountToastDot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
+}
+
+.notesBand .ledgerAccountsPanel {
+  align-items: start;
+}
+
+.ledgerAccountsColumn,
+.ledgerNotesColumn {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.ledgerAccountList {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ledgerAccountItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ledgerAccountItem:hover,
+.ledgerAccountItem[aria-expanded="true"] {
+  background: rgba(var(--ink-rgb), 0.04);
+}
+
+.ledgerAccountName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ledgerAccountItem strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.ledgerAccountConfirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 10px 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(var(--surface-higher-rgb), 0.8);
+  box-shadow: var(--shadow-sm);
+  font-size: 13px;
+}
+
+.ledgerAccountConfirm span {
+  flex: 1;
+  min-width: 140px;
+}
+
+.ledgerDefaultAccount {
+  display: grid;
+  gap: 4px;
+}
+
+.ledgerDefaultAccount > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.importAccountField {
+  align-items: center;
+}
+
+.importAccountField select {
+  min-width: 160px;
+}
+
+@media (max-width: 900px) {
+  .notesBand .ledgerAccountsPanel {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Expense rows keep their columns; the account dot sits in the row's left padding. */
+.expenseRow > .accountDot {
+  position: absolute;
+  top: 50%;
+  left: 5px;
+  margin-top: -8px;
+}
+
+.expenseGroup:not(.ungrouped) .expenseRow > .accountDot {
+  left: 16px;
+}
+
+@media (max-width: 680px) {
+  .expenseRow > .accountDot,
+  .expenseGroup:not(.ungrouped) .expenseRow > .accountDot {
+    top: 26px;
+    left: 8px;
+    margin-top: 0;
+  }
 }

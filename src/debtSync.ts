@@ -1,3 +1,4 @@
+import { defaultPayingAccountId } from "./accountFlow";
 import { clampDueDay, colors, createId, deriveLiveAccounts, getMonthKey } from "./finance";
 import type { CsvImportRow } from "./importer";
 import type { Account, ExpenseEntry, LedgerState, MonthBudget } from "./types";
@@ -96,6 +97,7 @@ function syncMonth(
   accounts: Account[],
   liveBalanceById: Map<string, number>,
   currentMonthKey: string,
+  payFromAccountId: string | undefined,
 ): MonthBudget {
   const isCurrentOrFuture = monthKey >= currentMonthKey;
   let expenses = month.expenses;
@@ -167,6 +169,9 @@ function syncMonth(
           date: dueDateIn(monthKey, account.dueDay),
           debtAccountId: account.id,
           scheduledPayment: true,
+          // Paid out of the default money account (usually the current account) unless moved; with
+          // no money account, from the debt itself, so only the debt side counts.
+          accountId: payFromAccountId ?? account.id,
           categorySource: "system",
         };
 
@@ -196,7 +201,7 @@ export function syncScheduledDebtPayments(state: LedgerState, currentMonthKey = 
   let changed = false;
   const months: Record<string, MonthBudget> = {};
   for (const [monthKey, month] of Object.entries(state.months)) {
-    const next = syncMonth(monthKey, month, state.accounts, liveBalanceById, currentMonthKey);
+    const next = syncMonth(monthKey, month, state.accounts, liveBalanceById, currentMonthKey, defaultPayingAccountId(state));
     if (next !== month) changed = true;
     months[monthKey] = next;
   }

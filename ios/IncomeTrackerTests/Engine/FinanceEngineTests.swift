@@ -717,6 +717,32 @@ final class DebtRollForwardTests: XCTestCase {
         XCTAssertEqual(linked.dedicatedMonthly["house"] ?? 0, 300, accuracy: 0.001)
     }
 
+    func testLedgerTransactionsMoveTheirAccount() {
+        var current = debtAccount(balance: 1000, minimumPayment: 0, type: .current, creditLimit: 0)
+        current.accountClass = .cash
+        current.id = "current"
+        current.balanceSetOn = "2026-01-01"
+        var card = debtAccount(balance: 200, minimumPayment: 0)
+        card.id = "card"
+        card.balanceSetOn = "2026-01-01"
+        let month = MonthBudget(
+            incomes: [IncomeEntry(id: "i", source: "Salary", amount: 2000, color: "#000", recurring: true,
+                                  date: "2026-01-05", accountId: "current")],
+            expenses: [
+                ExpenseEntry(id: "e1", name: "Tesco", category: "Food", amount: 40, color: "#000", recurring: false,
+                             date: "2026-01-06", accountId: "card"),
+                // Dated after "today": not counted yet.
+                ExpenseEntry(id: "e2", name: "Rent", category: "Home", amount: 900, color: "#000", recurring: true,
+                             date: "2026-01-28", accountId: "current"),
+            ]
+        )
+        let live = FinanceEngine.deriveLiveAccounts(
+            accounts: [current, card], months: ["2026-01": month], currentMonthKey: "2026-01", todayIso: "2026-01-10"
+        )
+        XCTAssertEqual(live[0].balance, 3000, accuracy: 0.001)
+        XCTAssertEqual(live[1].balance, 240, accuracy: 0.001)
+    }
+
     func testRollForwardChargesAprOnceWindowEnds() {
         // 2 months of 0% entered in January: Feb and Mar are free, Apr is charged.
         let card = debtAccount(rate: 12, promoMonths: 2, promoAsOf: "2026-01")

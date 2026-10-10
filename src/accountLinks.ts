@@ -1,5 +1,5 @@
 import { nameMentionsAccount } from "./debtSync";
-import { effectiveContribution, getMonthKey, recurringAccountTransfersByAccount } from "./finance";
+import { deriveLiveAccounts, effectiveContribution, getMonthKey, recurringAccountTransfersByAccount } from "./finance";
 import type { Account, ExpenseEntry, LedgerState, MonthBudget, SavingsGoal } from "./types";
 
 // Keeps Goals, Accounts and the ledger agreeing about savings.
@@ -22,7 +22,9 @@ function currentRate(account: Account): number {
 
 export function syncLinkedGoals(state: LedgerState): LedgerState {
   if (!state.goals.some((goal) => goal.accountId)) return state;
-  const byId = new Map(state.accounts.filter(isAssetAccount).map((account) => [account.id, account]));
+  // Live balances: the account as the ledger has moved it, not the last typed figure.
+  const live = deriveLiveAccounts({ accounts: state.accounts, months: state.months });
+  const byId = new Map(live.filter(isAssetAccount).map((account) => [account.id, account]));
   let changed = false;
   const goals = state.goals.map((goal) => {
     if (!goal.accountId) return goal;

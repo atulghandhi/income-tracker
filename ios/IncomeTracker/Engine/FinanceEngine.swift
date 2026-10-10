@@ -297,14 +297,18 @@ enum FinanceEngine {
         }
     }
 
-    /// Port of `deriveLiveAccounts`: debt balances rolled forward and promo windows counted down.
+    /// Port of `deriveLiveAccounts`: debt balances rolled forward, moved by the ledger
+    /// transactions that belong to each account, and promo windows counted down.
     nonisolated static func deriveLiveAccounts(
         accounts: [Account],
         months: [String: MonthBudget],
-        currentMonthKey: String = getMonthKey()
+        currentMonthKey: String = getMonthKey(),
+        todayIso: String? = nil
     ) -> [Account] {
-        tickPromoWindows(
-            rollForwardDebtBalances(accounts: accounts, months: months, currentMonthKey: currentMonthKey),
+        let today = todayIso ?? (currentMonthKey == getMonthKey() ? isoDateString(Date()) : "\(currentMonthKey)-31")
+        let rolled = rollForwardDebtBalances(accounts: accounts, months: months, currentMonthKey: currentMonthKey)
+        return tickPromoWindows(
+            AccountFlow.applyFlows(accounts: rolled, months: months, todayIso: today),
             currentMonthKey: currentMonthKey
         )
     }

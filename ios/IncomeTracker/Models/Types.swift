@@ -105,6 +105,8 @@ public struct IncomeEntry: Codable, Identifiable, Hashable, Sendable {
     public var recurring: Bool
     public var date: String?
     public var imported: ImportedTransactionMeta?
+    /// The account this money landed in; its balance moves with it. See `AccountFlow`.
+    public var accountId: String?
     public var seededFrom: SeededFromRef?
     /// Which layer decided the category ("user" is never overridden by automation).
     /// Mirrors CategorySource in src/types.ts; kept as a raw string for forward compatibility.
@@ -118,6 +120,7 @@ public struct IncomeEntry: Codable, Identifiable, Hashable, Sendable {
         recurring: Bool,
         date: String? = nil,
         imported: ImportedTransactionMeta? = nil,
+        accountId: String? = nil,
         seededFrom: SeededFromRef? = nil,
         categorySource: String? = nil
     ) {
@@ -128,12 +131,13 @@ public struct IncomeEntry: Codable, Identifiable, Hashable, Sendable {
         self.recurring = recurring
         self.date = date
         self.imported = imported
+        self.accountId = accountId
         self.seededFrom = seededFrom
         self.categorySource = categorySource
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, source, amount, color, recurring, date, imported, seededFrom, categorySource
+        case id, source, amount, color, recurring, date, imported, accountId, seededFrom, categorySource
     }
 
     /// Mirrors `normalizeMonths` in App.tsx. An empty colour is filled in by the
@@ -146,6 +150,7 @@ public struct IncomeEntry: Codable, Identifiable, Hashable, Sendable {
         color = c.lenientString(.color) ?? ""
         date = c.lenientNonEmptyString(.date)
         imported = c.lenientValue(ImportedTransactionMeta.self, .imported)
+        accountId = c.lenientNonEmptyString(.accountId)
         seededFrom = c.lenientValue(SeededFromRef.self, .seededFrom)
         categorySource = c.lenientNonEmptyString(.categorySource)
         // Migration: untagged manual entries become recurring, imported rows become one-off.
@@ -162,6 +167,8 @@ public struct ExpenseEntry: Codable, Identifiable, Hashable, Sendable {
     public var recurring: Bool
     public var date: String?
     public var imported: ImportedTransactionMeta?
+    /// The account this money left from (or, for a card, was spent on). See `AccountFlow`.
+    public var accountId: String?
     /// Links this payment to a debt account. For any month that has linked payments, their sum
     /// replaces that account's scheduled monthly payment in the balance roll-forward.
     public var debtAccountId: String?
@@ -184,6 +191,7 @@ public struct ExpenseEntry: Codable, Identifiable, Hashable, Sendable {
         recurring: Bool,
         date: String? = nil,
         imported: ImportedTransactionMeta? = nil,
+        accountId: String? = nil,
         debtAccountId: String? = nil,
         scheduledPayment: Bool? = nil,
         toAccountId: String? = nil,
@@ -198,6 +206,7 @@ public struct ExpenseEntry: Codable, Identifiable, Hashable, Sendable {
         self.recurring = recurring
         self.date = date
         self.imported = imported
+        self.accountId = accountId
         self.debtAccountId = debtAccountId
         self.scheduledPayment = scheduledPayment
         self.toAccountId = toAccountId
@@ -206,7 +215,7 @@ public struct ExpenseEntry: Codable, Identifiable, Hashable, Sendable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, name, category, amount, color, recurring, date, imported, debtAccountId, scheduledPayment, toAccountId, seededFrom, categorySource
+        case id, name, category, amount, color, recurring, date, imported, accountId, debtAccountId, scheduledPayment, toAccountId, seededFrom, categorySource
     }
 
     public init(from decoder: Decoder) throws {
@@ -218,6 +227,7 @@ public struct ExpenseEntry: Codable, Identifiable, Hashable, Sendable {
         color = c.lenientString(.color) ?? ""
         date = c.lenientNonEmptyString(.date)
         imported = c.lenientValue(ImportedTransactionMeta.self, .imported)
+        accountId = c.lenientNonEmptyString(.accountId)
         debtAccountId = c.lenientNonEmptyString(.debtAccountId)
         scheduledPayment = c.lenientOptionalBool(.scheduledPayment)
         toAccountId = c.lenientNonEmptyString(.toAccountId)
@@ -579,6 +589,10 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
     /// Debt only: months ("yyyy-MM") the user skipped the scheduled payment. The roll-forward
     /// charges no payment for them.
     public var skippedPaymentMonths: [String]?
+    /// Day ("yyyy-MM-dd") the balance was last typed; ledger rows dated from then move it.
+    public var balanceSetOn: String?
+    /// Cancels ledger movement that moved no money (already in the typed balance, or relabelled).
+    public var ledgerOffset: Double?
     /// Assets only: monthly surplus routed into this account.
     public var monthlyContribution: Double
     /// Debt only.
@@ -609,6 +623,8 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
         balanceAsOf: String? = nil,
         promoAsOf: String? = nil,
         skippedPaymentMonths: [String]? = nil,
+        balanceSetOn: String? = nil,
+        ledgerOffset: Double? = nil,
         includeInNetWorth: Bool,
         color: String,
         note: String
@@ -628,6 +644,8 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
         self.balanceAsOf = balanceAsOf
         self.promoAsOf = promoAsOf
         self.skippedPaymentMonths = skippedPaymentMonths
+        self.balanceSetOn = balanceSetOn
+        self.ledgerOffset = ledgerOffset
         self.includeInNetWorth = includeInNetWorth
         self.color = color
         self.note = note
@@ -636,7 +654,7 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
     enum CodingKeys: String, CodingKey {
         case id, name, accountClass, type, balance, rate, promoRate, promoMonths,
              monthlyContribution, creditLimit, minimumPayment, dueDay, balanceAsOf, promoAsOf,
-             skippedPaymentMonths, includeInNetWorth, color, note
+             skippedPaymentMonths, balanceSetOn, ledgerOffset, includeInNetWorth, color, note
     }
 
     /// Keys written by schema < 5 (`debts[]` entries) that still need to load.
@@ -675,6 +693,10 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
         promoAsOf = isValidMonthKey(storedPromoAsOf) ? storedPromoAsOf : getMonthKey()
         let skipped = c.lenientValue([String].self, .skippedPaymentMonths)?.filter { isValidMonthKey($0) }
         skippedPaymentMonths = (skipped?.isEmpty ?? true) ? nil : skipped
+        // Balances saved before the ledger moved them count as set today, so nothing jumps.
+        let setOn = c.lenientNonEmptyString(.balanceSetOn)
+        balanceSetOn = (setOn?.count == 10) ? setOn : isoDateString(Date())
+        ledgerOffset = c.lenientOptionalDouble(.ledgerOffset)
         includeInNetWorth = c.lenientOptionalBool(.includeInNetWorth) ?? true
         color = c.lenientString(.color) ?? ""
         note = c.lenientString(.note) ?? ""
@@ -700,6 +722,8 @@ public struct LedgerState: Codable, Hashable, Sendable {
     public var ledgerGoalId: String?
     public var savingsTarget: Double
     public var accounts: [Account]
+    /// Where new transactions go unless a better account is known (set on the web).
+    public var defaultAccountId: String?
     public var assumedInvestmentReturn: Double
     public var categoryRules: [CategoryRule]
     public var nameRules: [NameRule]
@@ -720,6 +744,7 @@ public struct LedgerState: Codable, Hashable, Sendable {
         ledgerGoalId: String?,
         savingsTarget: Double,
         accounts: [Account],
+        defaultAccountId: String? = nil,
         assumedInvestmentReturn: Double,
         categoryRules: [CategoryRule],
         nameRules: [NameRule] = [],
@@ -738,6 +763,7 @@ public struct LedgerState: Codable, Hashable, Sendable {
         self.ledgerGoalId = ledgerGoalId
         self.savingsTarget = savingsTarget
         self.accounts = accounts
+        self.defaultAccountId = defaultAccountId
         self.assumedInvestmentReturn = assumedInvestmentReturn
         self.categoryRules = categoryRules
         self.nameRules = nameRules
@@ -807,7 +833,7 @@ public struct LedgerState: Codable, Hashable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case schemaVersion, currency, selectedMonth, months, goals, goalPlannerSurplus,
-             goalsHorizonMonths, ledgerGoalId, savingsTarget, accounts, assumedInvestmentReturn,
+             goalsHorizonMonths, ledgerGoalId, savingsTarget, accounts, defaultAccountId, assumedInvestmentReturn,
              categoryRules, nameRules, importBatches, privacyMode, aiCategorizationEnabled, lastSavedAt
     }
 
@@ -897,6 +923,7 @@ public struct LedgerState: Codable, Hashable, Sendable {
             accounts[index].color = paletteColor(at: index)
         }
         self.accounts = accounts
+        defaultAccountId = c.lenientNonEmptyString(.defaultAccountId)
 
         assumedInvestmentReturn = c.lenientOptionalDouble(.assumedInvestmentReturn)
             .map { max(-50, min(50, $0)) } ?? DEFAULT_INVESTMENT_RETURN

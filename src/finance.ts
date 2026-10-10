@@ -1,3 +1,4 @@
+import { applyAccountFlows, isoToday } from "./accountFlow";
 import type {
   Account,
   AccountClass,
@@ -422,17 +423,23 @@ export function tickPromoWindows(accounts: Account[], currentMonthKey = getMonth
 }
 
 // The accounts every screen reads: debt balances rolled forward and promo windows counted down
-// to the current month. The stored ledger keeps the user's snapshots untouched.
+// to the current month, then moved by the ledger transactions that belong to each account
+// (see accountFlow.ts). The stored ledger keeps the user's snapshots untouched.
 export function deriveLiveAccounts({
   accounts,
   months,
   currentMonthKey = getMonthKey(),
+  todayIso,
 }: {
   accounts: Account[];
   months: Record<string, MonthBudget>;
   currentMonthKey?: string;
+  // Defaults to today when the current month is the real one, else the end of that month.
+  todayIso?: string;
 }): Account[] {
-  return tickPromoWindows(rollForwardDebtBalances({ accounts, months, currentMonthKey }), currentMonthKey);
+  const today = todayIso ?? (currentMonthKey === getMonthKey() ? isoToday() : `${currentMonthKey}-31`);
+  const rolled = rollForwardDebtBalances({ accounts, months, currentMonthKey });
+  return tickPromoWindows(applyAccountFlows(rolled, months, today), currentMonthKey);
 }
 
 // When a live debt (already rolled forward and promo-ticked) is cleared at its scheduled payment,

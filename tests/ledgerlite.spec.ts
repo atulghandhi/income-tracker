@@ -496,6 +496,55 @@ test.describe("Ledger", () => {
     await expect(page.getByLabel("Monthly surplus for goals")).toHaveValue("1700");
   });
 
+  test("every transaction belongs to an account and moves its balance", async ({ page }) => {
+    await page.clock.install({ time: new Date(2026, 9, 10) });
+    await page.goto("/");
+    await openView(page, "Accounts");
+    const editor = page.locator(".accountEditorPanel");
+    await editor.getByLabel("Account kind").selectOption("cash");
+    await editor.getByLabel("Account name").fill("Monzo");
+    await editor.getByLabel("Current balance").fill("1000");
+    await editor.getByRole("button", { name: "Add account" }).click();
+    await expect(page.getByLabel("Balance for Monzo")).toHaveValue("1000");
+    await editor.getByLabel("Account kind").selectOption("debt");
+    await editor.getByLabel("Account name").fill("Amex");
+    await editor.getByLabel("Current balance").fill("0");
+    await editor.getByLabel("Credit limit").fill("3000");
+    await editor.getByRole("button", { name: "Add account" }).click();
+    await expect(page.getByLabel("Balance for Amex")).toHaveValue("0");
+
+    await openView(page, "Ledger");
+    const panel = page.locator(".ledgerAccountsPanel");
+    await addExpense(page, "Tesco", 40);
+    // New spending goes to the default account, and its balance moves straight away.
+    await expect(page.getByRole("button", { name: "Tesco is in Monzo. Move to the next account" })).toBeVisible();
+    await expect(panel.getByRole("button", { name: /^Monzo/ })).toContainText("£960");
+
+    // Clicking the dot moves it (and its money) to the card, with a short toast naming the account.
+    await page.getByRole("button", { name: "Tesco is in Monzo. Move to the next account" }).click();
+    await expect(page.locator(".accountToast")).toHaveText("Amex");
+    await expect(page.locator(".accountToast")).toHaveCount(0, { timeout: 3000 });
+    await expect(panel.getByRole("button", { name: /^Monzo/ })).toContainText("£1,000");
+    await expect(panel.getByRole("button", { name: /^Amex/ })).toContainText("£40");
+
+    // Statement rows all go to the account picked for the file. (Rows dated before a balance was
+    // typed are already in it, so only ones from today on move it.)
+    await uploadCsv(page, ["Date,Description,Debit,Credit", "10/10/2026,Pret A Manger,10.00,"].join("\r\n"));
+    const dialog = page.getByRole("dialog", { name: "bank.csv" });
+    await dialog.getByLabel("Account these transactions belong to").selectOption({ label: "Amex" });
+    await dialog.getByRole("button", { name: /^Import \d/ }).click();
+    await expect(panel.getByRole("button", { name: /^Amex/ })).toContainText("£50");
+
+    // Category groups no longer carry a colour dot of their own.
+    await expect(page.locator(".expenseGroupHeader .swatch")).toHaveCount(0);
+
+    // Balances are read-only here: clicking one offers the Accounts page.
+    await panel.getByRole("button", { name: /^Monzo/ }).click();
+    await panel.getByRole("dialog", { name: "Go to accounts page?" }).getByRole("button", { name: "Go" }).click();
+    await expect(page.getByLabel("Balance for Monzo")).toHaveValue("1000");
+    await expect(page.getByLabel("Balance for Amex")).toHaveValue("50");
+  });
+
   test("explains health score, flags financial anomalies, and switches insight charts", async ({ page }) => {
     await openLedger(page);
     await addIncome(page, "Salary", 2000);

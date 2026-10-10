@@ -8,8 +8,10 @@ enum AccountLinks {
     /// Port of `syncLinkedGoals`.
     nonisolated static func syncLinkedGoals(_ state: inout LedgerState) {
         guard state.goals.contains(where: { $0.accountId != nil }) else { return }
+        // Live balances: the account as the ledger has moved it, not the last typed figure.
+        let live = FinanceEngine.deriveLiveAccounts(accounts: state.accounts, months: state.months)
         let assets = Dictionary(
-            state.accounts.filter { $0.accountClass != .debt }.map { ($0.id, $0) },
+            live.filter { $0.accountClass != .debt }.map { ($0.id, $0) },
             uniquingKeysWith: { first, _ in first }
         )
         for index in state.goals.indices {

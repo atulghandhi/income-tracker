@@ -21,6 +21,8 @@ export type IncomeEntry = {
   recurring: boolean;
   date?: string;
   imported?: ImportedTransactionMeta;
+  // The account this money landed in; its balance moves with it. See accountFlow.ts.
+  accountId?: string;
   seededFrom?: SeededFromRef;
   categorySource?: CategorySource;
 };
@@ -35,6 +37,8 @@ export type ExpenseEntry = {
   recurring: boolean;
   date?: string;
   imported?: ImportedTransactionMeta;
+  // The account this money left from (or, for a card, was spent on); its balance moves with it.
+  accountId?: string;
   // Links this payment to a debt account. For any month that has linked payments, their sum
   // replaces that account's scheduled monthly payment in the balance roll-forward — so an
   // imported overpayment reduces the debt by the real amount instead of the scheduled one.
@@ -172,6 +176,12 @@ export type Account = {
   // meaning "not paying this one". The roll-forward charges no payment for them and the ledger
   // does not re-add the row.
   skippedPaymentMonths?: string[];
+  // Day ("YYYY-MM-DD") the balance was last typed. Ledger transactions dated from then on move
+  // the balance; earlier ones are already in the typed figure. See accountFlow.ts.
+  balanceSetOn?: string;
+  // Cancels ledger movement that should not move money: transactions already counted when the
+  // balance was typed, or re-labelled to this account after the fact.
+  ledgerOffset?: number;
   // Shared.
   includeInNetWorth: boolean;
   color: string;
@@ -196,6 +206,8 @@ export type LedgerState = {
   ledgerGoalId: string | null;
   savingsTarget: number;
   accounts: Account[];
+  // Where new transactions go unless a better account is known (e.g. the account salary goes into).
+  defaultAccountId?: string | null;
   assumedInvestmentReturn: number;
   categoryRules: CategoryRule[];
   nameRules: NameRule[];
