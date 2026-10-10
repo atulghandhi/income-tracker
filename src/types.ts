@@ -44,6 +44,10 @@ export type ExpenseEntry = {
   // that month (an import, or a row the user typed) replaces it. Editing its amount confirms it
   // as the actual payment. See syncScheduledDebtPayments.
   scheduledPayment?: boolean;
+  // Links a transfer into one of the user's savings, current or investment accounts. The money is
+  // still leaving the budget, but it is the same money as that account's monthly contribution, so
+  // the forecast and goal planner count it once (see recurringAccountTransfersByAccount).
+  toAccountId?: string;
   seededFrom?: SeededFromRef;
   categorySource?: CategorySource;
 };
@@ -61,6 +65,10 @@ export type SavingsGoal = {
   monthlyAmount: number;    // contribution per month (fixed/auto); engine writes auto
   deadlineMonths: number;   // 0 = no deadline; >0 = must complete within N months
   interestRate: number;     // optional AER % compounded monthly on accumulated balance; 0 = flat
+  // Optional savings/investment account this goal lives in. When set, `saved` and `interestRate`
+  // follow the account (see syncLinkedGoals) and the account's monthly contribution funds this
+  // goal before any shared surplus does.
+  accountId?: string;
   note: string;
   createdAt: string;
 };

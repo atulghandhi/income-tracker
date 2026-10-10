@@ -66,7 +66,7 @@ public func buildWidgetSnapshot(from state: LedgerState) -> WidgetSnapshot {
         recurringMonthlySurplus: proj.recurringMonthlySurplus,
         horizonMonths: 12,
         assumedInvestmentReturn: state.assumedInvestmentReturn,
-        linkedDebtPayments: FinanceEngine.recurringDebtPaymentsByAccount(budget)
+        linkedTransfers: FinanceEngine.recurringAccountTransfersByAccount(budget)
     )
     let sparkline = outlook.map { $0.netWorth }
 

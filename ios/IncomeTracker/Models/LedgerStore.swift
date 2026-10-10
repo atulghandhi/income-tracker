@@ -71,6 +71,8 @@ public final class LedgerStore {
     public func update(_ mutation: (inout LedgerState) -> Void) {
         pushUndoSnapshot()
         mutation(&state)
+        // Goals linked to a savings account follow its balance and rate after every edit.
+        AccountLinks.syncLinkedGoals(&state)
         state.lastSavedAt = isoTimestampNow()
         scheduleSave(pushToCloud: true)
     }
@@ -83,6 +85,7 @@ public final class LedgerStore {
     public func applyQuietly(_ mutation: (inout LedgerState) -> Void) {
         let before = state
         mutation(&state)
+        AccountLinks.syncLinkedGoals(&state)
         guard state != before else { return }
         if state.isEquivalent(to: before) {
             scheduleSave(pushToCloud: false)

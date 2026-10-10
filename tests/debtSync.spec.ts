@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { bestDebtPaymentMatch, matchDebtPaymentRows, skipScheduledPayment, syncScheduledDebtPayments } from "../src/debtSync";
-import { buildNetWorthOutlook, calculateProjection, createInitialState, recurringDebtPaymentsByAccount, rollForwardDebtBalances } from "../src/finance";
+import { buildNetWorthOutlook, calculateProjection, createInitialState, recurringAccountTransfersByAccount, rollForwardDebtBalances } from "../src/finance";
 import type { CsvImportRow } from "../src/importer";
 import { buildDebtRemindersIcs, nextDueDate } from "../src/retention";
 import type { Account, ExpenseEntry, LedgerState, MonthBudget } from "../src/types";
@@ -211,7 +211,7 @@ test.describe("net worth outlook with debt payments in the ledger", () => {
       accounts: [account],
       projection: calculateProjection(month),
       months: 1,
-      linkedDebtPayments: recurringDebtPaymentsByAccount(month),
+      linkedTransfers: recurringAccountTransfersByAccount(month),
     });
 
     // £2,000 in, £500 of it moves to the loan: net worth rises by the full £2,000.

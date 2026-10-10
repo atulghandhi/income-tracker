@@ -64,18 +64,33 @@ struct GoalsScreen: View {
     private struct PlanKey: Hashable {
         let goals: [SavingsGoal]
         let surplus: Double
+        let dedicated: [String: Double]
         let horizon: Int
     }
 
     private var planKey: PlanKey {
-        PlanKey(goals: store.state.goals, surplus: effectiveSurplus, horizon: store.state.goalsHorizonMonths)
+        PlanKey(
+            goals: store.state.goals,
+            surplus: effectiveSurplus,
+            dedicated: goalPlan.dedicatedMonthly,
+            horizon: store.state.goalsHorizonMonths
+        )
+    }
+
+    /// Same rules as the web: goals share only money not already routed into an account, and a
+    /// goal's own account pays its contribution straight in.
+    private var goalPlan: AccountLinks.GoalPlanInputs {
+        AccountLinks.goalPlanInputs(
+            goals: store.state.goals,
+            accounts: store.effectiveAccounts,
+            month: store.currentMonthBudget,
+            recurringSurplus: FinanceEngine.projection(for: store.currentMonthBudget).recurringMonthlySurplus,
+            override: store.state.goalPlannerSurplus
+        )
     }
 
     private var effectiveSurplus: Double {
-        if let override = store.state.goalPlannerSurplus {
-            return override
-        }
-        return FinanceEngine.projection(for: store.currentMonthBudget).recurringMonthlySurplus
+        goalPlan.monthlySurplus
     }
 
     private var orderedGoals: [SavingsGoal] {
@@ -278,12 +293,14 @@ struct GoalsScreen: View {
         isLoadingSequence = true
         let goals = store.state.goals
         let surplus = effectiveSurplus
+        let dedicated = goalPlan.dedicatedMonthly
         let horizon = store.state.goalsHorizonMonths
         let result = await Task.detached(priority: .userInitiated) {
             FinanceEngine.runGoalSequence(
                 goals: goals,
                 monthlySurplus: surplus,
-                horizonMonths: horizon
+                horizonMonths: horizon,
+                dedicatedMonthly: dedicated
             )
         }.value
         guard !Task.isCancelled else { return }

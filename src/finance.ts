@@ -473,15 +473,24 @@ export function estimateDebtPayoff(account: Account): {
 // So contributions and debt payments are modelled as transfers out of a "cash" bucket, never as
 // extra inflows/outflows. Leftover surplus collects in that cash bucket (which may go negative,
 // representing drawing down reserves).
-// Recurring ledger rows linked to a debt account, summed per account. These are the same money
-// as the account's monthly payment, seen from the ledger side.
-export function recurringDebtPaymentsByAccount(month: MonthBudget): Record<string, number> {
+// Recurring ledger rows linked to one of the user's accounts (a debt payment, or a transfer into
+// savings), summed per account. These are the same money as that account's monthly payment or
+// contribution, seen from the ledger side.
+export function recurringAccountTransfersByAccount(month: MonthBudget): Record<string, number> {
   const byAccount: Record<string, number> = {};
   month.expenses.forEach((expense) => {
-    if (!expense.debtAccountId || !isRecurring(expense)) return;
-    byAccount[expense.debtAccountId] = (byAccount[expense.debtAccountId] ?? 0) + Math.max(0, Number(expense.amount) || 0);
+    const accountId = expense.debtAccountId ?? expense.toAccountId;
+    if (!accountId || !isRecurring(expense)) return;
+    byAccount[accountId] = (byAccount[accountId] ?? 0) + Math.max(0, Number(expense.amount) || 0);
   });
   return byAccount;
+}
+
+// What each asset account actually receives a month: the linked ledger transfer when there is one
+// (that is what the user really moves), otherwise the contribution set on the account.
+export function effectiveContribution(account: Account, linkedTransfers: Record<string, number>): number {
+  if (account.accountClass === "debt") return 0;
+  return account.id in linkedTransfers ? Math.max(0, linkedTransfers[account.id]) : Math.max(0, Number(account.monthlyContribution) || 0);
 }
 
 export function buildNetWorthOutlook({
@@ -489,20 +498,20 @@ export function buildNetWorthOutlook({
   projection,
   months,
   startDate = new Date(),
-  linkedDebtPayments = {},
+  linkedTransfers = {},
 }: {
   accounts: Account[];
   projection: Projection;
   months: number;
   startDate?: Date;
-  // From recurringDebtPaymentsByAccount(month). A debt payment in the ledger already lowers the
-  // recurring surplus; without this the forecast would also pay the debt out of cash, taking the
-  // same money twice. Linked accounts pay the ledger amount, and that amount is added back.
-  linkedDebtPayments?: Record<string, number>;
+  // From recurringAccountTransfersByAccount(month). A debt payment or savings transfer in the
+  // ledger already lowers the recurring surplus; without this the forecast would also move it out
+  // of cash, taking the same money twice. Linked accounts use the ledger amount, added back here.
+  linkedTransfers?: Record<string, number>;
 }): NetWorthPoint[] {
-  const debtIds = new Set(accounts.filter((account) => account.accountClass === "debt").map((account) => account.id));
-  const linkedBack = Object.entries(linkedDebtPayments)
-    .filter(([id]) => debtIds.has(id))
+  const accountIds = new Set(accounts.map((account) => account.id));
+  const linkedBack = Object.entries(linkedTransfers)
+    .filter(([id]) => accountIds.has(id))
     .reduce((sum, [, amount]) => sum + Math.max(0, amount), 0);
   const working = accounts.map((account) => ({
     accountClass: account.accountClass,
@@ -510,10 +519,10 @@ export function buildNetWorthOutlook({
     rate: Number(account.rate || 0),
     promoRate: Number(account.promoRate || 0),
     promoMonths: Math.max(0, Math.round(Number(account.promoMonths || 0))),
-    contribution: Math.max(0, Number(account.monthlyContribution || 0)),
+    contribution: effectiveContribution(account, linkedTransfers),
     payment:
-      account.accountClass === "debt" && account.id in linkedDebtPayments
-        ? Math.max(0, linkedDebtPayments[account.id])
+      account.accountClass === "debt" && account.id in linkedTransfers
+        ? Math.max(0, linkedTransfers[account.id])
         : Math.max(0, Number(account.minimumPayment || 0)),
     includeInNetWorth: account.includeInNetWorth !== false,
   }));
@@ -1041,13 +1050,18 @@ export function runGoalSequence({
   monthlySurplus,
   horizonMonths,
   startDate = new Date(),
+  dedicatedMonthly = {},
 }: {
   goals: SavingsGoal[];
   monthlySurplus: number;
   horizonMonths: number;
   startDate?: Date;
+  // Money that can only go to one goal, keyed by goal id: a linked account's monthly
+  // contribution. Paid in before the shared surplus is split, and never shared with other goals.
+  dedicatedMonthly?: Record<string, number>;
 }): GoalSequenceResult {
-  if (!goals.length || monthlySurplus <= 0) {
+  const hasDedicated = goals.some((goal) => (dedicatedMonthly[goal.id] ?? 0) > 0);
+  if (!goals.length || (monthlySurplus <= 0 && !hasDedicated)) {
     return {
       timeline: [],
       goals: goals.map((g) => ({
@@ -1097,6 +1111,30 @@ export function runGoalSequence({
 
       let remaining = surplus;
       const perGoal: GoalMonthPoint["perGoal"] = {};
+      // Interest is applied once per goal per month, whichever funding step reaches it first.
+      const grown = new Set<string>();
+      const grow = (w: WorkingGoal) => {
+        if (grown.has(w.goal.id)) return;
+        grown.add(w.goal.id);
+        if (w.goal.interestRate > 0) {
+          const monthlyRate = Math.pow(1 + w.goal.interestRate / 100, 1 / 12) - 1;
+          w.accumulated *= 1 + monthlyRate;
+        }
+      };
+
+      // Dedicated money (a linked account's contribution) goes in first, to its own goal only.
+      for (const w of working) {
+        const dedicated = dedicatedMonthly[w.goal.id] ?? 0;
+        if (w.completionMonth !== null || dedicated <= 0) continue;
+        grow(w);
+        const contribution = Math.min(dedicated, Math.max(0, w.goal.target - w.accumulated));
+        w.accumulated = Math.min(w.accumulated + contribution, w.goal.target);
+        perGoal[w.goal.id] = { accumulated: w.accumulated, contribution, complete: false };
+        if (w.accumulated >= w.goal.target) {
+          w.completionMonth = month;
+          perGoal[w.goal.id].complete = true;
+        }
+      }
 
       // Active = not yet complete.
       const active = working.filter((w) => w.completionMonth === null);
@@ -1109,15 +1147,13 @@ export function runGoalSequence({
         const contribution = Math.min(w.goal.monthlyAmount, remaining);
 
         // Apply monthly compounding on accumulated balance.
-        if (w.goal.interestRate > 0) {
-          const monthlyRate = Math.pow(1 + w.goal.interestRate / 100, 1 / 12) - 1;
-          w.accumulated *= 1 + monthlyRate;
-        }
+        grow(w);
 
         w.accumulated = Math.min(w.accumulated + contribution, w.goal.target);
         remaining = Math.max(0, remaining - contribution);
 
-        perGoal[w.goal.id] = { accumulated: w.accumulated, contribution, complete: false };
+        const earlier = perGoal[w.goal.id]?.contribution ?? 0;
+        perGoal[w.goal.id] = { accumulated: w.accumulated, contribution: earlier + contribution, complete: false };
 
         if (w.accumulated >= w.goal.target) {
           w.completionMonth = month;
@@ -1132,15 +1168,13 @@ export function runGoalSequence({
         if (remaining <= 0) break;
         const contribution = remaining;
 
-        if (w.goal.interestRate > 0) {
-          const monthlyRate = Math.pow(1 + w.goal.interestRate / 100, 1 / 12) - 1;
-          w.accumulated *= 1 + monthlyRate;
-        }
+        grow(w);
 
         w.accumulated = Math.min(w.accumulated + contribution, w.goal.target);
         remaining = 0;
 
-        perGoal[w.goal.id] = { accumulated: w.accumulated, contribution, complete: false };
+        const earlier = perGoal[w.goal.id]?.contribution ?? 0;
+        perGoal[w.goal.id] = { accumulated: w.accumulated, contribution: earlier + contribution, complete: false };
 
         if (w.accumulated >= w.goal.target) {
           w.completionMonth = month;
@@ -1162,7 +1196,7 @@ export function runGoalSequence({
     return { working, timeline };
   }
 
-  const { working, timeline } = simulate(monthlySurplus, horizonMonths);
+  const { working, timeline } = simulate(hasDedicated ? Math.max(0, monthlySurplus) : monthlySurplus, horizonMonths);
 
   // Build outcomes + gap analysis.
   const outcomeGoals: GoalOutcome[] = sorted.map((g) => {
@@ -1190,9 +1224,9 @@ export function runGoalSequence({
       } else {
         status = "at-risk";
         // Solve: how much extra monthly surplus is needed?
-        extraMonthlyNeeded = solveExtraMonthly(g, sorted, monthlySurplus, g.deadlineMonths, startDate);
+        extraMonthlyNeeded = solveExtraMonthly(g, sorted, monthlySurplus, g.deadlineMonths, startDate, dedicatedMonthly);
         // Solve: how many extra months are needed at current surplus?
-        extraMonthsNeeded = solveExtraMonths(g, sorted, monthlySurplus, horizonMonths, startDate);
+        extraMonthsNeeded = solveExtraMonths(g, sorted, monthlySurplus, horizonMonths, startDate, dedicatedMonthly);
       }
     } else {
       status = completionMonth !== null ? "no-deadline" : "no-deadline";
@@ -1224,12 +1258,13 @@ function solveExtraMonthly(
   baseSurplus: number,
   deadlineMonths: number,
   startDate: Date,
+  dedicatedMonthly: Record<string, number>,
 ): number {
   let lo = 0;
   let hi = target.target; // worst-case upper bound
   for (let iter = 0; iter < 32; iter++) {
     const mid = (lo + hi) / 2;
-    const result = runGoalSequence({ goals: allGoals, monthlySurplus: baseSurplus + mid, horizonMonths: deadlineMonths, startDate });
+    const result = runGoalSequence({ goals: allGoals, monthlySurplus: baseSurplus + mid, horizonMonths: deadlineMonths, startDate, dedicatedMonthly });
     const outcome = result.goals.find((g) => g.goalId === target.id);
     const hits = outcome?.completionMonth !== null && outcome!.completionMonth! <= deadlineMonths;
     if (hits) hi = mid; else lo = mid;
@@ -1245,12 +1280,13 @@ function solveExtraMonths(
   surplus: number,
   baseHorizon: number,
   startDate: Date,
+  dedicatedMonthly: Record<string, number>,
 ): number {
   let lo = baseHorizon;
   let hi = baseHorizon + 120;
   for (let iter = 0; iter < 32; iter++) {
     const mid = Math.ceil((lo + hi) / 2);
-    const result = runGoalSequence({ goals: allGoals, monthlySurplus: surplus, horizonMonths: mid, startDate });
+    const result = runGoalSequence({ goals: allGoals, monthlySurplus: surplus, horizonMonths: mid, startDate, dedicatedMonthly });
     const outcome = result.goals.find((g) => g.goalId === target.id);
     const hits = outcome?.completionMonth !== null;
     if (hits) hi = mid; else lo = mid;

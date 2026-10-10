@@ -1,4 +1,4 @@
-import { useState, useId } from "react";
+import { useEffect, useState, useId } from "react";
 import {
   Target,
   Plus,
@@ -9,6 +9,7 @@ import {
   Info,
 } from "lucide-react";
 import type {
+  Account,
   CurrencyCode,
   GoalFundingMode,
   GoalOutcome,
@@ -32,6 +33,11 @@ interface GoalsViewProps {
   goals: SavingsGoal[];
   goalSequence: GoalSequenceResult;
   goalPlannerSurplus: number;
+  // Monthly contributions going into accounts that no goal is linked to.
+  routedElsewhere: number;
+  // A linked account's monthly contribution, keyed by goal id.
+  dedicatedMonthly: Record<string, number>;
+  savingsAccounts: Account[];
   surplexOverridden: boolean;
   goalsHorizonMonths: number;
   currency: CurrencyCode;
@@ -50,6 +56,9 @@ export function GoalsView({
   goals,
   goalSequence,
   goalPlannerSurplus,
+  routedElsewhere,
+  dedicatedMonthly,
+  savingsAccounts,
   surplexOverridden,
   goalsHorizonMonths,
   currency,
@@ -66,6 +75,12 @@ export function GoalsView({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [surplusInput, setSurplusInput] = useState<string>(String(Math.round(goalPlannerSurplus)));
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
+  // Follow the ledger figure as it changes (new income, a new account contribution) unless the
+  // user has typed their own.
+  useEffect(() => {
+    if (!surplexOverridden) setSurplusInput(String(Math.round(goalPlannerSurplus)));
+  }, [goalPlannerSurplus, surplexOverridden]);
 
   const sorted = [...goals].sort((a, b) => a.priority - b.priority);
 
@@ -115,6 +130,11 @@ export function GoalsView({
                   </button>
                   )
                 </>
+              ) : routedElsewhere > 0 ? (
+                <span className={privacy ? "masked" : ""}>
+                  (from ledger, after {symbol}
+                  {Math.round(routedElsewhere).toLocaleString("en")}/mo already going into your accounts)
+                </span>
               ) : (
                 "(from ledger)"
               )}
@@ -184,6 +204,10 @@ export function GoalsView({
                 key={goal.id}
                 goal={goal}
                 outcome={outcome}
+                account={savingsAccounts.find((account) => account.id === goal.accountId) ?? null}
+                accountMonthly={dedicatedMonthly[goal.id] ?? 0}
+                savingsAccounts={savingsAccounts}
+                takenAccountIds={new Set(goals.filter((other) => other.id !== goal.id && other.accountId).map((other) => other.accountId!))}
                 isFirst={idx === 0}
                 isLast={idx === sorted.length - 1}
                 isEditing={editingId === goal.id}
@@ -354,6 +378,10 @@ function WaterfallTimeline({
 function GoalCard({
   goal,
   outcome,
+  account,
+  accountMonthly,
+  savingsAccounts,
+  takenAccountIds,
   isFirst,
   isLast,
   isEditing,
@@ -372,6 +400,10 @@ function GoalCard({
 }: {
   goal: SavingsGoal;
   outcome: GoalOutcome | null;
+  account: Account | null;
+  accountMonthly: number;
+  savingsAccounts: Account[];
+  takenAccountIds: Set<string>;
   isFirst: boolean;
   isLast: boolean;
   isEditing: boolean;
@@ -448,9 +480,21 @@ function GoalCard({
           <span>Target</span>
           <strong className={privacy ? "masked" : ""}>{symbol}{goal.target.toLocaleString("en")}</strong>
         </div>
-        {goal.monthlyAmount > 0 && (
+        {account && (
           <div className="goalCardStat">
-            <span>Per month</span>
+            <span>Saved in</span>
+            <strong>{account.name}</strong>
+          </div>
+        )}
+        {accountMonthly > 0 && (
+          <div className="goalCardStat">
+            <span>From account</span>
+            <strong className={privacy ? "masked" : ""}>{symbol}{Math.round(accountMonthly).toLocaleString("en")}/mo</strong>
+          </div>
+        )}
+        {goal.monthlyAmount > 0 && goal.fundingMode !== "fill" && (
+          <div className="goalCardStat">
+            <span>{accountMonthly > 0 ? "Plus surplus" : "Per month"}</span>
             <strong className={privacy ? "masked" : ""}>{symbol}{goal.monthlyAmount.toLocaleString("en")}</strong>
           </div>
         )}
@@ -471,6 +515,10 @@ function GoalCard({
       {isEditing && (
         <GoalEditor
           goal={goal}
+          account={account}
+          savingsAccounts={savingsAccounts}
+          takenAccountIds={takenAccountIds}
+          formatter={formatter}
           symbol={symbol}
           onUpdate={onUpdate}
           confirmDelete={confirmDelete}
@@ -487,6 +535,10 @@ function GoalCard({
 
 function GoalEditor({
   goal,
+  account,
+  savingsAccounts,
+  takenAccountIds,
+  formatter,
   symbol,
   onUpdate,
   confirmDelete,
@@ -495,6 +547,10 @@ function GoalEditor({
   onCancelDelete,
 }: {
   goal: SavingsGoal;
+  account: Account | null;
+  savingsAccounts: Account[];
+  takenAccountIds: Set<string>;
+  formatter: Intl.NumberFormat;
   symbol: string;
   onUpdate: (patch: Partial<SavingsGoal>) => void;
   confirmDelete: boolean;
@@ -542,10 +598,36 @@ function GoalEditor({
             min={0}
             value={goal.saved || ""}
             placeholder="0"
+            readOnly={Boolean(account)}
+            title={account ? `Follows the ${account.name} balance on Accounts` : undefined}
             onChange={(e) => onUpdate({ saved: parseFloat(e.target.value) || 0 })}
           />
         </div>
       </div>
+
+      {savingsAccounts.length > 0 && (
+        <div className="goalEditorRow">
+          <label htmlFor={`${uid}-account`}>Saved in</label>
+          <select
+            id={`${uid}-account`}
+            value={goal.accountId ?? ""}
+            onChange={(e) => onUpdate({ accountId: e.target.value || undefined })}
+          >
+            <option value="">Not linked to an account</option>
+            {savingsAccounts.map((option) => (
+              <option key={option.id} value={option.id} disabled={takenAccountIds.has(option.id)}>
+                {option.name} · {formatter.format(option.balance)}
+                {takenAccountIds.has(option.id) ? " (used by another goal)" : ""}
+              </option>
+            ))}
+          </select>
+          <small className="goalEditorHint">
+            {account
+              ? `Saved amount and interest follow ${account.name}. Its monthly contribution on Accounts goes to this goal first.`
+              : "Link a savings or investment account so this goal tracks its balance instead of a number you type."}
+          </small>
+        </div>
+      )}
 
       <div className="goalEditorRow">
         <label>Funding mode</label>
@@ -603,6 +685,8 @@ function GoalEditor({
               step={0.1}
               value={goal.interestRate || ""}
               placeholder="0"
+              readOnly={Boolean(account)}
+              title={account ? `Follows the ${account.name} rate on Accounts` : undefined}
               onChange={(e) => onUpdate({ interestRate: parseFloat(e.target.value) || 0 })}
             />
             <span

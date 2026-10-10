@@ -172,7 +172,7 @@ struct DashboardScreen: View {
                 ).recurringMonthlySurplus,
                 horizonMonths: horizon,
                 assumedInvestmentReturn: state.assumedInvestmentReturn,
-                linkedDebtPayments: FinanceEngine.recurringDebtPaymentsByAccount(
+                linkedTransfers: FinanceEngine.recurringAccountTransfersByAccount(
                     state.months[state.selectedMonth] ?? .empty
                 )
             )

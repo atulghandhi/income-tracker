@@ -168,6 +168,9 @@ public struct ExpenseEntry: Codable, Identifiable, Hashable, Sendable {
     /// Set on the row the web app adds each month from a debt account's scheduled payment; the
     /// real (imported or typed) payment replaces it. Kept here so saving from iOS round-trips it.
     public var scheduledPayment: Bool?
+    /// Links a transfer into one of the user's savings/current/investment accounts, so it counts
+    /// once against that account's monthly contribution.
+    public var toAccountId: String?
     public var seededFrom: SeededFromRef?
     /// See IncomeEntry.categorySource.
     public var categorySource: String?
@@ -183,6 +186,7 @@ public struct ExpenseEntry: Codable, Identifiable, Hashable, Sendable {
         imported: ImportedTransactionMeta? = nil,
         debtAccountId: String? = nil,
         scheduledPayment: Bool? = nil,
+        toAccountId: String? = nil,
         seededFrom: SeededFromRef? = nil,
         categorySource: String? = nil
     ) {
@@ -196,12 +200,13 @@ public struct ExpenseEntry: Codable, Identifiable, Hashable, Sendable {
         self.imported = imported
         self.debtAccountId = debtAccountId
         self.scheduledPayment = scheduledPayment
+        self.toAccountId = toAccountId
         self.seededFrom = seededFrom
         self.categorySource = categorySource
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, name, category, amount, color, recurring, date, imported, debtAccountId, scheduledPayment, seededFrom, categorySource
+        case id, name, category, amount, color, recurring, date, imported, debtAccountId, scheduledPayment, toAccountId, seededFrom, categorySource
     }
 
     public init(from decoder: Decoder) throws {
@@ -215,6 +220,7 @@ public struct ExpenseEntry: Codable, Identifiable, Hashable, Sendable {
         imported = c.lenientValue(ImportedTransactionMeta.self, .imported)
         debtAccountId = c.lenientNonEmptyString(.debtAccountId)
         scheduledPayment = c.lenientOptionalBool(.scheduledPayment)
+        toAccountId = c.lenientNonEmptyString(.toAccountId)
         seededFrom = c.lenientValue(SeededFromRef.self, .seededFrom)
         categorySource = c.lenientNonEmptyString(.categorySource)
         recurring = c.lenientOptionalBool(.recurring) ?? (imported == nil)
@@ -245,6 +251,9 @@ public struct SavingsGoal: Codable, Identifiable, Hashable, Sendable {
     public var monthlyAmount: Double
     public var deadlineMonths: Int
     public var interestRate: Double
+    /// Optional savings/investment account this goal lives in: `saved` and `interestRate` follow
+    /// it, and its monthly contribution funds this goal first. See `AccountLinks`.
+    public var accountId: String?
     public var note: String
     public var createdAt: String
 
@@ -259,6 +268,7 @@ public struct SavingsGoal: Codable, Identifiable, Hashable, Sendable {
         monthlyAmount: Double,
         deadlineMonths: Int,
         interestRate: Double,
+        accountId: String? = nil,
         note: String,
         createdAt: String
     ) {
@@ -272,13 +282,14 @@ public struct SavingsGoal: Codable, Identifiable, Hashable, Sendable {
         self.monthlyAmount = monthlyAmount
         self.deadlineMonths = deadlineMonths
         self.interestRate = interestRate
+        self.accountId = accountId
         self.note = note
         self.createdAt = createdAt
     }
 
     enum CodingKeys: String, CodingKey {
         case id, name, target, saved, color, priority, fundingMode, monthlyAmount,
-             deadlineMonths, interestRate, note, createdAt
+             deadlineMonths, interestRate, accountId, note, createdAt
     }
 
     /// Mirrors `normalizeGoals`. Colour "" and priority 0 mean "not stored" and are
@@ -295,6 +306,7 @@ public struct SavingsGoal: Codable, Identifiable, Hashable, Sendable {
         monthlyAmount = c.lenientDouble(.monthlyAmount, default: 0)
         deadlineMonths = c.lenientInt(.deadlineMonths, default: 0)
         interestRate = c.lenientDouble(.interestRate, default: 0)
+        accountId = c.lenientNonEmptyString(.accountId)
         note = c.lenientString(.note) ?? ""
         createdAt = c.lenientNonEmptyString(.createdAt) ?? isoTimestampNow()
     }

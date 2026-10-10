@@ -452,6 +452,50 @@ test.describe("Ledger", () => {
     await expect.poll(async () => (await inputValues(page, "input[aria-label='Expense name']")).length).toBe(2);
   });
 
+  test("goals follow their savings account and only share money not already going into accounts", async ({ page }) => {
+    await page.clock.install({ time: new Date(2026, 9, 10) });
+    await openLedger(page);
+    await addIncome(page, "Salary", 2000);
+
+    await openView(page, "Accounts");
+    const editor = page.locator(".accountEditorPanel");
+    await editor.getByLabel("Account kind").selectOption("savings");
+    await editor.getByLabel("Account name").fill("Vanguard ISA");
+    await editor.getByLabel("Current balance").fill("4000");
+    await editor.getByLabel("Monthly contribution").fill("300");
+    await editor.getByRole("button", { name: "Add account" }).click();
+    await expect(page.getByLabel("Balance for Vanguard ISA")).toHaveValue("4000");
+
+    await openView(page, "Goals");
+    // £2,000 surplus, but £300 of it already goes into the ISA every month.
+    await expect(page.getByLabel("Monthly surplus for goals")).toHaveValue("1700");
+    await expect(page.getByText(/after £300\/mo already going into your accounts/)).toBeVisible();
+
+    await page.getByRole("button", { name: "New goal" }).click();
+    await page.getByLabel("Goal name").fill("House deposit");
+    await page.getByLabel(/^Target/).fill("10000");
+    await page.getByLabel("Saved in").selectOption({ label: "Vanguard ISA · £4,000" });
+    // The saved amount now follows the account instead of a typed number.
+    await expect(page.getByLabel(/^Already saved/)).toHaveValue("4000");
+    await expect(page.getByLabel(/^Already saved/)).toHaveAttribute("readonly", "");
+    await expect(page.locator(".goalCardStat").filter({ hasText: "From account" })).toContainText("£300/mo");
+    // The ISA money now funds the goal, so it no longer counts as "going elsewhere".
+    await expect(page.getByText(/already going into your accounts/)).toHaveCount(0);
+
+    // Changing the balance on Accounts updates the goal.
+    await openView(page, "Accounts");
+    await page.getByLabel("Balance for Vanguard ISA").fill("4500");
+    await openView(page, "Goals");
+    await expect(page.locator(".goalCardStat").filter({ hasText: "Saved" }).first()).toContainText("£4,500");
+
+    // A transfer row in the ledger is linked to the ISA rather than counted on top of it.
+    await openView(page, "Ledger");
+    await addExpense(page, "Transfer to Vanguard ISA", 300);
+    await expect(page.getByLabel("Counts as money into Vanguard ISA")).toHaveCount(1);
+    await openView(page, "Goals");
+    await expect(page.getByLabel("Monthly surplus for goals")).toHaveValue("1700");
+  });
+
   test("explains health score, flags financial anomalies, and switches insight charts", async ({ page }) => {
     await openLedger(page);
     await addIncome(page, "Salary", 2000);

@@ -163,7 +163,7 @@ struct InsightsScreen: View {
                 recurringMonthlySurplus: proj.recurringMonthlySurplus,
                 horizonMonths: horizon,
                 assumedInvestmentReturn: state.assumedInvestmentReturn,
-                linkedDebtPayments: FinanceEngine.recurringDebtPaymentsByAccount(month)
+                linkedTransfers: FinanceEngine.recurringAccountTransfersByAccount(month)
             )
             let subs = Recurrence.detectSubscriptions(state)
             let missedNow = Recurrence.findMissed(state, todayIso: todayIso)

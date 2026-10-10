@@ -77,7 +77,7 @@ import {
   isValidMonthKey,
   deriveLiveAccounts,
   estimateDebtPayoff,
-  recurringDebtPaymentsByAccount,
+  recurringAccountTransfersByAccount,
   runGoalSequence,
   seedMonthFromPrevious,
   shiftMonth,
@@ -87,6 +87,7 @@ import { buildRulePattern, canonicalizeMerchant, descriptionMatchesPattern, isTr
 import { buildMerchantMemory } from "./merchantMemory";
 import { countSameName, findRuleTargeting, normalizeNameRules, renameEverywhere, type NameKind } from "./nameRules";
 import { parseQuickAdd } from "./quickAdd";
+import { goalPlanInputs, syncAccountLinks } from "./accountLinks";
 import { matchDebtPaymentRows, skipScheduledPayment, syncScheduledDebtPayments } from "./debtSync";
 import { applyRecurringFlag, detectSubscriptions, findMissedRecurring, reconcileSeededEntries, suggestRecurringFlags, type RecurrenceCandidate } from "./recurrence";
 import { aiCategorizeRows, applyAiSuggestions, isAiCategorizationAvailable, testAiConnection } from "./aiCategorize";
@@ -570,7 +571,7 @@ function App() {
         accounts: effectiveAccounts,
         projection,
         months: netWorthHorizon,
-        linkedDebtPayments: recurringDebtPaymentsByAccount(currentMonth),
+        linkedTransfers: recurringAccountTransfersByAccount(currentMonth),
       }),
     [effectiveAccounts, netWorthHorizon, projection, currentMonth],
   );
@@ -633,10 +634,29 @@ function App() {
     () => buildFinancialSignals({ projection, debtSummary, accounts: effectiveAccounts, assetSummary, month: currentMonth, savingsTarget: ledger.savingsTarget }),
     [currentMonth, debtSummary, assetSummary, effectiveAccounts, ledger.savingsTarget, projection],
   );
-  const goalPlannerSurplus = ledger.goalPlannerSurplus ?? projection.recurringMonthlySurplus;
+  // Goals share only the money that isn't already routed into an account each month; a goal's
+  // own account pays its contribution straight in.
+  const goalPlan = useMemo(
+    () =>
+      goalPlanInputs({
+        goals: ledger.goals,
+        accounts: effectiveAccounts,
+        month: currentMonth,
+        recurringSurplus: projection.recurringMonthlySurplus,
+        override: ledger.goalPlannerSurplus,
+      }),
+    [ledger.goals, effectiveAccounts, currentMonth, projection.recurringMonthlySurplus, ledger.goalPlannerSurplus],
+  );
+  const goalPlannerSurplus = goalPlan.monthlySurplus;
   const goalSequence = useMemo(
-    () => runGoalSequence({ goals: ledger.goals, monthlySurplus: goalPlannerSurplus, horizonMonths: ledger.goalsHorizonMonths }),
-    [ledger.goals, goalPlannerSurplus, ledger.goalsHorizonMonths],
+    () =>
+      runGoalSequence({
+        goals: ledger.goals,
+        monthlySurplus: goalPlannerSurplus,
+        horizonMonths: ledger.goalsHorizonMonths,
+        dedicatedMonthly: goalPlan.dedicatedMonthly,
+      }),
+    [ledger.goals, goalPlannerSurplus, ledger.goalsHorizonMonths, goalPlan.dedicatedMonthly],
   );
   const ledgerGoal = ledger.goals.find((g) => g.id === ledger.ledgerGoalId) ?? ledger.goals[0] ?? null;
   const ledgerGoalOutcome = ledgerGoal ? goalSequence.goals.find((o) => o.goalId === ledgerGoal.id) ?? null : null;
@@ -647,6 +667,7 @@ function App() {
     () => new Map(ledger.accounts.filter((account) => account.accountClass === "debt").map((account) => [account.id, account.name])),
     [ledger.accounts],
   );
+  const accountNameById = useMemo(() => new Map(ledger.accounts.map((account) => [account.id, account.name])), [ledger.accounts]);
   const merchantMemory = useMemo(() => buildMerchantMemory(ledger), [ledger]);
   const quickAddPreview = useMemo(() => {
     if (!quickAddInput.trim()) return null;
@@ -1073,7 +1094,7 @@ function App() {
     // Every change re-syncs scheduled debt payments, so an account edit, a new month, or an
     // import that brings in the real payment all leave exactly one payment row per debt.
     setLedger((current) => ({
-      ...syncScheduledDebtPayments(updater(current)),
+      ...syncScheduledDebtPayments(syncAccountLinks(updater(current))),
       lastSavedAt: new Date().toISOString(),
     }));
   }
@@ -1648,9 +1669,17 @@ function App() {
 
   function linkExpenseToDebt(id: string, debtAccountId: string | undefined) {
     const accountName = debtAccountId ? ledger.accounts.find((account) => account.id === debtAccountId)?.name : undefined;
-    updateExpense(id, { debtAccountId });
+    // A row is either a debt payment or a transfer into savings, never both.
+    updateExpense(id, { debtAccountId, ...(debtAccountId ? { toAccountId: undefined } : {}) });
     setCategoryMenu(null);
     setToast(accountName ? `Counted as payment towards ${accountName}` : "Payment unlinked from debt account");
+  }
+
+  function linkExpenseToSavings(id: string, toAccountId: string | undefined) {
+    const accountName = toAccountId ? ledger.accounts.find((account) => account.id === toAccountId)?.name : undefined;
+    updateExpense(id, { toAccountId, ...(toAccountId ? { debtAccountId: undefined } : {}) });
+    setCategoryMenu(null);
+    setToast(accountName ? `Counted as money into ${accountName}` : "Unlinked from savings account");
   }
 
   function clearDragState() {
@@ -3018,6 +3047,7 @@ function App() {
                                   formatter={moneyFormatter}
                                   symbol={currencySymbol}
                                   linkedAccountName={expense.debtAccountId ? debtAccountNameById.get(expense.debtAccountId) : undefined}
+                                  savingsAccountName={expense.toAccountId ? accountNameById.get(expense.toAccountId) : undefined}
                                   dragging={draggingExpenseId === expense.id}
                                   grouping={groupingSourceId === expense.id}
                                   dropState={dropState}
@@ -3247,6 +3277,9 @@ function App() {
               goals={ledger.goals}
               goalSequence={goalSequence}
               goalPlannerSurplus={goalPlannerSurplus}
+              routedElsewhere={goalPlan.routedElsewhere}
+              dedicatedMonthly={goalPlan.dedicatedMonthly}
+              savingsAccounts={effectiveAccounts.filter((account) => account.accountClass !== "debt")}
               surplexOverridden={ledger.goalPlannerSurplus !== null}
               goalsHorizonMonths={ledger.goalsHorizonMonths}
               currency={ledger.currency}
@@ -3881,6 +3914,7 @@ function App() {
             expense={menuExpense}
             options={categoryOptions}
             debtAccounts={effectiveAccounts.filter((account) => account.accountClass === "debt")}
+            savingsAccounts={effectiveAccounts.filter((account) => account.accountClass !== "debt")}
             formatter={moneyFormatter}
             privacy={ledger.privacyMode}
             x={categoryMenu.x}
@@ -3888,6 +3922,7 @@ function App() {
             onMove={(category) => moveExpenseFromMenu(menuExpense.id, category)}
             onUngroup={() => ungroupExpense(menuExpense.id)}
             onLinkDebt={(debtAccountId) => linkExpenseToDebt(menuExpense.id, debtAccountId)}
+            onLinkSavings={(toAccountId) => linkExpenseToSavings(menuExpense.id, toAccountId)}
           />
         )}
       </div>
@@ -4800,6 +4835,7 @@ function CategoryContextMenu({
   expense,
   options,
   debtAccounts,
+  savingsAccounts,
   formatter,
   privacy,
   x,
@@ -4807,10 +4843,12 @@ function CategoryContextMenu({
   onMove,
   onUngroup,
   onLinkDebt,
+  onLinkSavings,
 }: {
   expense: ExpenseEntry;
   options: CategoryOption[];
   debtAccounts: Account[];
+  savingsAccounts: Account[];
   formatter: Intl.NumberFormat;
   privacy: boolean;
   x: number;
@@ -4818,6 +4856,7 @@ function CategoryContextMenu({
   onMove: (category: string) => void;
   onUngroup: () => void;
   onLinkDebt: (debtAccountId: string | undefined) => void;
+  onLinkSavings: (toAccountId: string | undefined) => void;
 }) {
   return (
     <div
@@ -4885,6 +4924,34 @@ function CategoryContextMenu({
                   key={account.id}
                   aria-label={active ? `Unlink from ${account.name}` : `Count as payment towards ${account.name}`}
                   onClick={() => onLinkDebt(active ? undefined : account.id)}
+                >
+                  <span className="swatch small" style={{ background: account.color }} />
+                  <span>{account.name}</span>
+                  <em className={privacy ? "masked contextMenuMeta" : "contextMenuMeta"}>{formatter.format(account.balance)}</em>
+                  {active && <Check size={14} />}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+      {savingsAccounts.length > 0 && (
+        <>
+          <span className="contextMenuDivider" />
+          <div className="contextMenuTitle">
+            <span>Money moved into</span>
+          </div>
+          <div className="contextMenuList">
+            {savingsAccounts.map((account) => {
+              const active = account.id === expense.toAccountId;
+              return (
+                <button
+                  className={active ? "contextMenuItem active" : "contextMenuItem"}
+                  type="button"
+                  role="menuitem"
+                  key={account.id}
+                  aria-label={active ? `Unlink from ${account.name}` : `Count as money into ${account.name}`}
+                  onClick={() => onLinkSavings(active ? undefined : account.id)}
                 >
                   <span className="swatch small" style={{ background: account.color }} />
                   <span>{account.name}</span>
@@ -5158,6 +5225,7 @@ function ExpenseRow({
   formatter,
   symbol,
   linkedAccountName,
+  savingsAccountName,
   dragging,
   grouping,
   dropState,
@@ -5176,6 +5244,7 @@ function ExpenseRow({
   formatter: Intl.NumberFormat;
   symbol: string;
   linkedAccountName?: string;
+  savingsAccountName?: string;
   dragging: boolean;
   grouping: boolean;
   dropState?: ExpenseDropState;
@@ -5260,6 +5329,15 @@ function ExpenseRow({
         )}
         {/* A planned row always repeats (it comes from the account), and its clock already names
             the account, so it shows neither the link badge nor the repeat toggle. */}
+        {savingsAccountName && (
+          <span
+            className="debtLinkBadge"
+            aria-label={`Counts as money into ${savingsAccountName}`}
+            data-tip={`Counts as money into ${savingsAccountName}`}
+          >
+            <PiggyBank size={15} />
+          </span>
+        )}
         {linkedAccountName && !expense.scheduledPayment && (
           <span
             className="debtLinkBadge"
@@ -6755,7 +6833,7 @@ function useAnimatedNumber(value: number) {
 // Loaded state gets the same scheduled-debt-payment sync as every edit, so a new month opened
 // on load already carries this month's planned payments.
 function normalizeState(rawState: Partial<LedgerState>): LedgerState {
-  return syncScheduledDebtPayments(normalizeStateFields(rawState));
+  return syncScheduledDebtPayments(syncAccountLinks(normalizeStateFields(rawState)));
 }
 
 function normalizeStateFields(rawState: Partial<LedgerState>): LedgerState {

@@ -50,9 +50,12 @@ function compact(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+// Long tokens may hide inside run-together bank text ("HSBCBANKPLC"). Three-letter ones must
+// stand alone, or "ISA" would match every "VISA" line.
 export function nameMentionsAccount(text: string, account: Account): boolean {
   const haystack = compact(text);
-  return accountNameTokens(account.name).some((token) => haystack.includes(token));
+  const words = new Set(text.toLowerCase().split(/[^a-z0-9]+/));
+  return accountNameTokens(account.name).some((token) => (token.length >= 4 ? haystack.includes(token) : words.has(token)));
 }
 
 function amountTolerance(planned: number): number {

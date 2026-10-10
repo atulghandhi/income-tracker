@@ -682,10 +682,39 @@ final class DebtRollForwardTests: XCTestCase {
             recurringMonthlySurplus: 2000 - 500,
             horizonMonths: 1,
             assumedInvestmentReturn: 0,
-            linkedDebtPayments: FinanceEngine.recurringDebtPaymentsByAccount(month)
+            linkedTransfers: FinanceEngine.recurringAccountTransfersByAccount(month)
         )
         XCTAssertEqual(points[1].netWorth, -6000 + 2000, accuracy: 0.01)
         XCTAssertEqual(points[1].debtBalance, 5500, accuracy: 0.01)
+    }
+
+    func testDedicatedGoalMoneyOnlyReachesItsGoal() {
+        let holiday = SavingsGoal(id: "first", name: "Holiday", target: 1000, saved: 0, color: "#000", priority: 1,
+                                  fundingMode: .fixed, monthlyAmount: 1000, deadlineMonths: 0, interestRate: 0,
+                                  note: "", createdAt: "")
+        let house = SavingsGoal(id: "house", name: "House", target: 10000, saved: 4000, color: "#000", priority: 2,
+                                fundingMode: .fixed, monthlyAmount: 0, deadlineMonths: 0, interestRate: 0,
+                                note: "", createdAt: "")
+        let result = FinanceEngine.runGoalSequence(
+            goals: [holiday, house], monthlySurplus: 0, horizonMonths: 2, dedicatedMonthly: ["house": 300]
+        )
+        XCTAssertEqual(result.timeline[0].perGoal["house"]?.contribution ?? -1, 300, accuracy: 0.001)
+        XCTAssertEqual(result.timeline[0].perGoal["house"]?.accumulated ?? -1, 4300, accuracy: 0.001)
+        XCTAssertEqual(result.timeline[0].perGoal["first"]?.contribution ?? -1, 0, accuracy: 0.001)
+    }
+
+    func testGoalPlanSharesOnlyUnroutedSurplus() {
+        var isa = debtAccount(balance: 4000, type: .isa, creditLimit: 0)
+        isa.accountClass = .savings
+        isa.monthlyContribution = 300
+        let goal = SavingsGoal(id: "house", name: "House", target: 10000, saved: 0, color: "#000", priority: 1,
+                               fundingMode: .fixed, monthlyAmount: 0, deadlineMonths: 0, interestRate: 0,
+                               accountId: isa.id, note: "", createdAt: "")
+        let unlinked = AccountLinks.goalPlanInputs(goals: [], accounts: [isa], month: .empty, recurringSurplus: 2000, override: nil)
+        XCTAssertEqual(unlinked.monthlySurplus, 1700, accuracy: 0.001)
+        let linked = AccountLinks.goalPlanInputs(goals: [goal], accounts: [isa], month: .empty, recurringSurplus: 2000, override: nil)
+        XCTAssertEqual(linked.monthlySurplus, 1700, accuracy: 0.001)
+        XCTAssertEqual(linked.dedicatedMonthly["house"] ?? 0, 300, accuracy: 0.001)
     }
 
     func testRollForwardChargesAprOnceWindowEnds() {
