@@ -166,12 +166,15 @@ struct DashboardScreen: View {
         let horizon = selectedHorizon
         let points = await Task.detached(priority: .userInitiated) {
             FinanceEngine.netWorthOutlook(
-                accounts: FinanceEngine.rollForwardDebtBalances(accounts: state.accounts, months: state.months),
+                accounts: FinanceEngine.deriveLiveAccounts(accounts: state.accounts, months: state.months),
                 recurringMonthlySurplus: FinanceEngine.projection(
                     for: state.months[state.selectedMonth] ?? .empty
                 ).recurringMonthlySurplus,
                 horizonMonths: horizon,
-                assumedInvestmentReturn: state.assumedInvestmentReturn
+                assumedInvestmentReturn: state.assumedInvestmentReturn,
+                linkedTransfers: FinanceEngine.recurringAccountTransfersByAccount(
+                    state.months[state.selectedMonth] ?? .empty
+                )
             )
         }.value
         guard !Task.isCancelled else { return }
@@ -768,7 +771,7 @@ struct DashboardSummaryRows: View {
                     tone: .ink)
                 Divider().padding(.leading, 44)
                 row(icon: "creditcard", label: "Card utilisation",
-                    value: accounts.contains { $0.accountClass == .debt && $0.creditLimit > 0 } ? formatPercent(utilization, digits: 0) : "No cards",
+                    value: accounts.contains { FinanceEngine.countsTowardUtilization($0) && $0.creditLimit > 0 } ? formatPercent(utilization, digits: 0) : "No cards",
                     tone: utilization >= 80 ? .brandRed : utilization > 30 ? .brandAmber : .ink)
                 Divider().padding(.leading, 44)
                 row(icon: "square.and.arrow.down", label: "Last import",

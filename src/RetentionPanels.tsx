@@ -1,7 +1,15 @@
 import { useState } from "react";
 import { CalendarPlus, ChevronRight, Landmark, Smartphone, X } from "lucide-react";
 import { BANK_GUIDES } from "./generated/bankGuides";
-import { bankGuideUrl, bankName, buildReminderIcs, googleCalendarReminderUrl } from "./retention";
+import {
+  bankGuideUrl,
+  bankName,
+  buildDebtRemindersIcs,
+  buildReminderIcs,
+  googleCalendarDebtReminderUrl,
+  googleCalendarReminderUrl,
+  type DebtReminder,
+} from "./retention";
 
 const GROUPS = [...new Set(BANK_GUIDES.map((bank) => bank.group))];
 
@@ -22,6 +30,72 @@ export function BankSelect({ value, onChange, id = "bank-select" }: { value: str
       </select>
     </label>
   );
+}
+
+// Accounts panel: every debt's due day as a repeating calendar event, built from the accounts
+// themselves, so changing a due day here is all it takes to get a corrected reminder.
+export function DebtRemindersPanel({
+  reminders,
+  onDownloadIcs,
+  onReminderAdded,
+}: {
+  reminders: DebtReminder[];
+  onDownloadIcs: (fileName: string, contents: string) => void;
+  onReminderAdded: (method: "ics" | "google") => void;
+}) {
+  if (!reminders.length) return null;
+  return (
+    <article className="miniPanel debtRemindersPanel" aria-label="Payment reminders">
+      <div className="panelTitleRow">
+        <CalendarPlus size={17} />
+        <h3>Payment reminders</h3>
+      </div>
+      <p>A repeating calendar event for each debt on its due day, with an alert two days before.</p>
+      <ul className="debtReminderList">
+        {reminders.map((reminder) => (
+          <li key={reminder.id}>
+            <span>
+              <strong>{reminder.name}</strong>
+              <small>
+                Due on the {reminder.dueDay}
+                {ordinalSuffix(reminder.dueDay)}
+                {reminder.amountLabel ? ` · ${reminder.amountLabel}` : ""}
+              </small>
+            </span>
+            <a
+              className="commandButton"
+              href={googleCalendarDebtReminderUrl({ reminder })}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`Add ${reminder.name} to Google Calendar`}
+              onClick={() => onReminderAdded("google")}
+            >
+              Google Calendar
+            </a>
+          </li>
+        ))}
+      </ul>
+      <div className="buttonRow">
+        <button
+          className="commandButton"
+          type="button"
+          onClick={() => {
+            onDownloadIcs("income-tracker-payment-reminders.ics", buildDebtRemindersIcs({ reminders }));
+            onReminderAdded("ics");
+          }}
+        >
+          <CalendarPlus size={16} />
+          Add all to calendar
+        </button>
+      </div>
+      <small className="panelHint">Works with Apple Calendar, Outlook and Google. Changed a due day? Add them again and the events update.</small>
+    </article>
+  );
+}
+
+function ordinalSuffix(day: number) {
+  if (day % 100 >= 11 && day % 100 <= 13) return "th";
+  return day % 10 === 1 ? "st" : day % 10 === 2 ? "nd" : day % 10 === 3 ? "rd" : "th";
 }
 
 // Settings panel: pick a bank and a day of the month, then add a repeating

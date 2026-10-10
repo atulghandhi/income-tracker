@@ -59,13 +59,14 @@ public func buildWidgetSnapshot(from state: LedgerState) -> WidgetSnapshot {
     let budget = state.months[state.selectedMonth] ?? .empty
     let proj = FinanceEngine.projection(for: budget)
     // Debt balances rolled forward to today so the widget matches the app's derived figures.
-    let accounts = FinanceEngine.rollForwardDebtBalances(accounts: state.accounts, months: state.months)
+    let accounts = FinanceEngine.deriveLiveAccounts(accounts: state.accounts, months: state.months)
     let nwSummary = FinanceEngine.netWorthSummary(accounts)
     let outlook = FinanceEngine.netWorthOutlook(
         accounts: accounts,
         recurringMonthlySurplus: proj.recurringMonthlySurplus,
         horizonMonths: 12,
-        assumedInvestmentReturn: state.assumedInvestmentReturn
+        assumedInvestmentReturn: state.assumedInvestmentReturn,
+        linkedTransfers: FinanceEngine.recurringAccountTransfersByAccount(budget)
     )
     let sparkline = outlook.map { $0.netWorth }
 

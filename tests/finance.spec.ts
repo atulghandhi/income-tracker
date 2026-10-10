@@ -6,7 +6,10 @@ import {
   calculateDebtSummary,
   calculateHealthScore,
   calculateProjection,
+  deriveLiveAccounts,
+  estimateDebtPayoff,
   monthlyRateFromAnnual,
+  promoMonthsRemaining,
   rollForwardDebtBalances,
 } from "../src/finance";
 import type { Account, ExpenseEntry, MonthBudget } from "../src/types";
@@ -28,6 +31,7 @@ function debtAccount(overrides: Partial<Account>): Account {
     minimumPayment: 100,
     dueDay: 1,
     balanceAsOf: "2026-01",
+    promoAsOf: "2026-01",
     includeInNetWorth: true,
     color: "#12b886",
     note: "",
@@ -203,5 +207,93 @@ test.describe("debt balance roll-forward", () => {
 
     expect(rolled[0].balance).toBe(1000);
     expect(rolled[1]).toBe(savings);
+  });
+});
+
+test.describe("credit utilisation", () => {
+  test("only counts credit cards, never loans or overdrafts", () => {
+    const card = debtAccount({ id: "card", balance: 500, creditLimit: 2000 });
+    const loan = debtAccount({ id: "loan", type: "loan", balance: 9000, creditLimit: 10000 });
+    const loanNoLimit = debtAccount({ id: "loan-2", type: "loan", balance: 4000, creditLimit: 0 });
+    const overdraft = debtAccount({ id: "od", type: "overdraft", balance: 300, creditLimit: 500 });
+
+    const summary = calculateDebtSummary([card, loan, loanNoLimit, overdraft]);
+
+    expect(summary.utilization).toBe(25);
+    expect(summary.totalCreditLimit).toBe(2000);
+    expect(summary.availableCredit).toBe(1500);
+    // Loans still count as debt — they just are not "utilisation".
+    expect(summary.totalDebt).toBe(13800);
+  });
+
+  test("is zero with only loans", () => {
+    const loan = debtAccount({ type: "loan", balance: 9000, creditLimit: 0 });
+    expect(calculateDebtSummary([loan]).utilization).toBe(0);
+  });
+});
+
+test.describe("promo window countdown", () => {
+  test("counts down from the month it was entered", () => {
+    const card = debtAccount({ promoMonths: 12, promoAsOf: "2026-01" });
+
+    expect(promoMonthsRemaining(card, "2026-01")).toBe(12);
+    expect(promoMonthsRemaining(card, "2026-02")).toBe(11);
+    expect(promoMonthsRemaining(card, "2026-12")).toBe(1);
+    expect(promoMonthsRemaining(card, "2027-01")).toBe(0);
+    expect(promoMonthsRemaining(card, "2028-06")).toBe(0);
+  });
+
+  test("live accounts show months left and re-anchor to the current month", () => {
+    const card = debtAccount({ promoMonths: 12, promoAsOf: "2026-01", minimumPayment: 0 });
+    const saver = debtAccount({ id: "isa", accountClass: "savings", type: "isa", promoRate: 5, promoMonths: 6, promoAsOf: "2026-01" });
+
+    const [liveCard, liveSaver] = deriveLiveAccounts({ accounts: [card, saver], months: {}, currentMonthKey: "2026-04" });
+
+    expect(liveCard.promoMonths).toBe(9);
+    expect(liveCard.promoAsOf).toBe("2026-04");
+    expect(liveSaver.promoMonths).toBe(3);
+    // The stored snapshot is untouched.
+    expect(card.promoMonths).toBe(12);
+  });
+
+  test("roll-forward starts charging APR the month the 0% window ends", () => {
+    // 2 months of 0% entered in January: Feb and Mar are free, Apr is charged.
+    const card = debtAccount({ balance: 1000, rate: 12, promoMonths: 2, promoAsOf: "2026-01", minimumPayment: 100, balanceAsOf: "2026-01" });
+
+    const [rolled] = rollForwardDebtBalances({ accounts: [card], months: {}, currentMonthKey: "2026-04" });
+
+    const afterMar = 800;
+    const afterApr = afterMar * (1 + monthlyRateFromAnnual(12)) - 100;
+    expect(rolled.balance).toBeCloseTo(Number(afterApr.toFixed(2)), 2);
+  });
+
+  test("an expired window drops out of the 0% warnings and forecast", () => {
+    const card = debtAccount({ balance: 1000, rate: 24.9, promoMonths: 3, promoAsOf: "2026-01", minimumPayment: 0 });
+
+    const [live] = deriveLiveAccounts({ accounts: [card], months: {}, currentMonthKey: "2026-06" });
+
+    expect(live.promoMonths).toBe(0);
+  });
+});
+
+test.describe("debt payoff estimate", () => {
+  test("finds the payoff month and the payment that clears a 0% balance in time", () => {
+    const card = debtAccount({ balance: 1200, rate: 24.9, promoMonths: 12, minimumPayment: 50 });
+
+    const payoff = estimateDebtPayoff(card);
+
+    expect(payoff.promoMonthsLeft).toBe(12);
+    expect(payoff.paymentToClearInPromo).toBe(100);
+    expect(payoff.monthsToPayoff).toBeGreaterThan(12);
+  });
+
+  test("returns null when the payment never outruns the interest", () => {
+    const card = debtAccount({ balance: 5000, rate: 30, minimumPayment: 50 });
+    expect(estimateDebtPayoff(card).monthsToPayoff).toBeNull();
+  });
+
+  test("clears a simple 0% loan on schedule", () => {
+    const loan = debtAccount({ type: "loan", balance: 1000, rate: 0, minimumPayment: 100 });
+    expect(estimateDebtPayoff(loan).monthsToPayoff).toBe(10);
   });
 });

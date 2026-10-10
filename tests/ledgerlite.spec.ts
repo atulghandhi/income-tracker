@@ -349,6 +349,202 @@ test.describe("Ledger", () => {
     await expect(page.getByText("£1,200").first()).toBeVisible();
   });
 
+  test("loans stay out of card utilization and 0% months count down as time passes", async ({ page }) => {
+    await page.clock.install({ time: new Date(2026, 9, 10) });
+    await page.goto("/");
+    await addDebtAccount(page, { name: "Visa Classic", balance: 1200, limit: 3000, apr: 19.9, promoMonths: 12, payment: 75, dueDay: 12 });
+
+    const editor = page.locator(".accountEditorPanel");
+    await editor.getByLabel("Account kind").selectOption("debt");
+    await editor.getByLabel("Account type").selectOption("loan");
+    // A loan has no limit to use up, so the editor does not ask for one.
+    await expect(editor.getByLabel("Credit limit")).toHaveCount(0);
+    await editor.getByLabel("Account name").fill("Car loan");
+    await editor.getByLabel("Current balance").fill("8000");
+    await editor.getByLabel("Interest rate (APR) %").fill("6.9");
+    await editor.getByLabel("Monthly payment").fill("250");
+    await editor.getByLabel("Payment due day").fill("5");
+    await editor.getByRole("button", { name: "Add account" }).click();
+    await expect(page.getByLabel("Balance for Car loan")).toHaveValue("8000");
+    await expect(page.getByLabel("Credit limit for Car loan")).toHaveCount(0);
+
+    // Only the card counts: 1,200 / 3,000 = 40%, however large the loan is.
+    await expect(page.locator(".summaryStrip").getByText("40%")).toBeVisible();
+    await expect(page.getByText(/0% until October 2027/)).toBeVisible();
+    await expect(page.getByText(/pay £100\/mo to clear it before then/)).toBeVisible();
+
+    // Two months later the same card shows 10 months left without any edits, and the £150
+    // already paid lowers what it takes to clear the rest in time: £1,050 / 10.
+    await page.clock.runFor(2000); // let the debounced save land before reloading
+    await page.clock.setSystemTime(new Date(2026, 11, 10));
+    await page.reload();
+    await openView(page, "Accounts");
+    await expect(page.getByLabel("Promo months for Visa Classic")).toHaveValue("10");
+    await expect(page.getByText(/pay £105\/mo to clear it before then/)).toBeVisible();
+    // The end date stays put while the count falls.
+    await expect(page.getByText(/0% until October 2027/)).toBeVisible();
+    await expect(page.getByLabel("Credit limit for Car loan")).toHaveCount(0);
+    await expect(page.locator(".summaryStrip").getByText("35%")).toBeVisible();
+  });
+
+  test("debt payments appear in the ledger and a statement import replaces them without duplicates", async ({ page }) => {
+    await page.clock.install({ time: new Date(2026, 9, 10) });
+    await page.goto("/");
+    await addDebtAccount(page, { name: "HSBC credit card", balance: 1200, limit: 3000, apr: 22.9, promoMonths: 0, payment: 100, dueDay: 12 });
+    const editor = page.locator(".accountEditorPanel");
+    await editor.getByLabel("Account kind").selectOption("debt");
+    await editor.getByLabel("Account type").selectOption("loan");
+    await editor.getByLabel("Account name").fill("Car loan");
+    await editor.getByLabel("Current balance").fill("8000");
+    await editor.getByLabel("Interest rate (APR) %").fill("6.9");
+    await editor.getByLabel("Monthly payment").fill("500");
+    await editor.getByLabel("Payment due day").fill("5");
+    await editor.getByRole("button", { name: "Add account" }).click();
+    await expect(page.getByLabel("Balance for Car loan")).toHaveValue("8000");
+
+    // Both reminders are offered from the accounts themselves.
+    await expect(page.getByRole("link", { name: "Add Car loan to Google Calendar" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Add HSBC credit card to Google Calendar" })).toBeVisible();
+
+    await openView(page, "Ledger");
+    await expect.poll(() => inputValues(page, "input[aria-label='Expense name']")).toEqual(
+      expect.arrayContaining(["HSBC credit card payment", "Car loan payment"]),
+    );
+    await expect(page.locator(".plannedBadge")).toHaveCount(2);
+
+    await uploadCsv(
+      page,
+      [
+        "Date,Description,Debit,Credit",
+        "05/10/2026,BLACK HORSE FINANCE,500.00,",
+        "13/10/2026,223231 HSBCBANKPLC,101.34,",
+        "14/10/2026,Tesco Express,40.00,",
+      ].join("\r\n"),
+    );
+    const dialog = page.getByRole("dialog", { name: "bank.csv" });
+    await expect(dialog.getByText(/Your Car loan payment/)).toBeVisible();
+    // Name, amount and due date all agree, so the card payment is confident enough to skip review.
+    await dialog.getByRole("button", { name: /matched your rules/ }).click();
+    await expect(dialog.getByText(/Your HSBC credit card payment/)).toBeVisible();
+    await dialog.getByRole("button", { name: /^Import \d/ }).click();
+    await expect(dialog).toHaveCount(0);
+
+    // The planned rows gave way to the real payments: no doubles, and the card shows what was paid.
+    await expect(page.locator(".plannedBadge")).toHaveCount(0);
+    const names = await inputValues(page, "input[aria-label='Expense name']");
+    expect(names).not.toContain("Car loan payment");
+    expect(names).not.toContain("HSBC credit card payment");
+    expect(names.length).toBe(3);
+    await expect(page.getByLabel("Counts as a payment towards HSBC credit card")).toHaveCount(1);
+    await expect(page.getByLabel("Counts as a payment towards Car loan")).toHaveCount(1);
+
+    // Next month: the planned rows are back at the planned amounts, and the same bank text now
+    // links by the rule the first import learned, even for a much bigger card payment.
+    await page.clock.runFor(2000);
+    await page.clock.setSystemTime(new Date(2026, 10, 10));
+    await page.reload();
+    await openView(page, "Ledger");
+    await expect(page.locator(".plannedBadge")).toHaveCount(2);
+    await uploadCsv(page, ["Date,Description,Debit,Credit", "12/11/2026,223231 HSBCBANKPLC,250.00,"].join("\r\n"));
+    await page.getByRole("dialog", { name: "bank.csv" }).getByRole("button", { name: /^Import \d/ }).click();
+    await expect(page.locator(".plannedBadge")).toHaveCount(1);
+    await expect.poll(() => inputValues(page, "input[aria-label='Expense name']")).toContain("Car loan payment");
+    await expect.poll(async () => (await inputValues(page, "input[aria-label='Expense name']")).length).toBe(2);
+  });
+
+  test("goals follow their savings account and only share money not already going into accounts", async ({ page }) => {
+    await page.clock.install({ time: new Date(2026, 9, 10) });
+    await openLedger(page);
+    await addIncome(page, "Salary", 2000);
+
+    await openView(page, "Accounts");
+    const editor = page.locator(".accountEditorPanel");
+    await editor.getByLabel("Account kind").selectOption("savings");
+    await editor.getByLabel("Account name").fill("Vanguard ISA");
+    await editor.getByLabel("Current balance").fill("4000");
+    await editor.getByLabel("Monthly contribution").fill("300");
+    await editor.getByRole("button", { name: "Add account" }).click();
+    await expect(page.getByLabel("Balance for Vanguard ISA")).toHaveValue("4000");
+
+    await openView(page, "Goals");
+    // £2,000 surplus, but £300 of it already goes into the ISA every month.
+    await expect(page.getByLabel("Monthly surplus for goals")).toHaveValue("1700");
+    await expect(page.getByText(/after £300\/mo already going into your accounts/)).toBeVisible();
+
+    await page.getByRole("button", { name: "New goal" }).click();
+    await page.getByLabel("Goal name").fill("House deposit");
+    await page.getByLabel(/^Target/).fill("10000");
+    await page.getByLabel("Saved in").selectOption({ label: "Vanguard ISA · £4,000" });
+    // The saved amount now follows the account instead of a typed number.
+    await expect(page.getByLabel(/^Already saved/)).toHaveValue("4000");
+    await expect(page.getByLabel(/^Already saved/)).toHaveAttribute("readonly", "");
+    await expect(page.locator(".goalCardStat").filter({ hasText: "From account" })).toContainText("£300/mo");
+    // The ISA money now funds the goal, so it no longer counts as "going elsewhere".
+    await expect(page.getByText(/already going into your accounts/)).toHaveCount(0);
+
+    // Changing the balance on Accounts updates the goal.
+    await openView(page, "Accounts");
+    await page.getByLabel("Balance for Vanguard ISA").fill("4500");
+    await openView(page, "Goals");
+    await expect(page.locator(".goalCardStat").filter({ hasText: "Saved" }).first()).toContainText("£4,500");
+
+    // A transfer row in the ledger is linked to the ISA rather than counted on top of it.
+    await openView(page, "Ledger");
+    await addExpense(page, "Transfer to Vanguard ISA", 300);
+    await expect(page.getByLabel("Counts as money into Vanguard ISA")).toHaveCount(1);
+    await openView(page, "Goals");
+    await expect(page.getByLabel("Monthly surplus for goals")).toHaveValue("1700");
+  });
+
+  test("every transaction belongs to an account and moves its balance", async ({ page }) => {
+    await page.clock.install({ time: new Date(2026, 9, 10) });
+    await page.goto("/");
+    await openView(page, "Accounts");
+    const editor = page.locator(".accountEditorPanel");
+    await editor.getByLabel("Account kind").selectOption("cash");
+    await editor.getByLabel("Account name").fill("Monzo");
+    await editor.getByLabel("Current balance").fill("1000");
+    await editor.getByRole("button", { name: "Add account" }).click();
+    await expect(page.getByLabel("Balance for Monzo")).toHaveValue("1000");
+    await editor.getByLabel("Account kind").selectOption("debt");
+    await editor.getByLabel("Account name").fill("Amex");
+    await editor.getByLabel("Current balance").fill("0");
+    await editor.getByLabel("Credit limit").fill("3000");
+    await editor.getByRole("button", { name: "Add account" }).click();
+    await expect(page.getByLabel("Balance for Amex")).toHaveValue("0");
+
+    await openView(page, "Ledger");
+    const panel = page.locator(".ledgerAccountsPanel");
+    await addExpense(page, "Tesco", 40);
+    // New spending goes to the default account, and its balance moves straight away.
+    await expect(page.getByRole("button", { name: "Tesco is in Monzo. Move to the next account" })).toBeVisible();
+    await expect(panel.getByRole("button", { name: /^Monzo/ })).toContainText("£960");
+
+    // Clicking the dot moves it (and its money) to the card, with a short toast naming the account.
+    await page.getByRole("button", { name: "Tesco is in Monzo. Move to the next account" }).click();
+    await expect(page.locator(".accountToast")).toHaveText("Amex");
+    await expect(page.locator(".accountToast")).toHaveCount(0, { timeout: 3000 });
+    await expect(panel.getByRole("button", { name: /^Monzo/ })).toContainText("£1,000");
+    await expect(panel.getByRole("button", { name: /^Amex/ })).toContainText("£40");
+
+    // Statement rows all go to the account picked for the file. (Rows dated before a balance was
+    // typed are already in it, so only ones from today on move it.)
+    await uploadCsv(page, ["Date,Description,Debit,Credit", "10/10/2026,Pret A Manger,10.00,"].join("\r\n"));
+    const dialog = page.getByRole("dialog", { name: "bank.csv" });
+    await dialog.getByLabel("Account these transactions belong to").selectOption({ label: "Amex" });
+    await dialog.getByRole("button", { name: /^Import \d/ }).click();
+    await expect(panel.getByRole("button", { name: /^Amex/ })).toContainText("£50");
+
+    // Category groups no longer carry a colour dot of their own.
+    await expect(page.locator(".expenseGroupHeader .swatch")).toHaveCount(0);
+
+    // Balances are read-only here: clicking one offers the Accounts page.
+    await panel.getByRole("button", { name: /^Monzo/ }).click();
+    await panel.getByRole("dialog", { name: "Go to accounts page?" }).getByRole("button", { name: "Go" }).click();
+    await expect(page.getByLabel("Balance for Monzo")).toHaveValue("1000");
+    await expect(page.getByLabel("Balance for Amex")).toHaveValue("50");
+  });
+
   test("explains health score, flags financial anomalies, and switches insight charts", async ({ page }) => {
     await openLedger(page);
     await addIncome(page, "Salary", 2000);

@@ -21,6 +21,8 @@ export type IncomeEntry = {
   recurring: boolean;
   date?: string;
   imported?: ImportedTransactionMeta;
+  // The account this money landed in; its balance moves with it. See accountFlow.ts.
+  accountId?: string;
   seededFrom?: SeededFromRef;
   categorySource?: CategorySource;
 };
@@ -35,10 +37,21 @@ export type ExpenseEntry = {
   recurring: boolean;
   date?: string;
   imported?: ImportedTransactionMeta;
+  // The account this money left from (or, for a card, was spent on); its balance moves with it.
+  accountId?: string;
   // Links this payment to a debt account. For any month that has linked payments, their sum
   // replaces that account's scheduled monthly payment in the balance roll-forward — so an
   // imported overpayment reduces the debt by the real amount instead of the scheduled one.
   debtAccountId?: string;
+  // Set on the row the app adds each month from a debt account's scheduled payment. It is a
+  // placeholder for the real payment: the first actual payment linked to the same account in
+  // that month (an import, or a row the user typed) replaces it. Editing its amount confirms it
+  // as the actual payment. See syncScheduledDebtPayments.
+  scheduledPayment?: boolean;
+  // Links a transfer into one of the user's savings, current or investment accounts. The money is
+  // still leaving the budget, but it is the same money as that account's monthly contribution, so
+  // the forecast and goal planner count it once (see recurringAccountTransfersByAccount).
+  toAccountId?: string;
   seededFrom?: SeededFromRef;
   categorySource?: CategorySource;
 };
@@ -56,6 +69,10 @@ export type SavingsGoal = {
   monthlyAmount: number;    // contribution per month (fixed/auto); engine writes auto
   deadlineMonths: number;   // 0 = no deadline; >0 = must complete within N months
   interestRate: number;     // optional AER % compounded monthly on accumulated balance; 0 = flat
+  // Optional savings/investment account this goal lives in. When set, `saved` and `interestRate`
+  // follow the account (see syncLinkedGoals) and the account's monthly contribution funds this
+  // goal before any shared surplus does.
+  accountId?: string;
   note: string;
   createdAt: string;
 };
@@ -141,6 +158,9 @@ export type Account = {
   rate: number;
   promoRate: number;
   promoMonths: number;
+  // Month key ("YYYY-MM") `promoMonths` was entered in. The live months-left figure counts down
+  // from this anchor (see promoMonthsRemaining), so "12 months left" becomes 11 next month.
+  promoAsOf: string;
   // Assets only: how much monthly surplus is routed into this account.
   monthlyContribution: number;
   // Debt only.
@@ -152,6 +172,16 @@ export type Account = {
   // monthly payment (or that month's linked ledger payments) and charging interest along the
   // way. Editing the balance re-anchors to the current month.
   balanceAsOf: string;
+  // Debt only: months ("YYYY-MM") the user removed the scheduled payment row from the ledger,
+  // meaning "not paying this one". The roll-forward charges no payment for them and the ledger
+  // does not re-add the row.
+  skippedPaymentMonths?: string[];
+  // Day ("YYYY-MM-DD") the balance was last typed. Ledger transactions dated from then on move
+  // the balance; earlier ones are already in the typed figure. See accountFlow.ts.
+  balanceSetOn?: string;
+  // Cancels ledger movement that should not move money: transactions already counted when the
+  // balance was typed, or re-labelled to this account after the fact.
+  ledgerOffset?: number;
   // Shared.
   includeInNetWorth: boolean;
   color: string;
@@ -176,6 +206,8 @@ export type LedgerState = {
   ledgerGoalId: string | null;
   savingsTarget: number;
   accounts: Account[];
+  // Where new transactions go unless a better account is known (e.g. the account salary goes into).
+  defaultAccountId?: string | null;
   assumedInvestmentReturn: number;
   categoryRules: CategoryRule[];
   nameRules: NameRule[];

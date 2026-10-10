@@ -1189,7 +1189,7 @@ textarea::placeholder {
 }
 
 .incomeRow {
-  grid-template-columns: 24px 42px minmax(140px, 1fr) 150px auto;
+  grid-template-columns: 24px 22px minmax(140px, 1fr) 150px auto;
 }
 
 .expenseRow {
@@ -1212,6 +1212,21 @@ textarea::placeholder {
   height: 32px;
   color: var(--mint);
   opacity: 0.8;
+}
+
+/* A debt payment the ledger added from the account's schedule, waiting for the real one. */
+.plannedBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--muted);
+}
+
+.expenseRow.isPlanned .rowTotal {
+  color: var(--muted);
+  font-style: italic;
 }
 
 .importDebtAccountSelect {
@@ -1445,6 +1460,8 @@ textarea:focus,
 }
 
 .expenseGroup:not(.ungrouped) .expenseRow {
+  /* The extra indent comes out of the name column, so the row actions never clip at narrow widths. */
+  grid-template-columns: 24px minmax(120px, 1fr) 132px 98px auto;
   padding-left: 40px;
   border-bottom-color: rgba(var(--line-rgb), 0.055);
   background:
@@ -2048,6 +2065,18 @@ textarea:focus,
 
 .dueField {
   grid-area: due;
+}
+
+/* Debt rows split the promo row: months on the left, the promo (or balance-transfer) rate beside it. */
+.debtAccountRow.isDebt {
+  grid-template-areas:
+    "swatch main balance minimum remove"
+    "swatch meta limit apr due"
+    "swatch meta interest promo due";
+}
+
+.debtPromoRateField {
+  grid-area: promo;
 }
 
 /* Asset rows reuse the debt grid; the promo-rate input sits where a debt's due-day would. */
@@ -4210,6 +4239,19 @@ hr {
     row-gap: 12px;
   }
 
+  .debtAccountRow.isDebt {
+    grid-template-areas:
+      "swatch main remove"
+      "meta meta meta"
+      "balance balance balance"
+      "limit limit limit"
+      "minimum minimum minimum"
+      "apr apr apr"
+      "interest interest interest"
+      "promo promo promo"
+      "due due due";
+  }
+
   /* Each stacked field gets a label above a full-width control on phones,
      instead of the cramped label-beside-input used on wide screens. */
   .debtAccountRow .debtField,
@@ -4288,7 +4330,12 @@ hr {
   }
 
   .incomeRow {
-    grid-template-columns: 28px 40px 1fr;
+    grid-template-columns: 28px 22px 1fr;
+  }
+
+  .expenseRow,
+  .expenseGroup:not(.ungrouped) .expenseRow {
+    padding-left: 30px;
   }
 
   .incomeRow .moneyInput,
@@ -5183,7 +5230,17 @@ hr {
   border: 1px solid var(--line); border-radius: var(--radius);
   color: var(--ink); font-size: 13px;
 }
+.goalEditorRow select {
+  width: 100%; padding: 8px 10px; background: rgba(var(--surface-rgb),0.7);
+  border: 1px solid var(--line); border-radius: var(--radius);
+  color: var(--ink); font-size: 13px;
+}
+.goalEditorRow select:focus,
 .goalEditorRow input:focus { outline: none; border-color: rgba(var(--mint-rgb),0.4); }
+/* Fields that follow a linked account read as display values, not inputs. */
+.goalEditorRow input[readonly],
+.goalEditorInputRow input[readonly] { color: var(--muted); border-style: dashed; cursor: default; }
+.goalEditorHint { font-size: 11.5px; color: var(--muted); line-height: 1.45; }
 .goalEditorRow--2col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .goalEditorRow--2col > div { display: flex; flex-direction: column; gap: 6px; }
 
@@ -6166,5 +6223,240 @@ hr {
   .nudgeCard {
     padding: 14px;
     gap: 10px;
+  }
+}
+
+/* Loans have no limit; that slot shows the estimated payoff month instead. */
+.payoffField strong {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  padding-top: 6px;
+}
+
+/* Accounts page: one row per debt, with its own Google Calendar link. */
+.debtRemindersPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.debtRemindersPanel .panelTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.debtRemindersPanel .panelTitleRow h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.debtRemindersPanel p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.debtRemindersPanel .commandButton {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.debtReminderList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.debtReminderList li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.debtReminderList li > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.debtReminderList small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* ─── Accounts in the ledger ──────────────────────────────────────────────── */
+
+/* A transaction's account, as a dot in the account's colour. Click to move it to the next one. */
+.accountDot {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 2px solid rgba(var(--surface-rgb), 0.9);
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px rgba(var(--ink-rgb), 0.14);
+  cursor: pointer;
+  justify-self: center;
+  transition: transform 120ms ease;
+}
+
+.accountDot:hover {
+  transform: scale(1.18);
+}
+
+.accountDot.empty {
+  background: transparent;
+  box-shadow: none;
+  border: 0;
+  cursor: default;
+}
+
+.accountDot.static {
+  cursor: inherit;
+  flex: 0 0 auto;
+}
+
+.motion-off .accountDot {
+  transition: none;
+}
+
+.accountToast {
+  /* Sits above the sticky annual summary bar rather than over it. */
+  bottom: 72px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 650;
+}
+
+.accountToastDot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
+}
+
+.notesBand .ledgerAccountsPanel {
+  align-items: start;
+}
+
+.ledgerAccountsColumn,
+.ledgerNotesColumn {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.ledgerAccountList {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ledgerAccountItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ledgerAccountItem:hover,
+.ledgerAccountItem[aria-expanded="true"] {
+  background: rgba(var(--ink-rgb), 0.04);
+}
+
+.ledgerAccountName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ledgerAccountItem strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.ledgerAccountConfirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 10px 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(var(--surface-higher-rgb), 0.8);
+  box-shadow: var(--shadow-sm);
+  font-size: 13px;
+}
+
+.ledgerAccountConfirm span {
+  flex: 1;
+  min-width: 140px;
+}
+
+.ledgerDefaultAccount {
+  display: grid;
+  gap: 4px;
+}
+
+.ledgerDefaultAccount > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.importAccountField {
+  align-items: center;
+}
+
+.importAccountField select {
+  min-width: 160px;
+}
+
+@media (max-width: 900px) {
+  .notesBand .ledgerAccountsPanel {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Expense rows keep their columns; the account dot sits in the row's left padding. */
+.expenseRow > .accountDot {
+  position: absolute;
+  top: 50%;
+  left: 5px;
+  margin-top: -8px;
+}
+
+.expenseGroup:not(.ungrouped) .expenseRow > .accountDot {
+  left: 16px;
+}
+
+@media (max-width: 680px) {
+  .expenseRow > .accountDot,
+  .expenseGroup:not(.ungrouped) .expenseRow > .accountDot {
+    top: 26px;
+    left: 8px;
+    margin-top: 0;
   }
 }

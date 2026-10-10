@@ -87,14 +87,22 @@ enum FinanceEngine {
 
     // MARK: - Debt summary
 
+    /// Port of `countsTowardUtilization`: utilisation only measures revolving card credit.
+    /// Loans, overdrafts and other balances still count as debt, but not as "utilisation".
+    nonisolated static func countsTowardUtilization(_ account: Account) -> Bool {
+        account.accountClass == .debt && account.type == .creditCard
+    }
+
     nonisolated static func debtSummary(_ accounts: [Account]) -> DebtSummary {
         let debts = accounts.filter { $0.accountClass == .debt }
         let activeDebts = debts.filter { $0.balance > 0 }
 
         let totalDebt = activeDebts.reduce(0.0) { $0 + max(0.0, $1.balance) }
-        let totalCreditLimit = debts.reduce(0.0) { $0 + max(0.0, $1.creditLimit) }
-        let availableCredit = max(0.0, totalCreditLimit - totalDebt)
-        let utilization = totalCreditLimit > 0 ? (totalDebt / totalCreditLimit) * 100.0 : 0.0
+        let cards = debts.filter(countsTowardUtilization)
+        let totalCreditLimit = cards.reduce(0.0) { $0 + max(0.0, $1.creditLimit) }
+        let cardBalance = cards.reduce(0.0) { $0 + max(0.0, $1.balance) }
+        let availableCredit = max(0.0, totalCreditLimit - cardBalance)
+        let utilization = totalCreditLimit > 0 ? (cardBalance / totalCreditLimit) * 100.0 : 0.0
         let monthlyMinimums = activeDebts.reduce(0.0) { $0 + max(0.0, $1.minimumPayment) }
         let weightedApr: Double
         if totalDebt > 0 {
@@ -230,9 +238,6 @@ enum FinanceEngine {
 
             let paymentsByMonth = linkedPayments[account.id]
             let scheduledPayment = max(0.0, account.minimumPayment)
-            // A promo window still active now also covered the elapsed months being rolled.
-            let annualRate = account.promoMonths > 0 ? account.promoRate : account.rate
-            let monthly = monthlyRateFromAnnual(annualRate)
 
             var balance = max(0.0, account.balance)
             var changed = false
@@ -241,10 +246,14 @@ enum FinanceEngine {
                 guard balance > 0 else { break }
                 let monthKey = shiftMonth(anchor, by: step)
                 let linkedTotal = paymentsByMonth?[monthKey] ?? 0
-                let payment = linkedTotal > 0 ? linkedTotal : scheduledPayment
+                let skipped = account.skippedPaymentMonths?.contains(monthKey) ?? false
+                let payment = linkedTotal > 0 ? linkedTotal : (skipped ? 0 : scheduledPayment)
                 guard payment > 0 else { continue }
 
-                let owed = balance + balance * monthly
+                // Each elapsed month is priced at the rate in force that month, so a 0% window
+                // that ran out part-way through the roll starts charging APR from then.
+                let annualRate = isInPromoWindow(account, monthKey: monthKey) ? account.promoRate : account.rate
+                let owed = balance + balance * monthlyRateFromAnnual(annualRate)
                 balance = max(0.0, owed - payment)
                 changed = true
             }
@@ -256,6 +265,54 @@ enum FinanceEngine {
         }
     }
 
+    // MARK: - Promo window countdown
+
+    /// Port of `promoMonthsRemaining`: `promoMonths` is "months left as of `promoAsOf`", so the
+    /// live figure ticks down by itself each month instead of staying frozen.
+    nonisolated static func promoMonthsRemaining(_ account: Account, currentMonthKey: String = getMonthKey()) -> Int {
+        let promoMonths = max(0, account.promoMonths)
+        guard promoMonths > 0 else { return 0 }
+        let anchor = isValidMonthKey(account.promoAsOf) ? account.promoAsOf! : currentMonthKey
+        return max(0, promoMonths - max(0, monthsBetween(anchor, currentMonthKey)))
+    }
+
+    /// Port of `isInPromoWindow`.
+    nonisolated static func isInPromoWindow(_ account: Account, monthKey: String) -> Bool {
+        let promoMonths = max(0, account.promoMonths)
+        guard promoMonths > 0 else { return false }
+        // No anchor means the count was entered "now", so every elapsed month sat inside the window.
+        guard isValidMonthKey(account.promoAsOf) else { return true }
+        return monthsBetween(account.promoAsOf!, monthKey) <= promoMonths
+    }
+
+    /// Port of `tickPromoWindows`: months left, re-anchored to the current month.
+    nonisolated static func tickPromoWindows(_ accounts: [Account], currentMonthKey: String = getMonthKey()) -> [Account] {
+        accounts.map { account in
+            let remaining = promoMonthsRemaining(account, currentMonthKey: currentMonthKey)
+            if remaining == account.promoMonths && account.promoAsOf == currentMonthKey { return account }
+            var ticked = account
+            ticked.promoMonths = remaining
+            ticked.promoAsOf = currentMonthKey
+            return ticked
+        }
+    }
+
+    /// Port of `deriveLiveAccounts`: debt balances rolled forward, moved by the ledger
+    /// transactions that belong to each account, and promo windows counted down.
+    nonisolated static func deriveLiveAccounts(
+        accounts: [Account],
+        months: [String: MonthBudget],
+        currentMonthKey: String = getMonthKey(),
+        todayIso: String? = nil
+    ) -> [Account] {
+        let today = todayIso ?? (currentMonthKey == getMonthKey() ? isoDateString(Date()) : "\(currentMonthKey)-31")
+        let rolled = rollForwardDebtBalances(accounts: accounts, months: months, currentMonthKey: currentMonthKey)
+        return tickPromoWindows(
+            AccountFlow.applyFlows(accounts: rolled, months: months, todayIso: today),
+            currentMonthKey: currentMonthKey
+        )
+    }
+
     // MARK: - Net worth outlook
 
     /// Projects net worth forward month by month.
@@ -265,12 +322,40 @@ enum FinanceEngine {
     /// Only three things move it — fresh surplus in, asset growth, and debt interest.
     /// Contributions and debt payments are modelled as transfers out of an "unallocated cash" bucket,
     /// never as extra inflows/outflows. Leftover surplus collects in that bucket (may go negative).
+    /// Port of `recurringAccountTransfersByAccount`: recurring ledger rows linked to an account (a
+    /// debt payment or a transfer into savings), summed per account — the same money as that
+    /// account's monthly payment or contribution.
+    nonisolated static func recurringAccountTransfersByAccount(_ month: MonthBudget) -> [String: Double] {
+        var byAccount: [String: Double] = [:]
+        for expense in month.expenses where expense.recurring {
+            guard let id = expense.debtAccountId ?? expense.toAccountId else { continue }
+            byAccount[id, default: 0] += max(0.0, expense.amount)
+        }
+        return byAccount
+    }
+
+    /// Port of `effectiveContribution`: the linked ledger transfer when there is one, otherwise
+    /// the contribution set on the account.
+    nonisolated static func effectiveContribution(_ account: Account, linkedTransfers: [String: Double]) -> Double {
+        guard account.accountClass != .debt else { return 0 }
+        if let linked = linkedTransfers[account.id] { return max(0.0, linked) }
+        return max(0.0, account.monthlyContribution)
+    }
+
+    /// `linkedTransfers` (from `recurringAccountTransfersByAccount`): a debt payment or savings
+    /// transfer in the ledger already lowers the recurring surplus, so linked accounts use the
+    /// ledger amount and that amount is added back, instead of moving the same money twice.
     nonisolated static func netWorthOutlook(
         accounts: [Account],
         recurringMonthlySurplus: Double,
         horizonMonths: Int,
-        assumedInvestmentReturn: Double
+        assumedInvestmentReturn: Double,
+        linkedTransfers: [String: Double] = [:]
     ) -> [NetWorthPoint] {
+        let accountIds = Set(accounts.map(\.id))
+        let linkedBack = linkedTransfers
+            .filter { accountIds.contains($0.key) }
+            .reduce(0.0) { $0 + max(0.0, $1.value) }
         // Working copy — plain struct so mutations are clean value-type operations.
         struct WorkingAccount {
             var accountClass: AccountClass
@@ -290,8 +375,10 @@ enum FinanceEngine {
                 rate: a.rate,
                 promoRate: a.promoRate,
                 promoMonths: max(0, a.promoMonths),
-                contribution: max(0.0, a.monthlyContribution),
-                payment: max(0.0, a.minimumPayment),
+                contribution: effectiveContribution(a, linkedTransfers: linkedTransfers),
+                payment: a.accountClass == .debt && linkedTransfers[a.id] != nil
+                    ? max(0.0, linkedTransfers[a.id]!)
+                    : max(0.0, a.minimumPayment),
                 includeInNetWorth: a.includeInNetWorth
             )
         }
@@ -314,7 +401,7 @@ enum FinanceEngine {
 
             if monthIndex > 0 {
                 // 1. Fresh recurring surplus arrives.
-                unallocatedCash += recurringMonthlySurplus
+                unallocatedCash += recurringMonthlySurplus + linkedBack
 
                 // 2. Route contributions into asset accounts (transfer from unallocated cash).
                 for i in working.indices {
@@ -782,12 +869,16 @@ enum FinanceEngine {
 
     /// Waterfall simulation over a list of SavingsGoals.
     /// Port of runGoalSequence — same priority ordering, interest compounding, and gap analysis.
+    /// `dedicatedMonthly` (goal id → amount): a linked account's monthly contribution, paid into
+    /// that goal only, before the shared surplus is split. Port of the TS parameter of the same name.
     nonisolated static func runGoalSequence(
         goals: [SavingsGoal],
         monthlySurplus: Double,
-        horizonMonths: Int
+        horizonMonths: Int,
+        dedicatedMonthly: [String: Double] = [:]
     ) -> GoalSequenceResult {
-        guard !goals.isEmpty, monthlySurplus > 0 else {
+        let hasDedicated = goals.contains { (dedicatedMonthly[$0.id] ?? 0) > 0 }
+        guard !goals.isEmpty, monthlySurplus > 0 || hasDedicated else {
             return GoalSequenceResult(
                 timeline: [],
                 goals: goals.map { g in
@@ -824,10 +915,11 @@ enum FinanceEngine {
 
         let (working, timeline) = simulate(
             goals: sorted,
-            surplus: monthlySurplus,
+            surplus: hasDedicated ? max(0.0, monthlySurplus) : monthlySurplus,
             horizon: horizonMonths,
             startDate: startDate,
-            calendar: calendar
+            calendar: calendar,
+            dedicatedMonthly: dedicatedMonthly
         )
 
         // Build outcomes + gap analysis.
@@ -875,11 +967,13 @@ enum FinanceEngine {
                     status = .atRisk
                     extraMonthlyNeeded = solveExtraMonthly(
                         target: g, allGoals: sorted, baseSurplus: monthlySurplus,
-                        deadlineMonths: g.deadlineMonths, startDate: startDate, calendar: calendar
+                        deadlineMonths: g.deadlineMonths, startDate: startDate, calendar: calendar,
+                        dedicatedMonthly: dedicatedMonthly
                     )
                     extraMonthsNeeded = solveExtraMonths(
                         target: g, allGoals: sorted, surplus: monthlySurplus,
-                        baseHorizon: horizonMonths, startDate: startDate, calendar: calendar
+                        baseHorizon: horizonMonths, startDate: startDate, calendar: calendar,
+                        dedicatedMonthly: dedicatedMonthly
                     )
                 }
             } else {
@@ -1094,7 +1188,7 @@ private extension FinanceEngine {
 
     static func creditCardStats(_ debts: [Account]) -> CreditCardStats {
         let cards: [CardStat] = debts
-            .filter { $0.type == .creditCard && $0.creditLimit > 0 }
+            .filter { countsTowardUtilization($0) && $0.creditLimit > 0 }
             .map { d in
                 let bal = max(0.0, d.balance)
                 let lim = max(0.0, d.creditLimit)
@@ -1185,7 +1279,8 @@ private extension FinanceEngine {
         surplus: Double,
         horizon: Int,
         startDate: Date,
-        calendar: Calendar
+        calendar: Calendar,
+        dedicatedMonthly: [String: Double] = [:]
     ) -> (working: [WorkingGoal], timeline: [GoalMonthPoint]) {
         var working: [WorkingGoal] = goals.map { g in
             WorkingGoal(
@@ -1212,6 +1307,33 @@ private extension FinanceEngine {
 
             var remaining = surplus
             var perGoal: [String: GoalMonthPointPerGoal] = [:]
+            // Interest is applied once per goal per month, whichever funding step reaches it first.
+            var grown = Set<Int>()
+            func grow(_ i: Int) {
+                guard !grown.contains(i) else { return }
+                grown.insert(i)
+                if goals[i].interestRate > 0 {
+                    let mr = pow(1.0 + goals[i].interestRate / 100.0, 1.0 / 12.0) - 1.0
+                    working[i].accumulated *= (1.0 + mr)
+                }
+            }
+
+            // Dedicated money (a linked account's contribution) goes in first, to its own goal only.
+            for i in working.indices {
+                let dedicated = dedicatedMonthly[goals[i].id] ?? 0
+                guard working[i].completionMonth == nil, dedicated > 0 else { continue }
+                grow(i)
+                let contribution = min(dedicated, max(0.0, goals[i].target - working[i].accumulated))
+                working[i].accumulated = min(working[i].accumulated + contribution, goals[i].target)
+                var isComplete = false
+                if working[i].accumulated >= goals[i].target {
+                    working[i].completionMonth = month
+                    isComplete = true
+                }
+                perGoal[goals[i].id] = GoalMonthPointPerGoal(
+                    accumulated: working[i].accumulated, contribution: contribution, complete: isComplete
+                )
+            }
 
             // Indices of active (not yet complete) goals in each funding category.
             let activeIndices = working.indices.filter { working[$0].completionMonth == nil }
@@ -1224,10 +1346,7 @@ private extension FinanceEngine {
                 let contribution = min(goals[i].monthlyAmount, remaining)
 
                 // Apply monthly compounding before the contribution.
-                if goals[i].interestRate > 0 {
-                    let mr = pow(1.0 + goals[i].interestRate / 100.0, 1.0 / 12.0) - 1.0
-                    working[i].accumulated *= (1.0 + mr)
-                }
+                grow(i)
 
                 working[i].accumulated = min(working[i].accumulated + contribution, goals[i].target)
                 remaining = max(0.0, remaining - contribution)
@@ -1241,7 +1360,7 @@ private extension FinanceEngine {
                 }
                 perGoal[goals[i].id] = GoalMonthPointPerGoal(
                     accumulated: working[i].accumulated,
-                    contribution: contribution,
+                    contribution: (perGoal[goals[i].id]?.contribution ?? 0) + contribution,
                     complete: isComplete
                 )
             }
@@ -1251,10 +1370,7 @@ private extension FinanceEngine {
                 guard remaining > 0 else { break }
                 let contribution = remaining
 
-                if goals[i].interestRate > 0 {
-                    let mr = pow(1.0 + goals[i].interestRate / 100.0, 1.0 / 12.0) - 1.0
-                    working[i].accumulated *= (1.0 + mr)
-                }
+                grow(i)
 
                 working[i].accumulated = min(working[i].accumulated + contribution, goals[i].target)
                 remaining = 0.0
@@ -1266,7 +1382,7 @@ private extension FinanceEngine {
                 }
                 perGoal[goals[i].id] = GoalMonthPointPerGoal(
                     accumulated: working[i].accumulated,
-                    contribution: contribution,
+                    contribution: (perGoal[goals[i].id]?.contribution ?? 0) + contribution,
                     complete: isComplete
                 )
             }
@@ -1296,7 +1412,8 @@ private extension FinanceEngine {
         baseSurplus: Double,
         deadlineMonths: Int,
         startDate: Date,
-        calendar: Calendar
+        calendar: Calendar,
+        dedicatedMonthly: [String: Double] = [:]
     ) -> Double {
         var lo = 0.0
         var hi = target.target  // worst-case upper bound
@@ -1304,7 +1421,8 @@ private extension FinanceEngine {
             let mid = (lo + hi) / 2.0
             let workingResult = runGoalSequenceInternal(
                 goals: allGoals, surplus: baseSurplus + mid,
-                horizon: deadlineMonths, startDate: startDate, calendar: calendar
+                horizon: deadlineMonths, startDate: startDate, calendar: calendar,
+                dedicatedMonthly: dedicatedMonthly
             )
             let outcome = workingResult.first { $0.goalId == target.id }
             let hits = outcome?.completionMonth != nil && outcome!.completionMonth! <= deadlineMonths
@@ -1320,7 +1438,8 @@ private extension FinanceEngine {
         surplus: Double,
         baseHorizon: Int,
         startDate: Date,
-        calendar: Calendar
+        calendar: Calendar,
+        dedicatedMonthly: [String: Double] = [:]
     ) -> Int {
         var lo = baseHorizon
         var hi = baseHorizon + 120
@@ -1328,7 +1447,8 @@ private extension FinanceEngine {
             let mid = Int(ceil(Double(lo + hi) / 2.0))
             let workingResult = runGoalSequenceInternal(
                 goals: allGoals, surplus: surplus,
-                horizon: mid, startDate: startDate, calendar: calendar
+                horizon: mid, startDate: startDate, calendar: calendar,
+                dedicatedMonthly: dedicatedMonthly
             )
             let outcome = workingResult.first { $0.goalId == target.id }
             let hits = outcome?.completionMonth != nil
@@ -1344,17 +1464,19 @@ private extension FinanceEngine {
         surplus: Double,
         horizon: Int,
         startDate: Date,
-        calendar: Calendar
+        calendar: Calendar,
+        dedicatedMonthly: [String: Double] = [:]
     ) -> [WorkingGoal] {
-        guard !goals.isEmpty, surplus > 0 else { return [] }
+        let hasDedicated = goals.contains { (dedicatedMonthly[$0.id] ?? 0) > 0 }
+        guard !goals.isEmpty, surplus > 0 || hasDedicated else { return [] }
         let sorted = goals.sorted { a, b in
             if a.fundingMode == .fill && b.fundingMode != .fill { return false }
             if b.fundingMode == .fill && a.fundingMode != .fill { return true }
             return a.priority < b.priority
         }
         let (working, _) = simulate(
-            goals: sorted, surplus: surplus, horizon: horizon,
-            startDate: startDate, calendar: calendar
+            goals: sorted, surplus: hasDedicated ? max(0.0, surplus) : surplus, horizon: horizon,
+            startDate: startDate, calendar: calendar, dedicatedMonthly: dedicatedMonthly
         )
         return working
     }

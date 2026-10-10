@@ -4,6 +4,7 @@ import LandingPage from "./LandingPage";
 import Onboarding, { type OnboardingResult } from "./Onboarding";
 import type { CSSProperties, Dispatch, DragEvent, FormEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode, Ref, SetStateAction } from "react";
 import {
+  Clock3,
   AlertCircle,
   ArrowDown,
   ArrowUp,
@@ -74,7 +75,9 @@ import {
   getCurrencySymbol,
   getMonthKey,
   isValidMonthKey,
-  rollForwardDebtBalances,
+  deriveLiveAccounts,
+  estimateDebtPayoff,
+  recurringAccountTransfersByAccount,
   runGoalSequence,
   seedMonthFromPrevious,
   shiftMonth,
@@ -84,10 +87,23 @@ import { buildRulePattern, canonicalizeMerchant, descriptionMatchesPattern, isTr
 import { buildMerchantMemory } from "./merchantMemory";
 import { countSameName, findRuleTargeting, normalizeNameRules, renameEverywhere, type NameKind } from "./nameRules";
 import { parseQuickAdd } from "./quickAdd";
+import {
+  assignMissingAccounts,
+  countedFlowFor,
+  defaultAccountId,
+  distinctAccountColors,
+  guessAccountId,
+  isoToday,
+  nextAccountColor,
+  nextAccountId,
+  pickAccountColor,
+} from "./accountFlow";
+import { goalPlanInputs, linkSavingsTransfers, syncLinkedGoals } from "./accountLinks";
+import { matchDebtPaymentRows, skipScheduledPayment, syncScheduledDebtPayments } from "./debtSync";
 import { applyRecurringFlag, detectSubscriptions, findMissedRecurring, reconcileSeededEntries, suggestRecurringFlags, type RecurrenceCandidate } from "./recurrence";
 import { aiCategorizeRows, applyAiSuggestions, isAiCategorizationAvailable, testAiConnection } from "./aiCategorize";
 import { bucketCount, identifyAnalytics, track } from "./analytics";
-import { InstallBanner, MonthlyReminderPanel, NewMonthNudge } from "./RetentionPanels";
+import { DebtRemindersPanel, InstallBanner, MonthlyReminderPanel, NewMonthNudge } from "./RetentionPanels";
 import {
   INSTALL_DISMISSED_KEY,
   NUDGE_DISMISSED_KEY,
@@ -356,6 +372,8 @@ type ImportReviewState = {
   // spending. canFlip is false for sources that can't re-parse (bank feeds).
   signInverted: boolean;
   canFlip: boolean;
+  // Every row in one statement comes from one account; the user can change which.
+  accountId?: string;
 };
 type LastImportAction = {
   batchId: string;
@@ -511,6 +529,8 @@ function App() {
   const [query, setQuery] = useState("");
   // Starts empty so nothing flashes on load — the toast effect ignores empty values.
   const [toast, setToast] = useState("");
+  // Brief pill naming the account a transaction now belongs to, in that account's colour.
+  const [accountToast, setAccountToast] = useState<{ name: string; color: string; stamp: number } | null>(null);
   const [draggingExpenseId, setDraggingExpenseId] = useState<string | null>(null);
   const [groupingSourceId, setGroupingSourceId] = useState<string | null>(null);
   const [dropPreview, setDropPreview] = useState<ExpenseDropPreview>(null);
@@ -549,11 +569,12 @@ function App() {
   const moneyFormatter = useMemo(() => getCurrencyFormatter(ledger.currency), [ledger.currency]);
   const currencySymbol = useMemo(() => getCurrencySymbol(ledger.currency), [ledger.currency]);
   const projection = useMemo(() => calculateProjection(currentMonth), [currentMonth]);
-  // Debt balances rolled forward from their snapshot month to today — every summary, chart,
-  // and the accounts screen read these, so a card set up months ago shows what's left after
-  // the scheduled (or linked) payments, not the stale snapshot.
+  // Debt balances rolled forward from their snapshot month to today, and 0%/intro windows
+  // counted down — every summary, chart, and the accounts screen read these, so a card set up
+  // months ago shows what's left after the scheduled (or linked) payments, and "12 months
+  // interest-free" reads 11 a month later, not the stale snapshot.
   const effectiveAccounts = useMemo(
-    () => rollForwardDebtBalances({ accounts: ledger.accounts, months: ledger.months }),
+    () => deriveLiveAccounts({ accounts: ledger.accounts, months: ledger.months }),
     [ledger.accounts, ledger.months],
   );
   const debtSummary = useMemo(() => calculateDebtSummary(effectiveAccounts), [effectiveAccounts]);
@@ -565,8 +586,9 @@ function App() {
         accounts: effectiveAccounts,
         projection,
         months: netWorthHorizon,
+        linkedTransfers: recurringAccountTransfersByAccount(currentMonth),
       }),
-    [effectiveAccounts, netWorthHorizon, projection],
+    [effectiveAccounts, netWorthHorizon, projection, currentMonth],
   );
   const categoryRows = useMemo(() => buildCategoryRows(currentMonth, projection), [currentMonth, projection]);
   const expenseGroups = useMemo(() => buildExpenseGroups(currentMonth.expenses), [currentMonth.expenses]);
@@ -627,20 +649,38 @@ function App() {
     () => buildFinancialSignals({ projection, debtSummary, accounts: effectiveAccounts, assetSummary, month: currentMonth, savingsTarget: ledger.savingsTarget }),
     [currentMonth, debtSummary, assetSummary, effectiveAccounts, ledger.savingsTarget, projection],
   );
-  const goalPlannerSurplus = ledger.goalPlannerSurplus ?? projection.recurringMonthlySurplus;
-  const goalSequence = useMemo(
-    () => runGoalSequence({ goals: ledger.goals, monthlySurplus: goalPlannerSurplus, horizonMonths: ledger.goalsHorizonMonths }),
-    [ledger.goals, goalPlannerSurplus, ledger.goalsHorizonMonths],
+  // Goals share only the money that isn't already routed into an account each month; a goal's
+  // own account pays its contribution straight in.
+  const goalPlan = useMemo(
+    () =>
+      goalPlanInputs({
+        goals: ledger.goals,
+        accounts: effectiveAccounts,
+        month: currentMonth,
+        recurringSurplus: projection.recurringMonthlySurplus,
+        override: ledger.goalPlannerSurplus,
+      }),
+    [ledger.goals, effectiveAccounts, currentMonth, projection.recurringMonthlySurplus, ledger.goalPlannerSurplus],
   );
-  const ledgerGoal = ledger.goals.find((g) => g.id === ledger.ledgerGoalId) ?? ledger.goals[0] ?? null;
-  const ledgerGoalOutcome = ledgerGoal ? goalSequence.goals.find((o) => o.goalId === ledgerGoal.id) ?? null : null;
-  const ledgerGoalPercent = ledgerGoal ? clampPercent((ledgerGoal.saved / Math.max(ledgerGoal.target, 1)) * 100) : 0;
+  const goalPlannerSurplus = goalPlan.monthlySurplus;
+  const goalSequence = useMemo(
+    () =>
+      runGoalSequence({
+        goals: ledger.goals,
+        monthlySurplus: goalPlannerSurplus,
+        horizonMonths: ledger.goalsHorizonMonths,
+        dedicatedMonthly: goalPlan.dedicatedMonthly,
+      }),
+    [ledger.goals, goalPlannerSurplus, ledger.goalsHorizonMonths, goalPlan.dedicatedMonthly],
+  );
   const selectedYear = ledger.selectedMonth.split("-")[0];
   const menuExpense = categoryMenu ? currentMonth.expenses.find((expense) => expense.id === categoryMenu.expenseId) : undefined;
   const debtAccountNameById = useMemo(
     () => new Map(ledger.accounts.filter((account) => account.accountClass === "debt").map((account) => [account.id, account.name])),
     [ledger.accounts],
   );
+  const accountNameById = useMemo(() => new Map(ledger.accounts.map((account) => [account.id, account.name])), [ledger.accounts]);
+  const accountById = useMemo(() => new Map(ledger.accounts.map((account) => [account.id, account])), [ledger.accounts]);
   const merchantMemory = useMemo(() => buildMerchantMemory(ledger), [ledger]);
   const quickAddPreview = useMemo(() => {
     if (!quickAddInput.trim()) return null;
@@ -970,8 +1010,12 @@ function App() {
             minimumPayment: 0,
             dueDay: 1,
             balanceAsOf: getMonthKey(),
+            promoAsOf: getMonthKey(),
+            balanceSetOn: isoToday(),
+            ledgerOffset: 0,
             includeInNetWorth: true,
-            color: colors[(current.accounts.length + index) % colors.length],
+            // Placeholder; distinctAccountColors below gives each a different hue.
+            color: "",
             note: "",
           })),
         ];
@@ -1001,7 +1045,7 @@ function App() {
           ...current,
           currency: result.currency,
           months: { ...current.months, [monthKey]: { ...month, incomes, expenses } },
-          accounts,
+          accounts: distinctAccountColors(accounts),
           goals,
         };
       });
@@ -1045,6 +1089,12 @@ function App() {
   }, [toast]);
 
   useEffect(() => {
+    if (!accountToast) return;
+    const timer = window.setTimeout(() => setAccountToast(null), 1400);
+    return () => window.clearTimeout(timer);
+  }, [accountToast]);
+
+  useEffect(() => {
     if (!categoryMenu) return;
 
     function closeMenu() {
@@ -1063,8 +1113,10 @@ function App() {
   }, [categoryMenu]);
 
   function updateLedger(updater: (current: LedgerState) => LedgerState) {
+    // Every change re-syncs scheduled debt payments, so an account edit, a new month, or an
+    // import that brings in the real payment all leave exactly one payment row per debt.
     setLedger((current) => ({
-      ...updater(current),
+      ...syncLedgerLinks(updater(current)),
       lastSavedAt: new Date().toISOString(),
     }));
   }
@@ -1109,6 +1161,30 @@ function App() {
     setToast("Month switched");
   }
 
+  // A row typed into the current month happened today, so it moves its account's balance now.
+  // Rows typed into another month keep no day (past months are already in typed balances; future
+  // ones count from the 1st when that month arrives).
+  function newEntryDate(): string | undefined {
+    return ledger.selectedMonth === getMonthKey() ? isoToday() : undefined;
+  }
+
+  // Clicking a transaction's dot moves it to the next account; its money moves with it.
+  function cycleEntryAccount(kind: "income" | "expense", id: string) {
+    const entry =
+      kind === "income" ? currentMonth.incomes.find((income) => income.id === id) : currentMonth.expenses.find((expense) => expense.id === id);
+    const nextId = nextAccountId(ledger.accounts, entry?.accountId);
+    const account = ledger.accounts.find((item) => item.id === nextId);
+    if (!account) return;
+    if (kind === "income") updateIncome(id, { accountId: account.id });
+    else updateExpense(id, { accountId: account.id });
+    showAccountToast(account);
+  }
+
+  function showAccountToast(account: Account) {
+    setToastVisible(false);
+    setAccountToast({ name: account.name, color: account.color, stamp: Date.now() });
+  }
+
   function addIncome() {
     const amount = Number(incomeDraft.amount);
     if (!incomeDraft.source.trim()) {
@@ -1133,6 +1209,8 @@ function App() {
           amount,
           color: colors[month.incomes.length % colors.length],
           recurring: true,
+          date: newEntryDate(),
+          accountId: guessAccountId(ledger, "income", incomeDraft.source),
         },
       ],
     }));
@@ -1171,6 +1249,8 @@ function App() {
           color: remembered?.category ? remembered.color : colors[(month.expenses.length + 2) % colors.length],
           recurring: remembered?.recurring ?? true,
           categorySource: remembered?.category ? ("rule" as const) : undefined,
+          date: newEntryDate(),
+          accountId: guessAccountId(ledger, "expense", expenseDraft.name),
         },
       ],
     }));
@@ -1200,7 +1280,8 @@ function App() {
               amount: draft.amount,
               color: draft.color ?? colors[month.incomes.length % colors.length],
               recurring: draft.recurring,
-              date: draft.date,
+              date: draft.date ?? newEntryDate(),
+              accountId: guessAccountId(ledger, "income", draft.description),
             },
           ],
         };
@@ -1216,7 +1297,8 @@ function App() {
             category: draft.category === "Unsorted" ? "" : draft.category,
             color: draft.color ?? colors[(month.expenses.length + 2) % colors.length],
             recurring: draft.recurring,
-            date: draft.date,
+            date: draft.date ?? newEntryDate(),
+            accountId: guessAccountId(ledger, "expense", draft.description),
             categorySource: draft.category && draft.category !== "Unsorted" ? draft.categorySource : undefined,
           },
         ],
@@ -1237,7 +1319,12 @@ function App() {
   function updateExpense(id: string, patch: Partial<ExpenseEntry>) {
     updateCurrentMonth((month) => ({
       ...month,
-      expenses: month.expenses.map((expense) => (expense.id === id ? { ...expense, ...patch } : expense)),
+      expenses: month.expenses.map((expense) => {
+        if (expense.id !== id) return expense;
+        // Typing a different amount into a planned debt payment confirms what was actually paid.
+        const confirms = expense.scheduledPayment && "amount" in patch && patch.amount !== expense.amount;
+        return { ...expense, ...patch, ...(confirms ? { scheduledPayment: false } : {}) };
+      }),
     }));
   }
 
@@ -1289,6 +1376,23 @@ function App() {
 
   function removeExpense(id: string) {
     const entry = currentMonth.expenses.find((expense) => expense.id === id);
+    if (entry?.scheduledPayment && entry.debtAccountId) {
+      // A planned debt payment comes from the account, not from last month's row. Removing it
+      // means "not paying this one this month"; the account's monthly payment stays as it was.
+      const accountId = entry.debtAccountId;
+      const accountName = ledger.accounts.find((account) => account.id === accountId)?.name ?? "this account";
+      updateLedger((current) => {
+        const skipped = skipScheduledPayment(current, accountId, current.selectedMonth);
+        const month = skipped.months[current.selectedMonth];
+        if (!month) return skipped;
+        return {
+          ...skipped,
+          months: { ...skipped.months, [current.selectedMonth]: { ...month, expenses: month.expenses.filter((expense) => expense.id !== id) } },
+        };
+      });
+      setToast(`Skipped ${accountName} for ${formatMonth(ledger.selectedMonth)}. Set its monthly payment to 0 on Accounts to stop it.`);
+      return;
+    }
     updateLedger((current) => stopSeededRepeat(current, entry?.seededFrom, "expense"));
     updateCurrentMonth((month) => ({
       ...month,
@@ -1330,12 +1434,15 @@ function App() {
           promoRate: Math.max(0, Number(accountDraft.promoRate) || 0),
           promoMonths: clampWholeNumber(Number(accountDraft.promoMonths) || 0, 120),
           monthlyContribution: isDebt ? 0 : Math.max(0, Number(accountDraft.monthlyContribution) || 0),
-          creditLimit: isDebt ? Math.max(0, Number(accountDraft.creditLimit) || 0) : 0,
+          creditLimit: isDebt && accountDraft.type !== "loan" ? Math.max(0, Number(accountDraft.creditLimit) || 0) : 0,
           minimumPayment: isDebt ? Math.max(0, Number(accountDraft.minimumPayment) || 0) : 0,
           dueDay: isDebt ? clampDueDay(Number(accountDraft.dueDay) || 1) : 1,
           balanceAsOf: getMonthKey(),
+          promoAsOf: getMonthKey(),
+          balanceSetOn: isoToday(),
+          ledgerOffset: 0,
           includeInNetWorth: true,
-          color: colors[current.accounts.length % colors.length],
+          color: pickAccountColor(current.accounts.map((account) => account.color)),
           note: "",
         },
       ],
@@ -1346,12 +1453,24 @@ function App() {
 
   function updateAccount(id: string, patch: Partial<Account>) {
     // Editing the balance is the "true up against my statement" gesture: re-anchor the
-    // snapshot to this month so the debt roll-forward restarts from the value just typed.
-    const anchored = "balance" in patch ? { ...patch, balanceAsOf: getMonthKey() } : patch;
-    updateLedger((current) => ({
-      ...current,
-      accounts: current.accounts.map((account) => (account.id === id ? { ...account, ...anchored } : account)),
-    }));
+    // snapshot to now so the debt roll-forward and the ledger's movements restart from the value
+    // just typed. Promo months work the same way: the typed number is "months left as of now".
+    const anchored: Partial<Account> = { ...patch };
+    if ("balance" in patch) {
+      anchored.balanceAsOf = getMonthKey();
+      anchored.balanceSetOn = isoToday();
+      anchored.ledgerOffset = 0;
+    }
+    if ("promoMonths" in patch) anchored.promoAsOf = getMonthKey();
+    updateLedger((current) => {
+      let accounts = current.accounts.map((account) => (account.id === id ? { ...account, ...anchored } : account));
+      if ("balance" in patch) {
+        // Today's ledger rows on this account are already in the figure the user typed.
+        const counted = countedFlowFor(id, accounts, current.months);
+        accounts = accounts.map((account) => (account.id === id ? { ...account, ledgerOffset: -counted } : account));
+      }
+      return { ...current, accounts };
+    });
   }
 
   function removeAccount(id: string) {
@@ -1613,9 +1732,17 @@ function App() {
 
   function linkExpenseToDebt(id: string, debtAccountId: string | undefined) {
     const accountName = debtAccountId ? ledger.accounts.find((account) => account.id === debtAccountId)?.name : undefined;
-    updateExpense(id, { debtAccountId });
+    // A row is either a debt payment or a transfer into savings, never both.
+    updateExpense(id, { debtAccountId, ...(debtAccountId ? { toAccountId: undefined } : {}) });
     setCategoryMenu(null);
     setToast(accountName ? `Counted as payment towards ${accountName}` : "Payment unlinked from debt account");
+  }
+
+  function linkExpenseToSavings(id: string, toAccountId: string | undefined) {
+    const accountName = toAccountId ? ledger.accounts.find((account) => account.id === toAccountId)?.name : undefined;
+    updateExpense(id, { toAccountId, ...(toAccountId ? { debtAccountId: undefined } : {}) });
+    setCategoryMenu(null);
+    setToast(accountName ? `Counted as money into ${accountName}` : "Unlinked from savings account");
   }
 
   function clearDragState() {
@@ -1827,11 +1954,12 @@ function App() {
     });
     setImportReview({
       fileName: BANK_FEED_SOURCE_NAME,
-      rows: review.rows,
+      rows: matchDebtPaymentRows(review.rows, effectiveAccounts, moneyFormatter),
       errors: [],
       totalRows: review.total,
       signInverted: false,
       canFlip: false,
+      accountId: suggestImportAccount(false),
     });
   }
 
@@ -1865,6 +1993,15 @@ function App() {
     }
   }
 
+  // A card statement most likely belongs to a card; anything else to the default account.
+  function suggestImportAccount(cardStatement: boolean): string | undefined {
+    if (cardStatement) {
+      const card = ledger.accounts.find((account) => account.accountClass === "debt" && account.type === "credit-card");
+      if (card) return card.id;
+    }
+    return defaultAccountId(ledger);
+  }
+
   // Shared inlet for every text capture path (file upload, paste). Parses whatever
   // format arrives, opens the review, and — when the user opted in — asks the AI
   // backstop to upgrade the low-confidence rows in the background.
@@ -1879,11 +2016,12 @@ function App() {
     });
     setImportReview({
       fileName: sourceName,
-      rows: result.rows,
+      rows: matchDebtPaymentRows(result.rows, effectiveAccounts, moneyFormatter),
       errors: result.errors,
       totalRows: result.totalRows,
       signInverted: Boolean(result.signInverted),
       canFlip: true,
+      accountId: suggestImportAccount(Boolean(result.signInverted)),
     });
     setToast(
       !result.rows.length
@@ -2072,6 +2210,7 @@ function App() {
             recurring: false,
             date: row.date,
             imported,
+            accountId: importReview.accountId,
             categorySource: row.categorySource,
           };
           months[row.monthKey] = {
@@ -2093,6 +2232,7 @@ function App() {
           date: row.date,
           imported,
           debtAccountId: row.kind === "debt-payment" ? row.debtAccountId : undefined,
+          accountId: importReview.accountId,
           categorySource: row.categorySource,
         };
         months[row.monthKey] = {
@@ -2689,7 +2829,7 @@ function App() {
                       <strong className={ledger.privacyMode ? "masked" : ""}>{moneyFormatter.format(debtSummary.monthlyMinimums)}</strong>
                     </div>
                     <div>
-                      <span>Utilization</span>
+                      <span>Card utilization</span>
                       <strong>{formatDecimal(debtSummary.utilization)}%</strong>
                     </div>
                     <div>
@@ -2830,6 +2970,8 @@ function App() {
                         <IncomeRow
                           key={income.id}
                           income={income}
+                          account={accountById.get(income.accountId ?? "")}
+                          onCycleAccount={() => cycleEntryAccount("income", income.id)}
                           privacy={ledger.privacyMode}
                           symbol={currencySymbol}
                           dragging={draggingIncomeId === income.id}
@@ -2944,7 +3086,6 @@ function App() {
                                 >
                                   {categoryCollapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
                                 </button>
-                                <span className="swatch small" style={{ background: group.color }} />
                                 <input
                                   className="categoryNameInput"
                                   aria-label="Category name"
@@ -2979,10 +3120,13 @@ function App() {
                                 <ExpenseRow
                                   key={expense.id}
                                   expense={expense}
+                                  account={accountById.get(expense.accountId ?? "")}
+                                  onCycleAccount={() => cycleEntryAccount("expense", expense.id)}
                                   privacy={ledger.privacyMode}
                                   formatter={moneyFormatter}
                                   symbol={currencySymbol}
                                   linkedAccountName={expense.debtAccountId ? debtAccountNameById.get(expense.debtAccountId) : undefined}
+                                  savingsAccountName={expense.toAccountId ? accountNameById.get(expense.toAccountId) : undefined}
                                   dragging={draggingExpenseId === expense.id}
                                   grouping={groupingSourceId === expense.id}
                                   dropState={dropState}
@@ -3063,22 +3207,16 @@ function App() {
               </section>
 
               <section className="notesBand">
-                <GoalsPanel
-                  ledger={ledger}
+                <LedgerAccountsPanel
+                  accounts={effectiveAccounts}
+                  defaultAccountId={defaultAccountId(ledger)}
                   month={currentMonth}
-                  goal={ledgerGoal}
-                  goalPercent={ledgerGoalPercent}
-                  goalOutcome={ledgerGoalOutcome}
-                  allGoals={ledger.goals}
-                  ledgerGoalId={ledger.ledgerGoalId}
-                  projection={projection}
-                  onSelectGoal={(id) => updateLedger((c) => ({ ...c, ledgerGoalId: id }))}
-                  onGoToGoals={() => setActiveView("goals")}
-                  onGoalChange={(patch) => ledgerGoal && updateGoal(ledgerGoal.id, patch)}
+                  formatter={moneyFormatter}
+                  privacy={ledger.privacyMode}
+                  onDefaultChange={(accountId) => updateLedger((current) => ({ ...current, defaultAccountId: accountId }))}
+                  onGoToAccounts={() => setActiveView("accounts")}
                   onNoteChange={(note) => updateCurrentMonth((month) => ({ ...month, note }))}
                   onResetMonth={resetMonth}
-                  privacy={ledger.privacyMode}
-                  symbol={currencySymbol}
                 />
               </section>
 
@@ -3124,6 +3262,7 @@ function App() {
                           <AccountRow
                             key={account.id}
                             account={account}
+                            otherColors={ledger.accounts.filter((other) => other.id !== account.id).map((other) => other.color)}
                             symbol={currencySymbol}
                             formatter={moneyFormatter}
                             privacy={ledger.privacyMode}
@@ -3147,6 +3286,7 @@ function App() {
                           <AccountRow
                             key={account.id}
                             account={account}
+                            otherColors={ledger.accounts.filter((other) => other.id !== account.id).map((other) => other.color)}
                             symbol={currencySymbol}
                             formatter={moneyFormatter}
                             privacy={ledger.privacyMode}
@@ -3160,6 +3300,22 @@ function App() {
                     )}
                   </div>
                 </article>
+
+                <DebtRemindersPanel
+                  reminders={effectiveAccounts
+                    .filter((account) => account.accountClass === "debt" && account.balance > 0)
+                    .map((account) => ({
+                      id: account.id,
+                      name: account.name,
+                      dueDay: clampDueDay(account.dueDay),
+                      amountLabel: !ledger.privacyMode && account.minimumPayment > 0 ? moneyFormatter.format(account.minimumPayment) : null,
+                    }))}
+                  onDownloadIcs={(name, contents) => {
+                    downloadFile(name, contents, "text/calendar");
+                    setToast("Reminders saved. Open the file to add them to your calendar.");
+                  }}
+                  onReminderAdded={(method) => track("reminder_added", { method, kind: "debt" })}
+                />
 
                 <AccountEditor
                   draft={accountDraft}
@@ -3196,6 +3352,9 @@ function App() {
               goals={ledger.goals}
               goalSequence={goalSequence}
               goalPlannerSurplus={goalPlannerSurplus}
+              routedElsewhere={goalPlan.routedElsewhere}
+              dedicatedMonthly={goalPlan.dedicatedMonthly}
+              savingsAccounts={effectiveAccounts.filter((account) => account.accountClass !== "debt")}
               surplexOverridden={ledger.goalPlannerSurplus !== null}
               goalsHorizonMonths={ledger.goalsHorizonMonths}
               currency={ledger.currency}
@@ -3806,12 +3965,21 @@ function App() {
           </div>
         )}
 
+        {accountToast && (
+          <div className="statusToast accountToast" role="status" aria-live="polite" key={accountToast.stamp}>
+            <span className="accountToastDot" style={{ background: accountToast.color }} />
+            {accountToast.name}
+          </div>
+        )}
+
         {importReview && (
           <ImportReviewModal
             review={importReview}
             categoryOptions={importCategoryOptions}
             debtAccounts={ledger.accounts.filter((account) => account.accountClass === "debt")}
+            accounts={ledger.accounts}
             formatter={moneyFormatter}
+            onAccountChange={(accountId) => setImportReview((current) => (current ? { ...current, accountId } : current))}
             onClose={() => {
               feedRowMapRef.current = null; // cancelled feed reviews stay staged
               setImportReview(null);
@@ -3830,6 +3998,7 @@ function App() {
             expense={menuExpense}
             options={categoryOptions}
             debtAccounts={effectiveAccounts.filter((account) => account.accountClass === "debt")}
+            savingsAccounts={effectiveAccounts.filter((account) => account.accountClass !== "debt")}
             formatter={moneyFormatter}
             privacy={ledger.privacyMode}
             x={categoryMenu.x}
@@ -3837,6 +4006,7 @@ function App() {
             onMove={(category) => moveExpenseFromMenu(menuExpense.id, category)}
             onUngroup={() => ungroupExpense(menuExpense.id)}
             onLinkDebt={(debtAccountId) => linkExpenseToDebt(menuExpense.id, debtAccountId)}
+            onLinkSavings={(toAccountId) => linkExpenseToSavings(menuExpense.id, toAccountId)}
           />
         )}
       </div>
@@ -4282,8 +4452,10 @@ function ImportReviewModal({
   review,
   categoryOptions,
   debtAccounts,
+  accounts,
   formatter,
   onClose,
+  onAccountChange,
   onToggleFlip,
   onRowChange,
   onToggleAll,
@@ -4294,8 +4466,10 @@ function ImportReviewModal({
   review: ImportReviewState;
   categoryOptions: string[];
   debtAccounts: Account[];
+  accounts: Account[];
   formatter: Intl.NumberFormat;
   onClose: () => void;
+  onAccountChange: (accountId: string) => void;
   onToggleFlip: () => void;
   onRowChange: (id: string, patch: Partial<CsvImportRow>) => void;
   onToggleAll: (include: boolean) => void;
@@ -4393,6 +4567,23 @@ function ImportReviewModal({
                   </button>
                 )}
               </div>
+              {accounts.length > 0 && (
+                <label className="bulkCategoryField importAccountField">
+                  <span className="accountToastDot" style={{ background: accounts.find((account) => account.id === review.accountId)?.color }} />
+                  <span>All rows go into</span>
+                  <select
+                    value={review.accountId ?? ""}
+                    onChange={(event) => onAccountChange(event.target.value)}
+                    aria-label="Account these transactions belong to"
+                  >
+                    {accounts.map((account) => (
+                      <option key={account.id} value={account.id}>
+                        {account.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <label className="bulkCategoryField">
                 <span>Bulk category</span>
                 <input
@@ -4749,6 +4940,7 @@ function CategoryContextMenu({
   expense,
   options,
   debtAccounts,
+  savingsAccounts,
   formatter,
   privacy,
   x,
@@ -4756,10 +4948,12 @@ function CategoryContextMenu({
   onMove,
   onUngroup,
   onLinkDebt,
+  onLinkSavings,
 }: {
   expense: ExpenseEntry;
   options: CategoryOption[];
   debtAccounts: Account[];
+  savingsAccounts: Account[];
   formatter: Intl.NumberFormat;
   privacy: boolean;
   x: number;
@@ -4767,6 +4961,7 @@ function CategoryContextMenu({
   onMove: (category: string) => void;
   onUngroup: () => void;
   onLinkDebt: (debtAccountId: string | undefined) => void;
+  onLinkSavings: (toAccountId: string | undefined) => void;
 }) {
   return (
     <div
@@ -4845,6 +5040,34 @@ function CategoryContextMenu({
           </div>
         </>
       )}
+      {savingsAccounts.length > 0 && (
+        <>
+          <span className="contextMenuDivider" />
+          <div className="contextMenuTitle">
+            <span>Money moved into</span>
+          </div>
+          <div className="contextMenuList">
+            {savingsAccounts.map((account) => {
+              const active = account.id === expense.toAccountId;
+              return (
+                <button
+                  className={active ? "contextMenuItem active" : "contextMenuItem"}
+                  type="button"
+                  role="menuitem"
+                  key={account.id}
+                  aria-label={active ? `Unlink from ${account.name}` : `Count as money into ${account.name}`}
+                  onClick={() => onLinkSavings(active ? undefined : account.id)}
+                >
+                  <span className="swatch small" style={{ background: account.color }} />
+                  <span>{account.name}</span>
+                  <em className={privacy ? "masked contextMenuMeta" : "contextMenuMeta"}>{formatter.format(account.balance)}</em>
+                  {active && <Check size={14} />}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -4892,8 +5115,26 @@ function Panel({
   );
 }
 
+// The account a transaction belongs to, as a dot in that account's colour. Clicking moves the
+// transaction (and its money) to the next account. Hidden until the user has an account.
+function AccountDot({ account, label, onCycle }: { account?: Account; label: string; onCycle: () => void }) {
+  if (!account) return <span className="accountDot empty" aria-hidden="true" />;
+  return (
+    <button
+      className="accountDot"
+      type="button"
+      style={{ background: account.color }}
+      onClick={onCycle}
+      aria-label={`${label} is in ${account.name}. Move to the next account`}
+      data-tip={`${account.name} · click to change account`}
+    />
+  );
+}
+
 function IncomeRow({
   income,
+  account,
+  onCycleAccount,
   privacy,
   symbol,
   dragging,
@@ -4908,6 +5149,8 @@ function IncomeRow({
   onRemove,
 }: {
   income: IncomeEntry;
+  account?: Account;
+  onCycleAccount: () => void;
   privacy: boolean;
   symbol: string;
   dragging: boolean;
@@ -4965,13 +5208,7 @@ function IncomeRow({
       >
         ::
       </button>
-      <button
-        className="swatch"
-        type="button"
-        style={{ background: income.color }}
-        onClick={() => onChange({ color: nextColor(income.color) })}
-        aria-label="Cycle income color"
-      />
+      <AccountDot account={account} label={income.source || "income"} onCycle={onCycleAccount} />
       <input
         value={income.source}
         onChange={(event) => onChange({ source: capitalizeFirst(event.target.value) })}
@@ -5103,10 +5340,13 @@ function RecurringToggle({
 
 function ExpenseRow({
   expense,
+  account,
+  onCycleAccount,
   privacy,
   formatter,
   symbol,
   linkedAccountName,
+  savingsAccountName,
   dragging,
   grouping,
   dropState,
@@ -5121,10 +5361,13 @@ function ExpenseRow({
   onRemove,
 }: {
   expense: ExpenseEntry;
+  account?: Account;
+  onCycleAccount: () => void;
   privacy: boolean;
   formatter: Intl.NumberFormat;
   symbol: string;
   linkedAccountName?: string;
+  savingsAccountName?: string;
   dragging: boolean;
   grouping: boolean;
   dropState?: ExpenseDropState;
@@ -5159,7 +5402,7 @@ function ExpenseRow({
 
   return (
     <div
-      className={`financeRow expenseRow ${dragging ? "dragging" : ""} ${grouping ? "groupingSource" : ""} ${dropClass}`}
+      className={`financeRow expenseRow ${expense.scheduledPayment ? "isPlanned" : ""} ${dragging ? "dragging" : ""} ${grouping ? "groupingSource" : ""} ${dropClass}`}
       data-expense-name={expense.name}
       data-expense-id={expense.id}
       draggable
@@ -5181,6 +5424,7 @@ function ExpenseRow({
       >
         ::
       </button>
+      <AccountDot account={account} label={expense.name || "expense"} onCycle={onCycleAccount} />
       <input
         value={expense.name}
         onChange={(event) => onChange({ name: capitalizeFirst(event.target.value) })}
@@ -5198,7 +5442,27 @@ function ExpenseRow({
       />
       <span className={privacy ? "rowTotal masked" : "rowTotal"}>{formatter.format(expense.amount)}</span>
       <div className="rowActions">
-        {linkedAccountName && (
+        {expense.scheduledPayment && (
+          <span
+            className="plannedBadge"
+            aria-label={`Planned from ${linkedAccountName ?? "your debt account"}. Your real payment replaces it when you import your statement, or type the amount you paid.`}
+            data-tip={`Planned from ${linkedAccountName ?? "your debt account"}. Your real payment replaces it when you import your statement, or type the amount you paid.`}
+          >
+            <Clock3 size={15} />
+          </span>
+        )}
+        {/* A planned row always repeats (it comes from the account), and its clock already names
+            the account, so it shows neither the link badge nor the repeat toggle. */}
+        {savingsAccountName && (
+          <span
+            className="debtLinkBadge"
+            aria-label={`Counts as money into ${savingsAccountName}`}
+            data-tip={`Counts as money into ${savingsAccountName}`}
+          >
+            <PiggyBank size={15} />
+          </span>
+        )}
+        {linkedAccountName && !expense.scheduledPayment && (
           <span
             className="debtLinkBadge"
             aria-label={`Counts as a payment towards ${linkedAccountName}`}
@@ -5207,11 +5471,13 @@ function ExpenseRow({
             <CreditCard size={15} />
           </span>
         )}
-        <RecurringToggle
-          recurring={expense.recurring}
-          kind="expense"
-          onToggle={() => onChange({ recurring: !expense.recurring })}
-        />
+        {!expense.scheduledPayment && (
+          <RecurringToggle
+            recurring={expense.recurring}
+            kind="expense"
+            onToggle={() => onChange({ recurring: !expense.recurring })}
+          />
+        )}
         <button className="iconButton rowAction" type="button" onClick={onRemove} aria-label="Remove expense">
           <Trash2 size={17} />
         </button>
@@ -5222,6 +5488,7 @@ function ExpenseRow({
 
 function AccountRow({
   account,
+  otherColors,
   symbol,
   formatter,
   privacy,
@@ -5230,6 +5497,8 @@ function AccountRow({
   onRemove,
 }: {
   account: Account;
+  // Colours the other accounts use, so the swatch only offers ones that keep dots distinct.
+  otherColors: string[];
   symbol: string;
   formatter: Intl.NumberFormat;
   privacy: boolean;
@@ -5238,8 +5507,10 @@ function AccountRow({
   onRemove: () => void;
 }) {
   const isDebt = account.accountClass === "debt";
-  const utilization = isDebt && account.creditLimit > 0 ? clampPercent((account.balance / account.creditLimit) * 100) : 0;
+  const hasLimit = isDebt && account.type !== "loan";
+  const utilization = hasLimit && account.creditLimit > 0 ? clampPercent((account.balance / account.creditLimit) * 100) : 0;
   const typeOptions = ACCOUNT_TYPE_OPTIONS[account.accountClass];
+  const payoff = isDebt ? estimateDebtPayoff(account) : null;
 
   return (
     <div className={`debtAccountRow ${isDebt ? "isDebt" : "isAsset"}`} style={{ "--account-color": account.color } as CSSProperties}>
@@ -5247,7 +5518,7 @@ function AccountRow({
         className="swatchButton"
         type="button"
         style={{ background: account.color }}
-        onClick={() => onChange({ color: nextColor(account.color) })}
+        onClick={() => onChange({ color: nextAccountColor(account.color, otherColors) })}
         aria-label="Cycle account color"
       />
       <div className="debtAccountMain">
@@ -5276,7 +5547,12 @@ function AccountRow({
         />
       </div>
 
-      {isDebt ? (
+      {isDebt && !hasLimit ? (
+        <div className="debtField limitField payoffField">
+          <span>Paid off</span>
+          <strong>{payoffLabel(payoff)}</strong>
+        </div>
+      ) : isDebt ? (
         <div className="debtField limitField">
           <span>Limit</span>
           <MoneyInput
@@ -5314,11 +5590,11 @@ function AccountRow({
         <InfoHint label={`Rate help for ${account.name}`} text={rateHelp(account.accountClass)} />
       </label>
       <label className="numberField compact hintField interestFreeField">
-        <span className="fieldLabel">{isDebt ? "0% months" : "Intro months"}</span>
+        <span className="fieldLabel">{isDebt ? "Promo months" : "Intro months"}</span>
         <input
           value={String(account.promoMonths)}
           inputMode="numeric"
-          placeholder={isDebt ? "0% months left" : "Intro months left"}
+          placeholder={isDebt ? "Promo months left" : "Intro months left"}
           onChange={(event) => onChange({ promoMonths: clampWholeNumber(Number(event.target.value) || 0, 120) })}
           aria-label={`Promo months for ${account.name}`}
         />
@@ -5326,8 +5602,8 @@ function AccountRow({
           label={`Promo period help for ${account.name}`}
           text={
             isDebt
-              ? "Months left before APR starts applying. The forecast delays interest until then."
-              : "Months an intro rate applies before the standard rate takes over. Leave blank if none."
+              ? "Months left on a 0% or balance-transfer rate before the APR applies. It counts down by itself each month, and the forecast uses the promo rate until then."
+              : "Months left on an intro rate before the standard rate takes over. It counts down by itself each month. Leave blank if none."
           }
         />
       </label>
@@ -5345,6 +5621,20 @@ function AccountRow({
               onChange={(value) => onChange({ minimumPayment: Math.max(0, Number(value) || 0) })}
             />
           </div>
+          <label className="numberField compact hintField debtPromoRateField">
+            <span className="fieldLabel">Promo rate %</span>
+            <input
+              value={String(account.promoRate)}
+              inputMode="decimal"
+              placeholder="Promo rate %"
+              onChange={(event) => onChange({ promoRate: Math.max(0, Number(event.target.value) || 0) })}
+              aria-label={`Promo rate for ${account.name}`}
+            />
+            <InfoHint
+              label={`Promo rate help for ${account.name}`}
+              text="The rate during the promo months: 0 for an interest-free card, or the deal rate for a balance transfer (e.g. 2.9)."
+            />
+          </label>
           <label className="numberField compact hintField dueField">
             <span className="fieldLabel">Due day</span>
             <input value={String(account.dueDay)} inputMode="numeric" placeholder="Due day (1-31)" onChange={(event) => onChange({ dueDay: clampDueDay(Number(event.target.value) || 1) })} aria-label={`Due day for ${account.name}`} />
@@ -5368,7 +5658,7 @@ function AccountRow({
       <div className="debtAccountMeta">
         <span>{accountTypeLabel(account)}</span>
         <strong className={privacy ? "masked" : ""}>{formatter.format(account.balance)}</strong>
-        <em>{autoNote ? `${accountMetaCaption(account, utilization)} · ${autoNote}` : accountMetaCaption(account, utilization)}</em>
+        <em>{[accountMetaCaption(account, utilization, payoff, hasLimit, formatter, privacy), autoNote].filter(Boolean).join(" · ")}</em>
       </div>
       <button className="iconButton rowAction" type="button" onClick={onRemove} aria-label={`Remove ${account.name}`}>
         <Trash2 size={17} />
@@ -5462,7 +5752,7 @@ function AccountEditor({
           <input
             value={draft.promoMonths}
             inputMode="numeric"
-            placeholder={isDebt ? "Interest-free months left" : "Intro rate months (optional)"}
+            placeholder={isDebt ? "Promo months left (0% or balance transfer)" : "Intro rate months (optional)"}
             onChange={(event) => setDraft((current) => ({ ...current, promoMonths: event.target.value }))}
             aria-label="Promo months"
           />
@@ -5470,7 +5760,7 @@ function AccountEditor({
             label="Promo period help"
             text={
               isDebt
-                ? "Months before APR starts applying. The forecast delays interest until this period ends."
+                ? "Months left before APR starts applying, as of today. It counts down by itself each month, and the forecast delays interest until this period ends."
                 : "If this account has an intro rate, how many months it lasts before the standard rate takes over."
             }
           />
@@ -5478,13 +5768,25 @@ function AccountEditor({
 
         {isDebt ? (
           <>
-            <MoneyInput
-              ariaLabel="Credit limit"
-              value={draft.creditLimit}
-              symbol={symbol}
-              placeholder="Credit limit"
-              onChange={(value) => setDraft((current) => ({ ...current, creditLimit: value }))}
-            />
+            <label className="numberField hintField">
+              <input
+                value={draft.promoRate}
+                inputMode="decimal"
+                placeholder="Promo rate % (0 if interest-free)"
+                onChange={(event) => setDraft((current) => ({ ...current, promoRate: event.target.value }))}
+                aria-label="Promo rate"
+              />
+              <InfoHint label="Promo rate help" text="The rate during the promo months: 0 for an interest-free card, or the deal rate for a balance transfer (e.g. 2.9)." />
+            </label>
+            {draft.type !== "loan" && (
+              <MoneyInput
+                ariaLabel="Credit limit"
+                value={draft.creditLimit}
+                symbol={symbol}
+                placeholder={draft.type === "overdraft" ? "Overdraft limit" : "Credit limit"}
+                onChange={(value) => setDraft((current) => ({ ...current, creditLimit: value }))}
+              />
+            )}
             <MoneyInput
               ariaLabel="Monthly payment"
               value={draft.minimumPayment}
@@ -5552,10 +5854,40 @@ function debtAutoTrackNote(derived: Account, storedAccounts: Account[]): string 
   return `auto-tracked since ${formatMonth(stored.balanceAsOf)}`;
 }
 
-function accountMetaCaption(account: Account, utilization: number): string {
+function payoffLabel(payoff: ReturnType<typeof estimateDebtPayoff> | null): string {
+  if (!payoff) return "—";
+  if (payoff.monthsToPayoff === 0) return "Cleared";
+  if (payoff.monthsToPayoff === null) return "Set a payment";
+  return formatMonth(shiftMonth(getMonthKey(), payoff.monthsToPayoff));
+}
+
+function accountMetaCaption(
+  account: Account,
+  utilization: number,
+  payoff: ReturnType<typeof estimateDebtPayoff> | null,
+  hasLimit: boolean,
+  formatter: Intl.NumberFormat,
+  privacy: boolean,
+): string {
   if (account.accountClass === "debt") {
-    const limitNote = account.creditLimit > 0 ? `${formatDecimal(utilization)}% used · ` : "";
-    return `${limitNote}${account.promoMonths > 0 ? `${account.promoMonths} mo 0%` : "APR active"}`;
+    const parts: string[] = [];
+    if (hasLimit && account.creditLimit > 0) parts.push(`${formatDecimal(utilization)}% used`);
+    if (account.promoMonths > 0) {
+      // A date is easier to plan around than a bare count, and it visibly moves as months pass.
+      const promoEnds = formatMonth(shiftMonth(getMonthKey(), account.promoMonths));
+      parts.push(`${formatDecimal(account.promoRate)}% until ${promoEnds}`);
+      const shortfall = payoff && account.balance > 0 && account.minimumPayment < payoff.paymentToClearInPromo - 0.005;
+      if (shortfall && payoff) {
+        const needed = privacy ? "•••" : formatter.format(Math.ceil(payoff.paymentToClearInPromo));
+        parts.push(`pay ${needed}/mo to clear it before then`);
+      }
+    } else {
+      parts.push(account.rate > 0 ? `${formatDecimal(account.rate)}% APR` : "No interest");
+    }
+    if (hasLimit && payoff && payoff.monthsToPayoff !== null && payoff.monthsToPayoff > 0) {
+      parts.push(`paid off ${payoffLabel(payoff)}`);
+    }
+    return parts.join(" · ");
   }
   const rateNote = `${formatDecimal(account.rate)}% ${account.accountClass === "investment" ? "est." : "AER"}`;
   const contributionNote = account.monthlyContribution > 0 ? ` · +${Math.round(account.monthlyContribution)}/mo` : "";
@@ -5728,144 +6060,116 @@ function ProjectionDetail({
   );
 }
 
-function GoalsPanel({
-  ledger,
+// Under the ledger: every account with its live balance, in the colour its transactions' dots
+// use. Balances are read-only here (they change on Accounts, or by moving transactions); clicking
+// one offers to open Accounts. Also where new transactions' default account is chosen.
+function LedgerAccountsPanel({
+  accounts,
+  defaultAccountId,
   month,
-  goal,
-  goalPercent,
-  goalOutcome,
-  allGoals,
-  ledgerGoalId,
-  projection,
-  onSelectGoal,
-  onGoToGoals,
-  onGoalChange,
+  formatter,
+  privacy,
+  onDefaultChange,
+  onGoToAccounts,
   onNoteChange,
   onResetMonth,
-  privacy,
-  symbol,
 }: {
-  ledger: LedgerState;
+  accounts: Account[];
+  defaultAccountId: string | undefined;
   month: MonthBudget;
-  goal: SavingsGoal | null;
-  goalPercent: number;
-  goalOutcome: GoalOutcome | null;
-  allGoals: SavingsGoal[];
-  ledgerGoalId: string | null;
-  projection: Projection;
-  onSelectGoal: (id: string) => void;
-  onGoToGoals: () => void;
-  onGoalChange: (patch: Partial<SavingsGoal>) => void;
+  formatter: Intl.NumberFormat;
+  privacy: boolean;
+  onDefaultChange: (accountId: string) => void;
+  onGoToAccounts: () => void;
   onNoteChange: (note: string) => void;
   onResetMonth: () => void;
-  privacy: boolean;
-  symbol: string;
 }) {
-  const [showGoalPicker, setShowGoalPicker] = useState(false);
-  const runway = goal && projection.monthlyExpenses > 0 ? goal.saved / projection.monthlyExpenses : 0;
+  const [confirmFor, setConfirmFor] = useState<string | null>(null);
 
   return (
-    <article className="miniPanel goalPanel">
-      <PanelTitle
-        title="Notes and goals"
-        icon={
-          <InfoHint
-            label="What is Notes and goals for?"
-            text="Track a savings goal — emergency fund, holiday, house deposit — and see how close you are. The runway shows how many months your saved amount would cover expenses. Use notes to log anything worth remembering about this month."
-          />
-        }
-      />
-      <p className="panelSubcopy">Track goal progress and jot down notes for this month.</p>
-
-      {goal ? (
-        <>
-          <div className="goalSwitcherRow">
-            <button
-              className="goalSwitcherTrigger"
-              type="button"
-              onClick={() => setShowGoalPicker((v) => !v)}
-              aria-expanded={showGoalPicker}
-            >
-              <Target size={13} />
-              {goal.name || "Unnamed goal"}
-              <ChevronDown size={13} />
-            </button>
-            <button className="goalSwitcherLink" type="button" onClick={onGoToGoals}>
-              Manage goals
-            </button>
-            {showGoalPicker && (
-              <div className="goalPickerPopover">
-                {allGoals.map((g) => (
-                  <button
-                    key={g.id}
-                    className={`goalPickerOption${g.id === (ledgerGoalId ?? allGoals[0]?.id) ? " selected" : ""}`}
-                    type="button"
-                    onClick={() => { onSelectGoal(g.id); setShowGoalPicker(false); }}
-                  >
-                    <span className="goalPickerDot" style={{ background: g.color }} />
-                    {g.name || "Unnamed goal"}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <label className="goalName">
-            <input
-              value={goal.name}
-              placeholder="Goal name, e.g. Emergency fund"
-              onChange={(event) => onGoalChange({ name: capitalizeFirst(event.target.value) })}
-              onKeyDown={blurOnEnter}
-              aria-label="Goal name"
+    <article className="miniPanel goalPanel ledgerAccountsPanel">
+      <div className="ledgerAccountsColumn">
+        <PanelTitle
+          title="Accounts"
+          icon={
+            <InfoHint
+              label="What do the coloured dots mean?"
+              text="Each transaction's dot shows the account its money moved through. Click a dot to move it to another account; that account's balance moves with it. Change balances themselves on the Accounts page."
             />
-          </label>
-          <div className="goalAmounts">
-            <label className="goalAmountField">
-              <span>Saved</span>
-              <MoneyInput ariaLabel="Goal saved" value={String(goal.saved)} symbol={symbol} privacy={privacy} onChange={(value) => onGoalChange({ saved: Number(value) })} />
-            </label>
-            <label className="goalAmountField">
-              <span>Target</span>
-              <MoneyInput ariaLabel="Goal target" value={String(goal.target)} symbol={symbol} privacy={privacy} onChange={(value) => onGoalChange({ target: Number(value) })} />
-            </label>
-          </div>
-          <div className="progressLine">
-            <span style={{ width: `${goalPercent}%`, background: goal.color }} />
-          </div>
-          <div className="goalMeta">
-            <b className={privacy ? "masked" : ""}>{formatDecimal(goalPercent)}%</b>
-            {goalOutcome?.completionDate ? (
-              <span>Completes {goalOutcome.completionDate}</span>
-            ) : (
-              <span>{formatDecimal(runway)} month runway</span>
-            )}
-          </div>
-        </>
-      ) : (
-        <div className="goalEmptyNudge">
-          <button className="commandButton" type="button" onClick={onGoToGoals}>
-            <Target size={15} />
-            Set up goals
-          </button>
-          <p>Track savings targets in the Goals view.</p>
-        </div>
-      )}
-
-      <textarea
-        value={month.note}
-        placeholder="Add notes for this month..."
-        onChange={(event) => onNoteChange(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-            event.currentTarget.blur();
           }
-        }}
-        aria-label="Month notes"
-      />
-      <button className="quietButton" type="button" onClick={onResetMonth}>
-        <RotateCcw size={16} />
-        Reset selected month
-      </button>
+        />
+        {accounts.length ? (
+          <>
+            <ul className="ledgerAccountList">
+              {accounts.map((account) => (
+                <li key={account.id}>
+                  <button
+                    className="ledgerAccountItem"
+                    type="button"
+                    onClick={() => setConfirmFor((current) => (current === account.id ? null : account.id))}
+                    aria-expanded={confirmFor === account.id}
+                    aria-label={`${account.name}, ${privacy ? "balance hidden" : formatter.format(account.balance)}`}
+                  >
+                    <span className="accountDot static" style={{ background: account.color }} />
+                    <span className="ledgerAccountName">{account.name}</span>
+                    <strong className={`${account.accountClass === "debt" ? "negativeText" : ""} ${privacy ? "masked" : ""}`}>
+                      {account.accountClass === "debt" && account.balance > 0 ? "−" : ""}
+                      {formatter.format(account.balance)}
+                    </strong>
+                  </button>
+                  {confirmFor === account.id && (
+                    <div className="ledgerAccountConfirm" role="dialog" aria-label="Go to accounts page?">
+                      <span>Go to the Accounts page?</span>
+                      <button className="commandButton" type="button" onClick={onGoToAccounts}>
+                        Go
+                      </button>
+                      <button className="quietButton" type="button" onClick={() => setConfirmFor(null)}>
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <label className="selectField ledgerDefaultAccount">
+              <span>New transactions go into</span>
+              <select value={defaultAccountId ?? ""} onChange={(event) => onDefaultChange(event.target.value)} aria-label="Default account for new transactions">
+                {accounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </>
+        ) : (
+          <div className="goalEmptyNudge">
+            <button className="commandButton" type="button" onClick={onGoToAccounts}>
+              <PiggyBank size={15} />
+              Add an account
+            </button>
+            <p>Add your current account, savings and cards to see transactions move their balances.</p>
+          </div>
+        )}
+      </div>
+
+      <div className="ledgerNotesColumn">
+        <textarea
+          value={month.note}
+          placeholder="Add notes for this month..."
+          onChange={(event) => onNoteChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+              event.currentTarget.blur();
+            }
+          }}
+          aria-label="Month notes"
+        />
+        <button className="quietButton" type="button" onClick={onResetMonth}>
+          <RotateCcw size={16} />
+          Reset selected month
+        </button>
+      </div>
     </article>
   );
 }
@@ -6625,7 +6929,20 @@ function useAnimatedNumber(value: number) {
   return display;
 }
 
+// Loaded state gets the same scheduled-debt-payment sync as every edit, so a new month opened
+// on load already carries this month's planned payments.
 function normalizeState(rawState: Partial<LedgerState>): LedgerState {
+  return syncLedgerLinks(normalizeStateFields(rawState));
+}
+
+// The cross-page sync every change goes through: savings transfers linked, scheduled debt
+// payments in the ledger, every transaction on an account, and linked goals following their
+// account's live balance (last, so it sees the balances the steps before settled).
+function syncLedgerLinks(state: LedgerState): LedgerState {
+  return syncLinkedGoals(assignMissingAccounts(syncScheduledDebtPayments(linkSavingsTransfers(state))));
+}
+
+function normalizeStateFields(rawState: Partial<LedgerState>): LedgerState {
   const fallback = createInitialState();
 
   // ── v6 → v7 migration: single `goal` → `goals[]` ──
@@ -6679,7 +6996,9 @@ function normalizeState(rawState: Partial<LedgerState>): LedgerState {
     goalsHorizonMonths: Number.isFinite(state.goalsHorizonMonths) && state.goalsHorizonMonths > 0 ? state.goalsHorizonMonths : 60,
     ledgerGoalId: typeof state.ledgerGoalId === "string" ? state.ledgerGoalId : null,
     savingsTarget: Number.isFinite(state.savingsTarget) ? state.savingsTarget : fallback.savingsTarget,
-    accounts: normalizeAccounts(state),
+    // Distinct colours, so each account's dot in the ledger can only mean one account.
+    accounts: distinctAccountColors(normalizeAccounts(state)),
+    defaultAccountId: typeof state.defaultAccountId === "string" ? state.defaultAccountId : null,
     assumedInvestmentReturn: Number.isFinite(state.assumedInvestmentReturn)
       ? Math.max(-50, Math.min(50, state.assumedInvestmentReturn as number))
       : fallback.assumedInvestmentReturn,
@@ -6877,6 +7196,13 @@ function normalizeAccounts(state: Partial<LedgerState>): Account[] {
       // v7 → v8: pre-existing balances anchor to the month this version first loads, so the
       // roll-forward starts from now rather than retroactively repricing old snapshots.
       balanceAsOf: isValidMonthKey(item?.balanceAsOf) ? item.balanceAsOf : getMonthKey(),
+      // Promo counts saved before they ticked down start counting from the month this loads.
+      promoAsOf: isValidMonthKey(item?.promoAsOf) ? item.promoAsOf : getMonthKey(),
+      skippedPaymentMonths: Array.isArray(item?.skippedPaymentMonths) ? item.skippedPaymentMonths.filter(isValidMonthKey) : undefined,
+      // Balances saved before the ledger moved them are taken as set today: only what happens from
+      // now on moves them, so nothing jumps when this version first loads.
+      balanceSetOn: typeof item?.balanceSetOn === "string" && /^\d{4}-\d{2}-\d{2}$/.test(item.balanceSetOn) ? item.balanceSetOn : isoToday(),
+      ledgerOffset: Number.isFinite(item?.ledgerOffset) ? item.ledgerOffset : 0,
       includeInNetWorth: item?.includeInNetWorth !== false,
       color: item?.color || colors[index % colors.length],
       note: item?.note ?? "",
@@ -7100,11 +7426,6 @@ function downloadFile(name: string, content: string, type: string) {
   link.download = name;
   link.click();
   URL.revokeObjectURL(url);
-}
-
-function nextColor(color: string) {
-  const index = colors.indexOf(color);
-  return colors[(index + 1 + colors.length) % colors.length];
 }
 
 function nextCategoryName(expenses: ExpenseEntry[]) {

@@ -71,6 +71,8 @@ public final class LedgerStore {
     public func update(_ mutation: (inout LedgerState) -> Void) {
         pushUndoSnapshot()
         mutation(&state)
+        // Goals linked to a savings account follow its balance and rate after every edit.
+        AccountLinks.syncLinkedGoals(&state)
         state.lastSavedAt = isoTimestampNow()
         scheduleSave(pushToCloud: true)
     }
@@ -83,6 +85,7 @@ public final class LedgerStore {
     public func applyQuietly(_ mutation: (inout LedgerState) -> Void) {
         let before = state
         mutation(&state)
+        AccountLinks.syncLinkedGoals(&state)
         guard state != before else { return }
         if state.isEquivalent(to: before) {
             scheduleSave(pushToCloud: false)
@@ -405,11 +408,12 @@ public final class LedgerStore {
 
     // MARK: - Derived accounts
 
-    /// Accounts with debt balances rolled forward from their `balanceAsOf` snapshot to today —
-    /// every screen and summary should read these instead of `state.accounts` so a card set up
-    /// months ago shows what's left after the scheduled (or linked) payments.
+    /// Accounts with debt balances rolled forward from their `balanceAsOf` snapshot to today and
+    /// promo windows counted down — every screen and summary should read these instead of
+    /// `state.accounts` so a card set up months ago shows what's left after the scheduled (or
+    /// linked) payments, and "12 months 0%" reads 11 a month later.
     public var effectiveAccounts: [Account] {
-        FinanceEngine.rollForwardDebtBalances(accounts: state.accounts, months: state.months)
+        FinanceEngine.deriveLiveAccounts(accounts: state.accounts, months: state.months)
     }
 
     // MARK: - Account mutations
@@ -420,6 +424,12 @@ public final class LedgerStore {
             if next.balanceAsOf == nil {
                 next.balanceAsOf = getMonthKey()
             }
+            if next.promoAsOf == nil {
+                next.promoAsOf = getMonthKey()
+            }
+            if next.balanceSetOn == nil {
+                next.balanceSetOn = isoDateString(Date())
+            }
             s.accounts.append(next)
         }
     }
@@ -429,22 +439,33 @@ public final class LedgerStore {
             guard let idx = s.accounts.firstIndex(where: { $0.id == account.id }) else { return }
             let existing = s.accounts[idx]
             var next = account
-            if next.accountClass == .debt {
-                // The editor is populated from the rolled-forward balance. A different number
-                // means the user manually trued it up — re-anchor the snapshot to this month.
-                // An unchanged number keeps the stored snapshot + anchor so the derivation
-                // stays live (future linked payments can still refine the elapsed months).
-                let derived = FinanceEngine.rollForwardDebtBalances(
-                    accounts: [existing], months: s.months
-                ).first?.balance ?? existing.balance
-                if abs(next.balance - derived) > 0.005 || existing.accountClass != .debt {
-                    next.balanceAsOf = getMonthKey()
-                } else {
-                    next.balance = existing.balance
-                    next.balanceAsOf = existing.balanceAsOf ?? getMonthKey()
-                }
-            } else if next.balanceAsOf == nil {
-                next.balanceAsOf = existing.balanceAsOf
+            // The editor is populated from the live balance (rolled forward and moved by the
+            // ledger). A different number means the user trued it up: re-anchor to now, and
+            // cancel today's ledger rows, which are already in the typed figure. An unchanged
+            // number keeps the stored snapshot and anchors so the derivation stays live.
+            let derived = FinanceEngine.deriveLiveAccounts(accounts: [existing], months: s.months).first?.balance
+                ?? existing.balance
+            if abs(next.balance - derived) > 0.005 || existing.accountClass != next.accountClass {
+                next.balanceAsOf = getMonthKey()
+                next.balanceSetOn = isoDateString(Date())
+                next.ledgerOffset = 0
+                let counted = AccountFlow.flowTotals(
+                    accounts: [next], months: s.months, todayIso: isoDateString(Date())
+                )[next.id] ?? 0
+                next.ledgerOffset = -counted
+            } else {
+                next.balance = existing.balance
+                next.balanceAsOf = existing.balanceAsOf ?? getMonthKey()
+                next.balanceSetOn = existing.balanceSetOn
+                next.ledgerOffset = existing.ledgerOffset
+            }
+            // Same idea for promo months: the editor shows the live count. An unchanged number
+            // keeps the stored count + anchor ticking; a new one restarts the countdown today.
+            if next.promoMonths != FinanceEngine.promoMonthsRemaining(existing) {
+                next.promoAsOf = getMonthKey()
+            } else {
+                next.promoMonths = existing.promoMonths
+                next.promoAsOf = existing.promoAsOf ?? getMonthKey()
             }
             s.accounts[idx] = next
         }
@@ -463,6 +484,8 @@ public final class LedgerStore {
             copy.id = createId(prefix: "account")
             copy.name = "\(copy.name) copy"
             copy.balanceAsOf = getMonthKey()
+            copy.promoMonths = FinanceEngine.promoMonthsRemaining(copy)
+            copy.promoAsOf = getMonthKey()
             s.accounts.insert(copy, at: index + 1)
         }
     }

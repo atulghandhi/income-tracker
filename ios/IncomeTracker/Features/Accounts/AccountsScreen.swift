@@ -512,7 +512,7 @@ struct AccountRow: View {
                     color: account.accountClass == .debt ? .brandRed : .ink,
                     isPrivate: store.state.privacyMode
                 )
-                if account.accountClass == .debt && account.creditLimit > 0 {
+                if account.accountClass == .debt && account.type != .loan && account.creditLimit > 0 {
                     Text("\(formatPercent((account.balance / account.creditLimit) * 100, digits: 0)) used")
                         .font(.caption2)
                         .foregroundStyle((account.balance / account.creditLimit) >= 0.8 ? Color.brandRed : Color.muted)
@@ -547,8 +547,8 @@ struct AccountRow: View {
         case .debt:
             var parts: [String] = []
             if account.promoMonths > 0 {
-                let anchor = account.balanceAsOf ?? getMonthKey()
-                let promoEnds = shiftMonth(anchor, by: account.promoMonths)
+                // Live accounts carry months left as of today, so the end date counts from now.
+                let promoEnds = shiftMonth(getMonthKey(), by: account.promoMonths)
                 parts.append("\(formatPercent(account.promoRate)) until \(formatMonth(promoEnds)), then \(formatPercent(account.rate)) APR")
             } else {
                 parts.append("\(formatPercent(account.rate)) APR")
@@ -695,10 +695,13 @@ struct AccountEditorSheet: View {
 
                 if accountClass == .debt {
                     Section("Credit details") {
-                        LabeledContent("Limit") {
-                            TextField("0.00", text: $creditLimit)
-                                .keyboardType(.decimalPad)
-                                .multilineTextAlignment(.trailing)
+                        // Loans have no limit to use up, and never count toward utilisation.
+                        if accountType != .loan {
+                            LabeledContent("Limit") {
+                                TextField("0.00", text: $creditLimit)
+                                    .keyboardType(.decimalPad)
+                                    .multilineTextAlignment(.trailing)
+                            }
                         }
                         LabeledContent("Minimum payment") {
                             TextField("0.00", text: $minimumPayment)
@@ -825,10 +828,11 @@ struct AccountEditorSheet: View {
             promoRate: max(0, parseAmountInput(promoRate) ?? 0),
             promoMonths: clampWholeNumber(Double(parseIntegerInput(promoMonths) ?? 0), max: 120),
             monthlyContribution: isDebt ? 0 : max(0, parseAmountInput(monthlyContribution) ?? 0),
-            creditLimit: isDebt ? (parseAmountInput(creditLimit) ?? 0) : 0,
+            creditLimit: isDebt && accountType != .loan ? (parseAmountInput(creditLimit) ?? 0) : 0,
             minimumPayment: isDebt ? (parseAmountInput(minimumPayment) ?? 0) : 0,
             dueDay: isDebt ? clampDueDay(Double(parseIntegerInput(dueDay) ?? 1)) : 1,
             balanceAsOf: account?.balanceAsOf,
+            promoAsOf: account?.promoAsOf,
             includeInNetWorth: includeInNetWorth,
             color: colorHex,
             note: note

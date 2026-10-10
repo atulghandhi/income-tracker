@@ -1,3 +1,4 @@
+import { applyAccountFlows, isoToday } from "./accountFlow";
 import type {
   Account,
   AccountClass,
@@ -242,13 +243,22 @@ export function getAssetAccounts(accounts: Account[]): Account[] {
   return accounts.filter((account) => account.accountClass !== "debt");
 }
 
+// Credit utilisation only measures revolving card credit. Loans, overdrafts and other balances
+// still count towards total debt, but a car loan has no "limit" to use up, so including it would
+// inflate utilisation (and the credit-score estimate) for a perfectly normal borrowing pattern.
+export function countsTowardUtilization(account: Account): boolean {
+  return account.accountClass === "debt" && account.type === "credit-card";
+}
+
 export function calculateDebtSummary(accounts: DebtAccount[]): DebtSummary {
   const debts = getDebtAccounts(accounts);
   const activeDebts = debts.filter((debt) => debt.balance > 0);
   const totalDebt = activeDebts.reduce((sum, debt) => sum + Number(debt.balance || 0), 0);
-  const totalCreditLimit = debts.reduce((sum, debt) => sum + Math.max(0, Number(debt.creditLimit || 0)), 0);
-  const availableCredit = Math.max(0, totalCreditLimit - totalDebt);
-  const utilization = totalCreditLimit > 0 ? (totalDebt / totalCreditLimit) * 100 : 0;
+  const cards = debts.filter(countsTowardUtilization);
+  const totalCreditLimit = cards.reduce((sum, card) => sum + Math.max(0, Number(card.creditLimit || 0)), 0);
+  const cardBalance = cards.reduce((sum, card) => sum + Math.max(0, Number(card.balance || 0)), 0);
+  const availableCredit = Math.max(0, totalCreditLimit - cardBalance);
+  const utilization = totalCreditLimit > 0 ? (cardBalance / totalCreditLimit) * 100 : 0;
   const monthlyMinimums = activeDebts.reduce((sum, debt) => sum + Math.max(0, Number(debt.minimumPayment || 0)), 0);
   const weightedApr =
     totalDebt > 0 ? activeDebts.reduce((sum, debt) => sum + Math.max(0, Number(debt.rate || 0)) * debt.balance, 0) / totalDebt : 0;
@@ -357,10 +367,6 @@ export function rollForwardDebtBalances({
 
     const paymentsByMonth = linkedPayments.get(account.id);
     const scheduledPayment = Math.max(0, Number(account.minimumPayment) || 0);
-    // The promo window counts down from today, so any promo still active now also covered the
-    // elapsed months being rolled. Without one, the standard rate applies.
-    const annualRate = account.promoMonths > 0 ? Number(account.promoRate) || 0 : Number(account.rate) || 0;
-    const monthlyRate = monthlyRateFromAnnual(annualRate);
 
     let balance = Math.max(0, Number(account.balance) || 0);
     let changed = false;
@@ -368,16 +374,102 @@ export function rollForwardDebtBalances({
     for (let step = 1; step <= steps && balance > 0; step += 1) {
       const monthKey = shiftMonth(anchor, step);
       const linkedTotal = paymentsByMonth?.get(monthKey) ?? 0;
-      const payment = linkedTotal > 0 ? linkedTotal : scheduledPayment;
+      const skipped = account.skippedPaymentMonths?.includes(monthKey) ?? false;
+      const payment = linkedTotal > 0 ? linkedTotal : skipped ? 0 : scheduledPayment;
       if (payment <= 0) continue;
 
-      const owed = balance + balance * monthlyRate;
+      // Each elapsed month is priced at the rate in force that month, so a 0% window that ran
+      // out part-way through the roll starts charging APR from the month it ended.
+      const annualRate = isInPromoWindow(account, monthKey) ? Number(account.promoRate) || 0 : Number(account.rate) || 0;
+      const owed = balance + balance * monthlyRateFromAnnual(annualRate);
       balance = Math.max(0, owed - payment);
       changed = true;
     }
 
     return changed ? { ...account, balance: roundTo(balance, 2) } : account;
   });
+}
+
+// ─── Promo window countdown ──────────────────────────────────────────────────
+//
+// `promoMonths` is what the user typed ("12 months left") and `promoAsOf` is the month they typed
+// it. The live count is derived from the two, so it ticks down by itself each month instead of
+// staying frozen at whatever was entered. Month m is inside the window while it is no more than
+// `promoMonths` months after the anchor (month 1 is the month after it was entered), matching
+// effectiveAnnualRate's `monthIndex <= promoMonths` in the forecast.
+
+export function promoMonthsRemaining(account: Account, currentMonthKey = getMonthKey()): number {
+  const promoMonths = Math.max(0, Math.round(Number(account.promoMonths) || 0));
+  if (promoMonths <= 0) return 0;
+  const anchor = isValidMonthKey(account.promoAsOf) ? account.promoAsOf : currentMonthKey;
+  return Math.max(0, promoMonths - Math.max(0, monthsBetween(anchor, currentMonthKey)));
+}
+
+function isInPromoWindow(account: Account, monthKey: string): boolean {
+  const promoMonths = Math.max(0, Math.round(Number(account.promoMonths) || 0));
+  if (promoMonths <= 0) return false;
+  // No anchor means the count was entered "now", so every elapsed month sat inside the window.
+  if (!isValidMonthKey(account.promoAsOf)) return true;
+  return monthsBetween(account.promoAsOf, monthKey) <= promoMonths;
+}
+
+// Re-expresses each account's promo window as of the current month: months left, anchored to now.
+export function tickPromoWindows(accounts: Account[], currentMonthKey = getMonthKey()): Account[] {
+  return accounts.map((account) => {
+    const remaining = promoMonthsRemaining(account, currentMonthKey);
+    if (remaining === account.promoMonths && account.promoAsOf === currentMonthKey) return account;
+    return { ...account, promoMonths: remaining, promoAsOf: currentMonthKey };
+  });
+}
+
+// The accounts every screen reads: debt balances rolled forward and promo windows counted down
+// to the current month, then moved by the ledger transactions that belong to each account
+// (see accountFlow.ts). The stored ledger keeps the user's snapshots untouched.
+export function deriveLiveAccounts({
+  accounts,
+  months,
+  currentMonthKey = getMonthKey(),
+  todayIso,
+}: {
+  accounts: Account[];
+  months: Record<string, MonthBudget>;
+  currentMonthKey?: string;
+  // Defaults to today when the current month is the real one, else the end of that month.
+  todayIso?: string;
+}): Account[] {
+  const today = todayIso ?? (currentMonthKey === getMonthKey() ? isoToday() : `${currentMonthKey}-31`);
+  const rolled = rollForwardDebtBalances({ accounts, months, currentMonthKey });
+  return tickPromoWindows(applyAccountFlows(rolled, months, today), currentMonthKey);
+}
+
+// When a live debt (already rolled forward and promo-ticked) is cleared at its scheduled payment,
+// and what monthly payment would clear it before any 0% window closes. `monthsToPayoff` is null
+// when there is no payment or the payment never outruns the interest.
+export function estimateDebtPayoff(account: Account): {
+  monthsToPayoff: number | null;
+  promoMonthsLeft: number;
+  paymentToClearInPromo: number;
+} {
+  const promoMonthsLeft = Math.max(0, Math.round(Number(account.promoMonths) || 0));
+  const payment = Math.max(0, Number(account.minimumPayment) || 0);
+  let balance = Math.max(0, Number(account.balance) || 0);
+
+  let paymentToClearInPromo = 0;
+  if (balance > 0 && promoMonthsLeft > 0) {
+    const rate = monthlyRateFromAnnual(Number(account.promoRate) || 0);
+    paymentToClearInPromo =
+      rate > 0 ? (balance * rate) / (1 - Math.pow(1 + rate, -promoMonthsLeft)) : balance / promoMonthsLeft;
+  }
+
+  if (balance <= 0) return { monthsToPayoff: 0, promoMonthsLeft, paymentToClearInPromo };
+  if (payment <= 0) return { monthsToPayoff: null, promoMonthsLeft, paymentToClearInPromo };
+
+  for (let monthIndex = 1; monthIndex <= 600; monthIndex += 1) {
+    balance += balance * monthlyRateFromAnnual(effectiveAnnualRate(account, monthIndex));
+    balance -= payment;
+    if (balance <= 0.005) return { monthsToPayoff: monthIndex, promoMonthsLeft, paymentToClearInPromo };
+  }
+  return { monthsToPayoff: null, promoMonthsLeft, paymentToClearInPromo };
 }
 
 // Projects net worth forward by routing each month's surplus into the user's accounts,
@@ -388,25 +480,57 @@ export function rollForwardDebtBalances({
 // So contributions and debt payments are modelled as transfers out of a "cash" bucket, never as
 // extra inflows/outflows. Leftover surplus collects in that cash bucket (which may go negative,
 // representing drawing down reserves).
+// Recurring ledger rows linked to one of the user's accounts (a debt payment, or a transfer into
+// savings), summed per account. These are the same money as that account's monthly payment or
+// contribution, seen from the ledger side.
+export function recurringAccountTransfersByAccount(month: MonthBudget): Record<string, number> {
+  const byAccount: Record<string, number> = {};
+  month.expenses.forEach((expense) => {
+    const accountId = expense.debtAccountId ?? expense.toAccountId;
+    if (!accountId || !isRecurring(expense)) return;
+    byAccount[accountId] = (byAccount[accountId] ?? 0) + Math.max(0, Number(expense.amount) || 0);
+  });
+  return byAccount;
+}
+
+// What each asset account actually receives a month: the linked ledger transfer when there is one
+// (that is what the user really moves), otherwise the contribution set on the account.
+export function effectiveContribution(account: Account, linkedTransfers: Record<string, number>): number {
+  if (account.accountClass === "debt") return 0;
+  return account.id in linkedTransfers ? Math.max(0, linkedTransfers[account.id]) : Math.max(0, Number(account.monthlyContribution) || 0);
+}
+
 export function buildNetWorthOutlook({
   accounts,
   projection,
   months,
   startDate = new Date(),
+  linkedTransfers = {},
 }: {
   accounts: Account[];
   projection: Projection;
   months: number;
   startDate?: Date;
+  // From recurringAccountTransfersByAccount(month). A debt payment or savings transfer in the
+  // ledger already lowers the recurring surplus; without this the forecast would also move it out
+  // of cash, taking the same money twice. Linked accounts use the ledger amount, added back here.
+  linkedTransfers?: Record<string, number>;
 }): NetWorthPoint[] {
+  const accountIds = new Set(accounts.map((account) => account.id));
+  const linkedBack = Object.entries(linkedTransfers)
+    .filter(([id]) => accountIds.has(id))
+    .reduce((sum, [, amount]) => sum + Math.max(0, amount), 0);
   const working = accounts.map((account) => ({
     accountClass: account.accountClass,
     balance: Math.max(0, Number(account.balance || 0)),
     rate: Number(account.rate || 0),
     promoRate: Number(account.promoRate || 0),
     promoMonths: Math.max(0, Math.round(Number(account.promoMonths || 0))),
-    contribution: Math.max(0, Number(account.monthlyContribution || 0)),
-    payment: Math.max(0, Number(account.minimumPayment || 0)),
+    contribution: effectiveContribution(account, linkedTransfers),
+    payment:
+      account.accountClass === "debt" && account.id in linkedTransfers
+        ? Math.max(0, linkedTransfers[account.id])
+        : Math.max(0, Number(account.minimumPayment || 0)),
     includeInNetWorth: account.includeInNetWorth !== false,
   }));
 
@@ -421,7 +545,7 @@ export function buildNetWorthOutlook({
     if (monthIndex > 0) {
       // 1. Fresh surplus arrives. Only the recurring run rate repeats month to month — a one-off
       //    expense or windfall this month should not be extrapolated across the whole forecast.
-      unallocatedCash += projection.recurringMonthlySurplus;
+      unallocatedCash += projection.recurringMonthlySurplus + linkedBack;
 
       // 2. Route contributions into asset accounts (transfer out of cash — net worth unchanged).
       working.forEach((account) => {
@@ -819,7 +943,7 @@ export function clampWholeNumber(value: number, max = 600): number {
 
 function calculateCreditCardStats(debts: DebtAccount[]) {
   const cards = debts
-    .filter((debt) => debt.type === "credit-card" && debt.creditLimit > 0)
+    .filter((debt) => countsTowardUtilization(debt) && debt.creditLimit > 0)
     .map((debt) => ({
       id: debt.id,
       name: debt.name,
@@ -933,13 +1057,18 @@ export function runGoalSequence({
   monthlySurplus,
   horizonMonths,
   startDate = new Date(),
+  dedicatedMonthly = {},
 }: {
   goals: SavingsGoal[];
   monthlySurplus: number;
   horizonMonths: number;
   startDate?: Date;
+  // Money that can only go to one goal, keyed by goal id: a linked account's monthly
+  // contribution. Paid in before the shared surplus is split, and never shared with other goals.
+  dedicatedMonthly?: Record<string, number>;
 }): GoalSequenceResult {
-  if (!goals.length || monthlySurplus <= 0) {
+  const hasDedicated = goals.some((goal) => (dedicatedMonthly[goal.id] ?? 0) > 0);
+  if (!goals.length || (monthlySurplus <= 0 && !hasDedicated)) {
     return {
       timeline: [],
       goals: goals.map((g) => ({
@@ -989,6 +1118,30 @@ export function runGoalSequence({
 
       let remaining = surplus;
       const perGoal: GoalMonthPoint["perGoal"] = {};
+      // Interest is applied once per goal per month, whichever funding step reaches it first.
+      const grown = new Set<string>();
+      const grow = (w: WorkingGoal) => {
+        if (grown.has(w.goal.id)) return;
+        grown.add(w.goal.id);
+        if (w.goal.interestRate > 0) {
+          const monthlyRate = Math.pow(1 + w.goal.interestRate / 100, 1 / 12) - 1;
+          w.accumulated *= 1 + monthlyRate;
+        }
+      };
+
+      // Dedicated money (a linked account's contribution) goes in first, to its own goal only.
+      for (const w of working) {
+        const dedicated = dedicatedMonthly[w.goal.id] ?? 0;
+        if (w.completionMonth !== null || dedicated <= 0) continue;
+        grow(w);
+        const contribution = Math.min(dedicated, Math.max(0, w.goal.target - w.accumulated));
+        w.accumulated = Math.min(w.accumulated + contribution, w.goal.target);
+        perGoal[w.goal.id] = { accumulated: w.accumulated, contribution, complete: false };
+        if (w.accumulated >= w.goal.target) {
+          w.completionMonth = month;
+          perGoal[w.goal.id].complete = true;
+        }
+      }
 
       // Active = not yet complete.
       const active = working.filter((w) => w.completionMonth === null);
@@ -1001,15 +1154,13 @@ export function runGoalSequence({
         const contribution = Math.min(w.goal.monthlyAmount, remaining);
 
         // Apply monthly compounding on accumulated balance.
-        if (w.goal.interestRate > 0) {
-          const monthlyRate = Math.pow(1 + w.goal.interestRate / 100, 1 / 12) - 1;
-          w.accumulated *= 1 + monthlyRate;
-        }
+        grow(w);
 
         w.accumulated = Math.min(w.accumulated + contribution, w.goal.target);
         remaining = Math.max(0, remaining - contribution);
 
-        perGoal[w.goal.id] = { accumulated: w.accumulated, contribution, complete: false };
+        const earlier = perGoal[w.goal.id]?.contribution ?? 0;
+        perGoal[w.goal.id] = { accumulated: w.accumulated, contribution: earlier + contribution, complete: false };
 
         if (w.accumulated >= w.goal.target) {
           w.completionMonth = month;
@@ -1024,15 +1175,13 @@ export function runGoalSequence({
         if (remaining <= 0) break;
         const contribution = remaining;
 
-        if (w.goal.interestRate > 0) {
-          const monthlyRate = Math.pow(1 + w.goal.interestRate / 100, 1 / 12) - 1;
-          w.accumulated *= 1 + monthlyRate;
-        }
+        grow(w);
 
         w.accumulated = Math.min(w.accumulated + contribution, w.goal.target);
         remaining = 0;
 
-        perGoal[w.goal.id] = { accumulated: w.accumulated, contribution, complete: false };
+        const earlier = perGoal[w.goal.id]?.contribution ?? 0;
+        perGoal[w.goal.id] = { accumulated: w.accumulated, contribution: earlier + contribution, complete: false };
 
         if (w.accumulated >= w.goal.target) {
           w.completionMonth = month;
@@ -1054,7 +1203,7 @@ export function runGoalSequence({
     return { working, timeline };
   }
 
-  const { working, timeline } = simulate(monthlySurplus, horizonMonths);
+  const { working, timeline } = simulate(hasDedicated ? Math.max(0, monthlySurplus) : monthlySurplus, horizonMonths);
 
   // Build outcomes + gap analysis.
   const outcomeGoals: GoalOutcome[] = sorted.map((g) => {
@@ -1082,9 +1231,9 @@ export function runGoalSequence({
       } else {
         status = "at-risk";
         // Solve: how much extra monthly surplus is needed?
-        extraMonthlyNeeded = solveExtraMonthly(g, sorted, monthlySurplus, g.deadlineMonths, startDate);
+        extraMonthlyNeeded = solveExtraMonthly(g, sorted, monthlySurplus, g.deadlineMonths, startDate, dedicatedMonthly);
         // Solve: how many extra months are needed at current surplus?
-        extraMonthsNeeded = solveExtraMonths(g, sorted, monthlySurplus, horizonMonths, startDate);
+        extraMonthsNeeded = solveExtraMonths(g, sorted, monthlySurplus, horizonMonths, startDate, dedicatedMonthly);
       }
     } else {
       status = completionMonth !== null ? "no-deadline" : "no-deadline";
@@ -1116,12 +1265,13 @@ function solveExtraMonthly(
   baseSurplus: number,
   deadlineMonths: number,
   startDate: Date,
+  dedicatedMonthly: Record<string, number>,
 ): number {
   let lo = 0;
   let hi = target.target; // worst-case upper bound
   for (let iter = 0; iter < 32; iter++) {
     const mid = (lo + hi) / 2;
-    const result = runGoalSequence({ goals: allGoals, monthlySurplus: baseSurplus + mid, horizonMonths: deadlineMonths, startDate });
+    const result = runGoalSequence({ goals: allGoals, monthlySurplus: baseSurplus + mid, horizonMonths: deadlineMonths, startDate, dedicatedMonthly });
     const outcome = result.goals.find((g) => g.goalId === target.id);
     const hits = outcome?.completionMonth !== null && outcome!.completionMonth! <= deadlineMonths;
     if (hits) hi = mid; else lo = mid;
@@ -1137,12 +1287,13 @@ function solveExtraMonths(
   surplus: number,
   baseHorizon: number,
   startDate: Date,
+  dedicatedMonthly: Record<string, number>,
 ): number {
   let lo = baseHorizon;
   let hi = baseHorizon + 120;
   for (let iter = 0; iter < 32; iter++) {
     const mid = Math.ceil((lo + hi) / 2);
-    const result = runGoalSequence({ goals: allGoals, monthlySurplus: surplus, horizonMonths: mid, startDate });
+    const result = runGoalSequence({ goals: allGoals, monthlySurplus: surplus, horizonMonths: mid, startDate, dedicatedMonthly });
     const outcome = result.goals.find((g) => g.goalId === target.id);
     const hits = outcome?.completionMonth !== null;
     if (hits) hi = mid; else lo = mid;
