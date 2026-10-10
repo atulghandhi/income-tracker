@@ -2,6 +2,8 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./tests",
+  // The static-page specs need the built site; they run under playwright.seo.config.ts.
+  testIgnore: ["seo-pages.spec.ts", "bing-seo.spec.ts"],
   timeout: 30_000,
   expect: {
     timeout: 5_000,

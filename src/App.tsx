@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Analytics } from "@vercel/analytics/react";
 import LandingPage from "./LandingPage";
 import Onboarding, { type OnboardingResult } from "./Onboarding";
@@ -1051,14 +1051,28 @@ function App() {
       setCategoryMenu(null);
     }
 
+    // A scroll that finished just before the menu opened (scrolling a row into
+    // view, then long-pressing it) still delivers its event a frame later, so
+    // only close once the page has actually moved since the menu opened.
+    const openedAt = { x: window.scrollX, y: window.scrollY };
+    function closeOnScroll(event: Event) {
+      const target = event.target;
+      if (target instanceof Element && target.closest(".categoryContextMenu")) return;
+      if (target instanceof Element) {
+        closeMenu();
+        return;
+      }
+      if (Math.abs(window.scrollX - openedAt.x) > 4 || Math.abs(window.scrollY - openedAt.y) > 4) closeMenu();
+    }
+
     window.addEventListener("click", closeMenu);
     window.addEventListener("resize", closeMenu);
-    window.addEventListener("scroll", closeMenu, true);
+    window.addEventListener("scroll", closeOnScroll, true);
 
     return () => {
       window.removeEventListener("click", closeMenu);
       window.removeEventListener("resize", closeMenu);
-      window.removeEventListener("scroll", closeMenu, true);
+      window.removeEventListener("scroll", closeOnScroll, true);
     };
   }, [categoryMenu]);
 
@@ -4768,8 +4782,21 @@ function CategoryContextMenu({
   onUngroup: () => void;
   onLinkDebt: (debtAccountId: string | undefined) => void;
 }) {
+  // The opener only guesses the menu's size. Once it's rendered, pull it back
+  // inside the window so every item can be reached without scrolling, which
+  // would close it.
+  const menuRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const menu = menuRef.current;
+    if (!menu) return;
+    const { width, height } = menu.getBoundingClientRect();
+    menu.style.left = `${Math.max(12, Math.min(x, window.innerWidth - width - 12))}px`;
+    menu.style.top = `${Math.max(12, Math.min(y, window.innerHeight - height - 12))}px`;
+  }, [x, y, options.length, debtAccounts.length]);
+
   return (
     <div
+      ref={menuRef}
       className="categoryContextMenu"
       role="menu"
       aria-label={`Move ${expense.name} to category`}

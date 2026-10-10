@@ -193,6 +193,8 @@ test.describe("Ledger", () => {
     const sources = () => inputValues(page, "input[aria-label='Income source']");
     const amounts = () => inputValues(page, ".incomeRow input[aria-label='Income amount']");
 
+    // On a phone the first rows can sit above the screen; a drag can't reach them there.
+    await page.locator(".incomeRow").nth(0).scrollIntoViewIfNeeded();
     await page.locator(".incomeRow").nth(1).locator(".dragHandle").dragTo(page.locator(".incomeRow").nth(0), { targetPosition: { x: 200, y: 4 } });
     await expect.poll(sources).toEqual(["Salary", "Amazon refund", "Amazon refund", "Side gig"]);
 
@@ -223,6 +225,8 @@ test.describe("Ledger", () => {
     await addExpense(page, "Coffee", 4);
     await addExpense(page, "Lunch", 9);
     const expenseNames = () => inputValues(page, "input[aria-label='Expense name']");
+    // addExpense only waits for the name to appear, which the first "Coffee" already satisfies.
+    await expect.poll(expenseNames).toEqual(["Coffee", "Coffee", "Lunch"]);
 
     const first = page.locator("input[aria-label='Expense name']").first();
     await first.fill("Costa");
