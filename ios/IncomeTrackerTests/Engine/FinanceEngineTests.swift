@@ -497,22 +497,26 @@ final class DebtRollForwardTests: XCTestCase {
         promoRate: Double = 0,
         promoMonths: Int = 0,
         minimumPayment: Double = 100,
-        balanceAsOf: String? = "2026-01"
+        balanceAsOf: String? = "2026-01",
+        promoAsOf: String? = "2026-01",
+        type: AccountType = .creditCard,
+        creditLimit: Double = 2000
     ) -> Account {
         Account(
             id: "debt-1",
             name: "Card",
             accountClass: .debt,
-            type: .creditCard,
+            type: type,
             balance: balance,
             rate: rate,
             promoRate: promoRate,
             promoMonths: promoMonths,
             monthlyContribution: 0,
-            creditLimit: 2000,
+            creditLimit: creditLimit,
             minimumPayment: minimumPayment,
             dueDay: 1,
             balanceAsOf: balanceAsOf,
+            promoAsOf: promoAsOf,
             includeInNetWorth: true,
             color: "#12b886",
             note: ""
@@ -631,6 +635,40 @@ final class DebtRollForwardTests: XCTestCase {
             accounts: [card], months: [:], currentMonthKey: "2026-04"
         )
         XCTAssertEqual(rolled[0].balance, 1000, accuracy: 0.001)
+    }
+
+    func testUtilizationOnlyCountsCreditCards() {
+        let card = debtAccount(balance: 500, creditLimit: 2000)
+        let loan = debtAccount(balance: 9000, type: .loan, creditLimit: 10000)
+        let loanNoLimit = debtAccount(balance: 4000, type: .loan, creditLimit: 0)
+        let overdraft = debtAccount(balance: 300, type: .overdraft, creditLimit: 500)
+        let summary = FinanceEngine.debtSummary([card, loan, loanNoLimit, overdraft])
+        XCTAssertEqual(summary.utilization, 25, accuracy: 0.001)
+        XCTAssertEqual(summary.totalCreditLimit, 2000, accuracy: 0.001)
+        XCTAssertEqual(summary.availableCredit, 1500, accuracy: 0.001)
+        XCTAssertEqual(summary.totalDebt, 13800, accuracy: 0.001)
+    }
+
+    func testPromoMonthsCountDownFromAnchor() {
+        let card = debtAccount(promoMonths: 12, promoAsOf: "2026-01")
+        XCTAssertEqual(FinanceEngine.promoMonthsRemaining(card, currentMonthKey: "2026-01"), 12)
+        XCTAssertEqual(FinanceEngine.promoMonthsRemaining(card, currentMonthKey: "2026-02"), 11)
+        XCTAssertEqual(FinanceEngine.promoMonthsRemaining(card, currentMonthKey: "2027-01"), 0)
+        XCTAssertEqual(FinanceEngine.promoMonthsRemaining(card, currentMonthKey: "2028-06"), 0)
+
+        let live = FinanceEngine.deriveLiveAccounts(accounts: [card], months: [:], currentMonthKey: "2026-04")
+        XCTAssertEqual(live[0].promoMonths, 9)
+        XCTAssertEqual(live[0].promoAsOf, "2026-04")
+    }
+
+    func testRollForwardChargesAprOnceWindowEnds() {
+        // 2 months of 0% entered in January: Feb and Mar are free, Apr is charged.
+        let card = debtAccount(rate: 12, promoMonths: 2, promoAsOf: "2026-01")
+        let rolled = FinanceEngine.rollForwardDebtBalances(
+            accounts: [card], months: [:], currentMonthKey: "2026-04"
+        )
+        let afterApr = 800 * (1 + FinanceEngine.monthlyRate(fromAnnual: 12)) - 100
+        XCTAssertEqual(rolled[0].balance, (afterApr * 100).rounded() / 100, accuracy: 0.005)
     }
 }
 

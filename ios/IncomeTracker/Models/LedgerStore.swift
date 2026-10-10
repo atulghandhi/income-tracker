@@ -405,11 +405,12 @@ public final class LedgerStore {
 
     // MARK: - Derived accounts
 
-    /// Accounts with debt balances rolled forward from their `balanceAsOf` snapshot to today —
-    /// every screen and summary should read these instead of `state.accounts` so a card set up
-    /// months ago shows what's left after the scheduled (or linked) payments.
+    /// Accounts with debt balances rolled forward from their `balanceAsOf` snapshot to today and
+    /// promo windows counted down — every screen and summary should read these instead of
+    /// `state.accounts` so a card set up months ago shows what's left after the scheduled (or
+    /// linked) payments, and "12 months 0%" reads 11 a month later.
     public var effectiveAccounts: [Account] {
-        FinanceEngine.rollForwardDebtBalances(accounts: state.accounts, months: state.months)
+        FinanceEngine.deriveLiveAccounts(accounts: state.accounts, months: state.months)
     }
 
     // MARK: - Account mutations
@@ -419,6 +420,9 @@ public final class LedgerStore {
             var next = account
             if next.balanceAsOf == nil {
                 next.balanceAsOf = getMonthKey()
+            }
+            if next.promoAsOf == nil {
+                next.promoAsOf = getMonthKey()
             }
             s.accounts.append(next)
         }
@@ -446,6 +450,14 @@ public final class LedgerStore {
             } else if next.balanceAsOf == nil {
                 next.balanceAsOf = existing.balanceAsOf
             }
+            // Same idea for promo months: the editor shows the live count. An unchanged number
+            // keeps the stored count + anchor ticking; a new one restarts the countdown today.
+            if next.promoMonths != FinanceEngine.promoMonthsRemaining(existing) {
+                next.promoAsOf = getMonthKey()
+            } else {
+                next.promoMonths = existing.promoMonths
+                next.promoAsOf = existing.promoAsOf ?? getMonthKey()
+            }
             s.accounts[idx] = next
         }
     }
@@ -463,6 +475,8 @@ public final class LedgerStore {
             copy.id = createId(prefix: "account")
             copy.name = "\(copy.name) copy"
             copy.balanceAsOf = getMonthKey()
+            copy.promoMonths = FinanceEngine.promoMonthsRemaining(copy)
+            copy.promoAsOf = getMonthKey()
             s.accounts.insert(copy, at: index + 1)
         }
     }

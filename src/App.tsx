@@ -74,7 +74,8 @@ import {
   getCurrencySymbol,
   getMonthKey,
   isValidMonthKey,
-  rollForwardDebtBalances,
+  deriveLiveAccounts,
+  estimateDebtPayoff,
   runGoalSequence,
   seedMonthFromPrevious,
   shiftMonth,
@@ -549,11 +550,12 @@ function App() {
   const moneyFormatter = useMemo(() => getCurrencyFormatter(ledger.currency), [ledger.currency]);
   const currencySymbol = useMemo(() => getCurrencySymbol(ledger.currency), [ledger.currency]);
   const projection = useMemo(() => calculateProjection(currentMonth), [currentMonth]);
-  // Debt balances rolled forward from their snapshot month to today — every summary, chart,
-  // and the accounts screen read these, so a card set up months ago shows what's left after
-  // the scheduled (or linked) payments, not the stale snapshot.
+  // Debt balances rolled forward from their snapshot month to today, and 0%/intro windows
+  // counted down — every summary, chart, and the accounts screen read these, so a card set up
+  // months ago shows what's left after the scheduled (or linked) payments, and "12 months
+  // interest-free" reads 11 a month later, not the stale snapshot.
   const effectiveAccounts = useMemo(
-    () => rollForwardDebtBalances({ accounts: ledger.accounts, months: ledger.months }),
+    () => deriveLiveAccounts({ accounts: ledger.accounts, months: ledger.months }),
     [ledger.accounts, ledger.months],
   );
   const debtSummary = useMemo(() => calculateDebtSummary(effectiveAccounts), [effectiveAccounts]);
@@ -970,6 +972,7 @@ function App() {
             minimumPayment: 0,
             dueDay: 1,
             balanceAsOf: getMonthKey(),
+            promoAsOf: getMonthKey(),
             includeInNetWorth: true,
             color: colors[(current.accounts.length + index) % colors.length],
             note: "",
@@ -1330,10 +1333,11 @@ function App() {
           promoRate: Math.max(0, Number(accountDraft.promoRate) || 0),
           promoMonths: clampWholeNumber(Number(accountDraft.promoMonths) || 0, 120),
           monthlyContribution: isDebt ? 0 : Math.max(0, Number(accountDraft.monthlyContribution) || 0),
-          creditLimit: isDebt ? Math.max(0, Number(accountDraft.creditLimit) || 0) : 0,
+          creditLimit: isDebt && accountDraft.type !== "loan" ? Math.max(0, Number(accountDraft.creditLimit) || 0) : 0,
           minimumPayment: isDebt ? Math.max(0, Number(accountDraft.minimumPayment) || 0) : 0,
           dueDay: isDebt ? clampDueDay(Number(accountDraft.dueDay) || 1) : 1,
           balanceAsOf: getMonthKey(),
+          promoAsOf: getMonthKey(),
           includeInNetWorth: true,
           color: colors[current.accounts.length % colors.length],
           note: "",
@@ -1347,7 +1351,10 @@ function App() {
   function updateAccount(id: string, patch: Partial<Account>) {
     // Editing the balance is the "true up against my statement" gesture: re-anchor the
     // snapshot to this month so the debt roll-forward restarts from the value just typed.
-    const anchored = "balance" in patch ? { ...patch, balanceAsOf: getMonthKey() } : patch;
+    // Promo months work the same way: the typed number is "months left as of now".
+    const anchored: Partial<Account> = { ...patch };
+    if ("balance" in patch) anchored.balanceAsOf = getMonthKey();
+    if ("promoMonths" in patch) anchored.promoAsOf = getMonthKey();
     updateLedger((current) => ({
       ...current,
       accounts: current.accounts.map((account) => (account.id === id ? { ...account, ...anchored } : account)),
@@ -2689,7 +2696,7 @@ function App() {
                       <strong className={ledger.privacyMode ? "masked" : ""}>{moneyFormatter.format(debtSummary.monthlyMinimums)}</strong>
                     </div>
                     <div>
-                      <span>Utilization</span>
+                      <span>Card utilization</span>
                       <strong>{formatDecimal(debtSummary.utilization)}%</strong>
                     </div>
                     <div>
@@ -5238,8 +5245,10 @@ function AccountRow({
   onRemove: () => void;
 }) {
   const isDebt = account.accountClass === "debt";
-  const utilization = isDebt && account.creditLimit > 0 ? clampPercent((account.balance / account.creditLimit) * 100) : 0;
+  const hasLimit = isDebt && account.type !== "loan";
+  const utilization = hasLimit && account.creditLimit > 0 ? clampPercent((account.balance / account.creditLimit) * 100) : 0;
   const typeOptions = ACCOUNT_TYPE_OPTIONS[account.accountClass];
+  const payoff = isDebt ? estimateDebtPayoff(account) : null;
 
   return (
     <div className={`debtAccountRow ${isDebt ? "isDebt" : "isAsset"}`} style={{ "--account-color": account.color } as CSSProperties}>
@@ -5276,7 +5285,12 @@ function AccountRow({
         />
       </div>
 
-      {isDebt ? (
+      {isDebt && !hasLimit ? (
+        <div className="debtField limitField payoffField">
+          <span>Paid off</span>
+          <strong>{payoffLabel(payoff)}</strong>
+        </div>
+      ) : isDebt ? (
         <div className="debtField limitField">
           <span>Limit</span>
           <MoneyInput
@@ -5326,8 +5340,8 @@ function AccountRow({
           label={`Promo period help for ${account.name}`}
           text={
             isDebt
-              ? "Months left before APR starts applying. The forecast delays interest until then."
-              : "Months an intro rate applies before the standard rate takes over. Leave blank if none."
+              ? "Months left before APR starts applying. It counts down by itself each month, and the forecast delays interest until then."
+              : "Months left on an intro rate before the standard rate takes over. It counts down by itself each month. Leave blank if none."
           }
         />
       </label>
@@ -5368,7 +5382,7 @@ function AccountRow({
       <div className="debtAccountMeta">
         <span>{accountTypeLabel(account)}</span>
         <strong className={privacy ? "masked" : ""}>{formatter.format(account.balance)}</strong>
-        <em>{autoNote ? `${accountMetaCaption(account, utilization)} · ${autoNote}` : accountMetaCaption(account, utilization)}</em>
+        <em>{[accountMetaCaption(account, utilization, payoff, hasLimit, formatter, privacy), autoNote].filter(Boolean).join(" · ")}</em>
       </div>
       <button className="iconButton rowAction" type="button" onClick={onRemove} aria-label={`Remove ${account.name}`}>
         <Trash2 size={17} />
@@ -5470,7 +5484,7 @@ function AccountEditor({
             label="Promo period help"
             text={
               isDebt
-                ? "Months before APR starts applying. The forecast delays interest until this period ends."
+                ? "Months left before APR starts applying, as of today. It counts down by itself each month, and the forecast delays interest until this period ends."
                 : "If this account has an intro rate, how many months it lasts before the standard rate takes over."
             }
           />
@@ -5478,13 +5492,15 @@ function AccountEditor({
 
         {isDebt ? (
           <>
-            <MoneyInput
-              ariaLabel="Credit limit"
-              value={draft.creditLimit}
-              symbol={symbol}
-              placeholder="Credit limit"
-              onChange={(value) => setDraft((current) => ({ ...current, creditLimit: value }))}
-            />
+            {draft.type !== "loan" && (
+              <MoneyInput
+                ariaLabel="Credit limit"
+                value={draft.creditLimit}
+                symbol={symbol}
+                placeholder={draft.type === "overdraft" ? "Overdraft limit" : "Credit limit"}
+                onChange={(value) => setDraft((current) => ({ ...current, creditLimit: value }))}
+              />
+            )}
             <MoneyInput
               ariaLabel="Monthly payment"
               value={draft.minimumPayment}
@@ -5552,10 +5568,40 @@ function debtAutoTrackNote(derived: Account, storedAccounts: Account[]): string 
   return `auto-tracked since ${formatMonth(stored.balanceAsOf)}`;
 }
 
-function accountMetaCaption(account: Account, utilization: number): string {
+function payoffLabel(payoff: ReturnType<typeof estimateDebtPayoff> | null): string {
+  if (!payoff) return "—";
+  if (payoff.monthsToPayoff === 0) return "Cleared";
+  if (payoff.monthsToPayoff === null) return "Set a payment";
+  return formatMonth(shiftMonth(getMonthKey(), payoff.monthsToPayoff));
+}
+
+function accountMetaCaption(
+  account: Account,
+  utilization: number,
+  payoff: ReturnType<typeof estimateDebtPayoff> | null,
+  hasLimit: boolean,
+  formatter: Intl.NumberFormat,
+  privacy: boolean,
+): string {
   if (account.accountClass === "debt") {
-    const limitNote = account.creditLimit > 0 ? `${formatDecimal(utilization)}% used · ` : "";
-    return `${limitNote}${account.promoMonths > 0 ? `${account.promoMonths} mo 0%` : "APR active"}`;
+    const parts: string[] = [];
+    if (hasLimit && account.creditLimit > 0) parts.push(`${formatDecimal(utilization)}% used`);
+    if (account.promoMonths > 0) {
+      // A date is easier to plan around than a bare count, and it visibly moves as months pass.
+      const promoEnds = formatMonth(shiftMonth(getMonthKey(), account.promoMonths));
+      parts.push(`${formatDecimal(account.promoRate)}% until ${promoEnds}`);
+      const shortfall = payoff && account.balance > 0 && account.minimumPayment < payoff.paymentToClearInPromo - 0.005;
+      if (shortfall && payoff) {
+        const needed = privacy ? "•••" : formatter.format(Math.ceil(payoff.paymentToClearInPromo));
+        parts.push(`pay ${needed}/mo to clear it before then`);
+      }
+    } else {
+      parts.push(account.rate > 0 ? `${formatDecimal(account.rate)}% APR` : "No interest");
+    }
+    if (hasLimit && payoff && payoff.monthsToPayoff !== null && payoff.monthsToPayoff > 0) {
+      parts.push(`paid off ${payoffLabel(payoff)}`);
+    }
+    return parts.join(" · ");
   }
   const rateNote = `${formatDecimal(account.rate)}% ${account.accountClass === "investment" ? "est." : "AER"}`;
   const contributionNote = account.monthlyContribution > 0 ? ` · +${Math.round(account.monthlyContribution)}/mo` : "";
@@ -6877,6 +6923,8 @@ function normalizeAccounts(state: Partial<LedgerState>): Account[] {
       // v7 → v8: pre-existing balances anchor to the month this version first loads, so the
       // roll-forward starts from now rather than retroactively repricing old snapshots.
       balanceAsOf: isValidMonthKey(item?.balanceAsOf) ? item.balanceAsOf : getMonthKey(),
+      // Promo counts saved before they ticked down start counting from the month this loads.
+      promoAsOf: isValidMonthKey(item?.promoAsOf) ? item.promoAsOf : getMonthKey(),
       includeInNetWorth: item?.includeInNetWorth !== false,
       color: item?.color || colors[index % colors.length],
       note: item?.note ?? "",

@@ -87,6 +87,7 @@ function account(overrides: Partial<Account> & { id: string; name: string; accou
     dueDay: 1,
     // Fixed anchor so fixtures stay deterministic; the engine fixtures never roll forward.
     balanceAsOf: "2025-06",
+    promoAsOf: "2025-06",
     includeInNetWorth: true,
     color: "#12b886",
     note: "",

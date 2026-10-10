@@ -555,6 +555,9 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
     public var rate: Double
     public var promoRate: Double
     public var promoMonths: Int
+    /// Month key ("yyyy-MM") `promoMonths` was entered in. The live months-left figure counts
+    /// down from this anchor (`FinanceEngine.promoMonthsRemaining`). nil means "entered now".
+    public var promoAsOf: String?
     /// Assets only: monthly surplus routed into this account.
     public var monthlyContribution: Double
     /// Debt only.
@@ -583,6 +586,7 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
         minimumPayment: Double,
         dueDay: Int,
         balanceAsOf: String? = nil,
+        promoAsOf: String? = nil,
         includeInNetWorth: Bool,
         color: String,
         note: String
@@ -600,6 +604,7 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
         self.minimumPayment = minimumPayment
         self.dueDay = dueDay
         self.balanceAsOf = balanceAsOf
+        self.promoAsOf = promoAsOf
         self.includeInNetWorth = includeInNetWorth
         self.color = color
         self.note = note
@@ -607,7 +612,7 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case id, name, accountClass, type, balance, rate, promoRate, promoMonths,
-             monthlyContribution, creditLimit, minimumPayment, dueDay, balanceAsOf,
+             monthlyContribution, creditLimit, minimumPayment, dueDay, balanceAsOf, promoAsOf,
              includeInNetWorth, color, note
     }
 
@@ -642,6 +647,9 @@ public struct Account: Codable, Identifiable, Hashable, Sendable {
         // v7 → v8: pre-existing balances anchor to the month this version first loads.
         let storedAsOf = c.lenientString(.balanceAsOf)
         balanceAsOf = isValidMonthKey(storedAsOf) ? storedAsOf : getMonthKey()
+        // Promo counts saved before they ticked down start counting from the month this loads.
+        let storedPromoAsOf = c.lenientString(.promoAsOf)
+        promoAsOf = isValidMonthKey(storedPromoAsOf) ? storedPromoAsOf : getMonthKey()
         includeInNetWorth = c.lenientOptionalBool(.includeInNetWorth) ?? true
         color = c.lenientString(.color) ?? ""
         note = c.lenientString(.note) ?? ""

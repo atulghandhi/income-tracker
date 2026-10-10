@@ -141,6 +141,9 @@ export type Account = {
   rate: number;
   promoRate: number;
   promoMonths: number;
+  // Month key ("YYYY-MM") `promoMonths` was entered in. The live months-left figure counts down
+  // from this anchor (see promoMonthsRemaining), so "12 months left" becomes 11 next month.
+  promoAsOf: string;
   // Assets only: how much monthly surplus is routed into this account.
   monthlyContribution: number;
   // Debt only.

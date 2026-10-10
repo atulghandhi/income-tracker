@@ -242,13 +242,22 @@ export function getAssetAccounts(accounts: Account[]): Account[] {
   return accounts.filter((account) => account.accountClass !== "debt");
 }
 
+// Credit utilisation only measures revolving card credit. Loans, overdrafts and other balances
+// still count towards total debt, but a car loan has no "limit" to use up, so including it would
+// inflate utilisation (and the credit-score estimate) for a perfectly normal borrowing pattern.
+export function countsTowardUtilization(account: Account): boolean {
+  return account.accountClass === "debt" && account.type === "credit-card";
+}
+
 export function calculateDebtSummary(accounts: DebtAccount[]): DebtSummary {
   const debts = getDebtAccounts(accounts);
   const activeDebts = debts.filter((debt) => debt.balance > 0);
   const totalDebt = activeDebts.reduce((sum, debt) => sum + Number(debt.balance || 0), 0);
-  const totalCreditLimit = debts.reduce((sum, debt) => sum + Math.max(0, Number(debt.creditLimit || 0)), 0);
-  const availableCredit = Math.max(0, totalCreditLimit - totalDebt);
-  const utilization = totalCreditLimit > 0 ? (totalDebt / totalCreditLimit) * 100 : 0;
+  const cards = debts.filter(countsTowardUtilization);
+  const totalCreditLimit = cards.reduce((sum, card) => sum + Math.max(0, Number(card.creditLimit || 0)), 0);
+  const cardBalance = cards.reduce((sum, card) => sum + Math.max(0, Number(card.balance || 0)), 0);
+  const availableCredit = Math.max(0, totalCreditLimit - cardBalance);
+  const utilization = totalCreditLimit > 0 ? (cardBalance / totalCreditLimit) * 100 : 0;
   const monthlyMinimums = activeDebts.reduce((sum, debt) => sum + Math.max(0, Number(debt.minimumPayment || 0)), 0);
   const weightedApr =
     totalDebt > 0 ? activeDebts.reduce((sum, debt) => sum + Math.max(0, Number(debt.rate || 0)) * debt.balance, 0) / totalDebt : 0;
@@ -357,10 +366,6 @@ export function rollForwardDebtBalances({
 
     const paymentsByMonth = linkedPayments.get(account.id);
     const scheduledPayment = Math.max(0, Number(account.minimumPayment) || 0);
-    // The promo window counts down from today, so any promo still active now also covered the
-    // elapsed months being rolled. Without one, the standard rate applies.
-    const annualRate = account.promoMonths > 0 ? Number(account.promoRate) || 0 : Number(account.rate) || 0;
-    const monthlyRate = monthlyRateFromAnnual(annualRate);
 
     let balance = Math.max(0, Number(account.balance) || 0);
     let changed = false;
@@ -371,13 +376,92 @@ export function rollForwardDebtBalances({
       const payment = linkedTotal > 0 ? linkedTotal : scheduledPayment;
       if (payment <= 0) continue;
 
-      const owed = balance + balance * monthlyRate;
+      // Each elapsed month is priced at the rate in force that month, so a 0% window that ran
+      // out part-way through the roll starts charging APR from the month it ended.
+      const annualRate = isInPromoWindow(account, monthKey) ? Number(account.promoRate) || 0 : Number(account.rate) || 0;
+      const owed = balance + balance * monthlyRateFromAnnual(annualRate);
       balance = Math.max(0, owed - payment);
       changed = true;
     }
 
     return changed ? { ...account, balance: roundTo(balance, 2) } : account;
   });
+}
+
+// ─── Promo window countdown ──────────────────────────────────────────────────
+//
+// `promoMonths` is what the user typed ("12 months left") and `promoAsOf` is the month they typed
+// it. The live count is derived from the two, so it ticks down by itself each month instead of
+// staying frozen at whatever was entered. Month m is inside the window while it is no more than
+// `promoMonths` months after the anchor (month 1 is the month after it was entered), matching
+// effectiveAnnualRate's `monthIndex <= promoMonths` in the forecast.
+
+export function promoMonthsRemaining(account: Account, currentMonthKey = getMonthKey()): number {
+  const promoMonths = Math.max(0, Math.round(Number(account.promoMonths) || 0));
+  if (promoMonths <= 0) return 0;
+  const anchor = isValidMonthKey(account.promoAsOf) ? account.promoAsOf : currentMonthKey;
+  return Math.max(0, promoMonths - Math.max(0, monthsBetween(anchor, currentMonthKey)));
+}
+
+function isInPromoWindow(account: Account, monthKey: string): boolean {
+  const promoMonths = Math.max(0, Math.round(Number(account.promoMonths) || 0));
+  if (promoMonths <= 0) return false;
+  // No anchor means the count was entered "now", so every elapsed month sat inside the window.
+  if (!isValidMonthKey(account.promoAsOf)) return true;
+  return monthsBetween(account.promoAsOf, monthKey) <= promoMonths;
+}
+
+// Re-expresses each account's promo window as of the current month: months left, anchored to now.
+export function tickPromoWindows(accounts: Account[], currentMonthKey = getMonthKey()): Account[] {
+  return accounts.map((account) => {
+    const remaining = promoMonthsRemaining(account, currentMonthKey);
+    if (remaining === account.promoMonths && account.promoAsOf === currentMonthKey) return account;
+    return { ...account, promoMonths: remaining, promoAsOf: currentMonthKey };
+  });
+}
+
+// The accounts every screen reads: debt balances rolled forward and promo windows counted down
+// to the current month. The stored ledger keeps the user's snapshots untouched.
+export function deriveLiveAccounts({
+  accounts,
+  months,
+  currentMonthKey = getMonthKey(),
+}: {
+  accounts: Account[];
+  months: Record<string, MonthBudget>;
+  currentMonthKey?: string;
+}): Account[] {
+  return tickPromoWindows(rollForwardDebtBalances({ accounts, months, currentMonthKey }), currentMonthKey);
+}
+
+// When a live debt (already rolled forward and promo-ticked) is cleared at its scheduled payment,
+// and what monthly payment would clear it before any 0% window closes. `monthsToPayoff` is null
+// when there is no payment or the payment never outruns the interest.
+export function estimateDebtPayoff(account: Account): {
+  monthsToPayoff: number | null;
+  promoMonthsLeft: number;
+  paymentToClearInPromo: number;
+} {
+  const promoMonthsLeft = Math.max(0, Math.round(Number(account.promoMonths) || 0));
+  const payment = Math.max(0, Number(account.minimumPayment) || 0);
+  let balance = Math.max(0, Number(account.balance) || 0);
+
+  let paymentToClearInPromo = 0;
+  if (balance > 0 && promoMonthsLeft > 0) {
+    const rate = monthlyRateFromAnnual(Number(account.promoRate) || 0);
+    paymentToClearInPromo =
+      rate > 0 ? (balance * rate) / (1 - Math.pow(1 + rate, -promoMonthsLeft)) : balance / promoMonthsLeft;
+  }
+
+  if (balance <= 0) return { monthsToPayoff: 0, promoMonthsLeft, paymentToClearInPromo };
+  if (payment <= 0) return { monthsToPayoff: null, promoMonthsLeft, paymentToClearInPromo };
+
+  for (let monthIndex = 1; monthIndex <= 600; monthIndex += 1) {
+    balance += balance * monthlyRateFromAnnual(effectiveAnnualRate(account, monthIndex));
+    balance -= payment;
+    if (balance <= 0.005) return { monthsToPayoff: monthIndex, promoMonthsLeft, paymentToClearInPromo };
+  }
+  return { monthsToPayoff: null, promoMonthsLeft, paymentToClearInPromo };
 }
 
 // Projects net worth forward by routing each month's surplus into the user's accounts,
@@ -819,7 +903,7 @@ export function clampWholeNumber(value: number, max = 600): number {
 
 function calculateCreditCardStats(debts: DebtAccount[]) {
   const cards = debts
-    .filter((debt) => debt.type === "credit-card" && debt.creditLimit > 0)
+    .filter((debt) => countsTowardUtilization(debt) && debt.creditLimit > 0)
     .map((debt) => ({
       id: debt.id,
       name: debt.name,

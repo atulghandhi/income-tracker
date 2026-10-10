@@ -349,6 +349,44 @@ test.describe("Ledger", () => {
     await expect(page.getByText("£1,200").first()).toBeVisible();
   });
 
+  test("loans stay out of card utilization and 0% months count down as time passes", async ({ page }) => {
+    await page.clock.install({ time: new Date(2026, 9, 10) });
+    await page.goto("/");
+    await addDebtAccount(page, { name: "Visa Classic", balance: 1200, limit: 3000, apr: 19.9, promoMonths: 12, payment: 75, dueDay: 12 });
+
+    const editor = page.locator(".accountEditorPanel");
+    await editor.getByLabel("Account kind").selectOption("debt");
+    await editor.getByLabel("Account type").selectOption("loan");
+    // A loan has no limit to use up, so the editor does not ask for one.
+    await expect(editor.getByLabel("Credit limit")).toHaveCount(0);
+    await editor.getByLabel("Account name").fill("Car loan");
+    await editor.getByLabel("Current balance").fill("8000");
+    await editor.getByLabel("Interest rate (APR) %").fill("6.9");
+    await editor.getByLabel("Monthly payment").fill("250");
+    await editor.getByLabel("Payment due day").fill("5");
+    await editor.getByRole("button", { name: "Add account" }).click();
+    await expect(page.getByLabel("Balance for Car loan")).toHaveValue("8000");
+    await expect(page.getByLabel("Credit limit for Car loan")).toHaveCount(0);
+
+    // Only the card counts: 1,200 / 3,000 = 40%, however large the loan is.
+    await expect(page.locator(".summaryStrip").getByText("40%")).toBeVisible();
+    await expect(page.getByText(/0% until October 2027/)).toBeVisible();
+    await expect(page.getByText(/pay £100\/mo to clear it before then/)).toBeVisible();
+
+    // Two months later the same card shows 10 months left without any edits, and the £150
+    // already paid lowers what it takes to clear the rest in time: £1,050 / 10.
+    await page.clock.runFor(2000); // let the debounced save land before reloading
+    await page.clock.setSystemTime(new Date(2026, 11, 10));
+    await page.reload();
+    await openView(page, "Accounts");
+    await expect(page.getByLabel("Promo months for Visa Classic")).toHaveValue("10");
+    await expect(page.getByText(/pay £105\/mo to clear it before then/)).toBeVisible();
+    // The end date stays put while the count falls.
+    await expect(page.getByText(/0% until October 2027/)).toBeVisible();
+    await expect(page.getByLabel("Credit limit for Car loan")).toHaveCount(0);
+    await expect(page.locator(".summaryStrip").getByText("35%")).toBeVisible();
+  });
+
   test("explains health score, flags financial anomalies, and switches insight charts", async ({ page }) => {
     await openLedger(page);
     await addIncome(page, "Salary", 2000);

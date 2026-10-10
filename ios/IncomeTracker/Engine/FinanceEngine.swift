@@ -87,14 +87,22 @@ enum FinanceEngine {
 
     // MARK: - Debt summary
 
+    /// Port of `countsTowardUtilization`: utilisation only measures revolving card credit.
+    /// Loans, overdrafts and other balances still count as debt, but not as "utilisation".
+    nonisolated static func countsTowardUtilization(_ account: Account) -> Bool {
+        account.accountClass == .debt && account.type == .creditCard
+    }
+
     nonisolated static func debtSummary(_ accounts: [Account]) -> DebtSummary {
         let debts = accounts.filter { $0.accountClass == .debt }
         let activeDebts = debts.filter { $0.balance > 0 }
 
         let totalDebt = activeDebts.reduce(0.0) { $0 + max(0.0, $1.balance) }
-        let totalCreditLimit = debts.reduce(0.0) { $0 + max(0.0, $1.creditLimit) }
-        let availableCredit = max(0.0, totalCreditLimit - totalDebt)
-        let utilization = totalCreditLimit > 0 ? (totalDebt / totalCreditLimit) * 100.0 : 0.0
+        let cards = debts.filter(countsTowardUtilization)
+        let totalCreditLimit = cards.reduce(0.0) { $0 + max(0.0, $1.creditLimit) }
+        let cardBalance = cards.reduce(0.0) { $0 + max(0.0, $1.balance) }
+        let availableCredit = max(0.0, totalCreditLimit - cardBalance)
+        let utilization = totalCreditLimit > 0 ? (cardBalance / totalCreditLimit) * 100.0 : 0.0
         let monthlyMinimums = activeDebts.reduce(0.0) { $0 + max(0.0, $1.minimumPayment) }
         let weightedApr: Double
         if totalDebt > 0 {
@@ -230,9 +238,6 @@ enum FinanceEngine {
 
             let paymentsByMonth = linkedPayments[account.id]
             let scheduledPayment = max(0.0, account.minimumPayment)
-            // A promo window still active now also covered the elapsed months being rolled.
-            let annualRate = account.promoMonths > 0 ? account.promoRate : account.rate
-            let monthly = monthlyRateFromAnnual(annualRate)
 
             var balance = max(0.0, account.balance)
             var changed = false
@@ -244,7 +249,10 @@ enum FinanceEngine {
                 let payment = linkedTotal > 0 ? linkedTotal : scheduledPayment
                 guard payment > 0 else { continue }
 
-                let owed = balance + balance * monthly
+                // Each elapsed month is priced at the rate in force that month, so a 0% window
+                // that ran out part-way through the roll starts charging APR from then.
+                let annualRate = isInPromoWindow(account, monthKey: monthKey) ? account.promoRate : account.rate
+                let owed = balance + balance * monthlyRateFromAnnual(annualRate)
                 balance = max(0.0, owed - payment)
                 changed = true
             }
@@ -254,6 +262,50 @@ enum FinanceEngine {
             rolled.balance = roundTo(balance, digits: 2)
             return rolled
         }
+    }
+
+    // MARK: - Promo window countdown
+
+    /// Port of `promoMonthsRemaining`: `promoMonths` is "months left as of `promoAsOf`", so the
+    /// live figure ticks down by itself each month instead of staying frozen.
+    nonisolated static func promoMonthsRemaining(_ account: Account, currentMonthKey: String = getMonthKey()) -> Int {
+        let promoMonths = max(0, account.promoMonths)
+        guard promoMonths > 0 else { return 0 }
+        let anchor = isValidMonthKey(account.promoAsOf) ? account.promoAsOf! : currentMonthKey
+        return max(0, promoMonths - max(0, monthsBetween(anchor, currentMonthKey)))
+    }
+
+    /// Port of `isInPromoWindow`.
+    nonisolated static func isInPromoWindow(_ account: Account, monthKey: String) -> Bool {
+        let promoMonths = max(0, account.promoMonths)
+        guard promoMonths > 0 else { return false }
+        // No anchor means the count was entered "now", so every elapsed month sat inside the window.
+        guard isValidMonthKey(account.promoAsOf) else { return true }
+        return monthsBetween(account.promoAsOf!, monthKey) <= promoMonths
+    }
+
+    /// Port of `tickPromoWindows`: months left, re-anchored to the current month.
+    nonisolated static func tickPromoWindows(_ accounts: [Account], currentMonthKey: String = getMonthKey()) -> [Account] {
+        accounts.map { account in
+            let remaining = promoMonthsRemaining(account, currentMonthKey: currentMonthKey)
+            if remaining == account.promoMonths && account.promoAsOf == currentMonthKey { return account }
+            var ticked = account
+            ticked.promoMonths = remaining
+            ticked.promoAsOf = currentMonthKey
+            return ticked
+        }
+    }
+
+    /// Port of `deriveLiveAccounts`: debt balances rolled forward and promo windows counted down.
+    nonisolated static func deriveLiveAccounts(
+        accounts: [Account],
+        months: [String: MonthBudget],
+        currentMonthKey: String = getMonthKey()
+    ) -> [Account] {
+        tickPromoWindows(
+            rollForwardDebtBalances(accounts: accounts, months: months, currentMonthKey: currentMonthKey),
+            currentMonthKey: currentMonthKey
+        )
     }
 
     // MARK: - Net worth outlook
@@ -1094,7 +1146,7 @@ private extension FinanceEngine {
 
     static func creditCardStats(_ debts: [Account]) -> CreditCardStats {
         let cards: [CardStat] = debts
-            .filter { $0.type == .creditCard && $0.creditLimit > 0 }
+            .filter { countsTowardUtilization($0) && $0.creditLimit > 0 }
             .map { d in
                 let bal = max(0.0, d.balance)
                 let lim = max(0.0, d.creditLimit)

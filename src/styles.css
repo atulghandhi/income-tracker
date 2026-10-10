@@ -6168,3 +6168,11 @@ hr {
     gap: 10px;
   }
 }
+
+/* Loans have no limit; that slot shows the estimated payoff month instead. */
+.payoffField strong {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  padding-top: 6px;
+}

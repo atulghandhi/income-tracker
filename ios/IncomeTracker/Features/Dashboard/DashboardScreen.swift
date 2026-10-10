@@ -768,7 +768,7 @@ struct DashboardSummaryRows: View {
                     tone: .ink)
                 Divider().padding(.leading, 44)
                 row(icon: "creditcard", label: "Card utilisation",
-                    value: accounts.contains { $0.accountClass == .debt && $0.creditLimit > 0 } ? formatPercent(utilization, digits: 0) : "No cards",
+                    value: accounts.contains { FinanceEngine.countsTowardUtilization($0) && $0.creditLimit > 0 } ? formatPercent(utilization, digits: 0) : "No cards",
                     tone: utilization >= 80 ? .brandRed : utilization > 30 ? .brandAmber : .ink)
                 Divider().padding(.leading, 44)
                 row(icon: "square.and.arrow.down", label: "Last import",
