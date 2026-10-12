@@ -170,6 +170,15 @@ Ledger is the home destination, quick-log bar docked above the keyboard, Return 
 
 ## 4. Phase 0: Sync v2 (server, web, iOS, then Android)
 
+> **Status (12 Oct 2026):** implemented for the server, web and iOS, and tested; not yet
+> deployed. What shipped, how it was tested, and the dashboard and release steps are in
+> `docs/SYNC_V2_ROLLOUT.md`. Where the code refined this section: "unsaved changes"
+> means the ledger differs from both the server copy as stored and as this client
+> normalises it (otherwise clients that format JSON differently re-push each other);
+> first-sign-in "same data" means the same transaction and account ids, not equal
+> totals; and iOS merges at the JSON level and carries unknown keys from the server
+> copy instead of storing an extras bag per type.
+
 ### 4.1 Requirements
 
 | # | Requirement |
