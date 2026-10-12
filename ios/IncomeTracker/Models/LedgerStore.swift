@@ -28,11 +28,14 @@ public final class LedgerStore {
 
     // MARK: - Cloud push hook
 
-    /// Set at app startup. Pushes the freshly saved state to the cloud after
-    /// every debounced local save. Returns false when the push failed (offline
-    /// or server error) so the save status can reflect it. Implementations
-    /// should return true when the user is signed out (nothing to push).
+    /// Set at app startup. Called after every debounced local save of a user edit;
+    /// the installed closure hands the push to the SyncEngine, which reports its own
+    /// status. Returns false only when the push could not even be requested.
     public var cloudPusher: (@MainActor (LedgerState) async -> Bool)?
+
+    /// Sync v2 engine (Sync/SyncEngine.swift), created on first hydration.
+    @ObservationIgnored public var syncEngine: SyncEngine?
+    @ObservationIgnored var syncHost: StoreSyncHost?
 
     /// False until `hydrate` has settled which copy of the ledger is current.
     /// Cloud pushes are suppressed before that so an empty starter state can
@@ -170,11 +173,8 @@ public final class LedgerStore {
             saveStatus = .saving
             await persistLocally()
             if shouldPush, isHydrated, let cloudPusher {
-                let pushed = state
-                if await cloudPusher(pushed) {
-                    recordSyncedStamp(pushed.lastSavedAt)
-                    saveStatus = .loaded
-                } else {
+                // The engine moves the status on to saving / loaded / offline itself.
+                if !(await cloudPusher(state)) {
                     saveStatus = .offline
                 }
             } else {
@@ -591,6 +591,27 @@ public final class LedgerStore {
     }
 
     // MARK: - Whole-state replacement
+
+    /// Swaps in a ledger merged or adopted from the cloud. Not undoable, never pushed
+    /// from here (the engine decides), but saved locally like any other change.
+    public func replaceFromSync(_ newState: LedgerState) {
+        clearUndoHistory()
+        state = newState
+        scheduleSave(pushToCloud: false)
+    }
+
+    /// What this client does to every ledger it loads: open on today's month (seeding
+    /// it from the last-worked month) and keep linked goals on their account.
+    public static func normalizedForSync(_ input: LedgerState) -> LedgerState {
+        var next = input
+        let today = getMonthKey()
+        if next.months[today] == nil {
+            next.months[today] = FinanceEngine.seedMonth(from: next.months[next.selectedMonth], fromKey: next.selectedMonth, toKey: today)
+        }
+        next.selectedMonth = today
+        AccountLinks.syncLinkedGoals(&next)
+        return next
+    }
 
     /// Replaces the ledger outright (conflict resolution, sign-out). Not undoable.
     public func replaceState(_ newState: LedgerState, pushToCloud: Bool) {

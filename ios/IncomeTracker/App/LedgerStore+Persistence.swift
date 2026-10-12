@@ -14,10 +14,12 @@ private let kStateKey = "ledgerState_v\(CURRENT_SCHEMA_VERSION)"
 /// Keys written by earlier schema versions. Read as a fallback on first launch after an
 /// upgrade so local data isn't orphaned, then deleted once the current key is written.
 private let kLegacyStateKeys = ["ledgerState_v7"]
-/// `lastSavedAt` of the last state this device exchanged with the cloud (pushed or
-/// adopted). Lets hydration tell "only this device changed" from "only the cloud
-/// changed" without asking the user.
-private let kSyncedStampKey = "ledgerState_syncedStamp"
+/// Sync v2 bookkeeping: the last ledger JSON this device knows the server holds and
+/// its revision (see Sync/SyncEngine.swift), plus this install's device id.
+private let kSyncMetaKey = "ledgerState_syncV2Meta"
+private let kDeviceIdKey = "ledgerState_deviceId"
+/// Written by the pre-v2 sync; removed on first launch of this version.
+private let kLegacySyncedStampKey = "ledgerState_syncedStamp"
 private let kAppGroupID = "group.com.incometracker"
 
 // MARK: - LedgerStore + Persistence
@@ -26,18 +28,12 @@ extension LedgerStore {
 
     // MARK: - Hydration (launch and sign-in)
 
-    /// Loads the persisted state from local storage, then — if the user is signed in —
-    /// fetches the cloud copy and either adopts it, pushes the local one, or raises a
-    /// conflict for the user to settle. Local data is on screen before the network is
-    /// touched, so a slow connection never shows an empty ledger.
-    ///
-    /// Resolution when both sides exist (mirrors the web app, plus a three-way check
-    /// using the stamp of the last synced state):
-    ///   • local has no transactions or accounts → cloud wins
-    ///   • cloud unchanged since this device last synced → local wins and is pushed
-    ///   • local unchanged since this device last synced → cloud wins
-    ///   • same counts and totals per month → cloud wins (nothing to lose)
-    ///   • otherwise → `sync.mergeConflict`, and nothing is pushed until it is resolved
+    /// Loads the persisted state from local storage, then (if the user is signed in)
+    /// hands over to the SyncEngine, which reconciles with the cloud: an untouched
+    /// device adopts the cloud, a device that synced before merges both sides, and a
+    /// device whose own data has no shared history with the account asks the user
+    /// (combine / use account / use this device) via `sync.mergeConflict`.
+    /// Local data is on screen before the network is touched.
     func hydrate(sync: SyncCoordinator) async {
         if let running = hydrationTask {
             await running.value
@@ -54,84 +50,44 @@ extension LedgerStore {
         saveStatus = .loading
         clearUndoHistory()
         didLoadLocalWithoutHydration = false
+        UserDefaults(suiteName: kAppGroupID)?.removeObject(forKey: kLegacySyncedStampKey)
 
         let localState = loadFromUserDefaults()
         state = localState ?? LedgerState.initial
         snapToCurrentMonth()
 
-        var finalStatus: SaveStatus = .loaded
-        defer {
-            isHydrated = true
-            saveStatus = finalStatus
-        }
+        defer { isHydrated = true }
 
-        guard sync.isSignedIn, let userId = sync.currentUser?.id else { return }
+        guard sync.isSignedIn, let userId = sync.currentUser?.id else {
+            saveStatus = .loaded
+            return
+        }
 
         sync.isSyncing = true
         defer { sync.isSyncing = false }
-
-        do {
-            let cloudState = try await sync.loadCloudState()
-            // The user may have typed while the request was in flight; judge the live state.
-            let local = state
-
-            guard let cloud = cloudState else {
-                // Nothing in the cloud yet: back up whatever this device has.
-                try await sync.saveCloudState(local, userId: userId)
-                recordSyncedStamp(local.lastSavedAt)
-                return
-            }
-
-            let synced = lastSyncedStamp()
-            if !local.hasLocalData {
-                await adoptCloudState(cloud)
-            } else if synced != nil && cloud.lastSavedAt == synced {
-                // Only this device moved since the last sync (an offline edit, a Siri
-                // shortcut): push it, no questions asked.
-                try await sync.saveCloudState(local, userId: userId)
-                recordSyncedStamp(local.lastSavedAt)
-            } else if synced != nil && local.lastSavedAt == synced {
-                await adoptCloudState(cloud)
-            } else if local.isRoughlyEquivalent(to: cloud) {
-                await adoptCloudState(cloud)
-            } else {
-                // Both sides carry real, different data. Keep local on screen and let
-                // the user choose; the merge sheet calls replaceState with the winner.
-                sync.mergeConflict = SyncCoordinator.MergeConflict(local: local, cloud: cloud)
-            }
-        } catch {
-            finalStatus = .offline
-            sync.lastSyncError = error.localizedDescription
+        let engine = ensureSyncEngine(sync: sync)
+        let outcome = await engine.start(userId: userId)
+        if outcome == .offline {
+            sync.lastSyncError = sync.lastSyncError ?? "Cloud unavailable. Your changes are kept on this device."
         }
     }
 
-    /// Replaces the ledger with the cloud copy and persists it, without bumping
-    /// `lastSavedAt` (the cloud's own stamp is what this device has now).
-    private func adoptCloudState(_ cloud: LedgerState) async {
-        clearUndoHistory()
-        state = cloud
-        recordSyncedStamp(cloud.lastSavedAt)
-        snapToCurrentMonth()
-        await persistLocally()
+    /// The engine, its host adapter and bookkeeping store, created once per launch.
+    @discardableResult
+    func ensureSyncEngine(sync: SyncCoordinator) -> SyncEngine {
+        if let syncEngine { return syncEngine }
+        let host = StoreSyncHost(store: self, sync: sync)
+        syncHost = host
+        let engine = SyncEngine(transport: sync, store: host, host: host, deviceId: Self.deviceId())
+        syncEngine = engine
+        return engine
     }
 
     /// Foreground refresh: picks up edits made on another device while this one was
-    /// in the background. Never interrupts a pending local save or an open conflict.
+    /// in the background. Merges rather than asks, so it never interrupts the user.
     func refreshFromCloudIfIdle(sync: SyncCoordinator) async {
-        guard isHydrated, hydrationTask == nil, sync.isSignedIn,
-              sync.mergeConflict == nil, !hasUnsavedChanges else { return }
-        guard let cloud = try? await sync.loadCloudState() else { return }
-        guard sync.mergeConflict == nil, !hasUnsavedChanges else { return }
-
-        let synced = lastSyncedStamp()
-        if cloud.lastSavedAt == state.lastSavedAt || (synced != nil && cloud.lastSavedAt == synced) {
-            return // nothing new in the cloud
-        }
-        if !state.hasLocalData || (synced != nil && state.lastSavedAt == synced) || state.isRoughlyEquivalent(to: cloud) {
-            await adoptCloudState(cloud)
-        } else {
-            sync.mergeConflict = SyncCoordinator.MergeConflict(local: state, cloud: cloud)
-        }
+        guard isHydrated, sync.isSignedIn else { return }
+        syncEngine?.requestPull()
     }
 
     /// Used by App Intents when the app was launched in the background just to run
@@ -145,9 +101,10 @@ extension LedgerStore {
     }
 
     /// Signing out returns the device to a blank ledger (the account's data stays in
-    /// the cloud for the next sign-in). Mirrors `handleSignOut` on the web.
+    /// the cloud for the next sign-in) and forgets everything this device knew about
+    /// the account's sync history. Mirrors `handleSignOut` on the web.
     func resetAfterSignOut() {
-        clearSyncedStamp()
+        syncEngine?.reset()
         replaceState(LedgerState.initial, pushToCloud: false)
     }
 
@@ -184,20 +141,21 @@ extension LedgerStore {
 
     // MARK: - Cloud sync
 
-    /// Pushes the current state to Supabase if the user is signed in.
+    /// "Sync now": pull anything new, then push anything pending.
     func syncToCloud(sync: SyncCoordinator) async {
-        guard sync.isSignedIn, let userId = sync.currentUser?.id, sync.mergeConflict == nil else { return }
-        sync.isSyncing = true
-        defer { sync.isSyncing = false }
-        do {
-            let pushed = state
-            try await sync.saveCloudState(pushed, userId: userId)
-            recordSyncedStamp(pushed.lastSavedAt)
-            saveStatus = .loaded
-        } catch {
-            sync.lastSyncError = error.localizedDescription
-            saveStatus = .offline
-        }
+        guard sync.isSignedIn else { return }
+        let engine = ensureSyncEngine(sync: sync)
+        engine.requestPull()
+        engine.requestPush()
+    }
+
+    /// A random id for this install, so it recognises its own realtime echoes.
+    static func deviceId() -> String {
+        let defaults = UserDefaults(suiteName: kAppGroupID)
+        if let existing = defaults?.string(forKey: kDeviceIdKey) { return existing }
+        let id = "ios-\(UUID().uuidString.lowercased())"
+        defaults?.set(id, forKey: kDeviceIdKey)
+        return id
     }
 
     // MARK: - Export
@@ -244,20 +202,6 @@ extension LedgerStore {
         snapToCurrentMonth()
     }
 
-    // MARK: - Synced-stamp bookkeeping
-
-    func recordSyncedStamp(_ stamp: String) {
-        UserDefaults(suiteName: kAppGroupID)?.set(stamp, forKey: kSyncedStampKey)
-    }
-
-    private func lastSyncedStamp() -> String? {
-        UserDefaults(suiteName: kAppGroupID)?.string(forKey: kSyncedStampKey)
-    }
-
-    private func clearSyncedStamp() {
-        UserDefaults(suiteName: kAppGroupID)?.removeObject(forKey: kSyncedStampKey)
-    }
-
     // MARK: - Private helpers
 
     /// Reads the JSON blob from the shared UserDefaults suite and decodes it,
@@ -272,6 +216,72 @@ extension LedgerStore {
             }
         }
         return nil
+    }
+}
+
+// MARK: - Sync host
+
+/// Connects the SyncEngine to the store (the ledger on screen) and the coordinator
+/// (sign-in state, conflict sheet, errors). Also keeps the engine's bookkeeping in the
+/// App Group defaults beside the ledger.
+@MainActor
+final class StoreSyncHost: LedgerSyncHost, SyncMetaStore {
+    private weak var store: LedgerStore?
+    private weak var sync: SyncCoordinator?
+
+    init(store: LedgerStore, sync: SyncCoordinator) {
+        self.store = store
+        self.sync = sync
+    }
+
+    var syncLocalState: LedgerState { store?.state ?? .initial }
+
+    func syncReplaceLocal(_ next: LedgerState) {
+        store?.replaceFromSync(next)
+    }
+
+    func syncNormalize(_ state: LedgerState) -> LedgerState {
+        LedgerStore.normalizedForSync(state)
+    }
+
+    func syncStatusChanged(_ status: SyncEngine.Status) {
+        guard let store else { return }
+        switch status {
+        case .loading: store.saveStatus = .loading
+        case .saving: store.saveStatus = .saving
+        case .saved:
+            store.saveStatus = .loaded
+            sync?.lastSyncedAt = .now
+            sync?.lastSyncError = nil
+        case .offline: store.saveStatus = .offline
+        case .updateRequired:
+            store.saveStatus = .offline
+            sync?.lastSyncError = "Your data was saved by a newer version of Income Tracker. Update the app to keep syncing; your changes are kept on this iPhone."
+        }
+    }
+
+    func syncNeedsChoice(local: LedgerState, cloud: LedgerState) {
+        sync?.mergeConflict = SyncCoordinator.MergeConflict(local: local, cloud: cloud)
+    }
+
+    func syncRemoteApplied() {
+        sync?.lastSyncedAt = .now
+    }
+
+    func loadMeta(userId: String) -> SyncMeta? {
+        guard let data = UserDefaults(suiteName: kAppGroupID)?.data(forKey: kSyncMetaKey),
+              let meta = try? JSONDecoder().decode(SyncMeta.self, from: data),
+              meta.userId == userId else { return nil }
+        return meta
+    }
+
+    func saveMeta(_ meta: SyncMeta) {
+        guard let data = try? JSONEncoder().encode(meta) else { return }
+        UserDefaults(suiteName: kAppGroupID)?.set(data, forKey: kSyncMetaKey)
+    }
+
+    func clearMeta() {
+        UserDefaults(suiteName: kAppGroupID)?.removeObject(forKey: kSyncMetaKey)
     }
 }
 
