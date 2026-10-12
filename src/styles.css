@@ -4460,6 +4460,81 @@ hr {
   color: var(--muted);
 }
 
+.signInProviders {
+  display: grid;
+  gap: 10px;
+}
+
+.appleButton {
+  background: transparent;
+  color: var(--ink);
+}
+
+.appleButton:hover {
+  background: var(--surface-high);
+}
+
+.appleButton span {
+  background: var(--ink);
+  color: var(--surface);
+}
+
+.signInDivider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--faint);
+  font-size: 12px;
+}
+
+.signInDivider::before,
+.signInDivider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.signInEmailForm {
+  display: grid;
+  gap: 12px;
+}
+
+.signInEmailSubmit {
+  min-height: 44px;
+  justify-content: center;
+}
+
+.signInModeLinks {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.signInInfo {
+  margin: 0;
+  font-size: 13px;
+  color: var(--mint);
+}
+
+/* Short screens (landscape phones, the Fold cover screen): let the dialog scroll,
+   and drop the benefit list so the sign-in buttons and form come first. */
+.signInModal {
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+}
+
+@media (max-height: 560px) {
+  .signInModal {
+    gap: 14px;
+    padding: 20px 24px;
+  }
+
+  .signInBenefits {
+    display: none;
+  }
+}
+
 /* ─── Merge conflict modal ──────────────────────────── */
 .mergeModal {
   width: min(480px, 100%);
@@ -4549,6 +4624,18 @@ hr {
   color: var(--faint);
 }
 
+/* "Combine both" sits on its own row above the two either/or choices. */
+.mergeOption.recommended {
+  grid-column: 1 / -1;
+  border-color: var(--mint);
+}
+
+@media (max-width: 520px) {
+  .mergeOptions {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ─── Feedback modal ─────────────────────────────────── */
 .feedbackBackdrop {
   z-index: 200;
@@ -4632,7 +4719,8 @@ hr {
 }
 
 .feedbackModal input,
-.feedbackModal textarea {
+.feedbackModal textarea,
+.signInModal input {
   padding: 9px 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -4645,7 +4733,8 @@ hr {
 }
 
 .feedbackModal input:focus,
-.feedbackModal textarea:focus {
+.feedbackModal textarea:focus,
+.signInModal input:focus {
   outline: none;
   border-color: rgba(var(--blue-rgb), 0.6);
 }
@@ -4672,13 +4761,15 @@ hr {
   padding-top: 4px;
 }
 
-.feedbackSubmit {
+.feedbackSubmit,
+.signInEmailSubmit {
   background: rgba(var(--blue-rgb), 0.15);
   border-color: rgba(var(--blue-rgb), 0.35);
   color: var(--blue);
 }
 
-.feedbackSubmit:hover:not(:disabled) {
+.feedbackSubmit:hover:not(:disabled),
+.signInEmailSubmit:hover:not(:disabled) {
   background: rgba(var(--blue-rgb), 0.25);
   border-color: rgba(var(--blue-rgb), 0.5);
 }
@@ -6104,7 +6195,8 @@ hr {
   background: var(--amber);
 }
 
-.saveStatusChip.offline .saveDot {
+.saveStatusChip.offline .saveDot,
+.saveStatusChip.update .saveDot {
   background: var(--red);
 }
 

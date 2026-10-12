@@ -135,13 +135,27 @@ import {
   type BankConnection,
 } from "./feeds";
 import { GoalsView } from "./GoalsView";
-import { loadLedgerState, saveLedgerState } from "./storage";
+import { clearSyncMeta, getDeviceId, loadLedgerState, loadSyncMeta, saveLedgerState, saveSyncMeta } from "./storage";
+import { rebaseOnto, SyncEngine, type FirstSyncChoice } from "./sync/engine";
+import {
+  ACCOUNT_TYPE_OPTIONS,
+  DEFAULT_TYPE_BY_CLASS,
+  hasLocalData,
+  ledgerSummary,
+  normalizeState,
+  syncLedgerLinks,
+} from "./ledgerState";
 import {
   getCurrentSession,
   isSupabaseConfigured,
-  loadCloudLedgerState,
-  saveCloudLedgerState,
+  ledgerTransport,
+  subscribeLedgerChanges,
+  sendPasswordReset,
+  signInWithApple,
+  signInWithEmail,
   signInWithGoogle,
+  signUpWithEmail,
+  updatePassword,
   signOut,
   submitFeedback,
   supabase,
@@ -350,7 +364,7 @@ function readSeenTutorials(): Set<AppView> {
   }
 }
 
-type SaveState = "loading" | "saved" | "saving" | "offline";
+type SaveState = "loading" | "saved" | "saving" | "offline" | "update";
 type SyncConflict = { local: LedgerState; cloud: LedgerState };
 type NetWorthHorizon = 12 | 24 | 60;
 type InsightChartView = "inflow-outflow" | "cash-flow" | "net-worth";
@@ -405,38 +419,6 @@ type AccountDraft = {
   dueDay: string;
 };
 
-// Default sub-type for each account class, so switching the class picks a sensible type.
-const DEFAULT_TYPE_BY_CLASS: Record<AccountClass, AccountType> = {
-  debt: "credit-card",
-  cash: "current",
-  savings: "savings",
-  investment: "investment",
-};
-
-const ACCOUNT_TYPE_OPTIONS: Record<AccountClass, Array<{ value: AccountType; label: string }>> = {
-  debt: [
-    { value: "credit-card", label: "Credit card" },
-    { value: "loan", label: "Loan" },
-    { value: "overdraft", label: "Overdraft" },
-    { value: "other", label: "Other" },
-  ],
-  cash: [
-    { value: "current", label: "Current" },
-    { value: "other-asset", label: "Other cash" },
-  ],
-  savings: [
-    { value: "savings", label: "Savings" },
-    { value: "isa", label: "Cash ISA" },
-    { value: "other-asset", label: "Other" },
-  ],
-  investment: [
-    { value: "investment", label: "Investment / stocks" },
-    { value: "isa", label: "Stocks & shares ISA" },
-    { value: "pension", label: "Pension" },
-    { value: "other-asset", label: "Other" },
-  ],
-};
-
 const initialIncomeDraft: IncomeDraft = {
   source: "",
   amount: "",
@@ -471,6 +453,8 @@ function App() {
   const [cloudHydrated, setCloudHydrated] = useState(false);
   const authUserIdRef = useRef<string | null>(null);
   const [showSignInModal, setShowSignInModal] = useState(false);
+  // Arrived from a password-reset email: ask for the new password.
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [showSyncNudge, setShowSyncNudge] = useState(false);
   const [syncConflict, setSyncConflict] = useState<SyncConflict | null>(null);
@@ -564,6 +548,36 @@ function App() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const csvInputRef = useRef<HTMLInputElement | null>(null);
   const user = session?.user ?? null;
+
+  // ── Sync v2 (docs/ANDROID_APP_SPEC.md §4) ── the engine owns pushes, pulls and merges
+  // with the cloud; React owns the ledger on screen. When the engine swaps in merged
+  // data, anything typed since it read the ledger is rebased on top, never dropped.
+  const ledgerRef = useRef(ledger);
+  ledgerRef.current = ledger;
+  const lastRemoteToastRef = useRef(0);
+  const [realtimeJoined, setRealtimeJoined] = useState(false);
+  const syncEngineRef = useRef<SyncEngine | null>(null);
+  if (!syncEngineRef.current) {
+    syncEngineRef.current = new SyncEngine(
+      ledgerTransport,
+      { load: loadSyncMeta, save: saveSyncMeta, clear: clearSyncMeta },
+      {
+        getLocal: () => ledgerRef.current,
+        replaceLocal: (expected, next) => setLedger((current) => rebaseOnto(expected, current, next)),
+        onStatus: (status) => setSaveState(status === "update-required" ? "update" : status),
+        onRemoteApplied: () => {
+          // At most one "updated" toast a minute, however chatty the other devices are.
+          const now = Date.now();
+          if (now - lastRemoteToastRef.current < 60_000) return;
+          lastRemoteToastRef.current = now;
+          setToast("Updated from another device");
+        },
+        onChoiceNeeded: (local, cloud) => setSyncConflict({ local, cloud }),
+      },
+      getDeviceId(),
+    );
+  }
+  const syncEngine = syncEngineRef.current;
 
   const currentMonth = ledger.months[ledger.selectedMonth] ?? seedMonthFromPrevious();
   const moneyFormatter = useMemo(() => getCurrencyFormatter(ledger.currency), [ledger.currency]);
@@ -778,8 +792,9 @@ function App() {
     }
 
     void loadSession();
-    const subscription = supabase?.auth.onAuthStateChange((_event, nextSession) => {
+    const subscription = supabase?.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
+      if (event === "PASSWORD_RECOVERY") setPasswordRecovery(true);
       // Supabase re-emits SIGNED_IN/TOKEN_REFRESHED on tab refocus; only
       // re-open the vault when the signed-in user actually changes.
       const nextUserId = nextSession?.user?.id ?? null;
@@ -805,41 +820,15 @@ function App() {
 
     async function hydrateCloudLedger() {
       setSaveState("loading");
-      try {
-        await upsertUserProfile(activeUser);
-        const cloudState = await loadCloudLedgerState();
-        if (!alive) return;
-
-        if (cloudState) {
-          const normalizedCloud = normalizeState(cloudState);
-          if (hasLocalData(ledger)) {
-            // Only show conflict modal if the two sides are genuinely different.
-            // If they're identical (e.g. same device, same session) silently adopt cloud.
-            if (statesAreEquivalent(ledger, normalizedCloud)) {
-              setLedger(normalizedCloud);
-              setToast("Cloud data restored");
-            } else {
-              setSyncConflict({ local: ledger, cloud: normalizedCloud });
-              return;
-            }
-          } else {
-            setLedger(normalizedCloud);
-            setToast("Cloud data restored");
-          }
-        } else {
-          await saveCloudLedgerState(activeUser.id, ledger);
-          if (!alive) return;
-          setToast("Data backed up to cloud");
-        }
-
-        setCloudHydrated(true);
-        setSaveState("saved");
-      } catch {
-        if (!alive) return;
-        setCloudHydrated(true);
-        setSaveState("offline");
-        setToast("Cloud unavailable — working offline");
-      }
+      void upsertUserProfile(activeUser).catch(() => undefined);
+      const outcome = await syncEngine.start(activeUser.id);
+      if (!alive) return;
+      // A device with its own data that never synced with this account: the merge
+      // dialog (raised through onChoiceNeeded) takes over from here.
+      if (outcome.kind === "choose") return;
+      if (outcome.kind === "offline") setToast("Cloud unavailable — working offline");
+      if (outcome.kind === "update-required") setToast("Your data was saved by a newer version — reload to keep syncing");
+      setCloudHydrated(true);
     }
 
     void hydrateCloudLedger();
@@ -862,23 +851,66 @@ function App() {
   useEffect(() => {
     if (!hydrated || authLoading || (user && !cloudHydrated)) return;
 
-    setSaveState("saving");
+    if (!user) setSaveState("saving");
     const timeout = window.setTimeout(() => {
       saveLedgerState(ledger)
-        .then(async () => {
-          if (user) {
-            await saveCloudLedgerState(user.id, ledger);
-          }
-          setSaveState("saved");
+        .then(() => {
+          if (!user) setSaveState("saved");
         })
         .catch(() => {
           setSaveState("offline");
-          setToast(user ? "Cloud sync paused — changes kept on this device" : "Saved in this browser only");
+          setToast(user ? "Couldn't save in this browser — the cloud still has your changes" : "Saved in this browser only");
+        })
+        .finally(() => {
+          // Signed in: the engine pushes (compare-and-swap) and reports its own status.
+          if (user) syncEngine.requestPush();
         });
-    }, 240);
+    }, 300);
 
     return () => window.clearTimeout(timeout);
   }, [ledger, hydrated, authLoading, cloudHydrated, user?.id]);
+
+  // Live updates: a realtime poke from the database whenever any device saves, plus a
+  // fetch whenever the tab comes back or the network returns (to catch missed pokes).
+  useEffect(() => {
+    if (!user || !cloudHydrated) return;
+    const engine = syncEngine;
+    const unsubscribe = subscribeLedgerChanges(
+      user.id,
+      (payload) => engine.onPoke(payload),
+      (joined) => {
+        setRealtimeJoined(joined);
+        if (joined) engine.requestPull();
+      },
+    );
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") engine.requestPull();
+      else engine.requestPush();
+    };
+    const onOnline = () => {
+      engine.requestPull();
+      engine.requestPush();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("online", onOnline);
+    return () => {
+      unsubscribe();
+      setRealtimeJoined(false);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("online", onOnline);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, cloudHydrated]);
+
+  // Realtime down (blocked socket, flaky network): poll the revision while visible.
+  useEffect(() => {
+    if (!user || !cloudHydrated || realtimeJoined) return;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void syncEngine.checkRevision();
+    }, 30_000);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, cloudHydrated, realtimeJoined]);
 
   useEffect(() => {
     try {
@@ -2337,14 +2369,15 @@ function App() {
     focusNextFrame(incomeSourceInputRef);
   }
 
-  async function handleSignIn() {
+  async function handleSignIn(provider: "google" | "apple" = "google") {
+    const label = provider === "apple" ? "Apple" : "Google";
     setAuthWorking(true);
-    setToast("Redirecting to Google");
+    setToast(`Redirecting to ${label}`);
     try {
-      await signInWithGoogle();
+      await (provider === "apple" ? signInWithApple() : signInWithGoogle());
     } catch {
       setAuthWorking(false);
-      setToast("Google sign-in unavailable");
+      setToast(`${label} sign-in unavailable`);
     }
   }
 
@@ -2352,6 +2385,7 @@ function App() {
     setAuthWorking(true);
     try {
       await signOut();
+      await syncEngine.reset();
       const fresh = createInitialState();
       await saveLedgerState(fresh);
       setLedger(fresh);
@@ -2364,31 +2398,18 @@ function App() {
     }
   }
 
-  async function handleKeepLocal() {
-    if (!syncConflict || !user) return;
-    const local = syncConflict.local;
-    setSyncConflict(null);
-    try {
-      await saveCloudLedgerState(user.id, local);
-      setLedger(local);
-      setCloudHydrated(true);
-      setSaveState("saved");
-      setToast("Local data saved to cloud");
-    } catch {
-      setCloudHydrated(true);
-      setSaveState("offline");
-      setToast("Sync failed — using local data");
-    }
-  }
-
-  function handleUseCloud() {
+  async function resolveFirstSync(choice: FirstSyncChoice) {
     if (!syncConflict) return;
-    const cloud = syncConflict.cloud;
     setSyncConflict(null);
-    setLedger(cloud);
+    await syncEngine.resolveFirstSync(choice);
     setCloudHydrated(true);
-    setSaveState("saved");
-    setToast("Cloud data loaded");
+    setToast(
+      choice === "combine"
+        ? "Combined this device with your account"
+        : choice === "cloud"
+          ? "Account data loaded"
+          : "This device's data saved to your account",
+    );
   }
 
   function focusSearch() {
@@ -2561,7 +2582,9 @@ function App() {
               ? "Saving…"
               : saveState === "loading"
                 ? "Loading…"
-                : "Offline — saved here only"}
+                : saveState === "update"
+                  ? "Reload to keep syncing"
+                  : "Offline — saved here only"}
         </div>
 
         <button
@@ -4022,18 +4045,27 @@ function App() {
 
       {(showSignInModal || authWorking) && !user && (
         <SignInModal
-          onSignIn={handleSignIn}
+          onSignIn={(provider) => { void handleSignIn(provider); }}
           onDismiss={() => setShowSignInModal(false)}
           working={authWorking}
           configured={isSupabaseConfigured()}
         />
       )}
 
+      {passwordRecovery && user && (
+        <SetPasswordModal
+          onDone={() => {
+            setPasswordRecovery(false);
+            setToast("Password updated");
+          }}
+          onDismiss={() => setPasswordRecovery(false)}
+        />
+      )}
+
       {syncConflict && (
         <MergeConflictModal
           conflict={syncConflict}
-          onKeepLocal={() => { void handleKeepLocal(); }}
-          onUseCloud={handleUseCloud}
+          onChoose={(choice) => { void resolveFirstSync(choice); }}
         />
       )}
 
@@ -4099,11 +4131,42 @@ function SignInModal({
   working,
   configured,
 }: {
-  onSignIn: () => void;
+  onSignIn: (provider: "google" | "apple") => void;
   onDismiss: () => void;
   working: boolean;
   configured: boolean;
 }) {
+  const [mode, setMode] = useState<"signin" | "signup" | "reset">("signin");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ tone: "error" | "info"; text: string } | null>(null);
+
+  async function handleEmail(event: FormEvent) {
+    event.preventDefault();
+    const address = email.trim();
+    if (!address) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      if (mode === "reset") {
+        await sendPasswordReset(address);
+        setMessage({ tone: "info", text: "Check your inbox for a link to choose a new password." });
+      } else if (mode === "signup") {
+        const result = await signUpWithEmail(address, password);
+        if (result === "confirm") setMessage({ tone: "info", text: "Check your inbox to confirm your email, then sign in." });
+      } else {
+        await signInWithEmail(address, password);
+      }
+    } catch (error) {
+      setMessage({ tone: "error", text: error instanceof Error && error.message ? error.message : "Something went wrong. Please try again." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const submitLabel = mode === "reset" ? "Send reset link" : mode === "signup" ? "Create account" : "Sign in";
+
   return (
     <div
       className="modalBackdrop signInBackdrop"
@@ -4118,19 +4181,76 @@ function SignInModal({
           <img src="/icon.svg" alt="" width="40" height="40" style={{ borderRadius: 10, flexShrink: 0 }} aria-hidden="true" />
           <div>
             <h2 id="signin-title">Sync your data</h2>
-            <p>Back it up and use it anywhere</p>
+            <p>Back it up and use it on the web, iPhone and Android</p>
           </div>
         </div>
         <ul className="signInBenefits">
           <li><ShieldCheck size={14} /> Data isolated with row-level security</li>
-          <li><Cloud size={14} /> Automatic sync on every save</li>
+          <li><Cloud size={14} /> Changes appear on your other devices in seconds</li>
           <li><RotateCcw size={14} /> Restore instantly on any device</li>
         </ul>
         {configured ? (
-          <button className="googleButton" type="button" onClick={onSignIn} disabled={working}>
-            <span aria-hidden="true">G</span>
-            {working ? "Redirecting…" : "Continue with Google"}
-          </button>
+          <>
+            <div className="signInProviders">
+              <button className="googleButton" type="button" onClick={() => onSignIn("google")} disabled={working || busy}>
+                <span aria-hidden="true">G</span>
+                {working ? "Redirecting…" : "Continue with Google"}
+              </button>
+              <button className="googleButton appleButton" type="button" onClick={() => onSignIn("apple")} disabled={working || busy}>
+                <span aria-hidden="true">
+                  <svg width="13" height="15" viewBox="0 0 814 1000" fill="currentColor">
+                    <path d="M788 341c-6 4-108 61-108 189 0 148 130 200 134 202-1 3-21 72-69 142-43 62-88 123-156 123s-86-40-164-40c-77 0-104 41-167 41s-106-57-156-128C44 787 0 663 0 546c0-189 123-289 244-289 64 0 118 42 158 42 39 0 99-45 172-45 28 0 128 3 194 87zM554 159c30-36 52-86 52-136 0-7-1-14-2-20-49 2-108 33-143 74-28 32-54 82-54 133 0 8 1 15 2 18 3 1 9 1 14 1 45 0 101-30 131-70z" />
+                  </svg>
+                </span>
+                Continue with Apple
+              </button>
+            </div>
+            <div className="signInDivider" role="separator"><span>or with email</span></div>
+            <form className="signInEmailForm" onSubmit={(e) => { void handleEmail(e); }}>
+              <label className="feedbackLabel">
+                Email
+                <input
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  required
+                />
+              </label>
+              {mode !== "reset" && (
+                <label className="feedbackLabel">
+                  Password
+                  <input
+                    type="password"
+                    autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    minLength={mode === "signup" ? 8 : undefined}
+                    required
+                  />
+                </label>
+              )}
+              {message && (
+                <p className={message.tone === "error" ? "feedbackError" : "signInInfo"} role={message.tone === "error" ? "alert" : "status"}>
+                  {message.tone === "error" && <AlertCircle size={14} />} {message.text}
+                </p>
+              )}
+              <button className="commandButton signInEmailSubmit" type="submit" disabled={busy || working}>
+                {busy ? "Please wait…" : submitLabel}
+              </button>
+              <div className="signInModeLinks">
+                {mode === "signin" ? (
+                  <>
+                    <button type="button" className="signInSkip" onClick={() => { setMode("signup"); setMessage(null); }}>Create an account</button>
+                    <button type="button" className="signInSkip" onClick={() => { setMode("reset"); setMessage(null); }}>Forgot password?</button>
+                  </>
+                ) : (
+                  <button type="button" className="signInSkip" onClick={() => { setMode("signin"); setMessage(null); }}>Back to sign in</button>
+                )}
+              </div>
+            </form>
+          </>
         ) : (
           <div className="authWarning" role="alert">
             <AlertCircle size={18} />
@@ -4145,17 +4265,51 @@ function SignInModal({
   );
 }
 
+function SetPasswordModal({ onDone, onDismiss }: { onDone: () => void; onDismiss: () => void }) {
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      await updatePassword(password);
+      onDone();
+    } catch (failure) {
+      setError(failure instanceof Error && failure.message ? failure.message : "Couldn't update your password.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="modalBackdrop signInBackdrop" role="presentation">
+      <form className="signInModal" role="dialog" aria-modal="true" aria-labelledby="set-password-title" onSubmit={(e) => { void handleSubmit(e); }}>
+        <h2 id="set-password-title">Choose a new password</h2>
+        <label className="feedbackLabel">
+          New password
+          <input type="password" autoComplete="new-password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} required autoFocus />
+        </label>
+        {error && <p className="feedbackError" role="alert"><AlertCircle size={14} /> {error}</p>}
+        <button className="commandButton signInEmailSubmit" type="submit" disabled={busy}>{busy ? "Saving…" : "Save password"}</button>
+        <button className="signInSkip" type="button" onClick={onDismiss}>Not now</button>
+      </form>
+    </div>
+  );
+}
+
 function MergeConflictModal({
   conflict,
-  onKeepLocal,
-  onUseCloud,
+  onChoose,
 }: {
   conflict: SyncConflict;
-  onKeepLocal: () => void;
-  onUseCloud: () => void;
+  onChoose: (choice: FirstSyncChoice) => void;
 }) {
   const local = ledgerSummary(conflict.local);
   const cloud = ledgerSummary(conflict.cloud);
+  const count = (n: number, word: string) => `${n} ${word}${n !== 1 ? "s" : ""}`;
   return (
     <div className="modalBackdrop mergeBackdrop">
       <div className="mergeModal" role="dialog" aria-modal="true" aria-labelledby="merge-title">
@@ -4163,17 +4317,24 @@ function MergeConflictModal({
           <Cloud size={24} />
         </div>
         <h2 id="merge-title">Your account already has data</h2>
-        <p>Both this device and your cloud have separate data. Choose which to keep — the other will be overwritten.</p>
+        <p>This device and your account each have their own transactions. Choose how to bring them together.</p>
         <div className="mergeOptions">
-          <button className="mergeOption" type="button" onClick={onKeepLocal}>
-            <strong>Keep this device's data</strong>
-            <span>{local.transactions} transaction{local.transactions !== 1 ? "s" : ""} · {local.months} month{local.months !== 1 ? "s" : ""}</span>
-            <small>Cloud data will be replaced.</small>
+          <button className="mergeOption recommended" type="button" onClick={() => onChoose("combine")}>
+            <strong>Combine both (recommended)</strong>
+            <span>
+              {count(local.transactions, "transaction")} here + {count(cloud.transactions, "transaction")} in your account
+            </span>
+            <small>Nothing is lost. Statements imported on both are kept once.</small>
           </button>
-          <button className="mergeOption" type="button" onClick={onUseCloud}>
-            <strong>Use cloud data</strong>
-            <span>{cloud.transactions} transaction{cloud.transactions !== 1 ? "s" : ""} · {cloud.months} month{cloud.months !== 1 ? "s" : ""}</span>
-            <small>Local data will be cleared.</small>
+          <button className="mergeOption" type="button" onClick={() => onChoose("cloud")}>
+            <strong>Use my account's data</strong>
+            <span>{count(cloud.transactions, "transaction")} · {count(cloud.months, "month")}</span>
+            <small>This device's data will be cleared.</small>
+          </button>
+          <button className="mergeOption" type="button" onClick={() => onChoose("local")}>
+            <strong>Use this device's data</strong>
+            <span>{count(local.transactions, "transaction")} · {count(local.months, "month")}</span>
+            <small>Your account's data will be replaced on every device.</small>
           </button>
         </div>
       </div>
@@ -4341,44 +4502,6 @@ function VaultOverlay() {
       </div>
     </div>
   );
-}
-
-function hasLocalData(state: LedgerState): boolean {
-  return (
-    Object.values(state.months).some((m) => m.incomes.length > 0 || m.expenses.length > 0) ||
-    state.accounts.length > 0
-  );
-}
-
-// Two states are considered equivalent when every month has the same number of transactions
-// and the same total amounts. This is fast enough to run on every page load and avoids a
-// spurious conflict prompt when the same user opens the app on the same device after a sync.
-function statesAreEquivalent(a: LedgerState, b: LedgerState): boolean {
-  const keysA = Object.keys(a.months).sort();
-  const keysB = Object.keys(b.months).sort();
-  if (keysA.join(",") !== keysB.join(",")) return false;
-  return keysA.every((key) => {
-    const ma = a.months[key];
-    const mb = b.months[key];
-    if (!ma || !mb) return false;
-    if (ma.incomes.length !== mb.incomes.length) return false;
-    if (ma.expenses.length !== mb.expenses.length) return false;
-    const sumA = ma.incomes.reduce((s, i) => s + i.amount, 0) + ma.expenses.reduce((s, e) => s + e.amount, 0);
-    const sumB = mb.incomes.reduce((s, i) => s + i.amount, 0) + mb.expenses.reduce((s, e) => s + e.amount, 0);
-    return Math.abs(sumA - sumB) < 0.01;
-  });
-}
-
-function ledgerSummary(state: LedgerState): { months: number; transactions: number } {
-  let transactions = 0;
-  let months = 0;
-  for (const month of Object.values(state.months)) {
-    if (month.incomes.length > 0 || month.expenses.length > 0) {
-      months++;
-      transactions += month.incomes.length + month.expenses.length;
-    }
-  }
-  return { months, transactions };
 }
 
 function UserProfilePopup({
@@ -6929,88 +7052,6 @@ function useAnimatedNumber(value: number) {
   return display;
 }
 
-// Loaded state gets the same scheduled-debt-payment sync as every edit, so a new month opened
-// on load already carries this month's planned payments.
-function normalizeState(rawState: Partial<LedgerState>): LedgerState {
-  return syncLedgerLinks(normalizeStateFields(rawState));
-}
-
-// The cross-page sync every change goes through: savings transfers linked, scheduled debt
-// payments in the ledger, every transaction on an account, and linked goals following their
-// account's live balance (last, so it sees the balances the steps before settled).
-function syncLedgerLinks(state: LedgerState): LedgerState {
-  return syncLinkedGoals(assignMissingAccounts(syncScheduledDebtPayments(linkSavingsTransfers(state))));
-}
-
-function normalizeStateFields(rawState: Partial<LedgerState>): LedgerState {
-  const fallback = createInitialState();
-
-  // ── v6 → v7 migration: single `goal` → `goals[]` ──
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const state = rawState as any;
-  if (!Array.isArray(state.goals)) {
-    const old = state.goal as { id?: string; name?: string; saved?: number; target?: number } | undefined;
-    state.goals = old && (old.name || (old.target ?? 0) > 0)
-      ? [{
-          id: old.id ?? createId("goal"),
-          name: old.name || "Savings goal",
-          target: finiteNumber(old.target, 0),
-          saved: finiteNumber(old.saved, 0),
-          color: colors[0],
-          priority: 1,
-          fundingMode: "fixed",
-          monthlyAmount: 0,
-          deadlineMonths: 0,
-          interestRate: 0,
-          note: "",
-          createdAt: new Date().toISOString(),
-        }]
-      : [];
-    delete state.goal;
-  }
-
-  // Always open on the real current month — the stored selectedMonth is
-  // whatever month was on screen when state was last saved (often last
-  // month). When today's month doesn't exist yet, seed it from the month the
-  // user last worked in, same as navigating forward in the ledger.
-  const storedMonth = typeof state.selectedMonth === "string" && state.selectedMonth ? state.selectedMonth : fallback.selectedMonth;
-  const selectedMonth = getMonthKey();
-  const months = tidyImportedNames(normalizeMonths(state.months, fallback.months));
-  const normalizedMonths = months[selectedMonth]
-    ? months
-    : {
-        ...months,
-        [selectedMonth]: seedMonthFromPrevious(months[storedMonth], {
-          fromMonthKey: storedMonth,
-          toMonthKey: selectedMonth,
-        }),
-      };
-
-  return {
-    schemaVersion: CURRENT_SCHEMA_VERSION,
-    currency: currencyOptions.some((option) => option.code === state.currency) ? state.currency! : fallback.currency,
-    selectedMonth,
-    months: normalizedMonths,
-    goals: normalizeGoals(state.goals),
-    goalPlannerSurplus: Number.isFinite(state.goalPlannerSurplus) ? state.goalPlannerSurplus : null,
-    goalsHorizonMonths: Number.isFinite(state.goalsHorizonMonths) && state.goalsHorizonMonths > 0 ? state.goalsHorizonMonths : 60,
-    ledgerGoalId: typeof state.ledgerGoalId === "string" ? state.ledgerGoalId : null,
-    savingsTarget: Number.isFinite(state.savingsTarget) ? state.savingsTarget : fallback.savingsTarget,
-    // Distinct colours, so each account's dot in the ledger can only mean one account.
-    accounts: distinctAccountColors(normalizeAccounts(state)),
-    defaultAccountId: typeof state.defaultAccountId === "string" ? state.defaultAccountId : null,
-    assumedInvestmentReturn: Number.isFinite(state.assumedInvestmentReturn)
-      ? Math.max(-50, Math.min(50, state.assumedInvestmentReturn as number))
-      : fallback.assumedInvestmentReturn,
-    categoryRules: normalizeCategoryRules(state.categoryRules),
-    nameRules: normalizeNameRules(state.nameRules),
-    importBatches: normalizeImportBatches(state.importBatches),
-    privacyMode: Boolean(state.privacyMode),
-    aiCategorizationEnabled: Boolean(state.aiCategorizationEnabled),
-    lastSavedAt: state.lastSavedAt ?? new Date().toISOString(),
-  };
-}
-
 // Analytics label for an import inlet, derived from the review's source name.
 function importSourceOf(fileName: string): string {
   if (fileName === BANK_FEED_SOURCE_NAME) return "feed";
@@ -7100,144 +7141,6 @@ function learnCategoryRule(
     state: { ...state, categoryRules: Array.from(rules.values()).slice(-120), months },
     retroactivelyApplied,
   };
-}
-
-function normalizeMonths(months: LedgerState["months"] | undefined, fallback: LedgerState["months"]): LedgerState["months"] {
-  if (!months || !Object.keys(months).length) return fallback;
-
-  return Object.fromEntries(
-    Object.entries(months).map(([monthKey, month]) => [
-      monthKey,
-      {
-        incomes: Array.isArray(month?.incomes)
-          ? month.incomes.map((income, index) => ({
-              ...income,
-              id: income.id || createId("income"),
-              source: income.source ?? "Imported income",
-              amount: finiteNumber(income.amount, 0),
-              color: income.color || colors[index % colors.length],
-              // Migration: untagged manual entries become recurring, imported rows become one-off.
-              recurring: typeof income.recurring === "boolean" ? income.recurring : !income.imported,
-            }))
-          : [],
-        expenses: Array.isArray(month?.expenses)
-          ? month.expenses.map((expense, index) => ({
-              ...expense,
-              id: expense.id || createId("expense"),
-              name: expense.name ?? "Imported expense",
-              category: expense.category ?? "",
-              amount: finiteNumber(expense.amount, 0),
-              color: expense.color || colors[(index + 2) % colors.length],
-              // Migration: untagged manual entries become recurring, imported rows become one-off.
-              recurring: typeof expense.recurring === "boolean" ? expense.recurring : !expense.imported,
-            }))
-          : [],
-        note: month?.note ?? "",
-      },
-    ]),
-  );
-}
-
-// Reads the new accounts[] array if present, otherwise migrates the legacy debts[] array
-// (schema < 5), mapping apr -> rate and interestFreeMonths -> promoMonths.
-
-function normalizeGoals(raw: unknown): SavingsGoal[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.map((g, index) => ({
-    id: typeof g.id === "string" ? g.id : createId("goal"),
-    name: typeof g.name === "string" ? g.name : "Goal",
-    target: finiteNumber(g.target, 0),
-    saved: finiteNumber(g.saved, 0),
-    color: typeof g.color === "string" ? g.color : colors[index % colors.length],
-    priority: Number.isFinite(g.priority) ? g.priority : index + 1,
-    fundingMode: ["fixed", "fill", "auto"].includes(g.fundingMode) ? g.fundingMode : "fixed",
-    monthlyAmount: finiteNumber(g.monthlyAmount, 0),
-    deadlineMonths: finiteNumber(g.deadlineMonths, 0),
-    interestRate: finiteNumber(g.interestRate, 0),
-    note: typeof g.note === "string" ? g.note : "",
-    createdAt: typeof g.createdAt === "string" ? g.createdAt : new Date().toISOString(),
-  }));
-}
-
-function normalizeAccounts(state: Partial<LedgerState>): Account[] {
-  const raw = state as Record<string, unknown>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const source: any[] = Array.isArray(raw.accounts)
-    ? (raw.accounts as unknown[] as any[])
-    : Array.isArray(raw.debts)
-      ? (raw.debts as unknown[] as any[])
-      : [];
-
-  return source.map((item, index) => {
-    const candidateClass = typeof item?.accountClass === "string" ? item.accountClass : "debt";
-    const accountClass: AccountClass = (["cash", "savings", "investment", "debt"] as AccountClass[]).includes(candidateClass)
-      ? candidateClass
-      : "debt";
-    const isDebt = accountClass === "debt";
-
-    const validTypes = ACCOUNT_TYPE_OPTIONS[accountClass].map((option) => option.value) as string[];
-    const type: AccountType = validTypes.includes(item?.type) ? item.type : DEFAULT_TYPE_BY_CLASS[accountClass];
-
-    return {
-      id: item?.id || createId("account"),
-      name: item?.name || (isDebt ? "Debt account" : "Account"),
-      accountClass,
-      type,
-      balance: finiteNumber(item?.balance, 0),
-      // new `rate` falls back to legacy `apr`
-      rate: finiteNumber(item?.rate, finiteNumber(item?.apr, 0)),
-      promoRate: Math.max(0, finiteNumber(item?.promoRate, 0)),
-      // new `promoMonths` falls back to legacy `interestFreeMonths`
-      promoMonths: clampWholeNumber(finiteNumber(item?.promoMonths, finiteNumber(item?.interestFreeMonths, 0)), 120),
-      monthlyContribution: isDebt ? 0 : Math.max(0, finiteNumber(item?.monthlyContribution, 0)),
-      creditLimit: isDebt ? finiteNumber(item?.creditLimit, 0) : 0,
-      minimumPayment: isDebt ? finiteNumber(item?.minimumPayment, 0) : 0,
-      dueDay: isDebt ? clampDueDay(item?.dueDay) : 1,
-      // v7 → v8: pre-existing balances anchor to the month this version first loads, so the
-      // roll-forward starts from now rather than retroactively repricing old snapshots.
-      balanceAsOf: isValidMonthKey(item?.balanceAsOf) ? item.balanceAsOf : getMonthKey(),
-      // Promo counts saved before they ticked down start counting from the month this loads.
-      promoAsOf: isValidMonthKey(item?.promoAsOf) ? item.promoAsOf : getMonthKey(),
-      skippedPaymentMonths: Array.isArray(item?.skippedPaymentMonths) ? item.skippedPaymentMonths.filter(isValidMonthKey) : undefined,
-      // Balances saved before the ledger moved them are taken as set today: only what happens from
-      // now on moves them, so nothing jumps when this version first loads.
-      balanceSetOn: typeof item?.balanceSetOn === "string" && /^\d{4}-\d{2}-\d{2}$/.test(item.balanceSetOn) ? item.balanceSetOn : isoToday(),
-      ledgerOffset: Number.isFinite(item?.ledgerOffset) ? item.ledgerOffset : 0,
-      includeInNetWorth: item?.includeInNetWorth !== false,
-      color: item?.color || colors[index % colors.length],
-      note: item?.note ?? "",
-    };
-  });
-}
-
-function normalizeCategoryRules(rules: CategoryRule[] | undefined): CategoryRule[] {
-  if (!Array.isArray(rules)) return [];
-
-  return rules
-    .filter((rule) => rule.pattern?.trim() && rule.category?.trim())
-    .map((rule) => ({
-      id: rule.id || createId("rule"),
-      pattern: rule.pattern.trim().toLowerCase(),
-      category: rule.category.trim(),
-      kind: rule.kind ?? "expense",
-      debtAccountId: typeof rule.debtAccountId === "string" ? rule.debtAccountId : undefined,
-      createdAt: rule.createdAt ?? new Date().toISOString(),
-      updatedAt: rule.updatedAt ?? new Date().toISOString(),
-    }));
-}
-
-function normalizeImportBatches(batches: ImportBatch[] | undefined): ImportBatch[] {
-  if (!Array.isArray(batches)) return [];
-
-  return batches.map((batch) => ({
-    id: batch.id || createId("batch"),
-    fileName: batch.fileName || "Imported CSV",
-    importedAt: batch.importedAt ?? new Date().toISOString(),
-    totalRows: finiteNumber(batch.totalRows, 0),
-    importedRows: finiteNumber(batch.importedRows, 0),
-    skippedRows: finiteNumber(batch.skippedRows, 0),
-    transactionRefs: Array.isArray(batch.transactionRefs) ? batch.transactionRefs : [],
-  }));
 }
 
 // Add or refresh a "transfer between my accounts" rule keyed by its merchant pattern.
@@ -7334,10 +7237,6 @@ function removeImportBatchFromState(state: LedgerState, batchId: string): Ledger
     months,
     importBatches: state.importBatches.filter((item) => item.id !== batchId),
   };
-}
-
-function finiteNumber(value: unknown, fallback: number): number {
-  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
 function buildCategoryRows(month: MonthBudget, projection: Projection) {
