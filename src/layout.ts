@@ -161,14 +161,14 @@ const INSIGHTS_WIDGETS: WidgetDefinition[] = [
     sizes: ["m", "l", "xl"],
   },
   {
-    id: "take-home-full",
-    title: { GB: "Take-home pay estimate", US: "Gross-to-net pay estimate" },
+    id: "paycheck",
+    title: { GB: "Where your pay goes", US: "Where your paycheck goes" },
     description: {
-      GB: "PAYE income tax, National Insurance, student loan and pension from your gross salary.",
-      US: "Federal and state income tax, Social Security and Medicare from your gross salary, per paycheck.",
+      GB: "Gross pay split into income tax, National Insurance, student loan, pension and take-home — from the Pay & tax estimate.",
+      US: "Gross pay split into federal and state tax, Social Security, Medicare, deductions and take-home — from the Paycheck & tax estimate.",
     },
-    defaultSize: "xl",
-    sizes: ["l", "xl"],
+    defaultSize: "m",
+    sizes: ["s", "m", "l"],
   },
   {
     id: "limits",
@@ -181,7 +181,7 @@ const INSIGHTS_WIDGETS: WidgetDefinition[] = [
     id: "credit",
     title: { GB: "Credit score estimate", US: "Credit score estimate" },
     description: { GB: "Rough estimate on Experian's scale, with what the band means.", US: "Rough estimate with FICO and VantageScore bands." },
-    defaultSize: "s",
+    defaultSize: "m",
     sizes: ["s", "m", "l"],
   },
   {
@@ -233,7 +233,7 @@ const DEFAULT_IDS: Record<LayoutPage, Record<RegionKey, string[]>> = {
   },
   insights: {
     GB: ["summary", "cash-flow", "health", "chart", "categories", "anomalies", "payoff", "recurring", "annual"],
-    US: ["summary", "cash-flow", "health", "chart", "categories", "anomalies", "take-home-full", "limits", "credit", "payoff", "medical", "loans", "recurring", "annual"],
+    US: ["summary", "cash-flow", "health", "chart", "categories", "anomalies", "paycheck", "credit", "limits", "payoff", "medical", "loans", "recurring", "annual"],
   },
 };
 

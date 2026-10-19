@@ -58,7 +58,7 @@ test("wizard opens for a fresh user, applies entered data, and lands on a filled
   await expect(page.locator(".summaryStrip")).toContainText("£1,200");
 
   // Checklist ticked off everything except importing a statement.
-  await expect(page.locator(".gettingStarted")).toContainText("4 of 5 done");
+  await expect(page.locator(".gettingStarted")).toContainText("4 of 6 done");
 
   // The entries landed in the ledger as editable rows.
   await page.getByRole("button", { name: "Ledger" }).click();
@@ -99,7 +99,7 @@ test("wizard can be skipped entirely and every step is individually skippable", 
 
   // Lands on an empty dashboard with the getting-started checklist showing.
   await expect(dashboardHeading(page)).toBeVisible();
-  await expect(page.locator(".gettingStarted")).toContainText("0 of 5 done");
+  await expect(page.locator(".gettingStarted")).toContainText("0 of 6 done");
 
   // Reload: still no wizard.
   await page.reload();
@@ -126,7 +126,7 @@ test("the close button exits setup immediately and the checklist links into the 
   await page.getByLabel("Income amount").fill("2000");
   await page.getByLabel("Income amount").press("Enter");
   await page.getByRole("button", { name: "Dashboard" }).click();
-  await expect(page.locator(".gettingStarted")).toContainText("1 of 5 done");
+  await expect(page.locator(".gettingStarted")).toContainText("1 of 6 done");
   await expect(page.locator(".gsItem", { hasText: "Add your income" })).toBeDisabled();
 
   // Dismissing the checklist hides it and it stays hidden after reload.

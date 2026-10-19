@@ -30,7 +30,11 @@ Starling, Revolut, Chase, first direct, Metro Bank, Virgin Money, American Expre
 banks, and every format lands on the same review screen. A PDF it cannot read (a scanned image,
 say) gets a clear message; pasting the rows still works as a fallback.
 
-Each page has its own URL (`/dashboard`, `/ledger`, `/accounts`, `/goals`, `/allocate`, `/insights`,
+The take-home estimate has its own **Pay & tax** page (`/pay`; "Paycheck & tax" in the US): gross salary
+in, net pay out, with paycheck deductions from your accounts and a one-click "use as income". The
+dashboard carries a compact card and Insights charts where the pay goes.
+
+Each page has its own URL (`/dashboard`, `/ledger`, `/accounts`, `/pay`, `/goals`, `/allocate`, `/insights`,
 `/settings`), so a refresh stays put. The Dashboard and Insights pages are customisable: **Customise**
 lets you drag, resize, remove and add widgets; the arrangement is saved per device and region.
 
@@ -101,7 +105,9 @@ drives the upload, review and announcement in the browser. The fixtures are gene
 `npm run build:fixtures` rewrites them byte-for-byte from `scripts/build-statement-fixtures.mjs`, so a
 layout tweak is a code change with a diff.
 
-On a sandbox without Playwright's browser download, point `PW_CHROMIUM_PATH` at any Chromium binary.
+`npm test` first checks that Playwright's Chromium is installed (and downloads it if it can).
+Where no download is possible, point `PW_CHROMIUM_PATH` at any Chromium or Chrome binary. Run `npm install` first on a fresh checkout — the test and dev commands
+are local binaries, not globals.
 
 ## Licence
 

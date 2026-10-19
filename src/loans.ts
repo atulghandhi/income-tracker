@@ -154,7 +154,7 @@ export function loanSuggestion(account: Account, region: RegionKey, profile: Pic
     if (region === "GB") {
       const plan = account.studentLoanPlan;
       if (!plan) return { suggestedPayment: null, basis: "", notes: ["Pick the repayment plan to estimate payroll deductions."] };
-      if (salary <= 0) return { suggestedPayment: null, basis: "", notes: ["Add your gross salary (Insights › Take-home estimate) to work out the 9% repayment."] };
+      if (salary <= 0) return { suggestedPayment: null, basis: "", notes: ["Add your gross salary on the Pay & tax page to work out the 9% repayment."] };
       const repayment = ukStudentLoanRepayment({ grossAnnualSalary: salary, plan, year });
       return {
         suggestedPayment: repayment.monthly,
@@ -165,7 +165,7 @@ export function loanSuggestion(account: Account, region: RegionKey, profile: Pic
     // The loan-type select defaults to federal, so an unset type reads as federal here too.
     const loanType = account.studentLoanType ?? "federal";
     if (loanType === "federal" && account.repaymentPlan === "income-driven") {
-      if (salary <= 0) return { suggestedPayment: null, basis: "", notes: ["Add your gross salary (Insights › Take-home estimate) to estimate an income-driven payment."] };
+      if (salary <= 0) return { suggestedPayment: null, basis: "", notes: ["Add your gross salary on the Pay & tax page to estimate an income-driven payment."] };
       const estimate = incomeDrivenPayment({ adjustedGrossIncome: salary, familySize: account.familySize ?? 1 });
       return {
         suggestedPayment: estimate.monthly,

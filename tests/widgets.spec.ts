@@ -149,8 +149,8 @@ test.describe("page layouts", () => {
     expect(defaultLayout("dashboard", "GB").widgets.map((widget) => widget.id)).toEqual(["snapshot", "net-worth", "accounts-imports"]);
     const us = defaultLayout("dashboard", "US").widgets.map((widget) => widget.id);
     expect(us).toEqual(expect.arrayContaining(["retirement", "take-home", "medical", "loans"]));
-    expect(defaultLayout("insights", "GB").widgets.map((widget) => widget.id)).not.toContain("take-home-full");
-    expect(defaultLayout("insights", "US").widgets.map((widget) => widget.id)).toEqual(expect.arrayContaining(["take-home-full", "limits", "credit", "medical"]));
+    expect(defaultLayout("insights", "GB").widgets.map((widget) => widget.id)).not.toContain("paycheck");
+    expect(defaultLayout("insights", "US").widgets.map((widget) => widget.id)).toEqual(expect.arrayContaining(["paycheck", "limits", "credit", "medical"]));
     // Medical is a US-only widget.
     expect(availableWidgets("dashboard", "GB").map((widget) => widget.id)).not.toContain("medical");
     expect(availableWidgets("dashboard", "US").map((widget) => widget.id)).toContain("medical");

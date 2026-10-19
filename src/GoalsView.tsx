@@ -277,26 +277,22 @@ function WaterfallTimeline({
         viewBox={`0 0 ${LABEL_W + BAR_AREA_W + PAD} ${totalH}`}
         preserveAspectRatio="xMinYMid meet"
       >
-        {/* X-axis grid lines & labels */}
-        {quarterMonths.map((m) => (
+        {/* X-axis grid lines & labels (labels thinned so they never run into each other) */}
+        {quarterMonths.map((m, index) => (
           <g key={m}>
             <line
               x1={xForMonth(m)}
               y1={PAD}
               x2={xForMonth(m)}
               y2={totalH - 26}
-              stroke="rgba(212,228,250,0.07)"
+              stroke="rgba(var(--ink-rgb), 0.1)"
               strokeWidth={1}
             />
-            <text
-              x={xForMonth(m)}
-              y={totalH - 8}
-              textAnchor="middle"
-              fontSize={10}
-              fill="rgba(212,228,250,0.35)"
-            >
-              {m === 0 ? "Now" : sequence.timeline[m - 1]?.label ?? ""}
-            </text>
+            {index % Math.max(1, Math.ceil(quarterMonths.length / 9)) === 0 && (
+              <text x={xForMonth(m)} y={totalH - 8} textAnchor="middle" fontSize={10} fill="var(--muted)">
+                {m === 0 ? "Now" : sequence.timeline[m - 1]?.label ?? ""}
+              </text>
+            )}
           </g>
         ))}
 
@@ -306,7 +302,7 @@ function WaterfallTimeline({
           y1={PAD}
           x2={xForMonth(0)}
           y2={totalH - 26}
-          stroke="rgba(0,223,193,0.5)"
+          stroke="var(--mint)"
           strokeWidth={1.5}
           strokeDasharray="4 3"
         />
@@ -333,7 +329,7 @@ function WaterfallTimeline({
                 y={y + ROW_H / 2 + 4}
                 textAnchor="end"
                 fontSize={11}
-                fill="rgba(212,228,250,0.65)"
+                fill="var(--ink)"
                 style={{ fontFamily: "var(--sans, sans-serif)" }}
               >
                 {(goal.name || "Goal").slice(0, 16)}
@@ -346,7 +342,7 @@ function WaterfallTimeline({
                 width={BAR_AREA_W}
                 height={barH}
                 rx={4}
-                fill="rgba(212,228,250,0.04)"
+                fill="rgba(var(--ink-rgb), 0.06)"
               />
 
               {/* Fill bar */}
@@ -356,7 +352,7 @@ function WaterfallTimeline({
                 width={barW}
                 height={barH}
                 rx={4}
-                fill={notReached ? "rgba(255,180,80,0.25)" : isComplete ? "rgba(0,223,193,0.2)" : goal.color}
+                fill={notReached ? "rgba(var(--amber-rgb), 0.35)" : isComplete ? "rgba(var(--mint-rgb), 0.35)" : goal.color}
                 opacity={0.85}
               />
 
@@ -366,7 +362,7 @@ function WaterfallTimeline({
                   cx={xForMonth(outcome.completionMonth)}
                   cy={barY + barH / 2}
                   r={5}
-                  fill={isComplete ? "rgba(0,223,193,0.9)" : goal.color}
+                  fill={isComplete ? "var(--mint)" : goal.color}
                 />
               )}
             </g>

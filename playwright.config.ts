@@ -18,13 +18,18 @@ export default defineConfig({
     ...(process.env.PW_CHROMIUM_PATH ? { launchOptions: { executablePath: process.env.PW_CHROMIUM_PATH } } : {}),
   },
   webServer: {
-    command: "npm run dev -- --port 5173",
+    // --strictPort: if 5173 is taken by something else, fail loudly instead of silently starting
+    // on another port and timing out. A dev server already running on 5173 is reused as before.
+    command: "npm run dev -- --port 5173 --strictPort",
     url: "http://127.0.0.1:5173",
     reuseExistingServer: true,
-    timeout: 30_000,
+    // Cold starts pre-bundle dependencies; allow for a slow machine.
+    timeout: 120_000,
     // The dev server seeds fresh browsers with sample data for people; tests start empty.
     env: { VITE_DEV_SAMPLE: "0" },
   },
+  // Plain line-per-test output everywhere (the default switches to the terse dot reporter under CI).
+  reporter: [["list"]],
   projects: [
     {
       name: "chromium",

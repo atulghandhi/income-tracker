@@ -127,7 +127,7 @@ export function AccountPlanDetails({
             hint={
               salary > 0
                 ? "Sets the monthly amount from the gross salary in your take-home estimate. Leave at 0 to type the monthly amount instead."
-                : "Add your gross salary in Insights › Take-home estimate to use a % of pay; until then, type the monthly amount on the row above."
+                : "Add your gross salary on the Pay & tax page to use a % of pay; until then, type the monthly amount on the row above."
             }
           >
             <div className="planInputRow">
@@ -508,6 +508,66 @@ export function TakeHomeWidget({
   );
 }
 
+// Insights: a picture of where gross pay goes, built from the estimate on the Pay & tax page.
+// No inputs here — the numbers live on that page; this just charts them.
+export function PaycheckBreakdownWidget({
+  region,
+  taxProfile,
+  accounts,
+  formatter,
+  privacy,
+  onOpenPay,
+}: Omit<Money, "symbol"> & { region: RegionKey; taxProfile: TaxProfile; accounts: Account[]; onOpenPay: () => void }) {
+  const summary = useMemo(() => computeTakeHome(region, taxProfile, accounts), [region, taxProfile, accounts]);
+  const title = region === "US" ? "Where your paycheck goes" : "Where your pay goes";
+  if (!summary.hasSalary) {
+    return (
+      <article className="miniPanel paycheckPanel">
+        <PanelTitle title={title} icon={<Calculator size={16} />} />
+        <EmptyState
+          icon={<Calculator size={18} />}
+          title="No salary to chart yet"
+          text={region === "US" ? "Enter your gross salary on the Paycheck & tax page and this shows how it splits into taxes, deductions and take-home." : "Enter your gross salary on the Pay & tax page and this shows how it splits into tax, National Insurance, student loan and take-home."}
+          onAction={onOpenPay}
+        />
+      </article>
+    );
+  }
+  const palette = ["var(--red)", "var(--amber)", "var(--blue)", "#7a6cd6", "#d55181", "#e26030", "#c98500", "#008300"];
+  const segments = summary.lines
+    .slice(1, -1)
+    .filter((line) => line.amount < 0)
+    .map((line, index) => ({ label: line.label, amount: -line.amount, color: palette[index % palette.length] }));
+  const net = { label: "Take-home pay", amount: summary.net, color: "var(--mint)" };
+  const all = [net, ...segments];
+  return (
+    <article className="miniPanel paycheckPanel">
+      <PanelTitle title={title} icon={<Calculator size={16} />} action={<span className="panelWhen">{summary.yearLabel}</span>} />
+      <div className="paycheckBar" role="img" aria-label={`${title}: ${all.map((item) => `${item.label} ${Math.round((item.amount / summary.gross) * 100)}%`).join(", ")}`}>
+        {all.map((item) => (
+          <span key={item.label} style={{ flex: Math.max(item.amount, 0.0001), background: item.color }} title={`${item.label}: ${money(formatter, item.amount / 12, privacy)}/mo`} />
+        ))}
+      </div>
+      <div className="paycheckLegend">
+        {all.map((item) => (
+          <div className="paycheckLegendRow" key={item.label}>
+            <span className="swatch small" style={{ background: item.color }} />
+            <span>{item.label}</span>
+            <strong className={privacy ? "masked" : ""}>{formatter.format(item.amount / 12)}/mo</strong>
+            <em>{formatDecimal((item.amount / Math.max(1, summary.gross)) * 100)}%</em>
+          </div>
+        ))}
+      </div>
+      <p className="panelSubcopy">
+        Gross {money(formatter, summary.gross, privacy)} a year · effective {region === "US" ? "tax" : "deduction"} rate {formatDecimal(summary.effectiveRate)}% · estimate only.
+      </p>
+      <button className="linkButton" type="button" onClick={onOpenPay}>
+        Adjust the estimate on {region === "US" ? "Paycheck & tax" : "Pay & tax"} →
+      </button>
+    </article>
+  );
+}
+
 export function TakeHomeEstimator({
   region,
   taxProfile,
@@ -537,7 +597,7 @@ export function TakeHomeEstimator({
       />
       <p className="panelSubcopy">
         {region === "US"
-          ? "A rough picture of where a paycheck goes: federal brackets and the standard deduction, Social Security and Medicare, and a single state rate. No credits, itemised deductions or local taxes — not tax advice."
+          ? "A rough picture of where a paycheck goes: federal brackets and the standard deduction, Social Security and Medicare, and a single state rate. No credits, itemized deductions or local taxes — not tax advice."
           : "A rough picture of where pay goes: PAYE income tax (England, Wales and NI rates), employee National Insurance, student-loan deductions and pension contributions taken before tax. Standard tax code assumed — not tax advice."}
       </p>
       <div className="estimatorGrid">

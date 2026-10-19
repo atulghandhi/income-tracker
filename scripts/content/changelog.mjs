@@ -21,7 +21,7 @@ export const CHANGELOG = [
     date: "2026-10-12",
     title: "A US experience, customisable pages and page URLs",
     body:
-      "Pick your country from the top bar. United States users get American account types — checking, HYSA, CDs, HSA and FSA, 401(k) and 403(b), traditional and Roth IRA, 529 plans, auto and student loans — with plan details for contributions, employer match, tax treatment and annual limits, a gross-to-net paycheck estimate, federal student-loan repayment plans, medical spending against your deductible, and FICO and VantageScore credit bands. UK users gain workplace pensions and SIPPs with employer contributions, ISA and pension allowance tracking, and a PAYE, National Insurance and student-loan take-home estimate. The Dashboard and Insights pages can now be rearranged, resized and trimmed, and every page has its own address so a refresh stays where you were.",
+      "Pick your country from the top bar. United States users get American account types — checking, HYSA, CDs, HSA and FSA, 401(k) and 403(b), traditional and Roth IRA, 529 plans, auto and student loans — with plan details for contributions, employer match, tax treatment and annual limits, a gross-to-net paycheck estimate on its own Pay & tax page, federal student-loan repayment plans, medical spending against your deductible, and FICO and VantageScore credit bands. UK users gain workplace pensions and SIPPs with employer contributions, ISA and pension allowance tracking, and a PAYE, National Insurance and student-loan take-home estimate. The Dashboard and Insights pages can now be rearranged, resized and trimmed, and every page has its own address so a refresh stays where you were.",
   },
   {
     date: "2026-09-16",

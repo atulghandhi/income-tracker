@@ -259,7 +259,7 @@ export default function Onboarding({
               </select>
             </label>
           </div>
-          {region === "US" && <p className="obLede obLedeSmall">US accounts, tax tools and language are switched on. Your after-tax pay goes below; the gross-to-net estimator on Insights can work it out.</p>}
+          {region === "US" && <p className="obLede obLedeSmall">US accounts, tax tools and language are switched on. Your after-tax pay goes below; the Paycheck & tax page can work it out from your salary.</p>}
           <div className="obRows">
             {incomeRows.map((row) => (
               <div className="obRow" key={row.id}>

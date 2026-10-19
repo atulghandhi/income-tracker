@@ -20,17 +20,18 @@
   --glass: rgba(255, 255, 255, 0.88);
   --ink: #1c2333;
   --muted: #5f6b7e;
-  --faint: #8e98a9;
+  --faint: #5c687c;
   --line: rgba(24, 32, 56, 0.08);
   --line-strong: rgba(24, 32, 56, 0.18);
-  --blue: #2b6ceb;
+  /* Accent colours double as text colours, so each is dark enough to read on white (≥ 4.5:1). */
+  --blue: #2563d9;
   --blue-bright: #2059cc;
-  --blue-soft: rgba(43, 108, 235, 0.1);
-  --mint: #0b9883;
-  --mint-soft: rgba(11, 152, 131, 0.12);
-  --red: #ca3636;
-  --red-soft: rgba(202, 54, 54, 0.1);
-  --amber: #b2740a;
+  --blue-soft: rgba(37, 99, 217, 0.1);
+  --mint: #066f60;
+  --mint-soft: rgba(6, 111, 96, 0.12);
+  --red: #b92e2e;
+  --red-soft: rgba(185, 46, 46, 0.1);
+  --amber: #835508;
   --on-ink: #ffffff;
   --on-accent: #ffffff;
   --ink-rgb: 28, 35, 51;
@@ -40,11 +41,11 @@
   --nav-rgb: 253, 252, 251;
   --bg-rgb: 255, 255, 255;
   --bg-deep-rgb: 16, 24, 40;
-  --mint-rgb: 11, 152, 131;
-  --blue-rgb: 43, 108, 235;
+  --mint-rgb: 6, 111, 96;
+  --blue-rgb: 37, 99, 217;
   --blue-bright-rgb: 32, 89, 204;
-  --red-rgb: 202, 54, 54;
-  --amber-rgb: 178, 116, 10;
+  --red-rgb: 185, 46, 46;
+  --amber-rgb: 131, 85, 8;
   --on-ink-rgb: 255, 255, 255;
   --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.04), 0 2px 6px rgba(16, 24, 40, 0.04), 0 10px 24px -8px rgba(16, 24, 40, 0.07);
   --shadow-md: 0 2px 4px rgba(16, 24, 40, 0.05), 0 10px 20px -4px rgba(16, 24, 40, 0.08), 0 24px 48px -12px rgba(16, 24, 40, 0.1);
@@ -71,11 +72,11 @@
   --surface-higher: #273647;
   --glass: rgba(18, 33, 49, 0.78);
   --ink: #d4e4fa;
-  --muted: #9ea8b7;
-  --faint: #6f7b8c;
+  --muted: #a3adbc;
+  --faint: #97a2b3;
   --line: rgba(var(--line-rgb), 0.12);
   --line-strong: rgba(var(--line-rgb), 0.28);
-  --blue: #3291ff;
+  --blue: #5aa6ff;
   --blue-bright: #a7c8ff;
   --blue-soft: rgba(var(--blue-rgb), 0.15);
   --mint: #00dfc1;
@@ -93,7 +94,7 @@
   --bg-rgb: 5, 20, 36;
   --bg-deep-rgb: 1, 15, 31;
   --mint-rgb: 0, 223, 193;
-  --blue-rgb: 50, 145, 255;
+  --blue-rgb: 90, 166, 255;
   --blue-bright-rgb: 167, 200, 255;
   --red-rgb: 255, 180, 171;
   --amber-rgb: 244, 195, 106;
@@ -1776,7 +1777,6 @@ textarea:focus,
 .emptyStateHint {
   font-size: 11.5px;
   color: var(--mint);
-  opacity: 0.7;
   letter-spacing: 0.01em;
 }
 
@@ -3273,8 +3273,9 @@ hr {
   font-size: 11px;
 }
 
-.flowMonth:not(.active) {
-  opacity: 0.28;
+/* Months without data fade their bars, never their labels. */
+.flowMonth:not(.active) .flowBar {
+  opacity: 0.45;
 }
 
 .flowBar {
@@ -4254,7 +4255,7 @@ hr {
   }
 
   .navStack {
-    grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
   }
 
   .navItem {
@@ -5405,11 +5406,9 @@ hr {
   font-family: inherit;
   letter-spacing: 0.01em;
   transition: color 130ms ease;
-  opacity: 0.7;
 }
 .viewHomepageBtn:hover {
-  color: var(--muted);
-  opacity: 1;
+  color: var(--ink);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -5508,7 +5507,7 @@ hr {
 .goalStatus--ontrack  { background: rgba(var(--mint-rgb),0.1);  color: var(--mint); }
 .goalStatus--tight    { background: rgba(var(--amber-rgb),0.15); color: var(--amber); }
 .goalStatus--risk     { background: rgba(var(--red-rgb),0.15); color: var(--red); }
-.goalStatus--muted    { background: rgba(var(--line-rgb),0.12); color: var(--muted); }
+.goalStatus--muted    { background: rgba(var(--line-rgb),0.12); color: var(--ink); }
 
 /* Progress bar */
 .goalCardProgress { display: flex; align-items: center; gap: 10px; }
@@ -5620,9 +5619,9 @@ hr {
 .goalDeleteBtn {
   display: inline-flex; align-items: center; gap: 5px;
   background: none; border: none; color: var(--red);
-  font-size: 12px; cursor: pointer; opacity: 0.7; padding: 0; transition: opacity 120ms;
+  font-size: 12px; cursor: pointer; padding: 0; transition: color 120ms;
 }
-.goalDeleteBtn:hover { opacity: 1; }
+.goalDeleteBtn:hover { text-decoration: underline; }
 .goalDeleteConfirmBtn {
   display: inline-flex; align-items: center; gap: 5px;
   background: rgba(var(--red-rgb),0.15); border: 1px solid rgba(var(--red-rgb),0.35);
@@ -5655,9 +5654,9 @@ hr {
 .goalSwitcherTrigger:hover { color: var(--ink); border-color: var(--mint); }
 .goalSwitcherLink {
   background: none; border: none; color: var(--mint); font-size: 11px;
-  cursor: pointer; opacity: 0.7; padding: 0; margin-left: auto; transition: opacity 120ms;
+  cursor: pointer; padding: 0; margin-left: auto; transition: color 120ms;
 }
-.goalSwitcherLink:hover { opacity: 1; }
+.goalSwitcherLink:hover { text-decoration: underline; }
 .goalPickerPopover {
   position: absolute; top: calc(100% + 4px); left: 0;
   background: var(--surface); border: 1px solid var(--line);
@@ -6331,7 +6330,6 @@ hr {
 
 .gsItem:disabled {
   cursor: default;
-  opacity: 0.72;
 }
 
 .gsItem.done {
@@ -6530,7 +6528,7 @@ hr {
 
 .panelHint {
   font-size: 12px;
-  opacity: 0.7;
+  color: var(--muted);
   line-height: 1.5;
 }
 
@@ -6838,7 +6836,6 @@ hr {
 .widgetGrid.isEditing .widgetBody {
   pointer-events: none;
   user-select: none;
-  opacity: 0.92;
 }
 
 .widgetCell.isDragging {
@@ -8693,5 +8690,83 @@ select:not([multiple]):disabled {
 
   .customShares {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ─── Pay & tax page ─────────────────────────────────────────────────────────── */
+.payGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.payrollPanel,
+.payNotesPanel {
+  min-height: 240px;
+}
+
+.payNotes {
+  margin: 14px 0 0;
+  padding-left: 18px;
+  color: rgba(var(--ink-rgb), 0.84);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.payNotes li + li {
+  margin-top: 6px;
+}
+
+/* ─── Where your pay goes (Insights) ────────────────────────────────────────── */
+.paycheckPanel {
+  min-height: 240px;
+}
+
+.paycheckBar {
+  display: flex;
+  gap: 2px;
+  height: 18px;
+  margin-top: 18px;
+  overflow: hidden;
+  border-radius: 999px;
+}
+
+.paycheckBar span {
+  display: block;
+  min-width: 3px;
+}
+
+.paycheckLegend {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.paycheckLegendRow {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto 48px;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.paycheckLegendRow strong {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.paycheckLegendRow em {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-style: normal;
+  text-align: right;
+}
+
+@media (max-width: 1180px) {
+  .payGrid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-async function openView(page: Page, name: "Dashboard" | "Ledger" | "Accounts" | "Goals" | "Insights" | "Settings") {
+async function openView(page: Page, name: "Dashboard" | "Ledger" | "Accounts" | "Pay & tax" | "Paycheck & tax" | "Goals" | "Insights" | "Settings") {
   await page.locator(".sideNav").getByRole("button", { name, exact: true }).click();
 }
 
@@ -91,8 +91,9 @@ test.describe("US experience", () => {
     // Without a salary the % of pay field waits for one.
     await expect(page.getByLabel("Contribution percent for Fidelity 401k", { exact: true })).toBeDisabled();
 
-    // The estimator on Insights: $85,000 in Texas, paid every two weeks.
-    await openView(page, "Insights");
+    // The estimator on its own page: $85,000 in Texas, paid every two weeks.
+    await openView(page, "Paycheck & tax");
+    await expect(page).toHaveURL(/\/pay$/);
     const estimator = page.getByLabel("Take-home pay estimator");
     await estimator.getByLabel("Gross annual salary", { exact: true }).fill("85000");
     await estimator.getByLabel("State", { exact: true }).selectOption("TX");
@@ -129,15 +130,17 @@ test.describe("US experience", () => {
     await expect(retirement).toContainText("$5,100 / $24,500");
     // Contributing under the match cap would have been flagged; at 6% nothing is left behind.
     await expect(retirement.getByText(/free money left behind/)).toHaveCount(0);
-    // The credit estimate reads on the FICO scale.
+    // The credit estimate reads on the FICO scale, and Insights charts where the paycheck goes.
     await openView(page, "Insights");
     await expect(page.locator(".healthPanel")).toContainText("FICO");
     await expect(page.locator(".creditPanel")).toContainText("VantageScore");
+    await expect(page.locator(".paycheckPanel")).toContainText("Federal income tax");
+    await expect(page.locator(".paycheckPanel")).toContainText("Take-home pay");
   });
 
   test("federal student loans get repayment-plan estimates and medical spending tracks the deductible", async ({ page }) => {
     await switchToUs(page);
-    await openView(page, "Insights");
+    await openView(page, "Paycheck & tax");
     await page.getByLabel("Take-home pay estimator").getByLabel("Gross annual salary", { exact: true }).fill("60000");
 
     await openView(page, "Accounts");
@@ -213,12 +216,8 @@ test.describe("UK parity", () => {
     await page.getByRole("button", { name: "Add Pensions & ISAs widget" }).click();
     await page.getByRole("button", { name: "Finish customising the dashboard" }).click();
 
-    await openView(page, "Insights");
+    await openView(page, "Pay & tax");
     const estimator = page.getByLabel("Take-home pay estimator");
-    // The UK estimator is in the tray too; add it from the customise mode.
-    await page.getByRole("button", { name: "Customise the insights layout" }).click();
-    await page.getByRole("button", { name: "Add Take-home pay estimate widget" }).click();
-    await page.getByRole("button", { name: "Finish customising the insights" }).click();
     await estimator.getByLabel("Gross annual salary", { exact: true }).fill("40000");
     await estimator.getByLabel("Student loan plan", { exact: true }).selectOption("plan2");
     await expect(estimator.getByRole("row", { name: /Income tax/ })).toContainText("£5,486");

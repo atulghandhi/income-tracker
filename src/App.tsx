@@ -6,6 +6,7 @@ import type { CSSProperties, Dispatch, DragEvent, FormEvent, KeyboardEvent, Mous
 import {
   Clock3,
   AlertCircle,
+  Calculator,
   Landmark,
   ArrowDown,
   ArrowUp,
@@ -178,10 +179,12 @@ import {
   LoanDetails,
   LoansWidget,
   MedicalWidget,
+  PaycheckBreakdownWidget,
   RetirementWidget,
   TakeHomeEstimator,
   TakeHomeWidget,
 } from "./RegionPanels";
+import { computeTakeHome } from "./takeHome";
 import { AnimatedCurrency, EmptyState, InfoHint, MetricCard, MoneyInput, NumberInput, PanelTitle, ProgressRule, blurOnEnter, focusNextFrame, formatDecimal, handleDraftEnter } from "./ui";
 import { loadLedgerState, saveLedgerState } from "./storage";
 import {
@@ -327,6 +330,21 @@ const TUTORIALS_GB: Record<AppView, PageTutorial> = {
       },
     ],
   },
+  pay: {
+    title: "From gross salary to take-home",
+    badge: "Pay & tax",
+    steps: [
+      {
+        heading: "",
+        bullets: [
+          "Enter your gross annual salary and how often you're paid.",
+          "Pick your student loan plan; pension contributions set to come from pay on Accounts are deducted automatically.",
+          "Income tax, National Insurance and student loan are worked out for the current tax year — an estimate, not a payslip.",
+          "Use the net figure as this month's income with one click.",
+        ],
+      },
+    ],
+  },
   goals: {
     title: "Plan what you're saving for",
     badge: "Goals",
@@ -368,7 +386,7 @@ const TUTORIALS_GB: Record<AppView, PageTutorial> = {
           "Your health score rates cash flow, debt and savings.",
           "Charts show monthly cash flow and your category breakdown.",
           "Anomalies flag unusual spending worth a second look.",
-          "The take-home estimate turns a gross salary into net pay; Customise adds or removes widgets.",
+          "Where your pay goes charts the Pay & tax estimate; Customise adds or removes widgets.",
         ],
       },
     ],
@@ -401,7 +419,7 @@ const TUTORIALS_US: Record<AppView, PageTutorial> = {
         bullets: [
           "Left column is income, right column is expenses.",
           "Type a name and an amount — totals update as you type.",
-          "Enter your take-home pay as income; the gross-to-net estimate on Insights can work it out from your salary.",
+          "Enter your take-home pay as income; the Paycheck & tax page can work it out from your salary.",
           "Use the arrows up top to move between months.",
         ],
       },
@@ -432,7 +450,7 @@ const TUTORIALS_US: Record<AppView, PageTutorial> = {
         bullets: [
           "The net-worth outlook projects where your finances are heading.",
           "Retirement & tax-advantaged accounts tracks 401(k), IRA and HSA contributions against this year's limits, plus your employer match.",
-          "Take-home estimate turns a gross salary into net pay after federal, state and FICA taxes.",
+          "Take-home estimate previews the Paycheck & tax page: gross salary to net pay after federal, state and FICA taxes.",
           "Medical spending measures doctor, pharmacy and dental costs against your deductible and out-of-pocket maximum.",
           "Customize rearranges, resizes, adds and removes widgets — the layout is remembered on this device.",
         ],
@@ -452,6 +470,21 @@ const TUTORIALS_US: Record<AppView, PageTutorial> = {
           "Tap the i beside a type for a plain-English explanation — 401(k), Roth IRA, HSA, 529 and the rest.",
           "Open Plan details on a 401(k), IRA or HSA for contribution source, % of pay, employer match, tax treatment and annual limits.",
           "Open Loan details on a student loan to set federal vs private and the repayment plan; mortgages and auto loans take a remaining term.",
+        ],
+      },
+    ],
+  },
+  pay: {
+    title: "From gross salary to your paycheck",
+    badge: "Paycheck & tax",
+    steps: [
+      {
+        heading: "",
+        bullets: [
+          "Enter your gross annual salary, filing status, state and pay frequency.",
+          "401(k), HSA and FSA contributions set to come from your paycheck on Accounts are deducted automatically; add your pre-tax health premium.",
+          "Federal brackets, Social Security, Medicare and a state rate give the net paycheck — an estimate, not tax advice.",
+          "Use the net figure as this month's income with one click.",
         ],
       },
     ],
@@ -495,7 +528,7 @@ const TUTORIALS_US: Record<AppView, PageTutorial> = {
         heading: "",
         bullets: [
           "Your health score rates cash flow, debt and savings; the credit estimate reads on the FICO and VantageScore scales.",
-          "The gross-to-net estimate breaks a paycheck into federal and state tax, Social Security and Medicare — an estimate, not tax advice.",
+          "Where your paycheck goes charts the Paycheck & tax estimate as taxes, deductions and take-home.",
           "Contribution limits show how much 401(k), IRA, HSA and FSA headroom is left this year.",
           "Anomalies flag unusual spending, an employer match left on the table, or an FSA about to expire.",
           "Customize adds or removes widgets; the layout is remembered on this device.",
@@ -894,6 +927,11 @@ function App() {
     return [...ledgerSignals, ...planSignals].slice(0, 8);
   }, [financialSignals, planSignals]);
   const creditReading = useMemo(() => interpretCreditScore(healthScore.estimatedCreditScore, region), [healthScore.estimatedCreditScore, region]);
+  const takeHome = useMemo(() => computeTakeHome(region, ledger.taxProfile, ledger.accounts), [region, ledger.taxProfile, ledger.accounts]);
+  const payrollAccounts = useMemo(
+    () => ledger.accounts.filter((account) => account.accountClass !== "debt" && account.contributionSource === "payroll" && Number(account.monthlyContribution) > 0),
+    [ledger.accounts],
+  );
   // Goals share only the money that isn't already routed into an account each month; a goal's
   // own account pays its contribution straight in.
   const goalPlan = useMemo(
@@ -990,10 +1028,11 @@ function App() {
       income: monthsList.some((month) => month.incomes.length > 0),
       expenses: monthsList.some((month) => month.expenses.length > 0),
       account: ledger.accounts.length > 0,
+      pay: Number(ledger.taxProfile.grossAnnualSalary) > 0,
       goal: ledger.goals.length > 0,
       imported: ledger.importBatches.length > 0,
     };
-  }, [ledger.months, ledger.accounts, ledger.goals, ledger.importBatches]);
+  }, [ledger.months, ledger.accounts, ledger.goals, ledger.importBatches, ledger.taxProfile.grossAnnualSalary]);
 
   useEffect(() => {
     let alive = true;
@@ -2850,12 +2889,9 @@ function App() {
     track("layout_changed", { page, action });
   }
 
-  // Deep link from the compact take-home card to the full estimator on Insights, adding the
-  // estimator widget back if it was removed.
+  // The estimator lives on its own page; every "estimate your pay" link lands there.
   function openEstimator() {
-    updateLayout("insights", (layout) => addWidget(layout, "insights", region, "take-home-full"));
-    setActiveView("insights");
-    window.requestAnimationFrame(() => document.querySelector('[data-widget-id="take-home-full"]')?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    setActiveView("pay");
   }
 
   // "Use as monthly income" on the estimator: one recurring take-home row in the current month,
@@ -3103,19 +3139,8 @@ function App() {
             </div>
           </article>
         );
-      case "take-home-full":
-        return (
-          <TakeHomeEstimator
-            region={region}
-            taxProfile={ledger.taxProfile}
-            accounts={ledger.accounts}
-            formatter={moneyFormatter}
-            symbol={currencySymbol}
-            privacy={ledger.privacyMode}
-            onChange={(patch) => updateLedger((current) => ({ ...current, taxProfile: { ...current.taxProfile, ...patch } }))}
-            onUseAsIncome={applyTakeHomeIncome}
-          />
-        );
+      case "paycheck":
+        return <PaycheckBreakdownWidget region={region} taxProfile={ledger.taxProfile} accounts={ledger.accounts} formatter={moneyFormatter} privacy={ledger.privacyMode} onOpenPay={openEstimator} />;
       case "limits":
         return (
           <RetirementWidget
@@ -3249,10 +3274,12 @@ function App() {
     }
   };
 
+  const payPageTitle = region === "US" ? "Paycheck & tax" : "Pay & tax";
   const navItems: Array<{ id: AppView; label: string; icon: ReactNode }> = [
     { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard size={20} /> },
     { id: "ledger", label: "Ledger", icon: <ReceiptText size={20} /> },
     { id: "accounts", label: "Accounts", icon: <CreditCard size={20} /> },
+    { id: "pay", label: payPageTitle, icon: <Calculator size={20} /> },
     { id: "goals", label: "Goals", icon: <Target size={20} /> },
     { id: "allocate", label: "Allocate", icon: <Coins size={20} /> },
     { id: "insights", label: "Insights", icon: <LineChart size={20} /> },
@@ -3568,6 +3595,13 @@ function App() {
                       hint: "Savings, cards and loans build your net worth",
                       done: setupProgress.account,
                       action: () => setActiveView("accounts"),
+                    },
+                    {
+                      id: "pay",
+                      label: region === "US" ? "Estimate your paycheck" : "Estimate your take-home pay",
+                      hint: region === "US" ? "Gross salary → net after federal, state and FICA" : "Gross salary → net after tax, NI and student loan",
+                      done: setupProgress.pay,
+                      action: () => setActiveView("pay"),
                     },
                     {
                       id: "goal",
@@ -4119,6 +4153,104 @@ function App() {
                 </article>
               </section>
 
+            </section>
+          )}
+
+          {activeView === "pay" && (
+            <section className="viewStack" aria-label={payPageTitle}>
+              <div className="pageHeader compactHeader">
+                <div>
+                  <h2>{payPageTitle}</h2>
+                  <p>
+                    {region === "US"
+                      ? "What your gross salary becomes after federal and state tax, Social Security, Medicare and paycheck deductions — and one click to use it as income."
+                      : "What your gross salary becomes after income tax, National Insurance, student loan and pension — and one click to use it as income."}
+                  </p>
+                </div>
+                <div className="netBlock">
+                  <span>Take-home per month</span>
+                  <strong className={`positiveText ${ledger.privacyMode ? "masked" : ""}`}>
+                    <AnimatedCurrency value={takeHome.netMonthly} formatter={moneyFormatter} />
+                  </strong>
+                </div>
+              </div>
+
+              <TakeHomeEstimator
+                region={region}
+                taxProfile={ledger.taxProfile}
+                accounts={ledger.accounts}
+                formatter={moneyFormatter}
+                symbol={currencySymbol}
+                privacy={ledger.privacyMode}
+                onChange={(patch) => updateLedger((current) => ({ ...current, taxProfile: { ...current.taxProfile, ...patch } }))}
+                onUseAsIncome={applyTakeHomeIncome}
+              />
+
+              <section className="payGrid">
+                <article className="miniPanel payrollPanel">
+                  <PanelTitle title={region === "US" ? "Paycheck deductions from your accounts" : "Deductions from pay on your accounts"} icon={<Landmark size={16} />} />
+                  {payrollAccounts.length ? (
+                    <>
+                      <p className="panelSubcopy">
+                        {region === "US"
+                          ? "Accounts set to contribute from your paycheck. Pre-tax money lowers the income tax above; Roth money comes out after tax."
+                          : "Accounts set to contribute from your pay before tax. They lower the income tax above (net-pay arrangement)."}
+                      </p>
+                      <div className="retirementAccounts">
+                        {payrollAccounts.map((account) => (
+                          <div className="retirementAccount" key={account.id}>
+                            <span className="swatch small" style={{ background: account.color }} />
+                            <div className="subscriptionName">
+                              <strong>{account.name}</strong>
+                              <em>{accountTypeOption(region, account.accountClass, account.type).label}{account.taxTreatment === "roth" ? " · after tax" : " · before tax"}</em>
+                            </div>
+                            <strong className={ledger.privacyMode ? "masked" : ""}>{moneyFormatter.format(account.monthlyContribution)}/mo</strong>
+                            <em className={ledger.privacyMode ? "masked" : ""}>{account.employerMonthlyContribution ? `+${moneyFormatter.format(account.employerMonthlyContribution)} employer` : ""}</em>
+                          </div>
+                        ))}
+                      </div>
+                      <button className="linkButton" type="button" onClick={() => setActiveView("accounts")}>
+                        Change contributions on Accounts →
+                      </button>
+                    </>
+                  ) : (
+                    <EmptyState
+                      icon={<Landmark size={18} />}
+                      title={region === "US" ? "No paycheck deductions yet" : "No deductions from pay yet"}
+                      text={
+                        region === "US"
+                          ? "Add a 401(k), 403(b), HSA or FSA on Accounts and set its contributions to come from your paycheck; they are taken off here automatically."
+                          : "Add a workplace pension on Accounts and set its contributions to come from your pay; they are taken off here automatically."
+                      }
+                      onAction={() => setActiveView("accounts")}
+                    />
+                  )}
+                </article>
+
+                <article className="miniPanel payNotesPanel">
+                  <PanelTitle title="What this covers" icon={<InfoHint label="About the estimate" text={region === "US" ? "Federal brackets and the standard deduction for your filing status, Social Security up to the wage base, Medicare including the additional 0.9%, and one flat state rate. Credits, itemized deductions, local taxes, bonuses and multiple jobs are not modeled." : "Income tax at the England, Wales and Northern Ireland rates with the standard personal allowance and its taper, employee Class 1 National Insurance, student-loan deductions by plan and net-pay pension contributions. Scottish rates, benefits in kind, other tax codes and the High Income Child Benefit Charge are not modelled."} />} />
+                  <ul className="payNotes">
+                    {region === "US" ? (
+                      <>
+                        <li>Federal income tax from the {takeHome.yearLabel} brackets and standard deduction.</li>
+                        <li>Social Security (6.2%, up to the wage base) and Medicare (1.45%, plus 0.9% on high earners).</li>
+                        <li>State income tax as a single rate — flat-tax states exactly, others roughly. Override it if you know yours.</li>
+                        <li>401(k)/403(b), HSA and FSA contributions and pre-tax health premiums from your own figures.</li>
+                        <li>Not included: credits, itemized deductions, local taxes, bonuses, a second job or a spouse's income.</li>
+                      </>
+                    ) : (
+                      <>
+                        <li>Income tax for {takeHome.yearLabel} at the England, Wales and Northern Ireland rates, with the personal allowance tapering above £100,000.</li>
+                        <li>Employee National Insurance at 8% between the thresholds and 2% above the upper limit.</li>
+                        <li>Student loan by plan — 9% of pay above the threshold, 6% for a postgraduate loan.</li>
+                        <li>Pension contributions taken before tax from the accounts you set up.</li>
+                        <li>Not included: Scottish rates, other tax codes, benefits in kind, bonuses or the High Income Child Benefit Charge.</li>
+                      </>
+                    )}
+                  </ul>
+                  <p className="panelSubcopy">An estimate for planning, not tax advice. Your payslip is the real figure.</p>
+                </article>
+              </section>
             </section>
           )}
 

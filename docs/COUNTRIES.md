@@ -17,7 +17,7 @@ United States uses the GB experience with its own currency, exactly as the old c
 | `src/creditScore.ts` | Reads the 300–850 credit estimate as FICO + VantageScore (US) or Experian 0–999 (UK). |
 | `src/planSignals.ts` | Anomalies from plan data: match left behind, limit exceeded, FSA expiring, HSA without an HDHP. |
 | `src/layout.ts` + `src/WidgetGrid.tsx` | Customisable Dashboard / Insights layouts (order, width, add/remove), persisted in localStorage per page and region. |
-| `src/routes.ts` | `/dashboard`, `/ledger`, … ↔ views; `public/sw.js` and `vercel.json` serve them. |
+| `src/routes.ts` | `/dashboard`, `/ledger`, `/pay`, … ↔ views; `public/sw.js` and `vercel.json` serve them. |
 | `src/RegionPanels.tsx` | Plan / loan detail editors on account rows and the region widgets. |
 | `src/sampleData.ts` | Dev-only US and UK sample ledgers, loaded automatically for a fresh profile on the dev server (`?sample=us`, `?sample=uk`, `?sample=blank` to choose). |
 
