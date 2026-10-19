@@ -8,6 +8,7 @@ import {
   defaultLayout,
   hiddenWidgets,
   layoutStorageKey,
+  mergeLegacyLayouts,
   moveWidget,
   moveWidgetBefore,
   normalizeLayout,
@@ -147,50 +148,60 @@ test.describe("credit score interpretation", () => {
 // ─── Page layouts ────────────────────────────────────────────────────────────
 
 test.describe("page layouts", () => {
-  test("defaults: the UK dashboard keeps its original panels, the US one adds its own", () => {
-    expect(defaultLayout("dashboard", "GB").widgets.map((widget) => widget.id)).toEqual(["snapshot", "net-worth", "accounts-imports"]);
-    const us = defaultLayout("dashboard", "US").widgets.map((widget) => widget.id);
-    expect(us).toEqual(expect.arrayContaining(["retirement", "take-home", "medical", "loans"]));
-    expect(defaultLayout("insights", "GB").widgets.map((widget) => widget.id)).not.toContain("paycheck");
-    expect(defaultLayout("insights", "US").widgets.map((widget) => widget.id)).toEqual(expect.arrayContaining(["paycheck", "limits", "credit", "medical"]));
+  const ids = (layout: { widgets: Array<{ id: string }> }) => layout.widgets.map((widget) => widget.id);
+
+  test("one dashboard: the month, the trends and the region panels, with nothing shown twice", () => {
+    const gb = ids(defaultLayout("dashboard", "GB"));
+    expect(gb.slice(0, 3)).toEqual(["snapshot", "cash-flow", "health"]);
+    expect(gb).toEqual(expect.arrayContaining(["net-worth", "chart", "categories", "anomalies", "debt-overview", "payoff", "subscriptions", "annual"]));
+    expect(gb).not.toContain("paycheck");
+    const us = ids(defaultLayout("dashboard", "US"));
+    expect(us).toEqual(expect.arrayContaining(["retirement", "paycheck", "credit", "medical", "loans"]));
+    for (const region of ["GB", "US"] as const) {
+      const available = ids({ widgets: availableWidgets("dashboard", region) });
+      expect(new Set(available).size).toBe(available.length);
+      // Accounts and imports repeated other widgets; the pages' duplicates live on under one id each.
+      for (const gone of ["accounts-imports", "summary", "recurring", "limits"]) expect(available).not.toContain(gone);
+    }
     // Medical is a US-only widget.
-    expect(availableWidgets("dashboard", "GB").map((widget) => widget.id)).not.toContain("medical");
-    expect(availableWidgets("dashboard", "US").map((widget) => widget.id)).toContain("medical");
+    expect(ids({ widgets: availableWidgets("dashboard", "GB") })).not.toContain("medical");
+    expect(ids({ widgets: availableWidgets("dashboard", "US") })).toContain("medical");
   });
 
-  test("the money-flow family of widgets is on Insights in both regions, each with a renderer", () => {
+  test("the money-flow family of widgets is offered in both regions, each with a renderer", () => {
     for (const region of ["GB", "US"] as const) {
-      const ids = availableWidgets("insights", region).map((widget) => widget.id);
-      for (const id of Object.keys(INSIGHT_WIDGET_SPECS)) expect(ids).toContain(id);
-      expect(defaultLayout("insights", region).widgets.map((widget) => widget.id)).toEqual(expect.arrayContaining(["cash-flow", "spending-pace", "savings-rate"]));
+      const available = ids({ widgets: availableWidgets("dashboard", region) });
+      for (const id of Object.keys(INSIGHT_WIDGET_SPECS)) expect(available).toContain(id);
+      expect(ids(defaultLayout("dashboard", region))).toEqual(expect.arrayContaining(["cash-flow", "spending-pace", "savings-rate"]));
     }
     // Opt-in widgets wait in the tray.
-    expect(hiddenWidgets(defaultLayout("insights", "GB"), "insights", "GB").map((widget) => widget.id)).toEqual(
-      expect.arrayContaining(["todo", "notes", "calendar", "upcoming", "month-compare", "debt-overview"]),
+    expect(ids({ widgets: hiddenWidgets(defaultLayout("dashboard", "GB"), "dashboard", "GB") })).toEqual(
+      expect.arrayContaining(["todo", "notes", "calendar", "upcoming", "month-compare", "take-home", "goals"]),
     );
   });
 
-  test("insights widget data is cleaned on load and a look is stored per widget", () => {
-    expect(normalizeInsightsState(undefined)).toEqual({ version: 1, widgets: [], hiddenWarnings: [], notes: {}, todos: {} });
-    const state = normalizeInsightsState({
-      widgets: [{ id: "cash-flow", type: "moneyFlow", variant: "particles" }, { id: "x", type: "bogus" }],
-      // Grid placements from the old free-layout dashboard are simply dropped.
-      layouts: { desktop: { "cash-flow": { x: 0, y: 0, w: 3, h: 3 } } },
-      hiddenWarnings: ["promo-ending-1", 4],
-      notes: { notes: "Call the bank", other: 3 },
-      todos: { todo: [{ id: "t1", text: "Cancel gym", done: 1 }, { text: "no id" }] },
-    });
-    expect(state).toEqual({
-      version: 1,
-      widgets: [{ id: "cash-flow", type: "moneyFlow", variant: "particles" }],
-      hiddenWarnings: ["promo-ending-1"],
-      notes: { notes: "Call the bank" },
-      todos: { todo: [{ id: "t1", text: "Cancel gym", done: true, createdAt: new Date(0).toISOString() }] },
-    });
-    expect(widgetInstance(state, "cash-flow", "moneyFlow").variant).toBe("particles");
-    expect(widgetInstance(state, "todo", "todo")).toEqual({ id: "todo", type: "todo" });
-    const waterfall = setWidgetVariant(state, "cash-flow", "moneyFlow", "waterfall");
-    expect(waterfall.widgets).toEqual([{ id: "cash-flow", type: "moneyFlow", variant: "waterfall" }]);
+  test("the two layouts saved before the pages merged become one", () => {
+    const dashboard = { version: 1, widgets: [{ id: "net-worth", size: "m" }, { id: "accounts-imports", size: "xl" }, { id: "snapshot", size: "xl" }] };
+    const insights = { version: 1, widgets: [{ id: "summary", size: "xl" }, { id: "cash-flow", size: "l" }, { id: "recurring", size: "m" }, { id: "limits", size: "m" }] };
+    // Dashboard first, Accounts and imports replaced by Credit & debt, Insights' copies folded into
+    // the dashboard's ids.
+    expect(mergeLegacyLayouts(dashboard, insights, "US").widgets).toEqual([
+      { id: "net-worth", size: "m" },
+      { id: "debt-overview", size: "xl" },
+      { id: "snapshot", size: "xl" },
+      { id: "cash-flow", size: "l" },
+      { id: "subscriptions", size: "m" },
+      { id: "retirement", size: "m" },
+    ]);
+    // A page that was never customised brings its old defaults.
+    const onlyInsights = ids(mergeLegacyLayouts(null, insights, "GB"));
+    expect(onlyInsights.slice(0, 3)).toEqual(["snapshot", "net-worth", "debt-overview"]);
+    expect(onlyInsights).toEqual(expect.arrayContaining(["cash-flow", "subscriptions"]));
+    expect(ids(mergeLegacyLayouts(dashboard, null, "GB"))).toEqual(expect.arrayContaining(["net-worth", "snapshot", "cash-flow", "anomalies", "annual"]));
+    expect(ids(mergeLegacyLayouts(dashboard, null, "GB"))).not.toContain("accounts-imports");
+    expect(ids(mergeLegacyLayouts(dashboard, null, "GB"))).toContain("debt-overview");
+    // Nothing customised: the new default.
+    expect(mergeLegacyLayouts(null, null, "US")).toEqual(defaultLayout("dashboard", "US"));
   });
 
   test("sizes map to a six-column grid", () => {
@@ -199,7 +210,7 @@ test.describe("page layouts", () => {
 
   test("stored layouts are cleaned: unknown, foreign-region and duplicate widgets are dropped", () => {
     const layout = normalizeLayout(
-      { widgets: [{ id: "net-worth", size: "m" }, { id: "bogus", size: "s" }, { id: "medical", size: "m" }, { id: "net-worth", size: "xl" }, { id: "snapshot", size: "nope" }] },
+      { widgets: [{ id: "net-worth", size: "m" }, { id: "bogus", size: "s" }, { id: "medical", size: "m" }, { id: "net-worth", size: "xl" }, { id: "snapshot", size: "nope" }, { id: "summary", size: "xl" }] },
       "dashboard",
       "GB",
     );
@@ -208,34 +219,33 @@ test.describe("page layouts", () => {
       { id: "snapshot", size: "xl" },
     ]);
     expect(normalizeLayout(null, "dashboard", "GB")).toEqual(defaultLayout("dashboard", "GB"));
-    expect(normalizeLayout({ widgets: [{ id: "bogus" }] }, "insights", "US")).toEqual(defaultLayout("insights", "US"));
+    expect(normalizeLayout({ widgets: [{ id: "bogus" }] }, "dashboard", "US")).toEqual(defaultLayout("dashboard", "US"));
     expect(layoutStorageKey("dashboard", "US")).toBe("it_layout_dashboard_us");
   });
 
+  const three = normalizeLayout({ widgets: [{ id: "snapshot" }, { id: "net-worth" }, { id: "goals" }] }, "dashboard", "GB");
+
   test("widgets move, drop before or after each other, and clamp at the ends", () => {
-    const layout = defaultLayout("dashboard", "GB");
-    expect(moveWidget(layout, "accounts-imports", -1).widgets.map((widget) => widget.id)).toEqual(["snapshot", "accounts-imports", "net-worth"]);
-    expect(moveWidget(layout, "snapshot", -1)).toBe(layout);
-    expect(moveWidget(layout, "missing", 1)).toBe(layout);
-    expect(moveWidgetBefore(layout, "accounts-imports", "snapshot").widgets.map((widget) => widget.id)).toEqual(["accounts-imports", "snapshot", "net-worth"]);
-    expect(moveWidgetBefore(layout, "snapshot", "net-worth", "after").widgets.map((widget) => widget.id)).toEqual(["net-worth", "snapshot", "accounts-imports"]);
+    expect(ids(moveWidget(three, "goals", -1))).toEqual(["snapshot", "goals", "net-worth"]);
+    expect(moveWidget(three, "snapshot", -1)).toBe(three);
+    expect(moveWidget(three, "missing", 1)).toBe(three);
+    expect(ids(moveWidgetBefore(three, "goals", "snapshot"))).toEqual(["goals", "snapshot", "net-worth"]);
+    expect(ids(moveWidgetBefore(three, "snapshot", "net-worth", "after"))).toEqual(["net-worth", "snapshot", "goals"]);
   });
 
   test("resizing steps through the widget's allowed sizes", () => {
-    const layout = defaultLayout("dashboard", "GB");
-    const narrower = cycleWidgetSize(layout, "dashboard", "net-worth", -1);
+    const narrower = cycleWidgetSize(three, "dashboard", "net-worth", -1);
     expect(narrower.widgets.find((widget) => widget.id === "net-worth")?.size).toBe("l");
-    expect(cycleWidgetSize(layout, "dashboard", "net-worth", 1)).toBe(layout);
-    expect(resizeWidget(layout, "dashboard", "snapshot", "s")).toBe(layout);
-    expect(resizeWidget(layout, "dashboard", "snapshot", "l").widgets[0].size).toBe("l");
+    expect(cycleWidgetSize(three, "dashboard", "net-worth", 1)).toBe(three);
+    expect(resizeWidget(three, "dashboard", "snapshot", "s")).toBe(three);
+    expect(resizeWidget(three, "dashboard", "snapshot", "l").widgets[0].size).toBe("l");
   });
 
   test("removing hides a widget, the tray lists it, and adding brings it back at its default size", () => {
-    const layout = defaultLayout("dashboard", "GB");
-    const without = removeWidget(layout, "net-worth");
-    expect(without.widgets.map((widget) => widget.id)).toEqual(["snapshot", "accounts-imports"]);
-    expect(hiddenWidgets(without, "dashboard", "GB").map((widget) => widget.id)).toContain("net-worth");
-    expect(hiddenWidgets(layout, "dashboard", "GB").map((widget) => widget.id)).toEqual(expect.arrayContaining(["retirement", "take-home", "loans", "housing", "credit", "goals"]));
+    const without = removeWidget(three, "net-worth");
+    expect(ids(without)).toEqual(["snapshot", "goals"]);
+    expect(ids({ widgets: hiddenWidgets(without, "dashboard", "GB") })).toContain("net-worth");
+    expect(ids({ widgets: hiddenWidgets(three, "dashboard", "GB") })).toEqual(expect.arrayContaining(["retirement", "take-home", "loans", "housing", "credit", "cash-flow"]));
     const back = addWidget(without, "dashboard", "GB", "net-worth");
     expect(back.widgets[back.widgets.length - 1]).toEqual({ id: "net-worth", size: "xl" });
     expect(addWidget(back, "dashboard", "GB", "net-worth")).toBe(back);
@@ -251,6 +261,9 @@ test.describe("routes", () => {
     expect(viewFromPath("/")).toBeNull();
     expect(viewFromPath("/guides/")).toBeNull();
     expect(viewFromPath("/Accounts/")).toBe("accounts");
+    // Insights merged into the Dashboard; old links land there.
+    expect(APP_VIEWS).not.toContain("insights");
+    expect(viewFromPath("/insights")).toBe("dashboard");
     expect(isAppPath("/ledger")).toBe(true);
     expect(isAppPath("/index.html")).toBe(false);
   });

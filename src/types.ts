@@ -343,7 +343,7 @@ export type LumpSumSource = "self-employed" | "other-income" | "rental" | "savin
 export type UndergradLoanPlan = Exclude<UkStudentLoanPlan, "postgrad">;
 
 // Student loan repayments collected through Self Assessment on untaxed income. null = follow the
-// tax profile (Insights › Take-home estimate).
+// tax profile (the Pay & tax page).
 export type LumpSumStudentLoan = { repaying: boolean; plan: UndergradLoanPlan | null; postgrad: boolean };
 
 export type LumpSumTaxSettings = {

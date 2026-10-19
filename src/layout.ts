@@ -1,14 +1,16 @@
 import type { RegionKey } from "./region";
 
-// Customisable page layouts for the Dashboard and Insights pages. Each page is a list of widgets
-// in display order, each with a width; anything not in the list is hidden and can be added back
-// from the widget tray. Layouts are a per-device view preference (like the theme), stored in
-// localStorage per page and region so a US dashboard and a UK one keep separate arrangements.
+// The customisable Dashboard layout: a list of widgets in display order, each with a width; anything
+// not in the list is hidden and can be added back from the widget tray. Layouts are a per-device view
+// preference (like the theme), stored in localStorage per region so a US dashboard and a UK one keep
+// separate arrangements.
 
-export type LayoutPage = "dashboard" | "insights";
+// One customisable page since the Insights widgets moved onto the Dashboard (2026-10-19). The
+// page argument the helpers take is kept so a second customisable page can return.
+export type LayoutPage = "dashboard";
 export type WidgetSize = "s" | "m" | "l" | "xl";
 export type WidgetPlacement = { id: string; size: WidgetSize };
-export type PageLayout = { version: 1; widgets: WidgetPlacement[] };
+export type PageLayout = { version: typeof LAYOUT_VERSION; widgets: WidgetPlacement[] };
 
 export type WidgetDefinition = {
   id: string;
@@ -21,7 +23,8 @@ export type WidgetDefinition = {
   regions?: RegionKey[];
 };
 
-export const LAYOUT_VERSION = 1 as const;
+// 2: the Dashboard and Insights layouts merged into one (see mergeLegacyLayouts).
+export const LAYOUT_VERSION = 2 as const;
 export const WIDGET_SIZES: WidgetSize[] = ["s", "m", "l", "xl"];
 export const SIZE_LABELS: Record<WidgetSize, string> = { s: "⅓ width", m: "½ width", l: "⅔ width", xl: "Full width" };
 
@@ -30,13 +33,44 @@ export function spanFor(size: WidgetSize): number {
   return size === "s" ? 2 : size === "m" ? 3 : size === "l" ? 4 : 6;
 }
 
-const DASHBOARD_WIDGETS: WidgetDefinition[] = [
+const WIDGETS: WidgetDefinition[] = [
   {
     id: "snapshot",
     title: { GB: "Monthly snapshot", US: "Monthly snapshot" },
     description: { GB: "Income, spending, surplus and savings rate this month.", US: "Income, spending, surplus and savings rate this month." },
     defaultSize: "xl",
     sizes: ["l", "xl"],
+  },
+  {
+    id: "cash-flow",
+    title: { GB: "Money flow", US: "Money flow" },
+    description: {
+      GB: "Where this month's money came from and went, with what is left collected as savings. A waterfall or a particle stream.",
+      US: "Where this month's money came from and went, with what is left collected as savings. A waterfall or a particle stream.",
+    },
+    defaultSize: "xl",
+    sizes: ["l", "xl"],
+  },
+  {
+    id: "health",
+    title: { GB: "Health score", US: "Health score" },
+    description: { GB: "Cash flow, debt, payments, card headroom and savings, scored.", US: "Cash flow, debt, payments, card headroom and savings, scored." },
+    defaultSize: "s",
+    sizes: ["s", "m"],
+  },
+  {
+    id: "spending-pace",
+    title: { GB: "Spending pace", US: "Spending pace" },
+    description: { GB: "How fast the month is being spent and what is safe to spend per day.", US: "How fast the month is being spent and what is safe to spend per day." },
+    defaultSize: "s",
+    sizes: ["s", "m"],
+  },
+  {
+    id: "savings-rate",
+    title: { GB: "Savings rate", US: "Savings rate" },
+    description: { GB: "Annualised savings rate against your target.", US: "Annualized savings rate against your target." },
+    defaultSize: "s",
+    sizes: ["s", "m"],
   },
   {
     id: "net-worth",
@@ -46,10 +80,24 @@ const DASHBOARD_WIDGETS: WidgetDefinition[] = [
     sizes: ["m", "l", "xl"],
   },
   {
-    id: "accounts-imports",
-    title: { GB: "Accounts and imports", US: "Accounts and imports" },
-    description: { GB: "Debt totals, card utilisation and quick links to import.", US: "Debt totals, card utilization and quick links to import." },
-    defaultSize: "xl",
+    id: "chart",
+    title: { GB: "Trends", US: "Trends" },
+    description: { GB: "Monthly cash flow, volatility or the net-worth outlook.", US: "Monthly cash flow, volatility or the net-worth outlook." },
+    defaultSize: "l",
+    sizes: ["m", "l", "xl"],
+  },
+  {
+    id: "categories",
+    title: { GB: "Top categories", US: "Top categories" },
+    description: { GB: "Your biggest spending categories this month.", US: "Your biggest spending categories this month." },
+    defaultSize: "s",
+    sizes: ["s", "m"],
+  },
+  {
+    id: "anomalies",
+    title: { GB: "Detected anomalies", US: "Detected anomalies" },
+    description: { GB: "Pressure points worth a second look.", US: "Pressure points worth a second look." },
+    defaultSize: "l",
     sizes: ["m", "l", "xl"],
   },
   {
@@ -67,6 +115,16 @@ const DASHBOARD_WIDGETS: WidgetDefinition[] = [
     title: { GB: "Take-home estimate", US: "Take-home estimate" },
     description: { GB: "Gross salary to net pay after tax, National Insurance and student loan.", US: "Gross salary to net pay after federal, state and FICA taxes." },
     defaultSize: "s",
+    sizes: ["s", "m", "l"],
+  },
+  {
+    id: "paycheck",
+    title: { GB: "Where your pay goes", US: "Where your paycheck goes" },
+    description: {
+      GB: "Gross pay split into income tax, National Insurance, student loan, pension and take-home — from the Pay & tax estimate.",
+      US: "Gross pay split into federal and state tax, Social Security, Medicare, deductions and take-home — from the Paycheck & tax estimate.",
+    },
+    defaultSize: "m",
     sizes: ["s", "m", "l"],
   },
   {
@@ -109,8 +167,8 @@ const DASHBOARD_WIDGETS: WidgetDefinition[] = [
     id: "payoff",
     title: { GB: "Debt payoff plan", US: "Debt payoff plan" },
     description: {
-      GB: "Your chosen payoff strategy: debt-free date, interest saved against minimums, and this month's move.",
-      US: "Your chosen payoff strategy: debt-free date, interest saved against minimums, and this month's move.",
+      GB: "Your chosen payoff strategy: debt-free date, interest saved against minimums and this month's move; wider, it compares every strategy.",
+      US: "Your chosen payoff strategy: debt-free date, interest saved against minimums and this month's move; wider, it compares every strategy.",
     },
     defaultSize: "m",
     sizes: ["s", "m", "l", "xl"],
@@ -123,128 +181,6 @@ const DASHBOARD_WIDGETS: WidgetDefinition[] = [
       US: "What you pay for repeatedly, per year and per month, with price increases and renewals. Opens the Subscriptions page.",
     },
     defaultSize: "l",
-    sizes: ["m", "l", "xl"],
-  },
-];
-
-const INSIGHTS_WIDGETS: WidgetDefinition[] = [
-  {
-    id: "summary",
-    title: { GB: "Month summary", US: "Month summary" },
-    description: { GB: "Income, expenses, net and savings rate.", US: "Income, expenses, net and savings rate." },
-    defaultSize: "xl",
-    sizes: ["l", "xl"],
-  },
-  {
-    id: "cash-flow",
-    title: { GB: "Money flow", US: "Money flow" },
-    description: {
-      GB: "Where this month's money came from and went, with what is left collected as savings. A waterfall or a particle stream.",
-      US: "Where this month's money came from and went, with what is left collected as savings. A waterfall or a particle stream.",
-    },
-    defaultSize: "xl",
-    sizes: ["l", "xl"],
-  },
-  {
-    id: "spending-pace",
-    title: { GB: "Spending pace", US: "Spending pace" },
-    description: { GB: "How fast the month is being spent and what is safe to spend per day.", US: "How fast the month is being spent and what is safe to spend per day." },
-    defaultSize: "s",
-    sizes: ["s", "m"],
-  },
-  {
-    id: "savings-rate",
-    title: { GB: "Savings rate", US: "Savings rate" },
-    description: { GB: "Annualised savings rate against your target.", US: "Annualized savings rate against your target." },
-    defaultSize: "s",
-    sizes: ["s", "m"],
-  },
-  {
-    id: "health",
-    title: { GB: "Health score", US: "Health score" },
-    description: { GB: "Cash flow, debt, payments, card headroom and savings, scored.", US: "Cash flow, debt, payments, card headroom and savings, scored." },
-    defaultSize: "s",
-    sizes: ["s", "m"],
-  },
-  {
-    id: "chart",
-    title: { GB: "Trends", US: "Trends" },
-    description: { GB: "Monthly cash flow, volatility or the net-worth outlook.", US: "Monthly cash flow, volatility or the net-worth outlook." },
-    defaultSize: "l",
-    sizes: ["m", "l", "xl"],
-  },
-  {
-    id: "categories",
-    title: { GB: "Top categories", US: "Top categories" },
-    description: { GB: "Your biggest spending categories this month.", US: "Your biggest spending categories this month." },
-    defaultSize: "s",
-    sizes: ["s", "m"],
-  },
-  {
-    id: "anomalies",
-    title: { GB: "Detected anomalies", US: "Detected anomalies" },
-    description: { GB: "Pressure points worth a second look.", US: "Pressure points worth a second look." },
-    defaultSize: "l",
-    sizes: ["m", "l", "xl"],
-  },
-  {
-    id: "paycheck",
-    title: { GB: "Where your pay goes", US: "Where your paycheck goes" },
-    description: {
-      GB: "Gross pay split into income tax, National Insurance, student loan, pension and take-home — from the Pay & tax estimate.",
-      US: "Gross pay split into federal and state tax, Social Security, Medicare, deductions and take-home — from the Paycheck & tax estimate.",
-    },
-    defaultSize: "m",
-    sizes: ["s", "m", "l"],
-  },
-  {
-    id: "limits",
-    title: { GB: "ISA & pension allowances", US: "Contribution limits" },
-    description: { GB: "How much of this tax year's allowances your contributions use.", US: "How much of this year's 401(k), IRA, HSA and FSA limits your contributions use." },
-    defaultSize: "l",
-    sizes: ["m", "l", "xl"],
-  },
-  {
-    id: "credit",
-    title: { GB: "Credit score estimate", US: "Credit score estimate" },
-    description: { GB: "Rough estimate on Experian's scale, with what the band means.", US: "Rough estimate with FICO and VantageScore bands." },
-    defaultSize: "m",
-    sizes: ["s", "m", "l"],
-  },
-  {
-    id: "medical",
-    title: { GB: "Medical spending", US: "Medical spending" },
-    description: { GB: "", US: "Spending against your deductible and out-of-pocket maximum, with HSA and FSA balances." },
-    defaultSize: "m",
-    sizes: ["s", "m", "l"],
-    regions: ["US"],
-  },
-  {
-    id: "loans",
-    title: { GB: "Loans", US: "Loans & student loans" },
-    description: { GB: "Mortgages, car finance and student loans: payments, plans and payoff dates.", US: "Mortgages, auto loans and student loans: payments, repayment plans and payoff dates." },
-    defaultSize: "m",
-    sizes: ["s", "m", "l", "xl"],
-  },
-  {
-    id: "payoff",
-    title: { GB: "Debt payoff plan", US: "Debt payoff plan" },
-    description: {
-      GB: "Payoff strategies compared: interest, debt-free date and monthly payments under each, with your chosen plan's next move.",
-      US: "Payoff strategies compared: interest, debt-free date and monthly payments under each, with your chosen plan's next move.",
-    },
-    defaultSize: "l",
-    sizes: ["s", "m", "l", "xl"],
-  },
-  {
-    // Keeps its original id so saved layouts still show it.
-    id: "recurring",
-    title: { GB: "Subscriptions & regular payments", US: "Subscriptions & regular payments" },
-    description: {
-      GB: "Subscriptions, bills and renewals found in your ledger: yearly cost, price rises and what stopped. Opens the Subscriptions page.",
-      US: "Subscriptions, bills and renewals found in your ledger: yearly cost, price increases and what stopped. Opens the Subscriptions page.",
-    },
-    defaultSize: "xl",
     sizes: ["m", "l", "xl"],
   },
   {
@@ -285,7 +221,7 @@ const INSIGHTS_WIDGETS: WidgetDefinition[] = [
   {
     id: "notes",
     title: { GB: "Notes", US: "Notes" },
-    description: { GB: "A scratchpad that stays on your Insights page.", US: "A scratchpad that stays on your Insights page." },
+    description: { GB: "A scratchpad that stays on your dashboard.", US: "A scratchpad that stays on your dashboard." },
     defaultSize: "s",
     sizes: ["s", "m"],
   },
@@ -298,20 +234,49 @@ const INSIGHTS_WIDGETS: WidgetDefinition[] = [
   },
 ];
 
-const DEFAULT_IDS: Record<LayoutPage, Record<RegionKey, string[]>> = {
+const DEFAULT_IDS: Record<RegionKey, string[]> = {
+  GB: ["snapshot", "cash-flow", "health", "spending-pace", "savings-rate", "net-worth", "chart", "categories", "anomalies", "debt-overview", "payoff", "subscriptions", "annual"],
+  US: [
+    "snapshot",
+    "cash-flow",
+    "health",
+    "spending-pace",
+    "savings-rate",
+    "net-worth",
+    "chart",
+    "categories",
+    "anomalies",
+    "debt-overview",
+    "retirement",
+    "paycheck",
+    "credit",
+    "payoff",
+    "medical",
+    "loans",
+    "subscriptions",
+    "annual",
+  ],
+};
+
+// Until 2026-10-19 the Dashboard and Insights were two pages with a layout each, and a few
+// widgets existed on both under different ids. Stored layouts from then still use those ids.
+const LEGACY_IDS: Record<string, string> = { summary: "snapshot", recurring: "subscriptions", limits: "retirement" };
+
+// What each page showed by default before they merged, for a user who customised only one of them.
+const LEGACY_DEFAULTS: Record<"dashboard" | "insights", Record<RegionKey, string[]>> = {
+  // "Accounts and imports" sat last on both; Credit & debt takes its place.
   dashboard: {
-    // The UK dashboard keeps its original three panels; the rest wait in the tray.
-    GB: ["snapshot", "net-worth", "accounts-imports"],
-    US: ["snapshot", "net-worth", "retirement", "take-home", "medical", "loans", "accounts-imports"],
+    GB: ["snapshot", "net-worth", "debt-overview"],
+    US: ["snapshot", "net-worth", "retirement", "take-home", "medical", "loans", "debt-overview"],
   },
   insights: {
-    GB: ["summary", "cash-flow", "health", "spending-pace", "savings-rate", "chart", "categories", "anomalies", "payoff", "recurring", "annual"],
-    US: ["summary", "cash-flow", "health", "spending-pace", "savings-rate", "chart", "categories", "anomalies", "paycheck", "credit", "limits", "payoff", "medical", "loans", "recurring", "annual"],
+    GB: ["cash-flow", "health", "spending-pace", "savings-rate", "chart", "categories", "anomalies", "payoff", "subscriptions", "annual"],
+    US: ["cash-flow", "health", "spending-pace", "savings-rate", "chart", "categories", "anomalies", "paycheck", "credit", "retirement", "payoff", "medical", "loans", "subscriptions", "annual"],
   },
 };
 
-export function widgetDefinitions(page: LayoutPage): WidgetDefinition[] {
-  return page === "dashboard" ? DASHBOARD_WIDGETS : INSIGHTS_WIDGETS;
+export function widgetDefinitions(_page: LayoutPage): WidgetDefinition[] {
+  return WIDGETS;
 }
 
 export function availableWidgets(page: LayoutPage, region: RegionKey): WidgetDefinition[] {
@@ -326,7 +291,7 @@ export function defaultLayout(page: LayoutPage, region: RegionKey): PageLayout {
   const available = availableWidgets(page, region);
   return {
     version: LAYOUT_VERSION,
-    widgets: DEFAULT_IDS[page][region]
+    widgets: DEFAULT_IDS[region]
       .map((id) => available.find((widget) => widget.id === id))
       .filter((widget): widget is WidgetDefinition => Boolean(widget))
       .map((widget) => ({ id: widget.id, size: widget.defaultSize })),
@@ -346,7 +311,8 @@ export function normalizeLayout(raw: unknown, page: LayoutPage, region: RegionKe
   const seen = new Set<string>();
   const widgets: WidgetPlacement[] = [];
   for (const item of candidate.widgets as Array<{ id?: unknown; size?: unknown }>) {
-    const definition = available.find((widget) => widget.id === item?.id);
+    const id = typeof item?.id === "string" ? (LEGACY_IDS[item.id] ?? item.id) : item?.id;
+    const definition = available.find((widget) => widget.id === id);
     if (!definition || seen.has(definition.id)) continue;
     seen.add(definition.id);
     const size = isSize(item.size) && definition.sizes.includes(item.size) ? item.size : definition.defaultSize;
@@ -416,10 +382,42 @@ export function layoutStorageKey(page: LayoutPage, region: RegionKey): string {
   return `it_layout_${page}_${region.toLowerCase()}`;
 }
 
+// The two layouts saved before the pages merged become one: the dashboard's widgets first, then
+// the Insights ones, with the ids
+// that existed on both pages folded together. A page the user never customised contributes its old
+// defaults. Neither stored means nothing to keep: the new default applies.
+export function mergeLegacyLayouts(dashboardRaw: unknown, insightsRaw: unknown, region: RegionKey): PageLayout {
+  const listOf = (raw: unknown) => {
+    const candidate = raw as { widgets?: unknown } | null;
+    return candidate && Array.isArray(candidate.widgets) ? (candidate.widgets as Array<{ id?: unknown; size?: unknown }>) : null;
+  };
+  const dashboard = listOf(dashboardRaw);
+  const insights = listOf(insightsRaw);
+  if (!dashboard && !insights) return defaultLayout("dashboard", region);
+  const fallback = (page: "dashboard" | "insights") => LEGACY_DEFAULTS[page][region].map((id) => ({ id }));
+  // "Accounts and imports" gives way to "Credit & debt", which shows the same debt figures per card.
+  const combined = [...(dashboard ?? fallback("dashboard")), ...(insights ?? fallback("insights"))].map((item) =>
+    item?.id === "accounts-imports" ? { id: "debt-overview" } : item,
+  );
+  return normalizeLayout({ widgets: combined }, "dashboard", region);
+}
+
+function readStored(key: string): unknown {
+  const raw = localStorage.getItem(key);
+  return raw ? JSON.parse(raw) : null;
+}
+
 export function loadLayout(page: LayoutPage, region: RegionKey): PageLayout {
   try {
-    const raw = localStorage.getItem(layoutStorageKey(page, region));
-    return raw ? normalizeLayout(JSON.parse(raw), page, region) : defaultLayout(page, region);
+    const stored = readStored(layoutStorageKey(page, region)) as { version?: unknown } | null;
+    if (stored && stored.version === LAYOUT_VERSION) return normalizeLayout(stored, page, region);
+    const legacyInsightsKey = `it_layout_insights_${region.toLowerCase()}`;
+    const merged = mergeLegacyLayouts(stored, readStored(legacyInsightsKey), region);
+    if (stored || localStorage.getItem(legacyInsightsKey)) {
+      saveLayout(page, region, merged);
+      localStorage.removeItem(legacyInsightsKey);
+    }
+    return merged;
   } catch {
     return defaultLayout(page, region);
   }

@@ -25,6 +25,8 @@ const LIVE_SAMPLE_TYPES = new Set<InsightWidgetType>(["spendingPace", "upcoming"
 export type InsightWidgetSpec = {
   type: InsightWidgetType;
   rows: number;
+  // Rows at a given card width, for a widget whose tiles stack when it is narrow.
+  rowsAt?: (width: number) => number;
   hint?: { label: string; text: string };
   variants?: Array<{ id: string; label: string }>;
 };
@@ -49,7 +51,8 @@ export const INSIGHT_WIDGET_SPECS: Record<string, InsightWidgetSpec> = {
     rows: 2,
     hint: { label: "About the savings rate", text: "Net income divided by income for the month. The target slider sets the rate the health score and warnings measure against." },
   },
-  "debt-overview": { type: "debt", rows: 1 },
+  // Four figures and a row per card: one row at full width, taller as the tiles stack.
+  "debt-overview": { type: "debt", rows: 1, rowsAt: (width) => (width >= 760 ? 1 : width >= 480 ? 2 : 3) },
   "month-compare": { type: "monthCompare", rows: 2 },
   upcoming: { type: "upcoming", rows: 2 },
   calendar: { type: "calendar", rows: 2 },
@@ -106,12 +109,13 @@ export function InsightWidgetCard({
     return buildInsightsModel(demo, LIVE_SAMPLE_TYPES.has(spec.type) ? current : shiftMonth(current, -1), { today, formatter });
   }, [showSample, model.today, spec.type, formatter]);
 
-  const height = spec.rows * ROW_HEIGHT + (spec.rows - 1) * ROW_GAP;
+  const rows = width > 0 && spec.rowsAt ? spec.rowsAt(width) : spec.rows;
+  const height = rows * ROW_HEIGHT + (rows - 1) * ROW_GAP;
   const narrow = width > 0 && width < 340;
   const size: WidgetSize = {
     // Width in the original dashboard's quarter-page units, so a widget picks the same layout.
     w: width >= 760 ? 4 : width >= 560 ? 3 : width >= 340 ? 2 : 1,
-    h: spec.rows,
+    h: rows,
     cols: 4,
     width,
     height,

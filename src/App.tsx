@@ -344,10 +344,10 @@ const TUTORIALS_GB: Record<AppView, PageTutorial> = {
       {
         heading: "",
         bullets: [
-          "The net-worth outlook projects where your finances are heading.",
-          "The ledger summary shows this month's income vs spending.",
-          "Quick links jump you straight to accounts and imports.",
-          "Customise rearranges, resizes, adds and removes widgets — the layout is remembered on this device.",
+          "This month's snapshot and the money flow show where income came from and where it went — click a stream to see what is inside.",
+          "The health score rates cash flow, debt and savings; spending pace and the savings rate say how the month is going against your target.",
+          "Anomalies flag unusual spending worth a second look; dismiss any with the ×.",
+          "Customise rearranges, resizes, adds and removes widgets, such as to-dos, notes, a spending calendar or where your pay goes. The layout is remembered on this device.",
         ],
       },
     ],
@@ -430,22 +430,6 @@ const TUTORIALS_GB: Record<AppView, PageTutorial> = {
       },
     ],
   },
-  insights: {
-    title: "Spot the trends",
-    badge: "Insights",
-    steps: [
-      {
-        heading: "",
-        bullets: [
-          "Your health score rates cash flow, debt and savings.",
-          "The money flow shows where income came from and where it went — click a stream to see what is inside.",
-          "Spending pace and the savings rate say how the month is going against your target.",
-          "Anomalies flag unusual spending worth a second look; dismiss any with the ×.",
-          "Where your pay goes charts the Pay & tax estimate; Customise adds widgets such as to-dos, notes and a spending calendar.",
-        ],
-      },
-    ],
-  },
   settings: {
     title: "Data, privacy & rules",
     badge: "Settings",
@@ -503,11 +487,11 @@ const TUTORIALS_US: Record<AppView, PageTutorial> = {
       {
         heading: "",
         bullets: [
-          "The net-worth outlook projects where your finances are heading.",
+          "This month's snapshot and the money flow show where income came from and where it went — click a stream to see what is inside.",
           "Retirement & tax-advantaged accounts tracks 401(k), IRA and HSA contributions against this year's limits, plus your employer match.",
-          "Take-home estimate previews the Paycheck & tax page: gross salary to net pay after federal, state and FICA taxes.",
-          "Medical spending measures doctor, pharmacy and dental costs against your deductible and out-of-pocket maximum.",
-          "Customize rearranges, resizes, adds and removes widgets — the layout is remembered on this device.",
+          "Where your paycheck goes charts the Paycheck & tax estimate; the credit estimate reads on the FICO and VantageScore scales.",
+          "Anomalies flag unusual spending, an employer match left on the table, or an FSA about to expire; dismiss any with the ×.",
+          "Customize rearranges, resizes, adds and removes widgets, such as to-dos, notes or a spending calendar. The layout is remembered on this device.",
         ],
       },
     ],
@@ -587,23 +571,6 @@ const TUTORIALS_US: Record<AppView, PageTutorial> = {
           "Price increases are flagged with the extra cost per year. Charges in another currency move with the exchange rate and are not flagged.",
           "Annual renewals show their next date. Anything that stops being paid moves to Canceled — or mark it canceled yourself, and delete it from there.",
           "Open a row for its payment history, to widen the on-time window, or to say it is not a subscription.",
-        ],
-      },
-    ],
-  },
-  insights: {
-    title: "Spot the trends",
-    badge: "Insights",
-    steps: [
-      {
-        heading: "",
-        bullets: [
-          "Your health score rates cash flow, debt and savings; the credit estimate reads on the FICO and VantageScore scales.",
-          "Where your paycheck goes charts the Paycheck & tax estimate as taxes, deductions and take-home.",
-          "Contribution limits show how much 401(k), IRA, HSA and FSA headroom is left this year.",
-          "The money flow shows where income came from and where it went — click a stream to see what is inside.",
-          "Anomalies flag unusual spending, an employer match left on the table, or an FSA about to expire; dismiss any with the ×.",
-          "Customize adds widgets such as to-dos, notes and a spending calendar; the layout is remembered on this device.",
         ],
       },
     ],
@@ -894,11 +861,9 @@ function App() {
   const region: RegionKey = regionOf(ledger.country);
   const t = useMemo(() => textLocalizer(region), [region]);
   const [dashboardLayout, setDashboardLayout] = useState<PageLayout>(() => loadLayout("dashboard", region));
-  const [insightsLayout, setInsightsLayout] = useState<PageLayout>(() => loadLayout("insights", region));
   // Each region keeps its own arrangement; switching country loads that region's saved layout.
   useEffect(() => {
     setDashboardLayout(loadLayout("dashboard", region));
-    setInsightsLayout(loadLayout("insights", region));
     setLayoutEditing(null);
   }, [region]);
 
@@ -1000,13 +965,13 @@ function App() {
     return [...ledgerSignals, ...planSignals].slice(0, 8);
   }, [financialSignals, planSignals]);
   // The Insights widgets' own data, and the model the money-flow family of widgets draws from.
-  // The model walks every month of the ledger, so it is only built while Insights is open.
+  // The model walks every month of the ledger, so it is only built while the Dashboard is open.
   const insightsState = useMemo(() => normalizeInsightsState(ledger.insights), [ledger.insights]);
   const insightsModel = useMemo(
-    () => (activeView === "insights" ? buildInsightsModel(ledger, ledger.selectedMonth, { formatter: moneyFormatter }) : null),
+    () => (activeView === "dashboard" ? buildInsightsModel(ledger, ledger.selectedMonth, { formatter: moneyFormatter }) : null),
     [activeView, ledger, moneyFormatter],
   );
-  // Anomalies: the ledger and plan signals, plus the month-on-month ones the Insights model adds
+  // Anomalies: the ledger and plan signals, plus the month-on-month ones the insights model adds
   // (category spikes, subscription creep, bills that usually would have landed by now).
   const anomalySignals = useMemo(() => {
     if (!insightsModel) return allSignals;
@@ -1968,8 +1933,7 @@ function App() {
   }
 
   function updateLayout(page: LayoutPage, updater: (layout: PageLayout) => PageLayout) {
-    const setter = page === "dashboard" ? setDashboardLayout : setInsightsLayout;
-    setter((current) => {
+    setDashboardLayout((current) => {
       const next = updater(current);
       if (next !== current) saveLayout(page, region, next);
       return next;
@@ -2979,6 +2943,14 @@ function App() {
     track("layout_changed", { page, action });
   }
 
+  // The Ledger's "see the year" link: the annual projection on the Dashboard, added back if it was
+  // removed, and scrolled to.
+  function openAnnualView() {
+    updateLayout("dashboard", (layout) => addWidget(layout, "dashboard", region, "annual"));
+    setActiveView("dashboard");
+    window.requestAnimationFrame(() => document.querySelector('[data-widget-id="annual"]')?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
+
   // The estimator lives on its own page; every "estimate your pay" link lands there.
   function openEstimator() {
     setActiveView("pay");
@@ -3014,7 +2986,39 @@ function App() {
     setToast(`${moneyFormatter.format(amount)} a month added as take-home income`);
   }
 
-  const renderDashboardWidget: WidgetRenderer = (id) => {
+  const insightWidgetActions: WidgetActions = {
+    patchInsights,
+    markRecurring: (candidate) => {
+      updateLedger((current) => applyRecurringFlag(current, candidate));
+      setToast(`${candidate.label} marked recurring — it now feeds the forecast`);
+      track("recurring_marked", { cadence: candidate.cadence });
+    },
+    navigate: (view) => setActiveView(view),
+    setSavingsTarget: (value) => updateLedger((current) => ({ ...current, savingsTarget: value })),
+    toast: setToast,
+  };
+
+  // Every widget on the Dashboard. The money-flow family draws through InsightWidgetCard; the
+  // rest are rendered here.
+  const renderDashboardWidget: WidgetRenderer = (id, size) => {
+    const spec = INSIGHT_WIDGET_SPECS[id];
+    if (spec && insightsModel) {
+      return (
+        <InsightWidgetCard
+          id={id}
+          title={t(widgetDefinition("dashboard", id)?.title[region] ?? id)}
+          spec={spec}
+          model={insightsModel}
+          insights={insightsState}
+          actions={insightWidgetActions}
+          formatter={moneyFormatter}
+          privacy={ledger.privacyMode}
+          animations={animationsEnabled}
+          editing={layoutEditing === "dashboard"}
+          onVariant={(variant) => patchInsights((current) => setWidgetVariant(current, id, spec.type, variant))}
+        />
+      );
+    }
     switch (id) {
       case "snapshot":
         return (
@@ -3035,44 +3039,6 @@ function App() {
             />
             <p className="panelSubcopy">Projects your recurring monthly surplus, debt payments, and interest after any 0% period ends. One-off items are not extrapolated.</p>
             <NetWorthChart points={netWorthOutlook} formatter={moneyFormatter} privacy={ledger.privacyMode} compact />
-          </article>
-        );
-      case "accounts-imports":
-        return (
-          <article className="miniPanel debtPanel">
-            <PanelTitle title="Accounts and imports" icon={<CreditCard size={16} />} />
-            <div className="debtMiniGrid">
-              <div>
-                <span>Total debt</span>
-                <strong className={ledger.privacyMode ? "masked" : ""}>{moneyFormatter.format(debtSummary.totalDebt)}</strong>
-              </div>
-              <div>
-                <span>Monthly payments</span>
-                <strong className={ledger.privacyMode ? "masked" : ""}>{moneyFormatter.format(debtSummary.monthlyMinimums)}</strong>
-              </div>
-              <div>
-                <span>Card utilization</span>
-                <strong>{formatDecimal(debtSummary.utilization)}%</strong>
-              </div>
-              <div>
-                <span>Last import</span>
-                <strong>{ledger.importBatches[0]?.importedRows ?? 0} rows</strong>
-              </div>
-            </div>
-            <div className="buttonRow dashboardActions">
-              <button className="commandButton" type="button" onClick={() => setActiveView("accounts")}>
-                <CreditCard size={16} />
-                Manage accounts
-              </button>
-              <button className="commandButton" type="button" onClick={() => csvInputRef.current?.click()}>
-                <FileSpreadsheet size={16} />
-                Import file
-              </button>
-              <button className="commandButton" type="button" onClick={() => void importFromClipboard()}>
-                <ClipboardPaste size={16} />
-                Paste transactions
-              </button>
-            </div>
           </article>
         );
       case "retirement":
@@ -3111,55 +3077,21 @@ function App() {
       case "goals":
         return <GoalsWidget goals={ledger.goals} goalSequence={goalSequence} formatter={moneyFormatter} privacy={ledger.privacyMode} onOpenGoals={() => setActiveView("goals")} />;
       case "payoff":
-        return <PayoffWidget comparison={allocationPlan} settings={ledger.allocation} formatter={moneyFormatter} privacy={ledger.privacyMode} t={t} onOpen={() => setActiveView("allocate")} onOpenAccounts={() => setActiveView("accounts")} />;
+        // Narrow it is the chosen plan at a glance; given the width it compares every strategy.
+        return (
+          <PayoffWidget
+            comparison={allocationPlan}
+            settings={ledger.allocation}
+            formatter={moneyFormatter}
+            privacy={ledger.privacyMode}
+            t={t}
+            compare={size === "l" || size === "xl"}
+            onOpen={() => setActiveView("allocate")}
+            onOpenAccounts={() => setActiveView("accounts")}
+          />
+        );
       case "subscriptions":
         return <SubscriptionsWidget report={subscriptionReport} formatter={moneyFormatter} preciseFormatter={preciseFormatter} privacy={ledger.privacyMode} t={t} onOpen={() => setActiveView("subscriptions")} />;
-      default:
-        return null;
-    }
-  };
-
-  const insightWidgetActions: WidgetActions = {
-    patchInsights,
-    markRecurring: (candidate) => {
-      updateLedger((current) => applyRecurringFlag(current, candidate));
-      setToast(`${candidate.label} marked recurring — it now feeds the forecast`);
-      track("recurring_marked", { cadence: candidate.cadence });
-    },
-    navigate: (view) => setActiveView(view),
-    setSavingsTarget: (value) => updateLedger((current) => ({ ...current, savingsTarget: value })),
-    toast: setToast,
-  };
-
-  const renderInsightsWidget: WidgetRenderer = (id) => {
-    const spec = INSIGHT_WIDGET_SPECS[id];
-    if (spec && insightsModel) {
-      return (
-        <InsightWidgetCard
-          id={id}
-          title={t(widgetDefinition("insights", id)?.title[region] ?? id)}
-          spec={spec}
-          model={insightsModel}
-          insights={insightsState}
-          actions={insightWidgetActions}
-          formatter={moneyFormatter}
-          privacy={ledger.privacyMode}
-          animations={animationsEnabled}
-          editing={layoutEditing === "insights"}
-          onVariant={(variant) => patchInsights((current) => setWidgetVariant(current, id, spec.type, variant))}
-        />
-      );
-    }
-    switch (id) {
-      case "summary":
-        return (
-          <section className="statCardRow" aria-label="Month summary">
-            <MetricCard label="Total income" value={projection.monthlyIncome} tone="green" privacy={ledger.privacyMode} formatter={moneyFormatter} />
-            <MetricCard label="Total expenses" value={projection.monthlyExpenses} tone="red" privacy={ledger.privacyMode} formatter={moneyFormatter} />
-            <MetricCard label="Net income" value={projection.monthlySurplus} tone={projection.monthlySurplus >= 0 ? "green" : "red"} privacy={ledger.privacyMode} formatter={moneyFormatter} />
-            <MetricCard label="Savings rate" value={projection.savingsRate} suffix="%" tone="amber" privacy={ledger.privacyMode} formatter={moneyFormatter} />
-          </section>
-        );
       case "health":
         return (
           <article className={`miniPanel healthPanel ${healthScore.noData ? "" : healthTone(healthScore.score)}`}>
@@ -3273,40 +3205,6 @@ function App() {
       }
       case "paycheck":
         return <PaycheckBreakdownWidget region={region} taxProfile={ledger.taxProfile} accounts={ledger.accounts} formatter={moneyFormatter} privacy={ledger.privacyMode} onOpenPay={openEstimator} />;
-      case "limits":
-        return (
-          <RetirementWidget
-            accounts={effectiveAccounts}
-            region={region}
-            taxProfile={ledger.taxProfile}
-            formatter={moneyFormatter}
-            privacy={ledger.privacyMode}
-            title={region === "US" ? "Contribution limits" : "ISA & pension allowances"}
-            onOpenAccounts={() => setActiveView("accounts")}
-            onOpenEstimator={openEstimator}
-          />
-        );
-      case "credit":
-        return <CreditScoreWidget estimate={healthScore.estimatedCreditScore} noData={healthScore.noData} region={region} privacy={ledger.privacyMode} />;
-      case "medical":
-        return (
-          <MedicalWidget
-            months={ledger.months}
-            healthPlan={ledger.healthPlan}
-            accounts={effectiveAccounts}
-            formatter={moneyFormatter}
-            symbol={currencySymbol}
-            privacy={ledger.privacyMode}
-            onChange={(patch) => updateLedger((current) => ({ ...current, healthPlan: { ...current.healthPlan, ...patch } }))}
-            onOpenAccounts={() => setActiveView("accounts")}
-          />
-        );
-      case "loans":
-        return <LoansWidget accounts={effectiveAccounts} region={region} taxProfile={ledger.taxProfile} formatter={moneyFormatter} privacy={ledger.privacyMode} onOpenAccounts={() => setActiveView("accounts")} />;
-      case "payoff":
-        return <PayoffWidget comparison={allocationPlan} settings={ledger.allocation} formatter={moneyFormatter} privacy={ledger.privacyMode} t={t} compare onOpen={() => setActiveView("allocate")} onOpenAccounts={() => setActiveView("accounts")} />;
-      case "recurring":
-        return <SubscriptionsWidget report={subscriptionReport} formatter={moneyFormatter} preciseFormatter={preciseFormatter} privacy={ledger.privacyMode} t={t} onOpen={() => setActiveView("subscriptions")} />;
       case "annual":
         return (
           <section className="projectionPanel" aria-label="Annual calculation">
@@ -3348,7 +3246,6 @@ function App() {
     { id: "goals", label: "Goals", icon: <Target size={20} /> },
     { id: "allocate", label: "Allocate", icon: <Coins size={20} /> },
     { id: "subscriptions", label: "Subscriptions", icon: <Repeat size={20} /> },
-    { id: "insights", label: "Insights", icon: <LineChart size={20} /> },
     { id: "settings", label: "Settings", icon: <SettingsIcon size={20} /> },
   ];
   const insightChartTitle =
@@ -4079,9 +3976,9 @@ function App() {
               </section>
 
               <div className="annualInsightsCta">
-                <button className="commandButton" type="button" onClick={() => setActiveView("insights")}>
+                <button className="commandButton" type="button" onClick={openAnnualView}>
                   <LineChart size={16} />
-                  See annual insights
+                  See the year on the Dashboard
                 </button>
               </div>
             </section>
@@ -4398,35 +4295,6 @@ function App() {
               }}
               onImport={() => csvInputRef.current?.click()}
             />
-          )}
-
-          {activeView === "insights" && (
-            <section className="viewStack" aria-label="Insights">
-              <div className="pageHeader compactHeader">
-                <div>
-                  <h2>Insights</h2>
-                  <p>Cash flow, top categories, and trends for {formatMonth(ledger.selectedMonth)}.</p>
-                </div>
-                <div className="pageHeaderSide">
-                  <LayoutEditButton page="insights" editing={layoutEditing === "insights"} onToggle={() => setLayoutEditing((current) => (current === "insights" ? null : "insights"))} t={t} />
-                </div>
-              </div>
-
-              <WidgetGrid
-                page="insights"
-                region={region}
-                layout={insightsLayout}
-                editing={layoutEditing === "insights"}
-                hidden={hiddenWidgets(insightsLayout, "insights", region)}
-                render={renderInsightsWidget}
-                onMove={(id, delta) => changeLayout("insights", "move", (layout) => moveWidget(layout, id, delta))}
-                onDrop={(id, targetId, edge) => changeLayout("insights", "move", (layout) => moveWidgetBefore(layout, id, targetId, edge))}
-                onResize={(id, direction) => changeLayout("insights", "resize", (layout) => cycleWidgetSize(layout, "insights", id, direction))}
-                onRemove={(id) => changeLayout("insights", "remove", (layout) => removeWidget(layout, id))}
-                onAdd={(id) => changeLayout("insights", "add", (layout) => addWidget(layout, "insights", region, id))}
-                onReset={() => changeLayout("insights", "reset", () => defaultLayout("insights", region))}
-              />
-            </section>
           )}
 
           {activeView === "settings" && (

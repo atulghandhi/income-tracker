@@ -280,7 +280,7 @@ export function SubscriptionsView({
   );
 }
 
-// ─── Widget (Insights & Dashboard) ───────────────────────────────────────────
+// ─── Widget (Dashboard) ──────────────────────────────────────────────────────
 // A glance at the same report: yearly and monthly totals, what needs a look, and the biggest
 // items. Everything in it leads to the Subscriptions page.
 

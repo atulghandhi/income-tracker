@@ -79,7 +79,7 @@ test("wizard opens for a fresh user, applies entered data, and lands on a filled
   await page.reload();
   await expect(page.getByLabel("Accounts", { exact: true }).getByRole("heading", { name: "Accounts", exact: true })).toBeVisible({ timeout: 10_000 });
   await expect(wizard(page)).toBeHidden();
-  await page.getByRole("button", { name: "Dashboard" }).click();
+  await page.getByRole("button", { name: "Dashboard", exact: true }).click();
   await expect(dashboardHeading(page)).toBeVisible();
   await expect(wizard(page)).toBeHidden();
 });
@@ -125,7 +125,7 @@ test("the close button exits setup immediately and the checklist links into the 
   await page.locator("#add-income-source").fill("Salary");
   await page.getByLabel("Income amount").fill("2000");
   await page.getByLabel("Income amount").press("Enter");
-  await page.getByRole("button", { name: "Dashboard" }).click();
+  await page.getByRole("button", { name: "Dashboard", exact: true }).click();
   await expect(page.locator(".gettingStarted")).toContainText("1 of 6 done");
   await expect(page.locator(".gsItem", { hasText: "Add your income" })).toBeDisabled();
 

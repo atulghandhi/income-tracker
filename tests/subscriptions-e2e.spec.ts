@@ -2,14 +2,14 @@ import { expect, test, type Page } from "@playwright/test";
 
 // The Subscriptions page end to end: a year of bank rows comes in through the CSV importer, the
 // page finds the subscriptions, bills and renewals in them, and the user's decisions (cancel,
-// reactivate, delete, restore) stick. Also the Insights widget that leads here and the page URL.
+// reactivate, delete, restore) stick. Also the Dashboard widget that leads here and the page URL.
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem("hasSeenLanding", "1");
     localStorage.setItem("onboardingComplete", "1");
     localStorage.setItem("gettingStartedDismissed", "1");
-    localStorage.setItem("tutorialSeenPages", JSON.stringify(["ledger", "dashboard", "accounts", "goals", "subscriptions", "insights", "settings"]));
+    localStorage.setItem("tutorialSeenPages", JSON.stringify(["ledger", "dashboard", "accounts", "goals", "subscriptions", "settings"]));
   });
 });
 
@@ -175,10 +175,10 @@ test.describe("subscriptions page", () => {
     await expect(page.locator(".subsList .subsRow", { hasText: "Disney" })).toContainText("Cancelled");
   });
 
-  test("the Insights widget summarises the same report and opens the page", async ({ page }) => {
+  test("the Dashboard widget summarises the same report and opens the page", async ({ page }) => {
     await importStatement(page);
-    await tap(page.locator(".sideNav").getByRole("button", { name: "Insights", exact: true }));
-    const widget = page.locator('[data-widget-id="recurring"]');
+    await tap(page.locator(".sideNav").getByRole("button", { name: "Dashboard", exact: true }));
+    const widget = page.locator('[data-widget-id="subscriptions"]');
     await expect(widget).toContainText("Subscriptions & regular payments");
     await expect(widget).toContainText("Netflix went up £10.99 → £12.99");
     await expect(widget.locator(".subsWidgetRow", { hasText: "Netflix" })).toContainText("£12.99/mo");

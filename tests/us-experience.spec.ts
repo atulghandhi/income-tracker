@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-async function openView(page: Page, name: "Dashboard" | "Ledger" | "Accounts" | "Pay & tax" | "Paycheck & tax" | "Goals" | "Insights" | "Settings") {
+async function openView(page: Page, name: "Dashboard" | "Ledger" | "Accounts" | "Pay & tax" | "Paycheck & tax" | "Goals" | "Settings") {
   await page.locator(".sideNav").getByRole("button", { name, exact: true }).click();
 }
 
@@ -71,8 +71,13 @@ test.describe("US experience", () => {
     await expect(page).toHaveURL(/\/accounts$/);
     await expect(page.getByLabel("Accounts", { exact: true }).getByRole("heading", { name: "Accounts", exact: true })).toBeVisible();
     // A deep link opens the page directly.
+    await page.goto("/goals");
+    await expect(page.getByLabel("Goals", { exact: true }).getByRole("heading", { name: "Goals", exact: true })).toBeVisible();
+    // Insights is part of the Dashboard now: an old link lands there and the address follows.
     await page.goto("/insights");
-    await expect(page.getByLabel("Insights", { exact: true }).getByRole("heading", { name: "Insights", exact: true })).toBeVisible();
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page.getByLabel("Dashboard", { exact: true }).getByRole("heading", { name: "Dashboard", exact: true })).toBeVisible();
+    await expect(page.locator(".sideNav").getByRole("button", { name: "Insights", exact: true })).toHaveCount(0);
   });
 
   test("a 401(k) with an employer match feeds the gross-to-net estimate, the retirement widget and the forecast", async ({ page }) => {
@@ -130,8 +135,8 @@ test.describe("US experience", () => {
     await expect(retirement).toContainText("$5,100 / $24,500");
     // Contributing under the match cap would have been flagged; at 6% nothing is left behind.
     await expect(retirement.getByText(/free money left behind/)).toHaveCount(0);
-    // The credit estimate reads on the FICO scale, and Insights charts where the paycheck goes.
-    await openView(page, "Insights");
+    // The credit estimate reads on the FICO scale, and the Dashboard charts where the paycheck goes.
+    await openView(page, "Dashboard");
     await expect(page.locator(".healthPanel")).toContainText("FICO");
     await expect(page.locator(".creditPanel")).toContainText("VantageScore");
     await expect(page.locator(".paycheckPanel")).toContainText("Federal income tax");
@@ -177,7 +182,28 @@ test.describe("US experience", () => {
   test("the dashboard layout can be rearranged, resized, trimmed and extended, and survives a reload", async ({ page }) => {
     await switchToUs(page);
     const grid = page.getByLabel("dashboard widgets");
-    await expect(grid.locator(".widgetCell")).toHaveCount(7);
+    const defaults = [
+      "snapshot",
+      "cash-flow",
+      "health",
+      "spending-pace",
+      "savings-rate",
+      "net-worth",
+      "chart",
+      "categories",
+      "anomalies",
+      "debt-overview",
+      "retirement",
+      "paycheck",
+      "credit",
+      "payoff",
+      "medical",
+      "loans",
+      "subscriptions",
+      "annual",
+    ];
+    const ids = () => grid.locator(".widgetCell").evaluateAll((cells) => cells.map((cell) => (cell as HTMLElement).dataset.widgetId));
+    await expect.poll(ids).toEqual(defaults);
 
     await page.getByRole("button", { name: "Customize the dashboard layout" }).click();
     await page.getByRole("button", { name: "Remove Net worth outlook" }).click();
@@ -186,18 +212,38 @@ test.describe("US experience", () => {
     await page.getByRole("button", { name: "Add Goals widget" }).click();
     await page.getByRole("button", { name: "Finish customizing the dashboard" }).click();
 
-    const ids = () => grid.locator(".widgetCell").evaluateAll((cells) => cells.map((cell) => (cell as HTMLElement).dataset.widgetId));
-    await expect.poll(ids).toEqual(["snapshot", "retirement", "take-home", "loans", "medical", "accounts-imports", "goals"]);
+    const edited = [...defaults.filter((id) => id !== "net-worth" && id !== "loans")];
+    edited.splice(edited.indexOf("medical"), 0, "loans");
+    edited.push("goals");
+    await expect.poll(ids).toEqual(edited);
     await expect(grid.locator('[data-widget-id="snapshot"]')).toHaveClass(/size-l/);
 
     await page.reload();
-    await expect.poll(ids).toEqual(["snapshot", "retirement", "take-home", "loans", "medical", "accounts-imports", "goals"]);
+    await expect.poll(ids).toEqual(edited);
     await expect(grid.locator('[data-widget-id="snapshot"]')).toHaveClass(/size-l/);
 
     // Reset puts the default back.
     await page.getByRole("button", { name: "Customize the dashboard layout" }).click();
     await page.getByRole("button", { name: "Reset layout" }).click();
-    await expect.poll(ids).toEqual(["snapshot", "net-worth", "retirement", "take-home", "medical", "loans", "accounts-imports"]);
+    await expect.poll(ids).toEqual(defaults);
+  });
+
+  test("layouts saved for the old Dashboard and Insights pages are merged into one", async ({ page }) => {
+    await switchToUs(page);
+    // The ledger saves 240ms after a change; let the US choice land before reloading.
+    await page.waitForTimeout(800);
+    await page.reload();
+    await expect(page.getByLabel("Country", { exact: true })).toHaveValue("US");
+    await page.evaluate(() => {
+      localStorage.setItem("it_layout_dashboard_us", JSON.stringify({ version: 1, widgets: [{ id: "net-worth", size: "m" }, { id: "accounts-imports", size: "xl" }] }));
+      localStorage.setItem("it_layout_insights_us", JSON.stringify({ version: 1, widgets: [{ id: "summary", size: "xl" }, { id: "health", size: "s" }, { id: "limits", size: "m" }] }));
+    });
+    await page.reload();
+    const grid = page.getByLabel("dashboard widgets");
+    const ids = () => grid.locator(".widgetCell").evaluateAll((cells) => cells.map((cell) => (cell as HTMLElement).dataset.widgetId));
+    await expect.poll(ids).toEqual(["net-worth", "debt-overview", "snapshot", "health", "retirement"]);
+    expect(await page.evaluate(() => localStorage.getItem("it_layout_insights_us"))).toBeNull();
+    expect(JSON.parse((await page.evaluate(() => localStorage.getItem("it_layout_dashboard_us"))) ?? "{}").version).toBe(2);
   });
 });
 
@@ -207,9 +253,10 @@ test.describe("UK parity", () => {
   test("workplace pensions, ISA allowances and student-loan plans work for UK users without changing the default dashboard", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByLabel("Country", { exact: true })).toHaveValue("GB");
-    // The UK dashboard keeps its three panels; the new widgets wait in the tray.
+    // The UK dashboard carries no US panels and no pension panel by default; those wait in the tray.
     const grid = page.getByLabel("dashboard widgets");
-    await expect(grid.locator(".widgetCell")).toHaveCount(3);
+    await expect(grid.locator(".widgetCell")).toHaveCount(13);
+    await expect(grid.locator('[data-widget-id="retirement"]')).toHaveCount(0);
     await page.getByRole("button", { name: "Customise the dashboard layout" }).click();
     await expect(page.getByRole("button", { name: "Add Pensions & ISAs widget" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Add Medical spending widget" })).toHaveCount(0);
@@ -263,7 +310,7 @@ test.describe("sample data and tutorials", () => {
     await expect(page.locator(".medicalPanel")).toContainText("Deductible");
     await expect(page.locator(".loansPanel")).toContainText("Mortgage");
     await expect(page.locator(".loansPanel")).toContainText("Federal student loan");
-    await expect(page.locator(".takeHomePanel")).toContainText("Net per month");
+    await expect(page.locator(".paycheckPanel")).toContainText("Take-home pay");
     await expect(page.locator(".summaryStrip")).toContainText("$5,450");
     await openView(page, "Accounts");
     await expect(page.getByLabel("Balance for Chase Sapphire Visa", { exact: true })).toHaveValue("1850");
@@ -287,7 +334,7 @@ test.describe("sample data and tutorials", () => {
     await expect(tutorial).toContainText("401(k), Roth IRA, HSA, 529");
     await expect(tutorial).toContainText("Plan details");
     await tutorial.getByRole("button", { name: "Skip tutorial" }).click();
-    await openView(page, "Insights");
+    await openView(page, "Dashboard");
     await page.locator(".sideNav").getByRole("button", { name: /Tutorial/ }).click();
     await expect(tutorial).toContainText("FICO and VantageScore");
     await tutorial.getByRole("button", { name: "Skip tutorial" }).click();

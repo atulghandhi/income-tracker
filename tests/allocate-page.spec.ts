@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 // The Allocate page end to end: the sidebar entry and URL, the plan built from the sample ledger,
 // switching priorities (and having the choice survive a reload), including a debt that is left out
-// by default, and the Debt payoff plan widget on Insights and in the Dashboard tray.
+// by default, and the Debt payoff plan widget on the Dashboard.
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -102,23 +102,21 @@ test.describe("Allocate page", () => {
     await expect(view.getByRole("link", { name: /StepChange/ })).toHaveAttribute("href", /stepchange/);
   });
 
-  test("the Debt payoff plan widget sits on Insights by default and can be added to the Dashboard", async ({ page }) => {
-    await page.goto("/insights?sample=uk");
+  test("the Debt payoff plan widget is on the Dashboard by default and compares strategies when wide", async ({ page }) => {
+    await page.goto("/dashboard?sample=uk");
     const widget = page.locator(".payoffPanel");
     await expect(widget).toContainText("Debt payoff plan", { timeout: 20_000 });
     await expect(widget).toContainText("Least interest");
     await expect(widget).toContainText("Interest saved");
     await expect(widget).toContainText("Today: split the £2,500 lump sum");
+    // At half width it is the chosen plan at a glance; made wider it compares every strategy.
+    await expect(widget.locator(".compareTable")).toHaveCount(0);
+    await page.getByRole("button", { name: "Customise the dashboard layout" }).click();
+    await page.getByRole("button", { name: "Make Debt payoff plan wider" }).click();
+    await page.getByRole("button", { name: "Finish customising the dashboard" }).click();
     await expect(widget.locator(".compareTable")).toContainText("Quick wins");
     await widget.getByRole("button", { name: "Open Allocate" }).click();
     await expect(page).toHaveURL(/\/allocate$/);
-
-    await page.locator(".sideNav").getByRole("button", { name: "Dashboard", exact: true }).click();
-    await expect(page.locator(".payoffPanel")).toHaveCount(0);
-    await page.getByRole("button", { name: "Customise the dashboard layout" }).click();
-    await page.getByRole("button", { name: "Add Debt payoff plan widget" }).click();
-    await page.getByRole("button", { name: "Finish customising the dashboard" }).click();
-    await expect(page.locator(".payoffPanel")).toContainText("Debt-free");
   });
 
   test("a UK lump sum can be marked taxable and the tax held back is worked out from the salary band", async ({ page }) => {

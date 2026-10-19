@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 // Core ledger behaviour in the app shell: keyboard-first entry, quick add,
-// grouping, CSV review, accounts and insights. Skips the marketing landing and
+// grouping, CSV review, accounts and the dashboard's insight widgets. Skips the marketing landing and
 // the first-run wizard so each test starts on an empty dashboard.
 
 test.beforeEach(async ({ page }) => {
@@ -35,7 +35,7 @@ async function tap(locator: Locator) {
   await locator.page().mouse.click(box!.x + box!.width / 2, box!.y + box!.height / 2);
 }
 
-async function openView(page: Page, name: "Dashboard" | "Ledger" | "Accounts" | "Goals" | "Insights" | "Settings") {
+async function openView(page: Page, name: "Dashboard" | "Ledger" | "Accounts" | "Goals" | "Settings") {
   await page.locator(".sideNav").getByRole("button", { name, exact: true }).click();
 }
 
@@ -414,15 +414,16 @@ test.describe("Ledger", () => {
     await expect(page.getByText("Start with income")).toBeVisible();
 
     await openView(page, "Dashboard");
-    const outlook = page.locator(".flowPanel");
+    const outlook = page.locator('[data-widget-id="net-worth"]');
     await expect(outlook.getByRole("heading", { name: "Net worth outlook" })).toBeVisible();
     const horizon = outlook.getByRole("tablist", { name: "Net worth horizon" });
     await horizon.getByRole("button", { name: "5 years" }).click();
     await expect(horizon.getByRole("button", { name: "5 years" })).toHaveClass(/selected/);
     await horizon.getByRole("button", { name: "2 years" }).click();
     await expect(horizon.getByRole("button", { name: "2 years" })).toHaveClass(/selected/);
-    await expect(page.getByRole("heading", { name: "Accounts and imports" })).toBeVisible();
-    await expect(page.getByText("£1,200").first()).toBeVisible();
+    // The card's balance shows in Credit & debt; the old "Accounts and imports" card is gone.
+    await expect(page.locator('[data-widget-id="accounts-imports"]')).toHaveCount(0);
+    await expect(page.locator('[data-widget-id="debt-overview"]').getByText("£1,200").first()).toBeVisible();
   });
 
   test("loans stay out of card utilization and 0% months count down as time passes", async ({ page }) => {
@@ -629,7 +630,7 @@ test.describe("Ledger", () => {
     await addExpense(page, "Food", 600);
     await addDebtAccount(page, { name: "Everyday Visa", balance: 2850, limit: 3000, apr: 24.9, promoMonths: 0, payment: 50, dueDay: 18 });
 
-    await openView(page, "Insights");
+    await openView(page, "Dashboard");
     await expect(page.getByRole("heading", { name: "Health score" })).toBeVisible();
     await expect(page.getByText("Estimated credit score")).toBeVisible();
     await page.getByLabel("How health score is calculated").hover();
@@ -640,7 +641,7 @@ test.describe("Ledger", () => {
     await expect(charts.getByRole("button", { name: "Cash flow volatility" })).toHaveAttribute("aria-pressed", "true");
     await charts.getByRole("button", { name: "Net worth outlook" }).click();
     await expect(charts.getByRole("button", { name: "Net worth outlook" })).toHaveAttribute("aria-pressed", "true");
-    const horizon = page.getByRole("tablist", { name: "Net worth horizon" });
+    const horizon = page.locator('[data-widget-id="chart"]').getByRole("tablist", { name: "Net worth horizon" });
     await horizon.getByRole("button", { name: "5 years" }).click();
     await expect(horizon.getByRole("button", { name: "5 years" })).toHaveClass(/selected/);
     await charts.getByRole("button", { name: "Monthly cash flow" }).click();
@@ -653,7 +654,7 @@ test.describe("Ledger", () => {
     await looks.getByRole("radio", { name: "Particle stream" }).click();
     await expect(looks.getByRole("radio", { name: "Particle stream" })).toHaveAttribute("aria-checked", "true");
     await openView(page, "Ledger");
-    await openView(page, "Insights");
+    await openView(page, "Dashboard");
     await expect(looks.getByRole("radio", { name: "Particle stream" })).toHaveAttribute("aria-checked", "true");
 
     const anomalies = page.locator('[data-widget-id="anomalies"]');

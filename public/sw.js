@@ -13,8 +13,9 @@
 //     revalidate.
 //   - Cross-origin requests (Supabase, analytics, fonts): never intercepted.
 
-const VERSION = "it-sw-v6-pay-subscriptions-allocate";
+const VERSION = "it-sw-v7-one-dashboard";
 // App pages have their own URLs (see src/routes.ts); offline they are served from the cached shell.
+// /insights is a retired page: old bookmarks still open the app, which moves them to /dashboard.
 const APP_ROUTES = ["/", "/dashboard", "/ledger", "/accounts", "/pay", "/goals", "/subscriptions", "/allocate", "/insights", "/settings"];
 const SHELL_CACHE = `${VERSION}-shell`;
 const ASSET_CACHE = `${VERSION}-assets`;

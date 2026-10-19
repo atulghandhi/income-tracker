@@ -34,7 +34,7 @@ export function tierFor(width: number): WidgetTier {
 export type WidgetActions = {
   patchInsights: (updater: (current: InsightsState) => InsightsState) => void;
   markRecurring: (candidate: RecurrenceCandidate) => void;
-  navigate: (view: "dashboard" | "ledger" | "accounts" | "goals" | "insights" | "settings") => void;
+  navigate: (view: "dashboard" | "ledger" | "accounts" | "goals" | "settings") => void;
   setSavingsTarget: (value: number) => void;
   toast: (message: string) => void;
 };

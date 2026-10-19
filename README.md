@@ -32,11 +32,12 @@ say) gets a clear message; pasting the rows still works as a fallback.
 
 The take-home estimate has its own **Pay & tax** page (`/pay`; "Paycheck & tax" in the US): gross salary
 in, net pay out, with paycheck deductions from your accounts and a one-click "use as income". The
-dashboard carries a compact card and Insights charts where the pay goes.
+Dashboard can carry a compact take-home card and a chart of where the pay goes.
 
-Each page has its own URL (`/dashboard`, `/ledger`, `/accounts`, `/pay`, `/goals`, `/subscriptions`, `/allocate`, `/insights`,
-`/settings`), so a refresh stays put. The Dashboard and Insights pages are customisable: **Customise**
-lets you drag, resize, remove and add widgets; the arrangement is saved per device and region.
+Each page has its own URL (`/dashboard`, `/ledger`, `/accounts`, `/pay`, `/goals`, `/subscriptions`, `/allocate`,
+`/settings`), so a refresh stays put; the old `/insights` address opens the Dashboard. The Dashboard is
+customisable: **Customise** lets you drag, resize, remove and add widgets; the arrangement is saved per
+device and region.
 
 **Allocate** (`/allocate`) decides where spare money goes. It takes the ledger's spare-per-month figure
 and an optional one-off lump sum (a bonus, a refund) and splits them between the debts on Accounts, a
@@ -52,15 +53,15 @@ and can be switched in. UK users can mark a lump sum as taxable (freelance incom
 interest, dividends or a capital gain): the tax to set aside is worked out from the salary already
 taxed through PAYE and anything already received this tax year, held back before anything is
 allocated, and shown with its Self Assessment due date (`src/lumpSumTax.ts`, pinned by
-`tests/lumpSumTax.spec.ts`). A **Debt payoff plan** widget on Insights (and in the Dashboard tray) shows the
-chosen plan's headline figures and this month's move. The page is an illustration from the user's own
+`tests/lumpSumTax.spec.ts`). A **Debt payoff plan** widget on the Dashboard shows the
+chosen plan's headline figures and this month's move, and compares every strategy when it is made wide. The page is an illustration from the user's own
 figures, not advice: it says so, carries the standard assumptions, and links free debt help (MoneyHelper,
 StepChange, National Debtline and Citizens Advice in the UK; the CFPB and NFCC in the US).
 
 ## Subscriptions
 
 The Subscriptions page (`/subscriptions`, also reachable from the "Subscriptions & regular payments"
-widget on Insights or the Dashboard) lists everything the ledger shows being paid for repeatedly,
+widget on the Dashboard) lists everything the ledger shows being paid for repeatedly,
 with no setup: each payee is grouped, its cadence is fitted (weekly, fortnightly, 4-weekly — 13 a
 year — monthly, quarterly, half-yearly, yearly) and its cost per year worked out from the current
 price. Detection runs locally in `src/subscriptions.ts` and handles the awkward cases on purpose:
@@ -128,7 +129,7 @@ layout tweak is a code change with a diff.
 
 `npm test` covers the app; the static `/public` pages have their own run (`npm run test:seo`)
 because they must be served from the built output rather than the dev server's SPA fallback.
-`tests/insightsData.spec.ts` pins the numbers the money-flow family of Insights widgets draws.
+`tests/insightsData.spec.ts` pins the numbers the money-flow family of Dashboard widgets draws.
 
 `npm test` first checks that Playwright's Chromium is installed (and downloads it if it can).
 Sandboxes that cannot download but ship pinned builds (in `PLAYWRIGHT_BROWSERS_PATH`) work too:
@@ -136,11 +137,13 @@ Sandboxes that cannot download but ship pinned builds (in `PLAYWRIGHT_BROWSERS_P
 is set. Run `npm install` first on a fresh checkout — the test and dev commands are local
 binaries, not globals.
 
-## Insights widgets
+## Dashboard widgets
 
-The Insights page uses the same customisable grid as the Dashboard (`src/WidgetGrid.tsx`,
-`src/layout.ts`). Alongside the health score, trends, categories, anomalies and the region panels
-it offers a family of month widgets: a **money flow** (a waterfall, or a sideways particle stream)
+The Dashboard is one customisable grid (`src/WidgetGrid.tsx`, `src/layout.ts`); until 2026-10-19 the
+same kind of grid also ran a separate Insights page, and the first load after that date merges the
+two saved arrangements into one. Alongside the monthly snapshot, the net-worth outlook, the health
+score, trends, categories, anomalies and the region panels (the old "Accounts and imports" card is
+gone: Credit & debt shows the same figures per card) it offers a family of month widgets: a **money flow** (a waterfall, or a sideways particle stream)
 that shows where income came from and went, **spending pace**, **savings rate**, **versus last
 month**, **upcoming payments**, a **spending calendar**, **credit & debt**, a **to-do list** and
 **notes**. They draw from one pure model, `src/insightsData.ts`, and render through

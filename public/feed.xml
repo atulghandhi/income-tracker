@@ -8,6 +8,13 @@
     <language>en-gb</language>
     <lastBuildDate>Tue, 08 Sep 2026 09:00:00 GMT</lastBuildDate>
     <item>
+      <title>Update: Insights moves onto the Dashboard</title>
+      <link>https://www.theincometracker.com/whats-new.html</link>
+      <guid isPermaLink="true">https://www.theincometracker.com/whats-new.html#2026-10-19-insights-moves-onto-the-dashboard</guid>
+      <pubDate>Mon, 19 Oct 2026 09:00:00 GMT</pubDate>
+      <description>Insights and the Dashboard showed the same kind of thing, so they are now one page. Everything Insights had (the money flow, health score, trends, categories, anomalies, spending pace and the rest) sits on the Dashboard, and Customise arranges all of it together; if you had arranged both pages, your two layouts are combined. Widgets that were on both pages appear once, the Accounts and imports card gives way to Credit &amp; debt, which shows the same debt figures card by card, and an old Insights bookmark opens the Dashboard. Anomaly flags can now be dismissed, and the Debt payoff plan compares every strategy when you make it wide.</description>
+    </item>
+    <item>
       <title>Update: Allocate: debt payoff strategies and lump-sum planning</title>
       <link>https://www.theincometracker.com/whats-new.html</link>
       <guid isPermaLink="true">https://www.theincometracker.com/whats-new.html#2026-10-18-allocate-debt-payoff-strategies-and-lump</guid>
@@ -279,13 +286,6 @@
       <guid isPermaLink="true">https://www.theincometracker.com/compare/monzo-trends-alternative.html</guid>
       <pubDate>Tue, 08 Sep 2026 09:00:00 GMT</pubDate>
       <description>Trends is free inside Monzo and adds one other bank free, more on paid plans. The Income Tracker is free, works with every UK bank via CSV and needs no Monzo account.</description>
-    </item>
-    <item>
-      <title>The Income Tracker vs Plum</title>
-      <link>https://www.theincometracker.com/compare/plum-alternative.html</link>
-      <guid isPermaLink="true">https://www.theincometracker.com/compare/plum-alternative.html</guid>
-      <pubDate>Tue, 08 Sep 2026 09:00:00 GMT</pubDate>
-      <description>Plum links your bank to save and invest automatically, with paid tiers from £3.99 a month and no manual mode. The Income Tracker is a free CSV budget with no bank link.</description>
     </item>
   </channel>
 </rss>

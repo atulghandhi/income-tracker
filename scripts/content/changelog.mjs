@@ -4,6 +4,12 @@
 
 export const CHANGELOG = [
   {
+    date: "2026-10-19",
+    title: "Insights moves onto the Dashboard",
+    body:
+      "Insights and the Dashboard showed the same kind of thing, so they are now one page. Everything Insights had (the money flow, health score, trends, categories, anomalies, spending pace and the rest) sits on the Dashboard, and Customise arranges all of it together; if you had arranged both pages, your two layouts are combined. Widgets that were on both pages appear once, the Accounts and imports card gives way to Credit & debt, which shows the same debt figures card by card, and an old Insights bookmark opens the Dashboard. Anomaly flags can now be dismissed, and the Debt payoff plan compares every strategy when you make it wide.",
+  },
+  {
     date: "2026-10-18",
     title: "Allocate: debt payoff strategies and lump-sum planning",
     body:

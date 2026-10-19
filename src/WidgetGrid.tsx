@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowRight, Check, GripVertical, Minus, Plus, RotateCcw, Sli
 import { SIZE_LABELS, spanFor, widgetDefinition, type LayoutPage, type PageLayout, type WidgetDefinition, type WidgetSize } from "./layout";
 import type { RegionKey } from "./region";
 
-// The customisable grid behind the Dashboard and Insights pages. In normal use it simply lays the
+// The customisable grid behind the Dashboard. In normal use it simply lays the
 // widgets out; in edit mode each widget grows a toolbar (drag handle, move, resize, remove) and a
 // tray of hidden widgets appears underneath so they can be added back.
 

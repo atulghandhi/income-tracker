@@ -4,7 +4,7 @@ import { contributionLimitGroups, employerMatchShortfalls, limitYear } from "./r
 import type { Account, FinancialSignal, HealthPlan, MonthBudget, TaxProfile } from "./types";
 
 // Signals about the plan details: free employer money not taken, limits exceeded, FSA money about
-// to expire. They join the ledger-based anomalies on the Insights page.
+// to expire. They join the ledger-based anomalies on the Dashboard.
 
 export function buildPlanSignals({
   accounts,

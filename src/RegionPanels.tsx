@@ -508,7 +508,7 @@ export function TakeHomeWidget({
   );
 }
 
-// Insights: a picture of where gross pay goes, built from the estimate on the Pay & tax page.
+// Dashboard: a picture of where gross pay goes, built from the estimate on the Pay & tax page.
 // No inputs here — the numbers live on that page; this just charts them.
 export function PaycheckBreakdownWidget({
   region,

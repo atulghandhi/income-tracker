@@ -27,7 +27,7 @@ import { EmptyState, InfoHint, MoneyInput, NumberInput, PanelTitle, formatDecima
 
 // The Allocate page: where spare money and one-off lump sums go, under the priority the user
 // picks, with every strategy simulated side by side. Also the "Debt payoff plan" widget the
-// Dashboard and Insights pages show. All figures come from allocate.ts; this file only draws.
+// Dashboard shows. All figures come from allocate.ts; this file only draws.
 
 type Localizer = (text: string) => string;
 
@@ -505,7 +505,7 @@ export function AllocateView({
                       <label className="planField">
                         <span className="fieldLabel">
                           Salary before tax (monthly)
-                          <InfoHint label="Salary help" text="Your gross pay each month, taxed through PAYE. It sets which band the lump sum lands in. Taken from Insights › Take-home estimate when you have set a salary there; leave it at 0 if you have none." />
+                          <InfoHint label="Salary help" text="Your gross pay each month, taxed through PAYE. It sets which band the lump sum lands in. Taken from the Pay & tax page when you have set a salary there; leave it at 0 if you have none." />
                         </span>
                         <MoneyInput ariaLabel="Monthly salary before tax" symbol={symbol} value={monthlySalary ? String(monthlySalary) : ""} placeholder="0" privacy={privacy} onChange={(raw) => onChange({ lumpSumTax: { ...lumpTaxSettings, monthlySalary: parseMoney(raw) } })} />
                         {lumpTaxSettings.monthlySalary !== null && taxProfileSalary > 0 && (
@@ -1129,7 +1129,7 @@ export function PayoffWidget({
   formatter: Intl.NumberFormat;
   privacy: boolean;
   t: Localizer;
-  // Insights variant: adds the strategy table.
+  // Wide variant (a large Dashboard widget): adds the strategy table.
   compare?: boolean;
   onOpen: () => void;
   onOpenAccounts: () => void;

@@ -75,8 +75,8 @@ committed payments a year out, card utilisation now and in a year, savings built
 the lump-sum and first-month splits as stacked bars, the payoff order table (with include/exclude
 per debt), the debt-and-savings path against minimums only, the comparison table and bar charts
 for every strategy, the ranked savings destinations, and the notice. The **Debt payoff plan**
-widget (`PayoffWidget`) repeats the headline figures, a sparkline and this month's move on
-Insights (default) and in the Dashboard tray; the Insights variant adds the strategy table.
+widget (`PayoffWidget`) repeats the headline figures, a sparkline and this month's move on the
+Dashboard (on by default); at two-thirds or full width it adds the strategy table.
 
 ## Advice boundary
 
