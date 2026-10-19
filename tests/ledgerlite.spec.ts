@@ -273,6 +273,41 @@ test.describe("Ledger", () => {
     await expect(page.getByRole("button", { name: "Remove rename rule Costa" })).toBeVisible();
   });
 
+  test("the rename-all prompt cannot be confirmed by the Enter keystroke that opened it", async ({ page }) => {
+    // Regression: the prompt used to focus its "Rename all" button the instant it mounted — during
+    // the keydown of the Enter that committed the rename. Chromium then delivered that same
+    // keystroke's keypress to the button and clicked it, so every "Coffee" was renamed before
+    // anyone saw the prompt. The dialog itself must hold focus, and Enter on it must do nothing.
+    await openLedger(page);
+    await addExpense(page, "Coffee", 3);
+    await addExpense(page, "Coffee", 4);
+    const expenseNames = () => inputValues(page, "input[aria-label='Expense name']");
+
+    const first = page.locator("input[aria-label='Expense name']").first();
+    await first.fill("Costa");
+    await first.press("Enter");
+    const prompt = page.getByRole("dialog", { name: "Rename every “Coffee”?" });
+    await expect(prompt).toBeVisible();
+    // Focus sits on the dialog, never on one of its buttons.
+    await expect(prompt).toBeFocused();
+    await expect(prompt.getByRole("button", { name: /Rename all/ })).not.toBeFocused();
+
+    // A further Enter — the tail of the same keystroke, or a nervous extra press — changes nothing:
+    // the prompt stays open and the other Coffee is untouched.
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(300);
+    await expect(prompt).toBeVisible();
+    expect(await expenseNames()).toEqual(expect.arrayContaining(["Costa", "Coffee"]));
+    expect((await expenseNames()).filter((name) => name === "Coffee")).toHaveLength(1);
+
+    // The buttons are still reachable by keyboard, and Escape still dismisses.
+    await page.keyboard.press("Tab");
+    await expect(prompt.getByRole("button", { name: /Rename all/ })).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(prompt).toHaveCount(0);
+    expect((await expenseNames()).filter((name) => name === "Coffee")).toHaveLength(1);
+  });
+
   test("sorts category sections by total and category items by amount", async ({ page }) => {
     await openLedger(page);
     await addExpense(page, "Food low", 10);

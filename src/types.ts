@@ -133,6 +133,26 @@ export type NameRule = {
   updatedAt: string;
 };
 
+// What the user has decided about a detected subscription (see subscriptions.ts). Keyed by the
+// subscription's id (merchant + cadence, plus a price discriminator when one payee has several).
+// Detection itself is never stored — it is recomputed from the ledger — only these decisions are.
+export type SubscriptionPreference = {
+  id: string;
+  // "cancelled" moves it to the cancelled list; "deleted" removes it from the page altogether.
+  status?: "cancelled" | "deleted";
+  cancelledAt?: string; // ISO date
+  // Overrides the detected classification (a gym the app called a bill, say).
+  kind?: "subscription" | "bill";
+  // How many days early or late a payment may land and still count as on time.
+  toleranceDays?: number;
+  // A snapshot of what was cancelled, so the cancelled list can still show it if the ledger rows
+  // behind it are later deleted.
+  label?: string;
+  cadence?: "weekly" | "fortnightly" | "4-weekly" | "monthly" | "quarterly" | "half-yearly" | "annual";
+  price?: number;
+  updatedAt: string;
+};
+
 // Debt sub-types. "loan" is the generic personal loan; mortgages, car finance and student loans
 // are their own types so the app can offer the right fields (amortisation term, repayment plan).
 export type DebtAccountType = "credit-card" | "loan" | "mortgage" | "auto-loan" | "student-loan" | "overdraft" | "other";
@@ -387,6 +407,8 @@ export type LedgerState = {
   categoryRules: CategoryRule[];
   nameRules: NameRule[];
   importBatches: ImportBatch[];
+  // The user's decisions on the subscriptions page: cancelled, removed, reclassified, tolerance.
+  subscriptionPrefs: SubscriptionPreference[];
   privacyMode: boolean;
   // Stage C opt-in: allow sending transaction descriptions (never amounts or
   // identity) to the categorize-batch edge function for AI suggestions.

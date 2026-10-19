@@ -1777,6 +1777,7 @@ textarea:focus,
 .emptyStateHint {
   font-size: 11.5px;
   color: var(--mint);
+  opacity: 0.7;
   letter-spacing: 0.01em;
 }
 
@@ -4776,6 +4777,9 @@ hr {
 }
 
 /* ─── Merge conflict modal ──────────────────────────── */
+/* The dialog takes focus on open (see RenameAllModal); no ring on the panel itself. */
+.mergeModal:focus { outline: none; }
+
 .mergeModal {
   width: min(480px, 100%);
   /* Phones stretch modal backdrops to full height; this dialog stays compact. */
@@ -5406,6 +5410,7 @@ hr {
   font-family: inherit;
   letter-spacing: 0.01em;
   transition: color 130ms ease;
+  opacity: 0.7;
 }
 .viewHomepageBtn:hover {
   color: var(--ink);
@@ -6330,6 +6335,7 @@ hr {
 
 .gsItem:disabled {
   cursor: default;
+  opacity: 0.72;
 }
 
 .gsItem.done {
@@ -6836,6 +6842,7 @@ hr {
 .widgetGrid.isEditing .widgetBody {
   pointer-events: none;
   user-select: none;
+  opacity: 0.92;
 }
 
 .widgetCell.isDragging {
@@ -8769,4 +8776,217 @@ select:not([multiple]):disabled {
   .payGrid {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SUBSCRIPTIONS VIEW
+   Everything paid for repeatedly: summary strip, "needs a look" panel, tabbed
+   list with expandable rows, and the compact widget shared by Insights and
+   the Dashboard. Reads only theme tokens so it restyles with the theme.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* minmax(0, 1fr): a wide row or tab strip scrolls inside its panel instead of widening the page. */
+.subscriptionsView { gap: 22px; grid-template-columns: minmax(0, 1fr); }
+.subscriptionsView > * { min-width: 0; }
+
+.subsAsOf {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px;
+  background: rgba(var(--surface-rgb), 0.6); color: var(--muted);
+  font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 650;
+  white-space: nowrap;
+}
+.subsAsOf svg { color: var(--blue); }
+
+.subsSummary .metricCard { gap: 8px; min-height: 124px; }
+.subsSummary .metricCard strong { font-size: 26px; }
+.subsSummary .metricCard small {
+  color: var(--muted); font-size: 12px; font-family: var(--mono); font-variant-numeric: tabular-nums;
+}
+
+/* Panels on this page size to their content rather than the ledger's 420px floor. */
+.subsAlerts, .subsListPanel, .subsEmptyPanel { min-height: 0; padding: 22px 24px; gap: 16px; }
+.subsEmptyPanel { min-height: 360px; justify-content: center; }
+
+.subsAlertList { display: grid; gap: 8px; }
+.subsAlert {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 14px; border: 1px solid var(--line); border-radius: var(--radius);
+  background: rgba(var(--surface-rgb), 0.6);
+}
+.subsAlert > svg { flex-shrink: 0; color: var(--blue); }
+.subsAlert > div { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.subsAlert strong { color: var(--ink); font-size: 13.5px; }
+.subsAlert span { color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+.subsAlert .commandButton { flex-shrink: 0; min-height: 32px; font-size: 11.5px; padding: 0 12px; }
+.subsAlert.danger { border-color: rgba(var(--red-rgb), 0.32); background: rgba(var(--red-rgb), 0.05); }
+.subsAlert.danger > svg { color: var(--red); }
+.subsAlert.warning { border-color: rgba(var(--amber-rgb), 0.32); background: rgba(var(--amber-rgb), 0.05); }
+.subsAlert.warning > svg { color: var(--amber); }
+.subsAlert.good { border-color: rgba(var(--mint-rgb), 0.3); }
+.subsAlert.good > svg { color: var(--mint); }
+
+.subsListHeading { flex-wrap: wrap; }
+.subsListHeading .tabs button { display: inline-flex; align-items: center; gap: 7px; }
+.subsListHeading .tabs button b {
+  min-width: 20px; padding: 1px 6px; border-radius: 999px;
+  background: rgba(var(--ink-rgb), 0.08); color: var(--muted);
+  font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 11px; font-weight: 760;
+}
+.subsListHeading .tabs button.selected b { background: rgba(var(--blue-rgb), 0.12); color: var(--blue); }
+.subsListTotal { margin: 0; color: var(--muted); font-size: 13px; }
+.subsListTotal strong { color: var(--ink); font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+.subsList { display: flex; flex-direction: column; gap: 6px; }
+.subsRow {
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: rgba(var(--surface-rgb), 0.55);
+  transition: border-color 150ms ease, background 150ms ease;
+}
+.subsRow:hover { border-color: rgba(var(--blue-bright-rgb), 0.3); }
+.subsRow.open { border-color: rgba(var(--blue-bright-rgb), 0.38); background: rgba(var(--surface-rgb), 0.8); }
+.subsRow.status-cancelled, .subsRow.status-stopped { opacity: 0.92; }
+
+.subsRowMain {
+  width: 100%; display: grid; align-items: center; gap: 14px;
+  grid-template-columns: 10px minmax(0, 1.5fr) minmax(0, auto) minmax(120px, 0.8fr) minmax(110px, 0.7fr) 18px;
+  padding: 12px 14px; border: 0; background: none; color: inherit; text-align: left; cursor: pointer;
+  font: inherit;
+}
+.subsRowName { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.subsRowName strong { color: var(--ink); font-size: 14px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.subsRowName em, .subsRowPrice em, .subsRowYear em { color: var(--faint); font-size: 11.5px; font-style: normal; }
+.subsRowBadges { display: flex; flex-wrap: wrap; gap: 5px; justify-content: flex-end; }
+.subsRowPrice, .subsRowYear { display: flex; flex-direction: column; gap: 2px; align-items: flex-end; text-align: right; }
+.subsRowPrice strong, .subsRowYear strong { color: var(--ink); font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 700; }
+.subsRowYear strong { font-size: 15px; }
+.subsRowChevron { display: grid; place-items: center; color: var(--faint); }
+
+.subsBadge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: 999px;
+  font-size: 11px; font-weight: 650; letter-spacing: 0.01em; white-space: nowrap;
+}
+.subsBadge.red   { background: rgba(var(--red-rgb), 0.13); color: var(--red); }
+.subsBadge.amber { background: rgba(var(--amber-rgb), 0.15); color: var(--amber); }
+.subsBadge.mint  { background: rgba(var(--mint-rgb), 0.13); color: var(--mint); }
+.subsBadge.blue  { background: rgba(var(--blue-rgb), 0.12); color: var(--blue); }
+.subsBadge.muted { background: rgba(var(--ink-rgb), 0.07); color: var(--muted); }
+
+.subsDetail {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 24px;
+  padding: 6px 16px 18px; border-top: 1px solid var(--line); margin: 0 0 0;
+  animation: viewIn 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.subsDetail h4 {
+  margin: 14px 0 10px; color: var(--muted);
+  font-family: var(--mono); font-size: 11.5px; font-weight: 760; letter-spacing: 0.04em; text-transform: uppercase;
+}
+.subsHistory { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.subsHistory li {
+  display: flex; align-items: center; gap: 10px; padding: 5px 8px; border-radius: var(--radius-sm);
+  font-size: 13px; color: var(--ink);
+}
+.subsHistory li:nth-child(odd) { background: rgba(var(--ink-rgb), 0.03); }
+.subsHistory li > span { margin-left: auto; font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 650; }
+.subsHistory li em { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-style: normal; font-weight: 650; white-space: nowrap; }
+.subsHistory li em.up { color: var(--red); }
+.subsHistory li em.down { color: var(--mint); }
+.subsHistory li.afterCancel { background: rgba(var(--red-rgb), 0.06); }
+.subsHistory li.subsHistoryMore { color: var(--faint); font-size: 12px; background: none; }
+.subsHistoryDate {
+  background: none; border: 0; padding: 0; color: var(--muted); font: inherit; font-size: 12.5px;
+  cursor: pointer; text-decoration: underline dotted transparent; transition: color 120ms, text-decoration-color 120ms;
+}
+.subsHistoryDate:hover { color: var(--blue); text-decoration-color: currentColor; }
+
+.subsFacts { margin: 0; display: grid; gap: 8px; }
+.subsFacts > div { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 12px; align-items: center; }
+.subsFacts dt { color: var(--muted); font-size: 12px; font-weight: 650; }
+.subsFacts dd { margin: 0; color: var(--ink); font-size: 13px; }
+.subsChoice { display: inline-flex; gap: 3px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--well); }
+.subsChoice button {
+  min-height: 26px; padding: 0 12px; border: 0; border-radius: 999px; background: transparent;
+  color: var(--muted); font-size: 12px; font-weight: 650; cursor: pointer;
+}
+.subsChoice button.selected { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm); }
+.subsToleranceField { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.subsToleranceField select { max-width: 200px; min-height: 32px; font-size: 12.5px; }
+.subsToleranceField span { color: var(--faint); font-size: 11.5px; }
+.subsNotes { margin: 12px 0 0; padding-left: 18px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.subsNotes li + li { margin-top: 3px; }
+.subsMuted { color: var(--muted); font-size: 13px; margin: 0; }
+
+.subsActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; }
+.subsActions .commandButton, .subsActions .quietButton, .subsActions .dangerButton { min-height: 34px; font-size: 11.5px; }
+.subsActions .quietButton { gap: 6px; }
+.subsRemove { margin-left: auto; color: var(--muted); }
+.subsRemove:hover { color: var(--red); border-color: rgba(var(--red-rgb), 0.35); }
+.subsConfirm { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12.5px; }
+.subsConfirm .dangerButton { min-height: 34px; padding: 0 14px; font-size: 11.5px; font-weight: 760; text-transform: uppercase; }
+.subsConfirm .quietButton { min-height: 34px; }
+
+.subsListEmpty { margin: 6px 0 0; color: var(--muted); font-size: 13.5px; line-height: 1.55; }
+.subsDeletedNote { margin: 4px 0 0; color: var(--faint); font-size: 12px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.subsFootnote {
+  display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 0 6px;
+  color: var(--faint); font-size: 12px; line-height: 1.5;
+}
+.subsFootnote svg { flex-shrink: 0; margin-top: 2px; }
+
+/* ── Widget ── */
+.subsWidget { gap: 14px; }
+.subsWidgetOpen { font-size: 12px; font-weight: 700; color: var(--blue); text-transform: none; }
+.subsWidgetStats { margin-top: 4px; }
+.subsWidgetStats div.alert { border-color: rgba(var(--red-rgb), 0.32); }
+.subsWidgetStats div.alert strong { color: var(--red); }
+.subsWidgetAlerts { display: grid; gap: 6px; }
+.subsWidgetAlert {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  padding: 8px 11px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: rgba(var(--surface-rgb), 0.6); color: var(--ink); font: inherit; font-size: 12.5px; text-align: left; cursor: pointer;
+}
+.subsWidgetAlert svg { flex-shrink: 0; color: var(--blue); }
+.subsWidgetAlert.danger { border-color: rgba(var(--red-rgb), 0.3); }
+.subsWidgetAlert.danger svg { color: var(--red); }
+.subsWidgetAlert.warning { border-color: rgba(var(--amber-rgb), 0.3); }
+.subsWidgetAlert.warning svg { color: var(--amber); }
+.subsWidgetAlert:hover { background: rgba(var(--ink-rgb), 0.05); }
+.subsWidgetRow { width: 100%; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.subsWidgetRow .subscriptionName { text-align: left; }
+.subsWidgetRow > strong { color: var(--ink); font-family: var(--mono); font-size: 13px; }
+.subsWidgetYear { min-width: 88px; text-align: right; color: var(--muted); font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 12px; font-style: normal; }
+.subsWidgetMore { align-self: flex-start; gap: 6px; font-size: 12px; }
+
+/* Narrow widget sizes stack the price columns. */
+.widgetCell.size-m .subsWidgetStats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.widgetCell.size-m .subsWidgetYear { display: none; }
+
+@media (max-width: 900px) {
+  .subsRowMain { grid-template-columns: 10px minmax(0, 1.4fr) minmax(0, auto) 18px; grid-template-areas: "dot name price chev" "dot badges year chev"; row-gap: 6px; column-gap: 10px; }
+  .subsRowName strong { white-space: normal; overflow-wrap: anywhere; }
+  .subsRowName em { white-space: normal; }
+  .subsRowMain > .swatch { grid-area: dot; }
+  .subsRowName { grid-area: name; }
+  .subsRowBadges { grid-area: badges; justify-content: flex-start; }
+  .subsRowPrice { grid-area: price; }
+  .subsRowYear { grid-area: year; }
+  .subsRowChevron { grid-area: chev; }
+  .subsDetail { grid-template-columns: 1fr; gap: 8px; }
+  .subsFacts > div { grid-template-columns: 100px minmax(0, 1fr); }
+}
+
+@media (max-width: 560px) {
+  .subsAlert { flex-wrap: wrap; }
+  .subsAlert > div { flex-basis: calc(100% - 27px); }
+  .subsAlert .commandButton { margin-left: 27px; }
+  .subsRemove, .subsConfirm { margin-left: 0; }
+}
+
+@media (max-width: 680px) {
+  /* The tab strip scrolls sideways inside the panel rather than widening the page. */
+  .subsListHeading { min-width: 0; }
+  .subsListHeading .tabs { flex: 1 1 100%; min-width: 0; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .subsListHeading .tabs::-webkit-scrollbar { display: none; }
+  .subsListHeading .tabs button { white-space: nowrap; flex-shrink: 0; }
 }

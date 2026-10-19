@@ -77,6 +77,7 @@ import {
   DEFAULT_INVESTMENT_RETURN,
   formatMonth,
   getCurrencyFormatter,
+  getPreciseCurrencyFormatter,
   getCurrencySymbol,
   getMonthKey,
   isValidMonthKey,
@@ -107,7 +108,19 @@ import {
 } from "./accountFlow";
 import { goalPlanInputs, linkSavingsTransfers, syncLinkedGoals } from "./accountLinks";
 import { matchDebtPaymentRows, skipScheduledPayment, syncScheduledDebtPayments } from "./debtSync";
-import { applyRecurringFlag, detectSubscriptions, findMissedRecurring, reconcileSeededEntries, suggestRecurringFlags, type RecurrenceCandidate } from "./recurrence";
+import { reconcileSeededEntries } from "./recurrence";
+import {
+  deleteSubscription,
+  detectSubscriptions,
+  markSubscriptionCancelled,
+  normalizeSubscriptionPrefs,
+  reactivateSubscription,
+  restoreDeletedSubscriptions,
+  setSubscriptionKind,
+  setSubscriptionRecurring,
+  setSubscriptionTolerance,
+  type Subscription,
+} from "./subscriptions";
 import { aiCategorizeRows, applyAiSuggestions, isAiCategorizationAvailable, testAiConnection } from "./aiCategorize";
 import { bucketCount, identifyAnalytics, track } from "./analytics";
 import { DebtRemindersPanel, InstallBanner, MonthlyReminderPanel, NewMonthNudge } from "./RetentionPanels";
@@ -142,6 +155,7 @@ import {
   type BankConnection,
 } from "./feeds";
 import { GoalsView } from "./GoalsView";
+import { SubscriptionsView, SubscriptionsWidget } from "./SubscriptionsView";
 import {
   accountClassOptions,
   accountTypeOption,
@@ -376,6 +390,22 @@ const TUTORIALS_GB: Record<AppView, PageTutorial> = {
       },
     ],
   },
+  subscriptions: {
+    title: "Everything you pay for repeatedly",
+    badge: "Subscriptions",
+    steps: [
+      {
+        heading: "",
+        bullets: [
+          "Subscriptions, bills and renewals are detected from your ledger — nothing to set up.",
+          "Each one shows what it costs per year; 4-weekly payments count 13 times, not 12.",
+          "Price rises are flagged with the extra cost per year. Charges in another currency wobble with the exchange rate and are not flagged.",
+          "Yearly renewals show their next date. Anything that stops being paid moves to Cancelled — or mark it cancelled yourself, and delete it from there.",
+          "Open a row for its payment history, to widen the on-time window, or to say it is not a subscription.",
+        ],
+      },
+    ],
+  },
   insights: {
     title: "Spot the trends",
     badge: "Insights",
@@ -516,6 +546,22 @@ const TUTORIALS_US: Record<AppView, PageTutorial> = {
           "Charts compare every strategy against paying minimums only: interest, debt-free date, payments and card utilization.",
           "Choose where savings go too — highest safe APY, highest expected return, tax-advantaged accounts or your goals.",
           "Illustrations from your figures, not advice — free credit counseling is linked at the bottom.",
+        ],
+      },
+    ],
+  },
+  subscriptions: {
+    title: "Everything you pay for repeatedly",
+    badge: "Subscriptions",
+    steps: [
+      {
+        heading: "",
+        bullets: [
+          "Subscriptions, bills and renewals are detected from your ledger — nothing to set up.",
+          "Each one shows what it costs per year; every-4-weeks payments count 13 times, not 12.",
+          "Price increases are flagged with the extra cost per year. Charges in another currency move with the exchange rate and are not flagged.",
+          "Annual renewals show their next date. Anything that stops being paid moves to Canceled — or mark it canceled yourself, and delete it from there.",
+          "Open a row for its payment history, to widen the on-time window, or to say it is not a subscription.",
         ],
       },
     ],
@@ -833,6 +879,8 @@ function App() {
 
   const currentMonth = ledger.months[ledger.selectedMonth] ?? seedMonthFromPrevious();
   const moneyFormatter = useMemo(() => getCurrencyFormatter(ledger.currency), [ledger.currency]);
+  // Prices to the penny, for subscriptions where £10.99 → £12.99 is the whole story.
+  const preciseFormatter = useMemo(() => getPreciseCurrencyFormatter(ledger.currency), [ledger.currency]);
   const currencySymbol = useMemo(() => getCurrencySymbol(ledger.currency), [ledger.currency]);
   const projection = useMemo(() => calculateProjection(currentMonth), [currentMonth]);
   // Debt balances rolled forward from their snapshot month to today, and 0%/intro windows
@@ -1000,12 +1048,8 @@ function App() {
     [currentMonth],
   );
   const showSeededBanner = seededEntryCount > 0 && !seededBannerDismissed.has(ledger.selectedMonth);
-  const detectedSubscriptions = useMemo(() => detectSubscriptions(ledger), [ledger]);
-  const recurringSuggestions = useMemo(() => suggestRecurringFlags(ledger).slice(0, 5), [ledger]);
-  const missedRecurring = useMemo(
-    () => findMissedRecurring(ledger, new Date().toISOString().slice(0, 10)).slice(0, 4),
-    [ledger],
-  );
+  // Subscriptions, bills and renewals detected from the ledger, with the user's decisions applied.
+  const subscriptionReport = useMemo(() => detectSubscriptions(ledger), [ledger]);
   // Learned (non-transfer) rules with live match counts, for the hygiene panel.
   const learnedRules = useMemo(() => {
     const rules = ledger.categoryRules.filter((rule) => rule.kind !== "transfer");
@@ -1763,10 +1807,10 @@ function App() {
     setToast(entry?.seededFrom ? "Removed — won’t auto-add next month" : "Expense removed");
   }
 
-  function markCandidateRecurring(candidate: RecurrenceCandidate) {
-    updateLedger((current) => applyRecurringFlag(current, candidate));
-    setToast(`${candidate.label} marked recurring — it now feeds the forecast`);
-    track("recurring_marked", { cadence: candidate.cadence });
+  function cancelSubscription(subscription: Subscription, cancelledAt: string) {
+    updateLedger((current) => markSubscriptionCancelled(current, subscription, cancelledAt));
+    setToast(t(`${subscription.label} marked cancelled — it won't be copied into new months`));
+    track("subscription_cancelled", { cadence: subscription.cadence, detected: subscription.status === "stopped" });
   }
 
   function addAccount() {
@@ -3022,6 +3066,8 @@ function App() {
         return <GoalsWidget goals={ledger.goals} goalSequence={goalSequence} formatter={moneyFormatter} privacy={ledger.privacyMode} onOpenGoals={() => setActiveView("goals")} />;
       case "payoff":
         return <PayoffWidget comparison={allocationPlan} settings={ledger.allocation} formatter={moneyFormatter} privacy={ledger.privacyMode} t={t} onOpen={() => setActiveView("allocate")} onOpenAccounts={() => setActiveView("accounts")} />;
+      case "subscriptions":
+        return <SubscriptionsWidget report={subscriptionReport} formatter={moneyFormatter} preciseFormatter={preciseFormatter} privacy={ledger.privacyMode} t={t} onOpen={() => setActiveView("subscriptions")} />;
       default:
         return null;
     }
@@ -3174,74 +3220,7 @@ function App() {
       case "payoff":
         return <PayoffWidget comparison={allocationPlan} settings={ledger.allocation} formatter={moneyFormatter} privacy={ledger.privacyMode} t={t} compare onOpen={() => setActiveView("allocate")} onOpenAccounts={() => setActiveView("accounts")} />;
       case "recurring":
-        return (
-          <section className="miniPanel subscriptionsPanel" aria-label="Recurring payments">
-            <PanelTitle
-              title="Recurring payments detected"
-              icon={<Repeat size={16} />}
-              action={
-                <InfoHint
-                  label="How recurring payments are detected"
-                  text="Detected locally from your own ledger: the same merchant on a steady cadence with a steady amount. Nothing leaves this device."
-                />
-              }
-            />
-            {detectedSubscriptions.length ? (
-              <>
-                <div className="subscriptionSummary">
-                  <span>
-                    {detectedSubscriptions.length} recurring {detectedSubscriptions.length === 1 ? "payment" : "payments"} ·{" "}
-                    <strong className={ledger.privacyMode ? "masked" : ""}>
-                      {moneyFormatter.format(detectedSubscriptions.reduce((sum, candidate) => sum + candidate.monthlyEquivalent, 0))}
-                    </strong>{" "}
-                    / month
-                  </span>
-                </div>
-                <div className="subscriptionList">
-                  {detectedSubscriptions.slice(0, 8).map((candidate) => (
-                    <div className="subscriptionRow" key={`${candidate.kind}:${candidate.key}`}>
-                      <span className="swatch small" style={{ background: candidate.color }} />
-                      <div className="subscriptionName">
-                        <strong>{candidate.label}</strong>
-                        <em>
-                          {candidate.cadence} · seen {candidate.occurrences}×{candidate.category ? ` · ${candidate.category}` : ""}
-                        </em>
-                      </div>
-                      <strong className={ledger.privacyMode ? "masked" : ""}>{moneyFormatter.format(candidate.typicalAmount)}</strong>
-                      {!candidate.alreadyRecurring && (
-                        <button className="commandButton" type="button" onClick={() => markCandidateRecurring(candidate)}>
-                          <Repeat size={13} />
-                          Mark recurring
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <EmptyState
-                icon={<Repeat size={18} />}
-                title="No repeating payments detected yet"
-                text="Import a few months of transactions and repeating merchants show up here automatically."
-              />
-            )}
-            {missedRecurring.length > 0 && (
-              <div className="missedRecurring" role="status">
-                {missedRecurring.map((candidate) => (
-                  <p key={`missed-${candidate.kind}:${candidate.key}`}>
-                    <AlertCircle size={13} />
-                    {candidate.label} usually lands around {formatShortDate(candidate.nextExpected ?? candidate.lastSeen)} — not seen yet this cycle.
-                  </p>
-                ))}
-              </div>
-            )}
-            {recurringSuggestions.length > 0 && detectedSubscriptions.length === 0 && (
-              <p className="panelSubcopy">
-                {recurringSuggestions.length} repeating {recurringSuggestions.length === 1 ? "pattern" : "patterns"} found — mark them recurring above to feed the forecast.
-              </p>
-            )}
-          </section>
-        );
+        return <SubscriptionsWidget report={subscriptionReport} formatter={moneyFormatter} preciseFormatter={preciseFormatter} privacy={ledger.privacyMode} t={t} onOpen={() => setActiveView("subscriptions")} />;
       case "annual":
         return (
           <section className="projectionPanel" aria-label="Annual calculation">
@@ -3282,6 +3261,7 @@ function App() {
     { id: "pay", label: payPageTitle, icon: <Calculator size={20} /> },
     { id: "goals", label: "Goals", icon: <Target size={20} /> },
     { id: "allocate", label: "Allocate", icon: <Coins size={20} /> },
+    { id: "subscriptions", label: "Subscriptions", icon: <Repeat size={20} /> },
     { id: "insights", label: "Insights", icon: <LineChart size={20} /> },
     { id: "settings", label: "Settings", icon: <SettingsIcon size={20} /> },
   ];
@@ -4295,6 +4275,42 @@ function App() {
               onChange={updateAllocation}
               onOpenAccounts={() => setActiveView("accounts")}
               onOpenGoals={() => setActiveView("goals")}
+            />
+          )}
+
+          {activeView === "subscriptions" && (
+            <SubscriptionsView
+              report={subscriptionReport}
+              formatter={moneyFormatter}
+              preciseFormatter={preciseFormatter}
+              privacy={ledger.privacyMode}
+              t={t}
+              onCancel={cancelSubscription}
+              onReactivate={(subscription) => {
+                updateLedger((current) => reactivateSubscription(current, subscription));
+                setToast(t(`${subscription.label} is active again`));
+              }}
+              onDelete={(subscription) => {
+                updateLedger((current) => deleteSubscription(current, subscription));
+                setToast(t(`${subscription.label} removed from Subscriptions`));
+                track("subscription_deleted", { status: subscription.status });
+              }}
+              onRestoreDeleted={() => {
+                updateLedger((current) => restoreDeletedSubscriptions(current));
+                setToast("Removed subscriptions restored");
+              }}
+              onSetKind={(subscription, kind) => updateLedger((current) => setSubscriptionKind(current, subscription, kind))}
+              onSetTolerance={(subscription, days) => updateLedger((current) => setSubscriptionTolerance(current, subscription, days))}
+              onMarkRecurring={(subscription) => {
+                updateLedger((current) => setSubscriptionRecurring(current, subscription, true));
+                setToast(`${subscription.label} marked recurring — it now feeds the forecast`);
+                track("recurring_marked", { cadence: subscription.cadence });
+              }}
+              onOpenLedger={(monthKey) => {
+                updateLedger((current) => (current.months[monthKey] ? { ...current, selectedMonth: monthKey } : current));
+                setActiveView("ledger");
+              }}
+              onImport={() => csvInputRef.current?.click()}
             />
           )}
 
@@ -6056,11 +6072,15 @@ function RenameAllModal({
   onRenameAll: () => void;
   onJustThisOne: () => void;
 }) {
-  const renameAllRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const dismissRef = useRef(onJustThisOne);
   dismissRef.current = onJustThisOne;
   useEffect(() => {
-    renameAllRef.current?.focus();
+    // Focus the dialog itself, not a button. The prompt opens on the keydown of the Enter that
+    // committed the rename; Chromium delivers that keystroke's keypress to whatever is focused by
+    // then and treats Enter on a button as a click — so focusing "Rename all" here would confirm
+    // the prompt before anyone saw it. Tab reaches the buttons; Escape dismisses.
+    dialogRef.current?.focus();
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") dismissRef.current();
     };
@@ -6078,7 +6098,7 @@ function RenameAllModal({
         if (event.target === event.currentTarget) onJustThisOne();
       }}
     >
-      <div className="mergeModal" role="dialog" aria-modal="true" aria-labelledby="rename-all-title">
+      <div className="mergeModal" role="dialog" aria-modal="true" aria-labelledby="rename-all-title" ref={dialogRef} tabIndex={-1}>
         <div className="mergeModalIcon">
           <PenLine size={24} />
         </div>
@@ -6089,7 +6109,7 @@ function RenameAllModal({
             : `New imports are named “${from}” because of an earlier rename.`}
         </p>
         <div className="mergeOptions">
-          <button ref={renameAllRef} className="mergeOption" type="button" onClick={onRenameAll}>
+          <button className="mergeOption" type="button" onClick={onRenameAll}>
             <strong>{others ? `Rename all to “${to}”` : `Use “${to}” from now on`}</strong>
             <span>{others ? `${others + 1} transactions` : "Future imports"}</span>
             <small>Future imports with this name will be called “{to}” too.</small>
@@ -7775,6 +7795,7 @@ function normalizeStateFields(rawState: Partial<LedgerState>): LedgerState {
     categoryRules: normalizeCategoryRules(state.categoryRules),
     nameRules: normalizeNameRules(state.nameRules),
     importBatches: normalizeImportBatches(state.importBatches),
+    subscriptionPrefs: normalizeSubscriptionPrefs(state.subscriptionPrefs),
     privacyMode: Boolean(state.privacyMode),
     aiCategorizationEnabled: Boolean(state.aiCategorizationEnabled),
     // v9 → v10: ledgers saved before the Allocate page existed start on the default plan.

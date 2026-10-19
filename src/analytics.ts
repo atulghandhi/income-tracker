@@ -27,6 +27,8 @@ export type AnalyticsEvent =
   | "rule_learned" // { retro_applied }
   | "rename_all" // { renamed: bucket }
   | "recurring_marked" // { cadence }
+  | "subscription_cancelled" // { cadence, detected } — detected = it had already stopped being paid
+  | "subscription_deleted" // { status }
   | "ai_suggestions_applied" // { count }
   | "feed_connected"
   | "signed_in"

@@ -11,6 +11,12 @@ export const CHANGELOG = [
   },
   {
     date: "2026-10-15",
+    title: "A Subscriptions page",
+    body:
+      "Everything you pay for repeatedly, found in your own ledger with nothing to set up: subscriptions, bills and yearly renewals, each with its cost per year. Payments every 4 weeks count 13 times a year, not 12. Price rises are flagged with the extra cost per year, while charges billed in another currency are left alone when they only wobble with the exchange rate. Yearly renewals show their next date, several plans with one company are kept apart, and a direct debit nudged by a weekend or bank holiday still counts as on time. Anything that stops being paid moves to a Cancelled list; you can mark a subscription cancelled yourself, bring it back, or delete it from the list for good. Also on Insights and the Dashboard as a widget.",
+  },
+  {
+    date: "2026-10-15",
     title: "Import PDF bank statements directly",
     body:
       "Choose the PDF statement your bank gives you from Import data in Settings and review its transactions on the same screen as a CSV: categories suggested, duplicates unticked, transfers skipped, one-click undo. The statement's table is read in your browser and never uploaded. Built around Barclays, HSBC, Lloyds, Halifax, NatWest, Santander, Nationwide, TSB, Monzo, Starling, Revolut, Chase, first direct, Metro Bank, Virgin Money and American Express layouts, and it copes with most other UK and US banks. Dates printed without a year take it from the statement period, and the running balance is checked against every amount. A PDF it cannot read (a scanned image, say) gets a clear message and the paste route still works.",

@@ -82,7 +82,7 @@
   ],
   "rewrites": [
     {
-      "source": "/:view(dashboard|ledger|accounts|pay|goals|allocate|insights|settings)",
+      "source": "/:view(dashboard|ledger|accounts|pay|goals|subscriptions|allocate|insights|settings)",
       "destination": "/index.html"
     }
   ],

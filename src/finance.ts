@@ -113,6 +113,17 @@ export function getCurrencyFormatter(currency: CurrencyCode): Intl.NumberFormat 
   });
 }
 
+// Same currency with its minor units: subscription prices are £10.99, not £11.
+export function getPreciseCurrencyFormatter(currency: CurrencyCode): Intl.NumberFormat {
+  const option = currencyOptions.find((item) => item.code === currency) ?? currencyOptions[0];
+  return new Intl.NumberFormat(option.locale, {
+    style: "currency",
+    currency: option.code,
+    minimumFractionDigits: option.code === "JPY" ? 0 : 2,
+    maximumFractionDigits: option.code === "JPY" ? 0 : 2,
+  });
+}
+
 export function getCurrencySymbol(currency: CurrencyCode): string {
   const formatter = getCurrencyFormatter(currency);
   return formatter.formatToParts(0).find((part) => part.type === "currency")?.value ?? currency;
@@ -165,6 +176,7 @@ export function createInitialState(country: CountryCode = "GB", currency: Curren
     categoryRules: [],
     nameRules: [],
     importBatches: [],
+    subscriptionPrefs: [],
     privacyMode: false,
     allocation: { ...DEFAULT_ALLOCATION_SETTINGS, customShares: { ...DEFAULT_ALLOCATION_SETTINGS.customShares }, debtIncluded: {}, lumpSumTax: { ...DEFAULT_ALLOCATION_SETTINGS.lumpSumTax } },
     lastSavedAt: new Date().toISOString(),

@@ -13,9 +13,9 @@
 //     revalidate.
 //   - Cross-origin requests (Supabase, analytics, fonts): never intercepted.
 
-const VERSION = "it-sw-v6-pay-allocate";
+const VERSION = "it-sw-v6-pay-subscriptions-allocate";
 // App pages have their own URLs (see src/routes.ts); offline they are served from the cached shell.
-const APP_ROUTES = ["/", "/dashboard", "/ledger", "/accounts", "/pay", "/goals", "/allocate", "/insights", "/settings"];
+const APP_ROUTES = ["/", "/dashboard", "/ledger", "/accounts", "/pay", "/goals", "/subscriptions", "/allocate", "/insights", "/settings"];
 const SHELL_CACHE = `${VERSION}-shell`;
 const ASSET_CACHE = `${VERSION}-assets`;
 const OFFLINE_URL = "/offline.html";

@@ -34,7 +34,7 @@ The take-home estimate has its own **Pay & tax** page (`/pay`; "Paycheck & tax" 
 in, net pay out, with paycheck deductions from your accounts and a one-click "use as income". The
 dashboard carries a compact card and Insights charts where the pay goes.
 
-Each page has its own URL (`/dashboard`, `/ledger`, `/accounts`, `/pay`, `/goals`, `/allocate`, `/insights`,
+Each page has its own URL (`/dashboard`, `/ledger`, `/accounts`, `/pay`, `/goals`, `/subscriptions`, `/allocate`, `/insights`,
 `/settings`), so a refresh stays put. The Dashboard and Insights pages are customisable: **Customise**
 lets you drag, resize, remove and add widgets; the arrangement is saved per device and region.
 
@@ -56,6 +56,27 @@ allocated, and shown with its Self Assessment due date (`src/lumpSumTax.ts`, pin
 chosen plan's headline figures and this month's move. The page is an illustration from the user's own
 figures, not advice: it says so, carries the standard assumptions, and links free debt help (MoneyHelper,
 StepChange, National Debtline and Citizens Advice in the UK; the CFPB and NFCC in the US).
+
+## Subscriptions
+
+The Subscriptions page (`/subscriptions`, also reachable from the "Subscriptions & regular payments"
+widget on Insights or the Dashboard) lists everything the ledger shows being paid for repeatedly,
+with no setup: each payee is grouped, its cadence is fitted (weekly, fortnightly, 4-weekly — 13 a
+year — monthly, quarterly, half-yearly, yearly) and its cost per year worked out from the current
+price. Detection runs locally in `src/subscriptions.ts` and handles the awkward cases on purpose:
+
+- Price rises are flagged with the extra cost per year; a charge billed in another currency wobbles
+  with the exchange rate and is not treated as a price change.
+- Yearly renewals are found from two payments a year apart, with the next renewal date predicted.
+- Several subscriptions to one payee (three Apple charges on the same descriptor) are kept apart;
+  a subscription whose price changed stays one subscription with a price history.
+- A weekly shop or a salary is never a subscription; variable bills (energy) are tracked as bills.
+- A direct debit nudged by a weekend or bank holiday still counts as on time; the window can be
+  widened per subscription.
+- Anything that stops being paid moves to Cancelled automatically; the user can also mark a
+  subscription cancelled (which stops it seeding into new months), reactivate it, or delete it
+  from the cancelled list so it disappears from the page. A charge that lands after cancelling is
+  called out. Decisions live in the ledger (`subscriptionPrefs`) and sync with it.
 
 ## Repository layout
 
@@ -92,7 +113,7 @@ npm run test:seo   # static-site checks against a production build (separate con
 ```
 
 The calculation suites (`tests/finance.spec.ts`, `tests/finance-baseline.spec.ts`, `tests/tax.spec.ts`,
-`tests/retirement.spec.ts`, `tests/loans.spec.ts`, `tests/allocate.spec.ts`, `tests/lumpSumTax.spec.ts`, `tests/region.spec.ts`,
+`tests/retirement.spec.ts`, `tests/loans.spec.ts`, `tests/allocate.spec.ts`, `tests/lumpSumTax.spec.ts`, `tests/subscriptions.spec.ts`, `tests/region.spec.ts`,
 `tests/widgets.spec.ts`) pin
 every figure by hand from the published rules, so a change to a bracket, threshold or forecast shows up
 as a failing number rather than a vague regression. `tests/us-experience.spec.ts` drives the US and UK

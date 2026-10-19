@@ -141,6 +141,9 @@ const US_TERMS: Array<[RegExp, string]> = [
   [/\bcustomis(e|ed|es|ing|ation)\b/g, "customiz$1"],
   [/\bpetrol\b/g, "gas"],
   [/\bmobile phone\b/g, "cell phone"],
+  [/\bcancelled\b/g, "canceled"],
+  [/\bcancelling\b/g, "canceling"],
+  [/\bbank holiday(s)?\b/g, "public holiday$1"],
 ];
 
 function preserveCase(source: string, replacement: string): string {

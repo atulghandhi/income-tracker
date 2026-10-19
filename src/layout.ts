@@ -115,6 +115,16 @@ const DASHBOARD_WIDGETS: WidgetDefinition[] = [
     defaultSize: "m",
     sizes: ["s", "m", "l", "xl"],
   },
+  {
+    id: "subscriptions",
+    title: { GB: "Subscriptions & regular payments", US: "Subscriptions & regular payments" },
+    description: {
+      GB: "What you pay for repeatedly, per year and per month, with price rises and renewals. Opens the Subscriptions page.",
+      US: "What you pay for repeatedly, per year and per month, with price increases and renewals. Opens the Subscriptions page.",
+    },
+    defaultSize: "l",
+    sizes: ["m", "l", "xl"],
+  },
 ];
 
 const INSIGHTS_WIDGETS: WidgetDefinition[] = [
@@ -210,11 +220,15 @@ const INSIGHTS_WIDGETS: WidgetDefinition[] = [
     sizes: ["s", "m", "l", "xl"],
   },
   {
+    // Keeps its original id so saved layouts still show it.
     id: "recurring",
-    title: { GB: "Recurring payments", US: "Recurring payments" },
-    description: { GB: "Subscriptions and repeating payments found in your ledger.", US: "Subscriptions and repeating payments found in your ledger." },
+    title: { GB: "Subscriptions & regular payments", US: "Subscriptions & regular payments" },
+    description: {
+      GB: "Subscriptions, bills and renewals found in your ledger: yearly cost, price rises and what stopped. Opens the Subscriptions page.",
+      US: "Subscriptions, bills and renewals found in your ledger: yearly cost, price increases and what stopped. Opens the Subscriptions page.",
+    },
     defaultSize: "xl",
-    sizes: ["l", "xl"],
+    sizes: ["m", "l", "xl"],
   },
   {
     id: "annual",

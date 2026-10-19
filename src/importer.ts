@@ -688,7 +688,8 @@ const MERCHANT_ALIASES: Array<[RegExp, string]> = [
   [/\bsq\s*\*/g, "square "],
   [/\bcrv\b/g, ""],
   [/\bgoogle\s*\*/g, "google "],
-  [/\bapple\.com\/bill\b/g, "apple"],
+  // Aliases run on the normalised text, where punctuation has already become spaces.
+  [/\bapple\s+com\s+bill\b/g, "apple"],
   [/\bamznprime\b/g, "amazon prime"],
 ];
 
