@@ -37,7 +37,10 @@ export type AnalyticsEvent =
   | "reminder_added" // { method: "ics"|"google" }
   | "new_month_nudge" // { action: "shown"|"import"|"guide"|"dismiss" }
   | "install_prompt" // { action: "shown"|"accepted"|"dismissed"|"ios_hint" }
-  | "app_installed";
+  | "app_installed"
+  | "pdf_notice" // { action: "dismiss"|"import" } — the one-off PDF import announcement
+  | "country_changed" // { country }
+  | "layout_changed"; // { page, action: "move"|"resize"|"remove"|"add"|"reset" }
 
 let identifiedUserId: string | null = null;
 

@@ -16,7 +16,8 @@ import {
   X,
 } from "lucide-react";
 import { currencyOptions, getCurrencySymbol } from "./finance";
-import type { AccountClass, AccountType, CurrencyCode } from "./types";
+import { accountPresets, billPresets, countryOption, countryOptions, regionOf, type AccountPreset, type BillPreset } from "./region";
+import type { AccountClass, AccountType, CountryCode, CurrencyCode } from "./types";
 
 // First-run setup wizard. Collects rough numbers only — the promise made on
 // every step is "estimates are fine, everything can be edited later". The
@@ -34,6 +35,7 @@ export type OnboardingAccount = {
 export type OnboardingGoal = { name: string; target: number; saved: number };
 
 export type OnboardingResult = {
+  country: CountryCode;
   currency: CurrencyCode;
   incomes: OnboardingIncome[];
   expenses: OnboardingExpense[];
@@ -41,36 +43,8 @@ export type OnboardingResult = {
   goal: OnboardingGoal | null;
 };
 
-type BillPreset = { name: string; category: string };
-
-// Common UK regular outgoings — tapping a chip adds an editable row.
-const BILL_PRESETS: BillPreset[] = [
-  { name: "Rent / Mortgage", category: "Home" },
-  { name: "Council tax", category: "Bills" },
-  { name: "Energy", category: "Bills" },
-  { name: "Water", category: "Bills" },
-  { name: "Broadband", category: "Bills" },
-  { name: "Phone", category: "Bills" },
-  { name: "Groceries", category: "Food" },
-  { name: "Transport / fuel", category: "Travel" },
-  { name: "Subscriptions", category: "Subscriptions" },
-  { name: "Gym", category: "Health" },
-];
-
-type AccountPreset = {
-  key: string;
-  label: string;
-  hint: string;
-  accountClass: AccountClass;
-  type: AccountType;
-};
-
-const ACCOUNT_PRESETS: AccountPreset[] = [
-  { key: "current", label: "Current account", hint: "Everyday balance", accountClass: "cash", type: "current" },
-  { key: "savings", label: "Savings", hint: "Cash set aside", accountClass: "savings", type: "savings" },
-  { key: "credit-card", label: "Credit card", hint: "Amount owed", accountClass: "debt", type: "credit-card" },
-  { key: "investment", label: "Investments", hint: "Stocks, ISA, pension", accountClass: "investment", type: "investment" },
-];
+// Common regular outgoings and account types for the chosen country (region.ts) — tapping a chip
+// adds an editable row.
 
 type IncomeRowDraft = { id: number; source: string; amount: string };
 type BillRowDraft = { id: number; name: string; amount: string; category: string };
@@ -90,16 +64,34 @@ function nextId() {
 }
 
 export default function Onboarding({
+  initialCountry,
   initialCurrency,
   onFinish,
 }: {
+  initialCountry: CountryCode;
   initialCurrency: CurrencyCode;
   onFinish: (result: OnboardingResult, meta: { completed: boolean; skippedSteps: number }) => void;
 }) {
   // step -1 = welcome, 0-3 = the four setup steps, 4 = summary.
   const [step, setStep] = useState(-1);
   const [skippedSteps, setSkippedSteps] = useState(0);
+  const [country, setCountry] = useState<CountryCode>(initialCountry);
   const [currency, setCurrency] = useState<CurrencyCode>(initialCurrency);
+  const region = regionOf(country);
+  const BILL_PRESETS: BillPreset[] = billPresets(region);
+  const ACCOUNT_PRESETS: AccountPreset[] = accountPresets(region);
+
+  // Choosing a country brings its currency along; "Other" keeps whatever is selected.
+  function changeCountry(next: CountryCode) {
+    setCountry(next);
+    const option = countryOption(next);
+    if (option.currency) setCurrency(option.currency);
+    // Presets differ by country, so chips picked under the old one no longer apply.
+    if (regionOf(next) !== region) {
+      setBillRows([]);
+      setAccountRows([]);
+    }
+  }
   const [incomeRows, setIncomeRows] = useState<IncomeRowDraft[]>([{ id: nextId(), source: "Salary (take-home)", amount: "" }]);
   const [billRows, setBillRows] = useState<BillRowDraft[]>([]);
   const [accountRows, setAccountRows] = useState<AccountRowDraft[]>([]);
@@ -111,6 +103,7 @@ export default function Onboarding({
 
   const result: OnboardingResult = useMemo(
     () => ({
+      country,
       currency,
       incomes: incomeRows
         .map((row) => ({ source: row.source.trim(), amount: toAmount(row.amount) }))
@@ -131,7 +124,7 @@ export default function Onboarding({
           ? { name: goalName.trim(), target: toAmount(goalTarget), saved: toAmount(goalSaved) }
           : null,
     }),
-    [currency, incomeRows, billRows, accountRows, goalName, goalTarget, goalSaved],
+    [country, currency, incomeRows, billRows, accountRows, goalName, goalTarget, goalSaved],
   );
 
   const addedCount = result.incomes.length + result.expenses.length + result.accounts.length + (result.goal ? 1 : 0);
@@ -244,16 +237,29 @@ export default function Onboarding({
           title="What comes in each month?"
           lede="Your take-home pay after tax. A rough figure is fine — it powers your surplus and forecasts."
         >
-          <label className="obField obCurrencyField">
-            <span>Currency</span>
-            <select value={currency} onChange={(event) => setCurrency(event.target.value as CurrencyCode)} aria-label="Currency">
-              {currencyOptions.map((option) => (
-                <option value={option.code} key={option.code}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="obFieldRow">
+            <label className="obField obCurrencyField">
+              <span>Country</span>
+              <select value={country} onChange={(event) => changeCountry(event.target.value as CountryCode)} aria-label="Country">
+                {countryOptions.map((option) => (
+                  <option value={option.code} key={option.code}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="obField obCurrencyField">
+              <span>Currency</span>
+              <select value={currency} onChange={(event) => setCurrency(event.target.value as CurrencyCode)} aria-label="Currency">
+                {currencyOptions.map((option) => (
+                  <option value={option.code} key={option.code}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          {region === "US" && <p className="obLede obLedeSmall">US accounts, tax tools and language are switched on. Your after-tax pay goes below; the gross-to-net estimator on Insights can work it out.</p>}
           <div className="obRows">
             {incomeRows.map((row) => (
               <div className="obRow" key={row.id}>
@@ -305,6 +311,7 @@ export default function Onboarding({
         <StepFrame
           title="What goes out regularly?"
           lede="Tap the bills you pay each month, then put a rough amount on each. They'll repeat automatically every month."
+          key={`bills-${region}`}
         >
           <div className="obChips" role="group" aria-label="Common bills">
             {BILL_PRESETS.map((preset) => {

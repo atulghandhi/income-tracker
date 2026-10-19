@@ -1193,7 +1193,9 @@ textarea::placeholder {
 }
 
 .expenseRow {
-  grid-template-columns: 24px minmax(160px, 1fr) 132px 98px auto;
+  /* The name column gives way first, so a planned-payment row with an extra action icon never
+     pushes the category group past the panel's edge. */
+  grid-template-columns: 24px minmax(96px, 1fr) 132px 98px auto;
   padding-left: 24px;
 }
 
@@ -2016,11 +2018,14 @@ textarea:focus,
 
 .debtAccountRow {
   display: grid;
+  /* Every numeric field takes exactly one column so they all come out the same width; the
+     optional details panel opens as a full-width row underneath. */
   grid-template-areas:
     "swatch main balance minimum remove"
     "swatch meta limit apr due"
-    "swatch meta interest interest due";
-  grid-template-columns: 28px minmax(160px, 1.3fr) minmax(128px, 0.9fr) minmax(128px, 0.9fr) 76px;
+    "swatch meta interest . ."
+    "details details details details details";
+  grid-template-columns: 28px minmax(200px, 1.4fr) minmax(128px, 0.9fr) minmax(128px, 0.9fr) minmax(128px, 0.9fr);
   gap: 10px 12px;
   align-items: start;
   min-height: 112px;
@@ -2039,7 +2044,7 @@ textarea:focus,
 .debtAccountMain {
   grid-area: main;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 120px;
+  grid-template-columns: minmax(0, 1fr) minmax(140px, 176px);
   gap: 8px;
 }
 
@@ -2072,7 +2077,52 @@ textarea:focus,
   grid-template-areas:
     "swatch main balance minimum remove"
     "swatch meta limit apr due"
-    "swatch meta interest promo due";
+    "swatch meta interest promo ."
+    "details details details details details";
+}
+
+.accountDetails {
+  grid-area: details;
+  min-width: 0;
+  margin-top: 2px;
+}
+
+.debtAccountRow .detailsToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  margin-top: 4px;
+  padding: 4px 8px 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--blue);
+  font-size: 11.5px;
+  font-weight: 700;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
+}
+
+.debtAccountRow .detailsToggle:hover,
+.debtAccountRow .detailsToggle.open {
+  border-color: rgba(var(--blue-rgb), 0.4);
+  background: var(--blue-soft);
+}
+
+.typeSelectWrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.typeSelectWrap .infoHint {
+  width: 24px;
+  height: 24px;
+  color: var(--muted);
 }
 
 .debtPromoRateField {
@@ -2214,6 +2264,56 @@ textarea:focus,
   margin-top: 18px;
 }
 
+/* Each row is "control + 24px hint slot", so every control is exactly the same width whether or
+   not it has an info icon beside it. */
+.draftField {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.draftField > input,
+.draftField > select,
+.draftField > .moneyInput {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface);
+}
+
+.draftField > .moneyInput {
+  padding: 0 12px;
+}
+
+/* The money field's inner input is matched by the broad `.debtDraftGrid input` rule above; strip
+   that back so the outer label is the only box and its padding keeps text off the edge. */
+.draftField > .moneyInput input {
+  min-height: 40px;
+  padding: 0 2px 0 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.draftField .infoHint,
+.draftField .hintSlot {
+  width: 24px;
+  height: 24px;
+  color: var(--muted);
+}
+
+.draftField .hintSlot {
+  display: block;
+}
+
+.debtDraftGrid .inlineCta {
+  margin: 4px 0 0;
+}
+
 .accountClassSelect {
   font-weight: 720;
   color: var(--ink);
@@ -2231,6 +2331,10 @@ textarea:focus,
   display: flex;
   gap: 10px;
   margin-top: 18px;
+}
+
+.transferRuleAdd .commandButton {
+  min-height: 40px;
 }
 
 .transferRuleAdd input {
@@ -2539,6 +2643,14 @@ textarea:focus,
   transition:
     opacity 150ms ease,
     transform 150ms ease;
+}
+
+/* Invisible tooltips still take up layout space; near the edges of a phone screen that widened
+   the page and let the whole layout drift sideways. Touch screens can't hover, so drop them there. */
+@media (hover: none) {
+  [data-tip]::after {
+    display: none;
+  }
 }
 
 [data-tip]:hover::after,
@@ -3461,16 +3573,32 @@ hr {
   line-height: 1.55;
 }
 
+.architectureNote > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.architectureNote .commandButton {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* Rule lists are short; the default panel minimum left them mostly empty. */
+.learnedRulesPanel {
+  min-height: auto;
+}
+
 .dataPanel {
   min-height: 520px;
 }
 
 .dataActionGrid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 18px;
   margin-top: 24px;
 }
+
 
 .dataAction {
   min-height: 300px;
@@ -3626,8 +3754,35 @@ hr {
 
 .importTable {
   width: 100%;
+  /* Each review bucket is its own table; fixed widths keep their columns in line. */
+  table-layout: fixed;
+  min-width: 860px;
   border-collapse: collapse;
   font-size: 13px;
+}
+
+.importTable th:nth-child(1) {
+  width: 72px;
+}
+
+.importTable th:nth-child(2) {
+  width: 112px;
+}
+
+.importTable th:nth-child(4) {
+  width: 96px;
+}
+
+.importTable th:nth-child(5) {
+  width: 160px;
+}
+
+.importTable th:nth-child(6) {
+  width: 180px;
+}
+
+.importTable th:nth-child(7) {
+  width: 172px;
 }
 
 .importTable th {
@@ -3664,7 +3819,7 @@ hr {
 }
 
 .importTable td:nth-child(3) {
-  min-width: 250px;
+  min-width: 0;
 }
 
 .importTable td:nth-child(3) strong,
@@ -4047,13 +4202,24 @@ hr {
 }
 
 @media (max-width: 1180px) {
+  /* The bar is a flex row: let the search box drop to its own line before anything squashes. */
   .appBar {
-    grid-template-columns: minmax(210px, 1fr) minmax(220px, 360px);
+    flex-wrap: wrap;
+    gap: 12px 16px;
   }
 
-  .topActions {
-    grid-column: 1 / -1;
-    justify-content: flex-start;
+  .appBarTitle {
+    flex: 1 1 200px;
+  }
+
+  .appBar .searchShell {
+    flex: 1 1 100%;
+    order: 3;
+    max-width: none;
+  }
+
+  .appBar .topActions {
+    flex: 0 0 auto;
   }
 
   .monthlyGrid,
@@ -4099,8 +4265,9 @@ hr {
     height: 2px;
   }
 
+  /* The sidebar CTA goes; inline CTAs (Add account, Import) must stay usable on phones. */
   .localIdentity,
-  .navCta {
+  .navCta:not(.inlineCta) {
     display: none;
   }
 
@@ -4131,6 +4298,16 @@ hr {
     min-height: auto;
     padding: 14px;
   }
+
+  /* The rail wraps onto several lines on phones; leave room so the last control on a page can
+     scroll clear of it. */
+  .workspace {
+    padding-bottom: 160px;
+  }
+
+  html {
+    scroll-padding-bottom: 160px;
+  }
 }
 
 @media (max-width: 680px) {
@@ -4146,29 +4323,45 @@ hr {
     justify-content: flex-start;
   }
 
+  /* On a phone the bar and the add rows stay in the flow: stuck to the edges they covered most
+     of the screen and sat on top of whatever was being tapped. */
   .appBar {
-    grid-template-columns: 1fr;
-    gap: 12px;
-    padding: 14px;
+    position: static;
+    gap: 10px 12px;
+    padding: 10px 14px;
+  }
+
+  .addRow {
+    position: static;
   }
 
   .topActions {
-    gap: 8px;
+    gap: 4px;
   }
 
   .statusPill {
     display: none;
   }
 
-  .monthSwitch,
-  .monthLabel,
-  .searchShell,
-  .currencyControl {
-    width: 100%;
+  .monthSwitch {
+    gap: 2px;
   }
 
   .monthLabel {
     min-width: 0;
+  }
+
+  .monthLabel strong {
+    font-size: 15px;
+    white-space: nowrap;
+  }
+
+  .countryControl {
+    padding: 0 6px;
+  }
+
+  .countryControl select {
+    max-width: 128px;
   }
 
   .pageHeader h2 {
@@ -4182,6 +4375,17 @@ hr {
   .goalAmounts,
   .notesBand .goalPanel {
     grid-template-columns: 1fr;
+  }
+
+  /* The heading + tab strip is wider than a phone; let the tabs drop under the heading instead of
+     pushing the whole page sideways. */
+  .projectionPanel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sectionHeading {
+    flex-wrap: wrap;
+    gap: 12px;
   }
 
   .modalBackdrop {
@@ -4234,7 +4438,8 @@ hr {
       "minimum minimum minimum"
       "apr apr apr"
       "interest interest interest"
-      "due due due";
+      "due due due"
+      "details details details";
     grid-template-columns: 28px minmax(0, 1fr) 38px;
     row-gap: 12px;
   }
@@ -4249,7 +4454,8 @@ hr {
       "apr apr apr"
       "interest interest interest"
       "promo promo promo"
-      "due due due";
+      "due due due"
+      "details details details";
   }
 
   /* Each stacked field gets a label above a full-width control on phones,
@@ -4308,10 +4514,6 @@ hr {
     margin-inline: 0;
   }
 
-  .expenseGroups {
-    max-height: 62vh;
-  }
-
   .expenseGroup:not(.ungrouped) .expenseGroupHeader {
     flex-wrap: wrap;
     padding: 10px 12px 10px 22px;
@@ -4329,28 +4531,51 @@ hr {
     margin-left: 0;
   }
 
+  /* Two compact lines per row on a phone: handle + name, then amount + actions. */
   .incomeRow {
-    grid-template-columns: 28px 22px 1fr;
+    grid-template-columns: 28px 22px minmax(0, 1fr) auto;
+    gap: 8px 10px;
+    min-height: 0;
+  }
+
+  .incomeRow .moneyInput {
+    grid-column: 1 / 4;
+  }
+
+  .incomeRow .rowActions {
+    grid-column: 4 / 5;
+    grid-row: 2;
   }
 
   .expenseRow,
   .expenseGroup:not(.ungrouped) .expenseRow {
+    grid-template-columns: 24px minmax(0, 1fr) auto auto;
+    gap: 8px 10px;
+    min-height: 0;
     padding-left: 30px;
   }
 
-  .incomeRow .moneyInput,
-  .incomeRow .rowActions {
-    grid-column: 1 / -1;
+  .expenseRow > input[aria-label="Expense name"] {
+    grid-column: 2 / 5;
   }
 
-  .expenseRow .moneyInput,
-  .expenseRow .rowTotal,
+  .expenseRow .moneyInput {
+    grid-column: 1 / 3;
+  }
+
+  .expenseRow .rowTotal {
+    grid-column: 3 / 4;
+    grid-row: 2;
+    align-self: center;
+  }
+
   .expenseRow .rowActions {
-    grid-column: 1 / -1;
+    grid-column: 4 / 5;
+    grid-row: 2;
   }
 
   .rowActions {
-    justify-self: stretch;
+    justify-self: end;
     justify-content: flex-end;
   }
 
@@ -4458,6 +4683,93 @@ hr {
 
 .signInSkip:hover {
   color: var(--muted);
+}
+
+/* ─── Feature notice (PDF imports) ──────────────────── */
+.noticeBackdrop {
+  z-index: 200;
+  animation: fadeIn 180ms ease both;
+}
+
+.noticeModal {
+  position: relative;
+  width: min(480px, 100%);
+  /* Phones stretch modal backdrops to full height; this card stays compact. */
+  align-self: center;
+  display: grid;
+  gap: 16px;
+  padding: 32px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.5);
+  animation: cardIn 220ms ease both;
+}
+
+.noticeClose {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+}
+
+.noticeIcon {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.noticeModal h2 {
+  margin: 4px 0 0;
+  font-size: 22px;
+  font-weight: 640;
+  color: var(--ink);
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+.noticeModal p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.noticeBanks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.noticeBanks li {
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-high);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.noticeFootnote {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.noticeFootnote svg {
+  color: var(--mint);
+  flex-shrink: 0;
+}
+
+.noticeActions {
+  margin-top: 4px;
 }
 
 /* ─── Merge conflict modal ──────────────────────────── */
@@ -5466,7 +5778,8 @@ hr {
 /* ─── Status toast (finally rendered) + learned-rules panel ──────────────── */
 
 .statusToast {
-  position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+  /* Sits above the fixed annual-summary rail instead of covering its figures. */
+  position: fixed; bottom: 76px; left: 50%; transform: translateX(-50%);
   background: var(--ink); color: var(--on-ink);
   border-radius: 999px; box-shadow: var(--shadow-md);
   font-size: 12.5px; padding: 9px 18px; z-index: 300;
@@ -6459,4 +6772,978 @@ hr {
     left: 8px;
     margin-top: 0;
   }
+}
+
+/* ─── Page header side (customise button beside the headline figure) ─────────── */
+.pageHeaderSide {
+  display: flex;
+  align-items: flex-end;
+  gap: 18px;
+}
+
+.layoutEditButton {
+  min-height: 36px;
+  margin-bottom: 2px;
+}
+
+.layoutEditButton.active {
+  border-color: rgba(var(--mint-rgb), 0.45);
+  background: rgba(var(--mint-rgb), 0.1);
+  color: var(--mint);
+}
+
+/* ─── Widget grid ─────────────────────────────────────────────────────────────
+   Six columns; widgets span 2 (⅓), 3 (½), 4 (⅔) or 6 (full). Dense packing
+   fills gaps left when a narrow widget follows a wide one. */
+.widgetGrid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-auto-flow: dense;
+  gap: 24px;
+}
+
+.widgetCell {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  min-width: 0;
+}
+
+.widgetGrid.isEditing .widgetCell {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.widgetCell > .widgetBody {
+  display: grid;
+  min-width: 0;
+}
+
+.widgetCell > .widgetBody > * {
+  min-width: 0;
+}
+
+.widgetGrid.isEditing .widgetCell {
+  padding: 8px;
+  border: 2px dashed rgba(var(--blue-rgb), 0.35);
+  border-radius: calc(var(--radius-lg) + 6px);
+  background: rgba(var(--blue-rgb), 0.03);
+  transition:
+    border-color 150ms ease,
+    opacity 150ms ease;
+}
+
+.widgetGrid.isEditing .widgetBody {
+  pointer-events: none;
+  user-select: none;
+  opacity: 0.92;
+}
+
+.widgetCell.isDragging {
+  opacity: 0.45;
+}
+
+.widgetCell.drop-before::before,
+.widgetCell.drop-after::after {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  width: 4px;
+  border-radius: 2px;
+  background: var(--blue);
+  box-shadow: 0 0 0 3px rgba(var(--blue-rgb), 0.2);
+}
+
+.widgetCell.drop-before::before {
+  left: -14px;
+}
+
+.widgetCell.drop-after::after {
+  right: -14px;
+}
+
+.widgetToolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  margin-bottom: 8px;
+  padding: 3px 6px 3px 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.widgetHandle {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  cursor: grab;
+}
+
+.widgetHandle:hover {
+  background: rgba(var(--ink-rgb), 0.07);
+  color: var(--ink);
+}
+
+.widgetHandle:active {
+  cursor: grabbing;
+}
+
+.widgetToolbarTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 740;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.widgetToolbarGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+}
+
+.widgetToolbar .iconButton {
+  width: 30px;
+  min-height: 30px;
+}
+
+.widgetSizeGroup {
+  padding: 0 2px;
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+}
+
+.widgetSizeLabel {
+  min-width: 66px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 720;
+  text-align: center;
+}
+
+.widgetRemove:hover {
+  color: var(--red);
+}
+
+.widgetEmpty {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 40px 20px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-lg);
+  color: var(--muted);
+  text-align: center;
+}
+
+.widgetEmpty p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.widgetTray {
+  padding: 22px 24px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: rgba(var(--surface-rgb), 0.55);
+}
+
+.widgetTrayHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.widgetTrayHead h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 620;
+}
+
+.widgetTrayHead p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.widgetTrayList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.widgetTrayItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.widgetTrayItem strong {
+  display: block;
+  color: var(--ink);
+  font-size: 13.5px;
+}
+
+.widgetTrayItem p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.widgetTrayItem .commandButton {
+  flex: 0 0 auto;
+}
+
+.widgetTrayEmpty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 0;
+  color: var(--mint);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+/* ─── Plan / loan details ───────────────────────────────────────────────────── */
+.planDetails {
+  display: grid;
+  gap: 14px;
+  padding: 14px 16px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(var(--surface-higher-rgb), 0.32);
+}
+
+.planDetails.inline {
+  margin-top: 16px;
+}
+
+.planNote {
+  margin: 0;
+  color: rgba(var(--ink-rgb), 0.8);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.planGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px 16px;
+  align-items: start;
+}
+
+.planField {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.planField.wide {
+  grid-column: 1 / -1;
+}
+
+.planField .fieldLabel {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 20px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  font-weight: 720;
+}
+
+.planField .fieldLabel .infoHint {
+  width: 20px;
+  height: 20px;
+  color: var(--muted);
+}
+
+.planField > select,
+.planField > input,
+.planField .planInputRow > input {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface);
+  color: var(--ink);
+}
+
+.planField > .moneyInput {
+  min-height: 38px;
+  padding: 0 10px;
+  border-color: var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.planField > .moneyInput input {
+  padding: 0;
+}
+
+.planField input:read-only:not([type="checkbox"]) {
+  background: var(--well);
+  color: var(--muted);
+}
+
+.planInputRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.planInputRow > input {
+  flex: 1 1 72px;
+}
+
+.planInputRow .fieldSuffix {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.planComputed {
+  flex: 0 0 auto;
+  color: var(--mint);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.planCheck {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  align-self: end;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.planCheck input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--blue);
+}
+
+.planCheck span {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.planCheck .infoHint {
+  width: 20px;
+  height: 20px;
+  color: var(--muted);
+}
+
+.planSuggestion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(var(--mint-rgb), 0.3);
+  border-radius: var(--radius);
+  background: rgba(var(--mint-rgb), 0.08);
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.planSuggestion strong {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.planHint {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.planHint svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.planHint.warn {
+  color: var(--amber);
+}
+
+.planSummaryLine {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.limitMeter {
+  display: grid;
+  gap: 6px;
+}
+
+.limitMeterHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.limitMeterHead b {
+  color: var(--ink);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Limit lists (retirement, medical, goals widgets) ──────────────────────── */
+.limitList {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.limitRow {
+  display: grid;
+  gap: 6px;
+}
+
+.limitRowHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.limitRowHead > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.limitRowHead .infoHint {
+  width: 22px;
+  height: 22px;
+  color: var(--muted);
+}
+
+.limitRowHead b {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+
+.limitRow > em {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.4;
+}
+
+.limitRow.over .ruleTrack strong {
+  background: var(--red);
+}
+
+.limitRow.done .ruleTrack strong {
+  background: var(--blue);
+}
+
+.retirementStats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.loanStats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.retirementAccounts {
+  display: grid;
+  margin-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.retirementAccount {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.retirementAccount > strong {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.retirementAccount > em {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.linkButton {
+  width: fit-content;
+  margin-top: 12px;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 650;
+  text-align: left;
+}
+
+.linkButton:hover {
+  text-decoration: underline;
+}
+
+/* ─── Take-home pay ─────────────────────────────────────────────────────────── */
+.takeHomeHeadline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.takeHomeHeadline > div {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(var(--surface-rgb), 0.54);
+}
+
+.takeHomeHeadline span {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.takeHomeHeadline strong {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 20px;
+}
+
+.estimateBadge {
+  padding: 3px 9px;
+  border: 1px solid rgba(var(--amber-rgb), 0.4);
+  border-radius: 999px;
+  background: rgba(var(--amber-rgb), 0.1);
+  color: var(--amber);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 760;
+  white-space: nowrap;
+}
+
+.estimatorGrid {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.85fr) minmax(0, 1.25fr);
+  gap: 24px;
+  margin-top: 18px;
+}
+
+.estimatorInputs {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.estimatorResult {
+  min-width: 0;
+}
+
+.taxTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.taxTable th,
+.taxTable td {
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.taxTable th[scope="row"] {
+  color: var(--ink);
+  font-weight: 520;
+  text-align: left;
+  white-space: normal;
+}
+
+.taxTable thead th {
+  padding-top: 0;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 720;
+  text-transform: uppercase;
+}
+
+.taxTable td {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.taxTable small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.taxTable tr.gross th,
+.taxTable tr.gross td {
+  font-weight: 700;
+}
+
+.taxTable tr.total th,
+.taxTable tr.total td {
+  border-bottom: 0;
+  color: var(--mint);
+  font-weight: 760;
+}
+
+.estimatorFacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.estimatorFacts b {
+  color: var(--ink);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.estimatorResult .buttonRow {
+  margin-top: 16px;
+}
+
+/* ─── Credit score bands ────────────────────────────────────────────────────── */
+.scoreScale {
+  display: grid;
+  gap: 7px;
+  margin-top: 16px;
+}
+
+.scoreScaleHead {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.scoreScaleHead > span {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.scoreScaleHead > b {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 20px;
+}
+
+.scoreScaleHead > b small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.scoreBandChip {
+  margin-left: auto;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 760;
+}
+
+.scoreBandChip.bad,
+.scoreBand.bad {
+  background: rgba(var(--red-rgb), 0.16);
+  color: var(--red);
+}
+
+.scoreBandChip.warn,
+.scoreBand.warn {
+  background: rgba(var(--amber-rgb), 0.18);
+  color: var(--amber);
+}
+
+.scoreBandChip.ok,
+.scoreBand.ok {
+  background: rgba(var(--amber-rgb), 0.1);
+  color: var(--amber);
+}
+
+.scoreBandChip.good,
+.scoreBand.good {
+  background: rgba(var(--mint-rgb), 0.16);
+  color: var(--mint);
+}
+
+.scoreBandChip.great,
+.scoreBand.great {
+  background: rgba(var(--blue-rgb), 0.16);
+  color: var(--blue);
+}
+
+.scoreBands {
+  position: relative;
+  display: flex;
+  gap: 3px;
+  height: 9px;
+}
+
+.scoreBand {
+  border-radius: 3px;
+}
+
+.scoreBand.bad {
+  background: var(--red);
+}
+
+.scoreBand.warn {
+  background: var(--amber);
+}
+
+.scoreBand.ok {
+  background: rgba(var(--amber-rgb), 0.55);
+}
+
+.scoreBand.good {
+  background: var(--mint);
+}
+
+.scoreBand.great {
+  background: var(--blue);
+}
+
+.scoreMarker {
+  position: absolute;
+  top: -4px;
+  width: 3px;
+  height: 17px;
+  border-radius: 2px;
+  background: var(--ink);
+  box-shadow: 0 0 0 2px var(--surface);
+  transform: translateX(-50%);
+}
+
+.scoreBandLabels {
+  display: flex;
+  gap: 3px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.scoreBandLabels span {
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.creditEstimate strong small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* ─── Onboarding country row ───────────────────────────────────────────────── */
+.obFieldRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+}
+
+.obLedeSmall {
+  font-size: 13px;
+}
+
+/* New panels never force the tall minimum the first-generation panels carry. */
+.retirementPanel,
+.takeHomePanel,
+.medicalPanel,
+.loansPanel,
+.housingPanel,
+.creditPanel,
+.goalsPanel,
+.estimatorPanel {
+  min-height: 240px;
+}
+
+.estimatorPanel {
+  min-height: auto;
+}
+
+.medicalStats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.medicalPanel .planHint {
+  margin-top: 14px;
+}
+
+.widgetCell.size-s .debtMiniGrid,
+.widgetCell.size-m .debtMiniGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.widgetCell.size-s .summaryStrip,
+.widgetCell.size-m .summaryStrip,
+.widgetCell.size-s .statCardRow,
+.widgetCell.size-m .statCardRow {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.widgetCell.size-s .estimatorGrid,
+.widgetCell.size-m .estimatorGrid,
+.widgetCell.size-l .estimatorGrid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (max-width: 1180px) {
+  .widgetCell {
+    grid-column: 1 / -1 !important;
+  }
+
+  .estimatorGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .pageHeaderSide {
+    align-items: flex-start;
+    flex-direction: column-reverse;
+    gap: 10px;
+  }
+
+  .widgetToolbarTitle {
+    display: none;
+  }
+
+  .medicalStats,
+  .retirementStats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .widgetCell.drop-before::before,
+  .widgetCell.drop-after::after {
+    display: none;
+  }
+
+  .planGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .widgetTrayHead {
+    flex-direction: column;
+  }
+}
+
+/* ─── Select chevrons ─────────────────────────────────────────────────────────
+   One chevron for every dropdown, with room on the right so it never touches the
+   edge of the control. background-image only, so each select keeps its own
+   background colour. */
+select:not([multiple]) {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 30px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236f7b8c' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px 12px;
+}
+
+[data-theme="dark"] select:not([multiple]) {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ea8b7' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px 12px;
+}
+
+select:not([multiple]):disabled {
+  opacity: 0.6;
+}
+
+.currencyControl select,
+.countryControl select {
+  padding-right: 26px;
+  background-position: right 6px center;
+}
+
+.countryControl select {
+  max-width: none;
+  font-weight: 760;
+}
+
+/* Country + currency stack in Settings. */
+.compactSetting .selectField + .selectField {
+  margin-top: 10px;
 }

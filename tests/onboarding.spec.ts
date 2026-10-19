@@ -74,9 +74,13 @@ test("wizard opens for a fresh user, applies entered data, and lands on a filled
   await expect(page.getByLabel("Accounts", { exact: true }).getByRole("heading", { name: "Accounts", exact: true })).toBeVisible();
   await expect(page.locator(".accountsGrid")).toContainText("Savings");
 
-  // Reload: the wizard must not reappear.
+  // Reload: the page stays where it was (the URL names it) and the wizard must not reappear.
+  await expect(page).toHaveURL(/\/accounts$/);
   await page.reload();
-  await expect(dashboardHeading(page)).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByLabel("Accounts", { exact: true }).getByRole("heading", { name: "Accounts", exact: true })).toBeVisible({ timeout: 10_000 });
+  await expect(wizard(page)).toBeHidden();
+  await page.getByRole("button", { name: "Dashboard" }).click();
+  await expect(dashboardHeading(page)).toBeVisible();
   await expect(wizard(page)).toBeHidden();
 });
 

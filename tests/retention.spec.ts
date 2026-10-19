@@ -1,11 +1,16 @@
 import { expect, test } from "@playwright/test";
 import { buildReminderIcs, googleCalendarReminderUrl, nextReminderDate, shouldShowNewMonthNudge } from "../src/retention";
 
+// Reminder dates are calendar days in the user's own time zone, so they are read
+// back with local getters: toISOString() would shift a local midnight to the
+// previous day anywhere east of UTC (a British summer included).
+const localDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+
 test.describe("Monthly reminder", () => {
   test("picks the next occurrence of the chosen day", () => {
     const today = new Date(2026, 8, 9); // 9 September 2026
-    expect(nextReminderDate(2, today).toISOString().slice(0, 10)).toBe("2026-10-02");
-    expect(nextReminderDate(15, today).toISOString().slice(0, 10)).toBe("2026-09-15");
+    expect(localDate(nextReminderDate(2, today))).toBe("2026-10-02");
+    expect(localDate(nextReminderDate(15, today))).toBe("2026-09-15");
     // Days past the 28th are clamped so every month has the date.
     expect(nextReminderDate(31, today).getDate()).toBe(28);
   });
@@ -16,6 +21,8 @@ test.describe("Monthly reminder", () => {
     expect(ics).toContain("RRULE:FREQ=MONTHLY;BYMONTHDAY=2");
     expect(ics).toContain("DTSTART;VALUE=DATE:20261002");
     expect(ics).toContain("DTEND;VALUE=DATE:20261003");
+    // The creation stamp is the same instant in UTC whatever the local zone.
+    expect(ics).toContain(`DTSTAMP:${new Date(2026, 8, 9, 10, 30).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z")}`);
     expect(ics).toContain("UID:test@theincometracker.com");
     expect(ics).toContain("SUMMARY:Import last month's Monzo statement into The Income Tracker");
     // The bank guide link survives escaping and folding.

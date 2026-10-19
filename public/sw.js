@@ -13,7 +13,9 @@
 //     revalidate.
 //   - Cross-origin requests (Supabase, analytics, fonts): never intercepted.
 
-const VERSION = "it-sw-v3-wallet";
+const VERSION = "it-sw-v4-routes";
+// App pages have their own URLs (see src/routes.ts); offline they are served from the cached shell.
+const APP_ROUTES = ["/", "/dashboard", "/ledger", "/accounts", "/goals", "/insights", "/settings"];
 const SHELL_CACHE = `${VERSION}-shell`;
 const ASSET_CACHE = `${VERSION}-assets`;
 const OFFLINE_URL = "/offline.html";
@@ -70,7 +72,7 @@ async function networkFirst(request, cacheName) {
     const cached = await cache.match(request, { ignoreSearch: true });
     if (cached) return cached;
     const shell = await cache.match("/", { ignoreSearch: true });
-    if (shell && request.mode === "navigate" && new URL(request.url).pathname === "/") return shell;
+    if (shell && request.mode === "navigate" && APP_ROUTES.includes(new URL(request.url).pathname.replace(/\/+$/, "") || "/")) return shell;
     const offline = await cache.match(OFFLINE_URL);
     return offline || new Response("Offline", { status: 503, headers: { "content-type": "text/plain" } });
   }

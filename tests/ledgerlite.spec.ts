@@ -35,6 +35,9 @@ async function addIncome(page: Page, source: string, amount: number) {
   await page.locator(INCOME_AMOUNT).fill(String(amount));
   await page.locator(INCOME_AMOUNT).press("Enter");
   await expect.poll(() => inputValues(page, "input[aria-label='Income source']")).toContain(source);
+  // The app hands focus back to the add row on the next frame; wait for that so the
+  // next action cannot be redirected into the add row.
+  await expect(page.locator(INCOME_SOURCE)).toBeFocused();
 }
 
 async function addExpense(page: Page, name: string, amount: number) {
@@ -42,6 +45,9 @@ async function addExpense(page: Page, name: string, amount: number) {
   await page.locator(EXPENSE_AMOUNT).fill(String(amount));
   await page.locator(EXPENSE_AMOUNT).press("Enter");
   await expect.poll(() => inputValues(page, "input[aria-label='Expense name']")).toContain(name);
+  // The app hands focus back to the add row on the next frame; wait for that so a
+  // fill into another field straight afterwards cannot be redirected into the add row.
+  await expect(page.locator(EXPENSE_NAME)).toBeFocused();
 }
 
 async function groupExpenses(page: Page, first: string, second: string, category: string) {
@@ -54,7 +60,7 @@ async function groupExpenses(page: Page, first: string, second: string, category
 }
 
 async function uploadCsv(page: Page, csv: string) {
-  await page.locator('input[accept="text/csv,.csv,.ofx,.qif,.txt"]').setInputFiles({
+  await page.getByLabel("Import a bank statement file").setInputFiles({
     name: "bank.csv",
     mimeType: "text/csv",
     buffer: Buffer.from(csv),
@@ -192,9 +198,31 @@ test.describe("Ledger", () => {
     await addIncome(page, "Side gig", 50);
     const sources = () => inputValues(page, "input[aria-label='Income source']");
     const amounts = () => inputValues(page, ".incomeRow input[aria-label='Income amount']");
+    // A drag needs both rows on screen: the browser abandons the gesture if the page scrolls mid-drag.
+    // Starting a native drag is also timing-sensitive under load, so the gesture is repeated until
+    // the order actually changes.
+    const showRows = (index: number) => page.locator(".incomeRow").nth(index).evaluate((row) => row.scrollIntoView({ block: "center" }));
+    async function dragRow(from: number, to: number, edge: "before" | "after", expected: string[]) {
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        await showRows(Math.min(from, to) + 1);
+        // Let row and toast animations settle. allSettled: an animation that is cancelled
+        // mid-flight (a toast replaced, a row re-rendered) rejects its `finished` promise.
+        await page.evaluate(() => Promise.allSettled(document.getAnimations().map((animation) => animation.finished)));
+        const target = page.locator(".incomeRow").nth(to);
+        const box = await target.boundingBox();
+        const y = edge === "before" ? 4 : (box?.height ?? 40) - 4;
+        await page.locator(".incomeRow").nth(from).locator(".dragHandle").dragTo(target, { targetPosition: { x: 200, y } });
+        try {
+          await expect.poll(sources, { timeout: 1500 }).toEqual(expected);
+          return;
+        } catch {
+          // The gesture didn't take; try again.
+        }
+      }
+      await expect.poll(sources).toEqual(expected);
+    }
 
-    await page.locator(".incomeRow").nth(1).locator(".dragHandle").dragTo(page.locator(".incomeRow").nth(0), { targetPosition: { x: 200, y: 4 } });
-    await expect.poll(sources).toEqual(["Salary", "Amazon refund", "Amazon refund", "Side gig"]);
+    await dragRow(1, 0, "before", ["Salary", "Amazon refund", "Amazon refund", "Side gig"]);
 
     await page.locator(".incomeRow").nth(3).locator(".dragHandle").focus();
     await page.keyboard.press("ArrowUp");
@@ -208,12 +236,7 @@ test.describe("Ledger", () => {
     await expect.poll(sources).toEqual(["Salary", "Side gig", "Amazon refund", "Amazon refund"]);
 
     // Dragging from an automatic order keeps what was on screen, applies the move, and switches to custom.
-    // Moved rows replay their entry animation; let them settle before dragging.
-    await page.evaluate(() => Promise.all(document.getAnimations().map((animation) => animation.finished)));
-    const lastRow = page.locator(".incomeRow").nth(3);
-    const lastBox = await lastRow.boundingBox();
-    await page.locator(".incomeRow").nth(1).locator(".dragHandle").dragTo(lastRow, { targetPosition: { x: 200, y: (lastBox?.height ?? 40) - 4 } });
-    await expect.poll(sources).toEqual(["Salary", "Amazon refund", "Amazon refund", "Side gig"]);
+    await dragRow(1, 3, "after", ["Salary", "Amazon refund", "Amazon refund", "Side gig"]);
     await expect(order).toHaveValue("custom");
   });
 

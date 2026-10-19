@@ -44,6 +44,8 @@ interface GoalsViewProps {
   symbol: string;
   formatter: Intl.NumberFormat;
   privacy: boolean;
+  // Localises copy for the user's country (UK → US spellings and terms).
+  t?: (text: string) => string;
   onAddGoal: () => string;
   onUpdateGoal: (id: string, patch: Partial<SavingsGoal>) => void;
   onRemoveGoal: (id: string) => void;
@@ -65,6 +67,7 @@ export function GoalsView({
   symbol,
   formatter,
   privacy,
+  t = (text) => text,
   onAddGoal,
   onUpdateGoal,
   onRemoveGoal,
@@ -201,6 +204,7 @@ export function GoalsView({
             const outcome = goalSequence.goals.find((o) => o.goalId === goal.id) ?? null;
             return (
               <GoalCard
+                t={t}
                 key={goal.id}
                 goal={goal}
                 outcome={outcome}
@@ -376,6 +380,7 @@ function WaterfallTimeline({
 // ─── GoalCard ─────────────────────────────────────────────────────────────────
 
 function GoalCard({
+  t,
   goal,
   outcome,
   account,
@@ -398,6 +403,7 @@ function GoalCard({
   onDelete,
   onCancelDelete,
 }: {
+  t: (text: string) => string;
   goal: SavingsGoal;
   outcome: GoalOutcome | null;
   account: Account | null;
@@ -514,6 +520,7 @@ function GoalCard({
 
       {isEditing && (
         <GoalEditor
+          t={t}
           goal={goal}
           account={account}
           savingsAccounts={savingsAccounts}
@@ -534,6 +541,7 @@ function GoalCard({
 // ─── GoalEditor ───────────────────────────────────────────────────────────────
 
 function GoalEditor({
+  t,
   goal,
   account,
   savingsAccounts,
@@ -546,6 +554,7 @@ function GoalEditor({
   onDelete,
   onCancelDelete,
 }: {
+  t: (text: string) => string;
   goal: SavingsGoal;
   account: Account | null;
   savingsAccounts: Account[];
@@ -697,7 +706,7 @@ function GoalEditor({
             >
               <Info size={13} />
               <span className="goalEditorInfoTooltip">
-                Optional. If set, the engine compounds interest monthly on the accumulated balance — simulating the return you'd earn in a savings account or ISA.
+                {t("Optional. If set, the engine compounds interest monthly on the accumulated balance — simulating the return you'd earn in a savings account or ISA.")}
               </span>
             </span>
           </div>
@@ -705,7 +714,7 @@ function GoalEditor({
       </div>
 
       <div className="goalEditorRow">
-        <label>Colour</label>
+        <label>{t("Colour")}</label>
         <div className="goalColorPicker">
           {colors.slice(0, 8).map((c) => (
             <button

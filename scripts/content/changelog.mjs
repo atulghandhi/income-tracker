@@ -4,6 +4,20 @@
 
 export const CHANGELOG = [
   {
+    date: "2026-10-15",
+    title: "Import PDF bank statements directly",
+    body:
+      "Choose the PDF statement your bank gives you from Import data in Settings and review its transactions on the same screen as a CSV: categories suggested, duplicates unticked, transfers skipped, one-click undo. The statement's table is read in your browser and never uploaded. Built around Barclays, HSBC, Lloyds, Halifax, NatWest, Santander, Nationwide, TSB, Monzo, Starling, Revolut, Chase, first direct, Metro Bank, Virgin Money and American Express layouts, and it copes with most other UK and US banks. Dates printed without a year take it from the statement period, and the running balance is checked against every amount. A PDF it cannot read (a scanned image, say) gets a clear message and the paste route still works.",
+    href: "/guides/import-pdf-bank-statement.html",
+    hrefLabel: "How to import a PDF statement",
+  },
+  {
+    date: "2026-10-12",
+    title: "A US experience, customisable pages and page URLs",
+    body:
+      "Pick your country from the top bar. United States users get American account types — checking, HYSA, CDs, HSA and FSA, 401(k) and 403(b), traditional and Roth IRA, 529 plans, auto and student loans — with plan details for contributions, employer match, tax treatment and annual limits, a gross-to-net paycheck estimate, federal student-loan repayment plans, medical spending against your deductible, and FICO and VantageScore credit bands. UK users gain workplace pensions and SIPPs with employer contributions, ISA and pension allowance tracking, and a PAYE, National Insurance and student-loan take-home estimate. The Dashboard and Insights pages can now be rearranged, resized and trimmed, and every page has its own address so a refresh stays where you were.",
+  },
+  {
     date: "2026-09-16",
     title: "Seven more bank guides, four calculators, four templates and six guides",
     body:

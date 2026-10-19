@@ -8,6 +8,20 @@
     <language>en-gb</language>
     <lastBuildDate>Tue, 08 Sep 2026 09:00:00 GMT</lastBuildDate>
     <item>
+      <title>Update: Import PDF bank statements directly</title>
+      <link>https://www.theincometracker.com/whats-new.html</link>
+      <guid isPermaLink="true">https://www.theincometracker.com/whats-new.html#2026-10-15-import-pdf-bank-statements-directly</guid>
+      <pubDate>Thu, 15 Oct 2026 09:00:00 GMT</pubDate>
+      <description>Choose the PDF statement your bank gives you from Import data in Settings and review its transactions on the same screen as a CSV: categories suggested, duplicates unticked, transfers skipped, one-click undo. The statement's table is read in your browser and never uploaded. Built around Barclays, HSBC, Lloyds, Halifax, NatWest, Santander, Nationwide, TSB, Monzo, Starling, Revolut, Chase, first direct, Metro Bank, Virgin Money and American Express layouts, and it copes with most other UK and US banks. Dates printed without a year take it from the statement period, and the running balance is checked against every amount. A PDF it cannot read (a scanned image, say) gets a clear message and the paste route still works.</description>
+    </item>
+    <item>
+      <title>Update: A US experience, customisable pages and page URLs</title>
+      <link>https://www.theincometracker.com/whats-new.html</link>
+      <guid isPermaLink="true">https://www.theincometracker.com/whats-new.html#2026-10-12-a-us-experience-customisable-pages-and-p</guid>
+      <pubDate>Mon, 12 Oct 2026 09:00:00 GMT</pubDate>
+      <description>Pick your country from the top bar. United States users get American account types — checking, HYSA, CDs, HSA and FSA, 401(k) and 403(b), traditional and Roth IRA, 529 plans, auto and student loans — with plan details for contributions, employer match, tax treatment and annual limits, a gross-to-net paycheck estimate, federal student-loan repayment plans, medical spending against your deductible, and FICO and VantageScore credit bands. UK users gain workplace pensions and SIPPs with employer contributions, ISA and pension allowance tracking, and a PAYE, National Insurance and student-loan take-home estimate. The Dashboard and Insights pages can now be rearranged, resized and trimmed, and every page has its own address so a refresh stays where you were.</description>
+    </item>
+    <item>
       <title>Update: Seven more bank guides, four calculators, four templates and six guides</title>
       <link>https://www.theincometracker.com/whats-new.html</link>
       <guid isPermaLink="true">https://www.theincometracker.com/whats-new.html#2026-09-16-seven-more-bank-guides-four-calculators-</guid>
@@ -272,20 +286,6 @@
       <guid isPermaLink="true">https://www.theincometracker.com/compare/snoop-alternative.html</guid>
       <pubDate>Tue, 08 Sep 2026 09:00:00 GMT</pubDate>
       <description>Snoop is free but does little until you connect a bank, and manual accounts need Snoop Plus at £5.99 a month. The Income Tracker is free, CSV-based and private.</description>
-    </item>
-    <item>
-      <title>The Income Tracker vs Emma</title>
-      <link>https://www.theincometracker.com/compare/emma-alternative.html</link>
-      <guid isPermaLink="true">https://www.theincometracker.com/compare/emma-alternative.html</guid>
-      <pubDate>Tue, 08 Sep 2026 09:00:00 GMT</pubDate>
-      <description>Emma's tiers cost £4.99 to £14.99 a month and lock CSV import behind Pro. The Income Tracker is free, needs no bank connection and keeps data in your browser.</description>
-    </item>
-    <item>
-      <title>The best free budgeting apps in the UK (2026)</title>
-      <link>https://www.theincometracker.com/compare/best-free-budgeting-apps-uk.html</link>
-      <guid isPermaLink="true">https://www.theincometracker.com/compare/best-free-budgeting-apps-uk.html</guid>
-      <pubDate>Tue, 08 Sep 2026 09:00:00 GMT</pubDate>
-      <description>Ten free budgeting apps for UK users compared on price, open banking, manual or CSV entry and who each suits. Prices checked September 2026. Our own weaknesses included.</description>
     </item>
   </channel>
 </rss>

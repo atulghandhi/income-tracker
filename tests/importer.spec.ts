@@ -96,6 +96,26 @@ test.describe("CSV bank importer", () => {
     });
     expect(buildRulePattern("PRET A MANGER 1234")).toBe("pret manger");
   });
+
+  test("treats a card purchase as spending and a payment to a card as a debt payment", () => {
+    const result = parseBankCsv({
+      fileName: "statement.csv",
+      state: createInitialState(),
+      text: [
+        "Date,Description,Amount",
+        "23/12/2025,Card Payment to Amazon.co.uk,-34.99",
+        "19/12/2025,Card Payment to Sainsburys S/Mkts,-46.12",
+        "08/01/2026,Payment to Barclaycard,-120.00",
+        "26/01/2026,BARCLAYCARD CARD PAYMENT BP,-120.00",
+      ].join("\n"),
+    });
+    expect(result.rows.find((row) => row.description.includes("Amazon"))).toMatchObject({ kind: "expense", category: "Unsorted" });
+    expect(result.rows.find((row) => row.description.includes("Sainsburys"))).toMatchObject({ kind: "expense", category: "Food" });
+    expect(result.rows.filter((row) => row.description.includes("Barclaycard") || row.description.includes("BARCLAYCARD")).map((row) => row.kind)).toEqual([
+      "debt-payment",
+      "debt-payment",
+    ]);
+  });
 });
 
 test.describe("Pasted statement lines (PDF copy and paste)", () => {
@@ -151,6 +171,25 @@ test.describe("Display names for bank descriptors", () => {
       ["PAYPAL *EBAY", "eBay"],
       ["4332 07OCT26 , SQ *FLAT WHITE COFFEE , MANCHESTER GB", "Flat White Coffee"],
       ["HMRC GOV.UK SA", "HMRC SA"],
+      // Statement wording: "Received From", type codes after the details, payment types on a second line.
+      ["Received From Acme Ltd Ref: Salary Dec 25", "Acme"],
+      ["Refund From Amazon.co.uk", "Amazon"],
+      ["ACME LTD SALARY JAN 26 CR", "Acme Salary Jan 26"],
+      ["JANE DOE DINNER BP", "Jane Doe Dinner"],
+      ["Jane Doe Faster Payment: DINNER", "Jane Doe"],
+      ["London Borough of Camden Direct Debit: COUNCIL TAX", "London Borough of Camden"],
+      ["Savings Pot Pot transfer", "Savings Pot"],
+      ["ATM Kings Cross Cash withdrawal", "ATM Kings Cross"],
+      // NatWest/RBS: a two-row transaction joined into one description — the payee
+      // names it, never the Faster Payment reference or the ID that wrapped onto row two.
+      ["Automated Credit MANGOPAY S.A. MGP VINTED FP 28/08/26 12 34567890123456789012 BGC", "Mangopay S.A. Mgp Vinted"],
+      ["Automated Debit HOMETOWN LETTINGS RENT FLAT 4 FP 28/08/26 07 24681357924681357924 FPO", "Hometown Lettings Rent Flat"],
+      ["Automated Credit ACME LTD SALARY JUL 26 FP 31/07/26 09 12345678901234567890 BGC", "Acme Salary Jul 26"],
+      ["Cash Withdrawal NATWEST KINGS CROSS ATM 05AUG26 CSH", "Cash Withdrawal NATWEST"],
+      ["4332 28JUL26 CD , TESCO STORES 2423 , LONDON GB CPM", "Tesco Stores"],
+      // Santander: the payer after the comma names a giro credit, not the payment type.
+      ["BANK GIRO CREDIT REF ACME LTD SALARY, ACME LTD", "Acme"],
+      ["Card Transaction COSTA COFFEE LONDON", "Costa Coffee London"],
     ];
     for (const [raw, expected] of cases) expect(cleanMerchantName(raw), raw).toBe(expected);
   });

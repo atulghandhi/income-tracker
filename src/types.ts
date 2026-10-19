@@ -133,10 +133,48 @@ export type NameRule = {
   updatedAt: string;
 };
 
-export type DebtAccountType ="credit-card" | "loan" | "overdraft" | "other";
+// Debt sub-types. "loan" is the generic personal loan; mortgages, car finance and student loans
+// are their own types so the app can offer the right fields (amortisation term, repayment plan).
+export type DebtAccountType = "credit-card" | "loan" | "mortgage" | "auto-loan" | "student-loan" | "overdraft" | "other";
 
-// Asset sub-types (for the savings/debit/investment side)
-export type AssetAccountType = "current" | "savings" | "isa" | "investment" | "pension" | "other-asset";
+// Asset sub-types (for the savings/debit/investment side). Which of these a user is offered depends
+// on their country (see region.ts): "isa"/"lisa"/"pension"/"sipp" are UK instruments, "hysa"/"cd"/
+// "money-market"/"hsa"/"fsa"/"401k"/"403b"/"traditional-ira"/"roth-ira"/"529" are US ones. Every
+// type stays valid whatever the country, so switching country never rewrites an account.
+export type AssetAccountType =
+  | "current"
+  | "savings"
+  | "isa"
+  | "lisa"
+  | "hysa"
+  | "cd"
+  | "money-market"
+  | "hsa"
+  | "fsa"
+  | "investment"
+  | "pension"
+  | "sipp"
+  | "401k"
+  | "403b"
+  | "traditional-ira"
+  | "roth-ira"
+  | "529"
+  | "other-asset";
+
+// How contributions and growth are taxed. Defaults per type live in region.ts; a 401(k) can be
+// switched to "roth" by the user.
+export type TaxTreatment = "pre-tax" | "roth" | "taxable" | "tax-free" | "triple";
+
+// Where a contribution comes from. "payroll" money never reaches the user's bank account (it is
+// taken from gross pay before take-home), so it must not be subtracted from the ledger surplus,
+// which is built from take-home income. "personal" money moves out of the budget as before.
+export type ContributionSource = "personal" | "payroll";
+
+// US federal student-loan repayment plans (simplified).
+export type RepaymentPlan = "standard" | "graduated" | "extended" | "income-driven";
+
+// UK student-loan plans: repayments are a percentage of pay above the plan's threshold.
+export type UkStudentLoanPlan = "plan1" | "plan2" | "plan4" | "plan5" | "postgrad";
 
 // The high-level class decides whether the balance adds to or subtracts from net worth,
 // and which fields are meaningful.
@@ -186,14 +224,81 @@ export type Account = {
   includeInNetWorth: boolean;
   color: string;
   note: string;
+
+  // ── Optional plan details ─────────────────────────────────────────────────
+  // Everything below is optional and only offered for the account types it applies to. An account
+  // with none of it set behaves exactly as before. See retirement.ts and loans.ts.
+
+  // Retirement, pension and tax-advantaged accounts.
+  taxTreatment?: TaxTreatment;
+  contributionSource?: ContributionSource;
+  // Employee contribution as a % of gross pay. When set and a gross salary is known (taxProfile),
+  // `monthlyContribution` is kept in step with it by syncPlanContributions.
+  contributionPercent?: number;
+  // Employer money: a match on what the employee pays in ("100% of the first 4%") and/or a fixed
+  // % of pay regardless (UK auto-enrolment minimum 3%, US non-elective contributions). Resolved to
+  // `employerMonthlyContribution` when a salary is known; typed directly when it is not.
+  employerMatchPercent?: number;
+  employerMatchCapPercent?: number;
+  employerContributionPercent?: number;
+  employerMonthlyContribution?: number;
+  // Contribution limits: the statutory annual limit is looked up by type and year; these adjust it.
+  annualLimitOverride?: number;
+  catchUpEligible?: boolean;
+  coverage?: "self" | "family";
+
+  // Fixed terms: a CD's term, or a loan's remaining amortisation term in months.
+  termMonths?: number;
+
+  // Student loans.
+  studentLoanType?: "federal" | "private";
+  repaymentPlan?: RepaymentPlan;
+  studentLoanPlan?: UkStudentLoanPlan;
+  familySize?: number;
 };
 
 // Back-compat alias for code/signatures still referring to a debt account shape.
 export type DebtAccount = Account;
 
+// Gross-to-net inputs shared by the US and UK estimators, and by workplace-plan contributions that
+// are expressed as a % of pay. Every figure is optional; the estimators say so loudly.
+export type TaxProfile = {
+  grossAnnualSalary: number;
+  payFrequency: PayFrequency;
+  // US
+  filingStatus: FilingStatus;
+  state: string;
+  stateRateOverride: number | null;
+  // UK
+  studentLoanPlan: UkStudentLoanPlan | "none";
+  postgradLoan: boolean;
+  // Estimated monthly health-insurance premium taken before tax (US). Kept here rather than on the
+  // health plan so the estimator works without one.
+  preTaxHealthPremiumMonthly: number;
+};
+
+export type PayFrequency = "monthly" | "semimonthly" | "biweekly" | "weekly";
+export type FilingStatus = "single" | "married-joint" | "married-separate" | "head";
+
+// US health cover: what the plan costs and where the deductible / out-of-pocket maximum sit, so
+// medical spending in the ledger can be measured against them.
+export type HealthPlan = {
+  planType: "" | "hdhp" | "ppo" | "hmo" | "epo" | "other";
+  coverage: "self" | "family";
+  premiumMonthly: number;
+  deductible: number;
+  outOfPocketMax: number;
+  // 1 = January. Most plans run on the calendar year.
+  planYearStartMonth: number;
+};
+
 export type LedgerState = {
   schemaVersion: number;
   currency: CurrencyCode;
+  // Decides labels, account types and which region-specific tools show. See region.ts.
+  country: CountryCode;
+  taxProfile: TaxProfile;
+  healthPlan: HealthPlan;
   selectedMonth: string;
   months: Record<string, MonthBudget>;
   /** Multi-goal list, ordered by priority ascending. Replaces the old single `goal`. */
@@ -254,7 +359,12 @@ export type AssetSummary = {
   totalCash: number;
   totalSavings: number;
   totalInvestments: number;
+  // Everything going into asset accounts each month: the user's contributions plus employer money.
   monthlyContributions: number;
+  // The part that leaves the budget (personal contributions, not payroll or employer ones).
+  cashContributions: number;
+  payrollContributions: number;
+  employerContributions: number;
   weightedAssetRate: number;
 };
 
@@ -346,3 +456,7 @@ export type GoalSequenceResult = {
 };
 
 export type CurrencyCode = "GBP" | "USD" | "EUR" | "CAD" | "AUD" | "INR" | "JPY";
+
+// Countries the app can be set to. "US" and "GB" have their own experience; the rest use the
+// GB-geared app with their own currency.
+export type CountryCode = "US" | "GB" | "IE" | "CA" | "AU" | "IN" | "JP" | "OTHER";
