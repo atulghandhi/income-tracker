@@ -186,8 +186,8 @@ type BuildImportRowOptions = {
   noteOverride?: string;
 };
 
-// Single point every capture path funnels through — CSV rows, pasted lines, OFX/QIF
-// records, and staged bank-feed transactions all become the same reviewable row.
+// Single point every capture path funnels through — CSV rows, pasted lines
+// and OFX/QIF records all become the same reviewable row.
 export function buildImportRow({
   rowNumber,
   date,
