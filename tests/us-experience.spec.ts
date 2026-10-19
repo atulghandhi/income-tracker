@@ -55,7 +55,8 @@ test.describe("US experience", () => {
     // The "i" beside the type explains it.
     await editor.getByLabel("Account type").selectOption("student-loan");
     await editor.getByLabel("What is a Student loan?").hover();
-    await expect(editor.getByText(/Federal loans have fixed rates/)).toBeVisible();
+    // Hints open at the document root so they are never clipped by the panel they sit in.
+    await expect(page.getByRole("tooltip")).toContainText(/Federal loans have fixed rates/);
 
     // A refresh stays on the Accounts page, still in the US experience.
     await page.waitForTimeout(1000);

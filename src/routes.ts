@@ -1,9 +1,9 @@
 // Each app view has its own URL (/dashboard, /ledger, …) so a refresh or a shared link lands on
 // the same page instead of bouncing back to the dashboard.
 
-export type AppView = "dashboard" | "ledger" | "accounts" | "goals" | "insights" | "settings";
+export type AppView = "dashboard" | "ledger" | "accounts" | "goals" | "allocate" | "insights" | "settings";
 
-export const APP_VIEWS: AppView[] = ["dashboard", "ledger", "accounts", "goals", "insights", "settings"];
+export const APP_VIEWS: AppView[] = ["dashboard", "ledger", "accounts", "goals", "allocate", "insights", "settings"];
 
 export const DEFAULT_VIEW: AppView = "dashboard";
 

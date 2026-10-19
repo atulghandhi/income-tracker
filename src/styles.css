@@ -623,13 +623,6 @@ textarea {
   margin-left: auto;
 }
 
-.appBarTitle h2 {
-  margin: 0;
-  color: var(--ink);
-  font-size: 25px;
-  font-weight: 560;
-}
-
 .searchShell {
   min-height: 40px;
   display: flex;
@@ -2581,11 +2574,13 @@ textarea:focus,
   outline: 0;
 }
 
-.infoHint > span {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 10px);
-  z-index: 20;
+.infoHint.isOpen {
+  color: var(--blue);
+}
+
+.infoHintBubble {
+  position: fixed;
+  z-index: 1000;
   width: min(320px, calc(100vw - 36px));
   padding: 10px 12px;
   border: 1px solid var(--line-strong);
@@ -2597,18 +2592,34 @@ textarea:focus,
   font-size: 12px;
   font-weight: 600;
   line-height: 1.45;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(4px);
-  transition:
-    opacity 150ms ease,
-    transform 150ms ease;
+  text-align: left;
+  white-space: normal;
+  animation: hintIn 140ms ease both;
 }
 
-.infoHint:hover > span,
-.infoHint:focus-visible > span {
-  opacity: 1;
-  transform: translateY(0);
+@keyframes hintIn {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.infoHintBubble ul,
+.infoHintBubble ol {
+  margin: 6px 0 0;
+  padding-left: 16px;
+}
+
+.infoHintBubble li + li {
+  margin-top: 4px;
+}
+
+.infoHintBubble b {
+  color: var(--ink);
 }
 
 /* Themed instant tooltip for icon buttons and toggles — replaces native title
@@ -3515,15 +3526,6 @@ hr {
   height: 24px;
 }
 
-.signalCard .infoHint > span {
-  top: calc(100% + 8px);
-  right: -4px;
-  bottom: auto;
-  border-color: rgba(var(--mint-rgb), 0.35);
-  background: rgba(var(--bg-rgb), 0.99);
-  color: rgba(var(--ink-rgb), 0.96);
-}
-
 .settingsHeader {
   min-height: 120px;
 }
@@ -4252,7 +4254,7 @@ hr {
   }
 
   .navStack {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
   }
 
   .navItem {
@@ -7746,4 +7748,950 @@ select:not([multiple]):disabled {
 /* Country + currency stack in Settings. */
 .compactSetting .selectField + .selectField {
   margin-top: 10px;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ALLOCATE VIEW — debt payoff and lump-sum allocation planner
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.allocateView {
+  gap: 18px;
+}
+
+.pageHeader p.withHint .infoHint {
+  width: 24px;
+  height: 24px;
+  margin-left: 2px;
+  vertical-align: middle;
+}
+
+.allocateGrid {
+  display: grid;
+  grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.allocateInputs,
+.allocateResults {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+.allocateInputs > *,
+.allocateResults > * {
+  min-width: 0;
+}
+
+.allocatePanel {
+  min-height: 0;
+}
+
+.allocateFields {
+  margin-top: 16px;
+}
+
+.allocateFields .planField > select {
+  min-height: 38px;
+  padding: 0 28px 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface);
+  color: var(--ink);
+}
+
+.allocateFieldHint {
+  display: block;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.allocateFieldHint .inlineLinkBtn {
+  font-size: 11.5px;
+}
+
+.allocateNote {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(var(--blue-rgb), 0.25);
+  border-radius: var(--radius);
+  background: rgba(var(--blue-rgb), 0.06);
+  color: var(--ink);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.allocateNote svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--blue);
+}
+
+.allocateNote.warn {
+  border-color: rgba(var(--amber-rgb), 0.35);
+  background: rgba(var(--amber-rgb), 0.08);
+}
+
+.allocateNote.warn svg {
+  color: var(--amber);
+}
+
+.allocateNote .inlineLinkBtn {
+  font-size: 12.5px;
+  color: var(--blue);
+}
+
+/* Taxable lump sum (UK) */
+.planCheckRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  grid-column: 1 / -1;
+  padding: 0 0 0 24px;
+}
+
+.planCheckRow .planCheck {
+  min-height: 30px;
+}
+
+.lumpTaxResult {
+  grid-column: 1 / -1;
+  padding: 12px 14px;
+  border: 1px solid rgba(var(--amber-rgb), 0.35);
+  border-radius: var(--radius);
+  background: rgba(var(--amber-rgb), 0.07);
+}
+
+.lumpTaxHeadline {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.lumpTaxHeadline > div {
+  display: grid;
+  gap: 3px;
+  flex: 1 1 auto;
+}
+
+.lumpTaxHeadline > .infoHint {
+  margin-left: auto;
+}
+
+.lumpTaxHeadline span {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 720;
+}
+
+.lumpTaxHeadline strong {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 18px;
+}
+
+.lumpTaxHeadline em {
+  color: var(--muted);
+  font-size: 11.5px;
+  font-style: normal;
+}
+
+.lumpTaxLines {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0 0;
+  padding: 10px 0 0;
+  border-top: 1px solid rgba(var(--amber-rgb), 0.25);
+  list-style: none;
+}
+
+.lumpTaxLines li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.lumpTaxLines li em {
+  color: var(--muted);
+  font-style: normal;
+}
+
+.lumpTaxLines li strong {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Priority picker */
+.priorityList {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.priorityOption {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(var(--surface-rgb), 0.5);
+  color: var(--ink);
+  text-align: left;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease;
+}
+
+.priorityOption:hover {
+  border-color: rgba(var(--blue-rgb), 0.35);
+}
+
+.priorityOption.isActive {
+  border-color: rgba(var(--blue-rgb), 0.55);
+  background: rgba(var(--blue-rgb), 0.08);
+}
+
+.priorityRadio {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 50%;
+  color: var(--on-accent);
+}
+
+.priorityOption.isActive .priorityRadio {
+  border-color: var(--blue);
+  background: var(--blue);
+}
+
+.priorityText {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.priorityText strong {
+  font-size: 13.5px;
+  font-weight: 650;
+}
+
+.priorityText em {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.4;
+}
+
+.priorityList.compact .priorityOption {
+  padding: 7px 10px;
+}
+
+.priorityMethodChip {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 8px 4px 0;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgba(var(--mint-rgb), 0.14);
+  color: var(--mint);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.panelTitleActions .priorityMethodChip {
+  margin: 0;
+}
+
+.customShares {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.customShares .planField.wide,
+.customShares .allocateNote {
+  grid-column: 1 / -1;
+}
+
+/* Headline metrics */
+.allocateMetrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.allocateMetrics > div {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-height: 96px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(var(--surface-rgb), 0.54);
+}
+
+.allocateMetrics span {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11.5px;
+  font-weight: 720;
+}
+
+.allocateMetrics strong {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 19px;
+  line-height: 1.15;
+}
+
+.allocateMetrics em {
+  color: var(--muted);
+  font-size: 11.5px;
+  font-style: normal;
+  line-height: 1.4;
+}
+
+/* Split bars */
+.splitBlock + .splitBlock {
+  margin-top: 18px;
+}
+
+.splitBlock h4 {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 16px 0 10px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.splitBlock h4 small {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.splitBarTrack {
+  display: flex;
+  gap: 2px;
+  height: 18px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--track);
+}
+
+.splitBarSegment {
+  display: block;
+  min-width: 3px;
+  height: 100%;
+  transition: width 320ms ease;
+}
+
+.splitBarLegend {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 6px 18px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.splitBarLegend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12.5px;
+}
+
+.splitBarLegend .splitBarName {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.splitBarLegend strong {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+}
+
+.splitBarLegend em {
+  min-width: 38px;
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+  text-align: right;
+}
+
+/* Tables */
+.payoffTableWrap {
+  margin-top: 16px;
+  overflow-x: auto;
+}
+
+.payoffTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.payoffTable th {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 720;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.payoffTable th .infoHint {
+  width: 18px;
+  height: 18px;
+  margin-left: 2px;
+  vertical-align: middle;
+}
+
+.payoffTable td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.payoffTable td:nth-child(2) .swatch {
+  margin-right: 6px;
+}
+
+.payoffTable td strong {
+  font-family: var(--sans, inherit);
+  font-weight: 650;
+}
+
+.payoffTable td em {
+  display: block;
+  color: var(--muted);
+  font-family: var(--sans, inherit);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.payoffTable tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.payoffTable tr.isCleared td {
+  color: var(--muted);
+}
+
+.payoffTable tr.isExcluded td {
+  color: var(--muted);
+}
+
+.payoffTable td em .infoHint {
+  width: 18px;
+  height: 18px;
+  margin-left: 2px;
+  vertical-align: middle;
+}
+
+.payoffTable input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--blue);
+}
+
+.compareTable tbody tr:not(.isBaseline) {
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.compareTable tbody tr:not(.isBaseline):hover {
+  background: rgba(var(--blue-rgb), 0.05);
+}
+
+.compareTable tbody tr:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: -2px;
+}
+
+.compareTable tr.isSelected td {
+  background: rgba(var(--blue-rgb), 0.08);
+}
+
+.compareTable tr.isSelected td:first-child {
+  box-shadow: inset 3px 0 0 var(--blue);
+}
+
+.compareTable tr.isBaseline td {
+  color: var(--muted);
+  background: var(--well);
+}
+
+.compareTable td.isBest {
+  color: var(--mint);
+  font-weight: 700;
+}
+
+.compareTable td.isBest svg {
+  margin-right: 4px;
+  vertical-align: -2px;
+}
+
+.compareTable.mini {
+  font-size: 12px;
+}
+
+.compareTable.mini td,
+.compareTable.mini th {
+  padding: 6px 8px;
+}
+
+/* Debt path chart */
+.debtPathChart {
+  margin-top: 14px;
+}
+
+.debtPathChart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.chartGrid {
+  stroke: var(--line);
+  stroke-dasharray: 2 4;
+}
+
+.chartAxis {
+  stroke: var(--line-strong);
+}
+
+.chartAxisLabel {
+  fill: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chartLine {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.chartLine.selected {
+  stroke: var(--blue);
+}
+
+.chartLine.baseline {
+  stroke: var(--faint);
+  stroke-width: 2;
+  stroke-dasharray: 6 5;
+}
+
+.chartLine.savings {
+  stroke: var(--mint);
+}
+
+.chartMarker {
+  stroke: var(--blue);
+  stroke-width: 1.2;
+  stroke-dasharray: 3 3;
+  opacity: 0.7;
+}
+
+.chartMarkerLabel {
+  fill: var(--blue);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.chartLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.chartLegend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.legendLine {
+  display: inline-block;
+  width: 22px;
+  height: 0;
+  border-top: 2.5px solid var(--blue);
+}
+
+.legendLine.baseline {
+  border-top-style: dashed;
+  border-top-color: var(--faint);
+}
+
+.legendLine.savings {
+  border-top-color: var(--mint);
+}
+
+/* Strategy bars */
+.strategyCharts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 18px 28px;
+  margin-top: 20px;
+}
+
+.strategyChartHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 32px;
+  margin-bottom: 8px;
+}
+
+.strategyChartHead h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.strategyChartHead select {
+  min-height: 30px;
+  padding: 0 26px 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface);
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.strategyBars {
+  display: grid;
+  gap: 4px;
+}
+
+.strategyBar {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr) 84px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  transition: background 120ms ease;
+}
+
+.strategyBar:hover {
+  background: rgba(var(--blue-rgb), 0.05);
+}
+
+.strategyBar.isSelected {
+  border-color: rgba(var(--blue-rgb), 0.35);
+  background: rgba(var(--blue-rgb), 0.07);
+}
+
+.strategyBarName {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.strategyBarTrack {
+  display: block;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--track);
+}
+
+.strategyBarTrack i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: rgba(var(--blue-rgb), 0.55);
+  transition: width 320ms ease;
+}
+
+.strategyBar.isBest .strategyBarTrack i {
+  background: var(--mint);
+}
+
+.strategyBarTrack i.isNull {
+  background: repeating-linear-gradient(90deg, var(--track) 0 6px, rgba(var(--ink-rgb), 0.12) 6px 12px);
+}
+
+.strategyBar strong {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  text-align: right;
+}
+
+.strategyBar.isBest strong {
+  color: var(--mint);
+}
+
+/* Destinations */
+.destinationList {
+  display: grid;
+  gap: 6px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.destinationList li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(var(--surface-rgb), 0.5);
+}
+
+.destinationList li.isFirst {
+  border-color: rgba(var(--mint-rgb), 0.45);
+  background: rgba(var(--mint-rgb), 0.07);
+}
+
+.destinationRank {
+  flex: 0 0 auto;
+  width: 20px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 720;
+}
+
+.destinationName {
+  flex: 1 1 auto;
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.destinationName strong {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.destinationName em {
+  color: var(--muted);
+  font-size: 11.5px;
+  font-style: normal;
+}
+
+.destinationRate {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+}
+
+/* Notice */
+.allocateNotice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 24px;
+  padding: 12px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: rgba(var(--surface-rgb), 0.5);
+  color: var(--ink);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.allocateNoticeHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.allocateNoticeHead svg {
+  color: var(--mint);
+}
+
+.allocateNoticeHead h4 {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.allocateNotice p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.allocateNotice a {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--blue);
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.allocateNotice a:hover {
+  text-decoration: underline;
+}
+
+.allocateRiskLine {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 12px 0 0;
+  color: var(--amber);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Next moves (page + widget) */
+.nextMoves {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(var(--surface-rgb), 0.54);
+}
+
+.nextMovesTitle {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 720;
+}
+
+.nextMoves ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nextMoves li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+}
+
+.nextMoves li > span:nth-child(2) {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nextMoves li strong {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.nextMovesMore {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+/* Widget */
+.payoffPanel .payoffStats {
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  margin-top: 16px;
+}
+
+.payoffPanel .payoffStats div {
+  min-height: 74px;
+  gap: 4px;
+}
+
+.payoffPanel .payoffStats strong {
+  font-size: 16px;
+}
+
+.payoffPanel .payoffStats em {
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.payoffSparkline {
+  display: block;
+  width: 100%;
+  height: 56px;
+  margin-top: 14px;
+}
+
+.payoffSparkline .chartLine {
+  vector-effect: non-scaling-stroke;
+}
+
+@media (max-width: 1100px) {
+  .allocateGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .allocateInputs {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .strategyBar {
+    grid-template-columns: 104px minmax(0, 1fr) 72px;
+  }
+
+  .customShares {
+    grid-template-columns: 1fr;
+  }
 }

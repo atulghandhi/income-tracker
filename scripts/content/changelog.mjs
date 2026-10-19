@@ -4,6 +4,12 @@
 
 export const CHANGELOG = [
   {
+    date: "2026-10-18",
+    title: "Allocate: debt payoff strategies and lump-sum planning",
+    body:
+      "A new Allocate page in the sidebar splits your spare money each month, and any one-off lump sum, between the debts on Accounts, a cash buffer, a tax bill and savings. Pick the priority — least interest (avalanche), lower payments soonest, quick wins (snowball), credit-score recovery, cash buffer first, tax bill first, balanced or your own percentages — and choose where savings go: highest safe rate, highest expected return, tax wrappers first or your goals. Every strategy is simulated month by month against paying minimums only and compared on interest, debt-free date, monthly payments, card utilisation, buffer and net position, with a 0% promo guard and payment rollover. UK users can mark a lump sum as taxable — freelance income, rental profit, interest, dividends or a capital gain — and the tax to set aside is worked out from your salary band and held back before anything is allocated. A Debt payoff plan widget joins Insights and the Dashboard tray. Illustrations from your own figures, not advice, with free debt help linked on the page.",
+  },
+  {
     date: "2026-10-15",
     title: "Import PDF bank statements directly",
     body:

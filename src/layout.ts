@@ -105,6 +105,16 @@ const DASHBOARD_WIDGETS: WidgetDefinition[] = [
     defaultSize: "m",
     sizes: ["s", "m", "l"],
   },
+  {
+    id: "payoff",
+    title: { GB: "Debt payoff plan", US: "Debt payoff plan" },
+    description: {
+      GB: "Your chosen payoff strategy: debt-free date, interest saved against minimums, and this month's move.",
+      US: "Your chosen payoff strategy: debt-free date, interest saved against minimums, and this month's move.",
+    },
+    defaultSize: "m",
+    sizes: ["s", "m", "l", "xl"],
+  },
 ];
 
 const INSIGHTS_WIDGETS: WidgetDefinition[] = [
@@ -190,6 +200,16 @@ const INSIGHTS_WIDGETS: WidgetDefinition[] = [
     sizes: ["s", "m", "l", "xl"],
   },
   {
+    id: "payoff",
+    title: { GB: "Debt payoff plan", US: "Debt payoff plan" },
+    description: {
+      GB: "Payoff strategies compared: interest, debt-free date and monthly payments under each, with your chosen plan's next move.",
+      US: "Payoff strategies compared: interest, debt-free date and monthly payments under each, with your chosen plan's next move.",
+    },
+    defaultSize: "l",
+    sizes: ["s", "m", "l", "xl"],
+  },
+  {
     id: "recurring",
     title: { GB: "Recurring payments", US: "Recurring payments" },
     description: { GB: "Subscriptions and repeating payments found in your ledger.", US: "Subscriptions and repeating payments found in your ledger." },
@@ -212,8 +232,8 @@ const DEFAULT_IDS: Record<LayoutPage, Record<RegionKey, string[]>> = {
     US: ["snapshot", "net-worth", "retirement", "take-home", "medical", "loans", "accounts-imports"],
   },
   insights: {
-    GB: ["summary", "cash-flow", "health", "chart", "categories", "anomalies", "recurring", "annual"],
-    US: ["summary", "cash-flow", "health", "chart", "categories", "anomalies", "take-home-full", "limits", "credit", "medical", "loans", "recurring", "annual"],
+    GB: ["summary", "cash-flow", "health", "chart", "categories", "anomalies", "payoff", "recurring", "annual"],
+    US: ["summary", "cash-flow", "health", "chart", "categories", "anomalies", "take-home-full", "limits", "credit", "payoff", "medical", "loans", "recurring", "annual"],
   },
 };
 

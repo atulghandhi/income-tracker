@@ -242,6 +242,8 @@ export function buildSampleLedger(country: CountryCode, today = new Date()): Led
     defaultAccountId: accounts[0]?.id ?? null,
     taxProfile: { ...base.taxProfile, ...spec.taxProfile },
     healthPlan: { ...base.healthPlan, ...(spec.healthPlan ?? {}) },
+    // A bonus to split on the Allocate page, so the lump-sum charts have something to show.
+    allocation: { ...base.allocation, lumpSum: region === "US" ? 4_000 : 2_500 },
     lastSavedAt: today.toISOString(),
   };
 }

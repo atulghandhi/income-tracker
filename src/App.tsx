@@ -18,6 +18,7 @@ import {
   CircleHelp,
   ClipboardPaste,
   Cloud,
+  Coins,
   CreditCard,
   Database,
   Download,
@@ -161,6 +162,8 @@ import {
   type RegionKey,
 } from "./region";
 import { syncPlanContributions } from "./retirement";
+import { buildPlanInputs, comparePlans, normalizeAllocationSettings } from "./allocate";
+import { AllocateView, PayoffWidget } from "./AllocateView";
 import { buildPlanSignals } from "./planSignals";
 import { interpretCreditScore } from "./creditScore";
 import { APP_VIEWS, DEFAULT_VIEW, pathForView, viewFromPath, type AppView } from "./routes";
@@ -198,6 +201,7 @@ import type {
   Account,
   AccountClass,
   AccountType,
+  AllocationSettings,
   CategoryRule,
   CountryCode,
   CurrencyCode,
@@ -338,6 +342,22 @@ const TUTORIALS_GB: Record<AppView, PageTutorial> = {
       },
     ],
   },
+  allocate: {
+    title: "Decide where spare money goes",
+    badge: "Allocate",
+    steps: [
+      {
+        heading: "",
+        bullets: [
+          "Type a one-off lump sum (a bonus, a refund) and check the spare-per-month figure from your ledger.",
+          "Pick a priority: least interest (avalanche), quick wins (snowball), lower payments soonest, credit score recovery, a cash buffer or a tax bill first.",
+          "Charts compare every strategy against paying minimums only: interest, debt-free date, payments and card utilisation.",
+          "Choose where savings go too — highest safe rate, highest expected return, tax wrappers or your goals.",
+          "Illustrations from your figures, not advice — free debt help is linked at the bottom.",
+        ],
+      },
+    ],
+  },
   insights: {
     title: "Spot the trends",
     badge: "Insights",
@@ -447,6 +467,22 @@ const TUTORIALS_US: Record<AppView, PageTutorial> = {
           "Pick how it's funded: Fixed, Auto, or Fill from spare surplus.",
           "Link a goal to a HYSA or brokerage account and its balance and contributions flow in automatically.",
           "The timeline shows when each goal completes; higher-priority goals are funded first.",
+        ],
+      },
+    ],
+  },
+  allocate: {
+    title: "Decide where spare money goes",
+    badge: "Allocate",
+    steps: [
+      {
+        heading: "",
+        bullets: [
+          "Type a one-off lump sum (a bonus, a tax refund) and check the spare-per-month figure from your ledger.",
+          "Pick a priority: least interest (avalanche), quick wins (snowball), lower payments soonest, credit score recovery, a cash buffer or estimated taxes first.",
+          "Charts compare every strategy against paying minimums only: interest, debt-free date, payments and card utilization.",
+          "Choose where savings go too — highest safe APY, highest expected return, tax-advantaged accounts or your goals.",
+          "Illustrations from your figures, not advice — free credit counseling is linked at the bottom.",
         ],
       },
     ],
@@ -881,6 +917,30 @@ function App() {
         dedicatedMonthly: goalPlan.dedicatedMonthly,
       }),
     [ledger.goals, goalPlannerSurplus, ledger.goalsHorizonMonths, goalPlan.dedicatedMonthly],
+  );
+  // The Allocate page and its widget: every payoff strategy simulated from the live debts, the
+  // same spare-per-month figure the goal planner uses, and the saved plan settings.
+  // "Spare each month" for the plan is the ledger's own figure, whatever the Goals page was told.
+  const ledgerSpare = ledger.goalPlannerSurplus === null
+    ? goalPlannerSurplus
+    : goalPlanInputs({ goals: ledger.goals, accounts: effectiveAccounts, month: currentMonth, recurringSurplus: projection.recurringMonthlySurplus, override: null }).monthlySurplus;
+  const allocationPlan = useMemo(
+    () =>
+      comparePlans(
+        buildPlanInputs({
+          accounts: effectiveAccounts,
+          goals: ledger.goals,
+          settings: ledger.allocation,
+          monthlySurplus: ledgerSpare,
+          monthlyExpenses: projection.recurringMonthlyExpenses,
+          assumedInvestmentReturn: ledger.assumedInvestmentReturn,
+          region,
+          country: ledger.country,
+          taxProfile: ledger.taxProfile,
+        }),
+        ledger.allocation.priority,
+      ),
+    [effectiveAccounts, ledger.goals, ledger.allocation, ledgerSpare, projection.recurringMonthlyExpenses, ledger.assumedInvestmentReturn, region, ledger.country, ledger.taxProfile],
   );
   const selectedYear = ledger.selectedMonth.split("-")[0];
   const menuExpense = categoryMenu ? currentMonth.expenses.find((expense) => expense.id === categoryMenu.expenseId) : undefined;
@@ -1376,6 +1436,12 @@ function App() {
       ...syncLedgerLinks(updater(current)),
       lastSavedAt: new Date().toISOString(),
     }));
+  }
+
+  function updateAllocation(patch: Partial<AllocationSettings>) {
+    updateLedger((current) => ({ ...current, allocation: { ...current.allocation, ...patch } }));
+    const field = Object.keys(patch)[0];
+    if (field) track("allocation_changed", { field, ...(field === "priority" || field === "savingsPriority" ? { value: String(patch[field as keyof AllocationSettings]) } : {}) });
   }
 
   function updateCurrentMonth(updater: (month: MonthBudget) => MonthBudget) {
@@ -2918,6 +2984,8 @@ function App() {
         return <CreditScoreWidget estimate={healthScore.estimatedCreditScore} noData={healthScore.noData} region={region} privacy={ledger.privacyMode} />;
       case "goals":
         return <GoalsWidget goals={ledger.goals} goalSequence={goalSequence} formatter={moneyFormatter} privacy={ledger.privacyMode} onOpenGoals={() => setActiveView("goals")} />;
+      case "payoff":
+        return <PayoffWidget comparison={allocationPlan} settings={ledger.allocation} formatter={moneyFormatter} privacy={ledger.privacyMode} t={t} onOpen={() => setActiveView("allocate")} onOpenAccounts={() => setActiveView("accounts")} />;
       default:
         return null;
     }
@@ -3078,6 +3146,8 @@ function App() {
         );
       case "loans":
         return <LoansWidget accounts={effectiveAccounts} region={region} taxProfile={ledger.taxProfile} formatter={moneyFormatter} privacy={ledger.privacyMode} onOpenAccounts={() => setActiveView("accounts")} />;
+      case "payoff":
+        return <PayoffWidget comparison={allocationPlan} settings={ledger.allocation} formatter={moneyFormatter} privacy={ledger.privacyMode} t={t} compare onOpen={() => setActiveView("allocate")} onOpenAccounts={() => setActiveView("accounts")} />;
       case "recurring":
         return (
           <section className="miniPanel subscriptionsPanel" aria-label="Recurring payments">
@@ -3184,21 +3254,10 @@ function App() {
     { id: "ledger", label: "Ledger", icon: <ReceiptText size={20} /> },
     { id: "accounts", label: "Accounts", icon: <CreditCard size={20} /> },
     { id: "goals", label: "Goals", icon: <Target size={20} /> },
+    { id: "allocate", label: "Allocate", icon: <Coins size={20} /> },
     { id: "insights", label: "Insights", icon: <LineChart size={20} /> },
     { id: "settings", label: "Settings", icon: <SettingsIcon size={20} /> },
   ];
-  const activeTitle =
-    activeView === "dashboard"
-      ? "Dashboard"
-      : activeView === "ledger"
-        ? "Ledger"
-        : activeView === "accounts"
-          ? "Accounts"
-          : activeView === "goals"
-            ? "Goals"
-            : activeView === "insights"
-              ? "Insights"
-              : "Settings";
   const insightChartTitle =
     insightChartView === "cash-flow"
       ? "Cash flow volatility"
@@ -3332,8 +3391,10 @@ function App() {
 
       <div className="workspace">
         <header className="appBar">
+          {/* The page names itself in its own header below, so the bar only carries controls:
+              the month switcher on the Ledger, and the country, theme and privacy toggles. */}
           <div className="appBarTitle">
-            {activeView === "ledger" ? (
+            {activeView === "ledger" && (
               <div className="monthSwitch" aria-label="Selected month">
                 <button className="iconButton" type="button" onClick={() => changeMonth(-1)} aria-label="Previous month" aria-keyshortcuts="Alt+ArrowLeft">
                   <ChevronLeft size={19} />
@@ -3345,8 +3406,6 @@ function App() {
                   <ChevronRight size={19} />
                 </button>
               </div>
-            ) : (
-              <h2>{activeTitle}</h2>
             )}
           </div>
 
@@ -4084,6 +4143,26 @@ function App() {
               onReorderGoal={reorderGoal}
               onSurplusOverride={(v) => updateLedger((c) => ({ ...c, goalPlannerSurplus: v }))}
               onHorizonChange={(h) => updateLedger((c) => ({ ...c, goalsHorizonMonths: h }))}
+            />
+          )}
+
+          {activeView === "allocate" && (
+            <AllocateView
+              comparison={allocationPlan}
+              settings={ledger.allocation}
+              ledgerSurplus={ledgerSpare}
+              monthlyExpenses={projection.recurringMonthlyExpenses}
+              assumedInvestmentReturn={ledger.assumedInvestmentReturn}
+              region={region}
+              country={ledger.country}
+              taxProfile={ledger.taxProfile}
+              symbol={currencySymbol}
+              formatter={moneyFormatter}
+              privacy={ledger.privacyMode}
+              t={t}
+              onChange={updateAllocation}
+              onOpenAccounts={() => setActiveView("accounts")}
+              onOpenGoals={() => setActiveView("goals")}
             />
           )}
 
@@ -7566,6 +7645,8 @@ function normalizeStateFields(rawState: Partial<LedgerState>): LedgerState {
     importBatches: normalizeImportBatches(state.importBatches),
     privacyMode: Boolean(state.privacyMode),
     aiCategorizationEnabled: Boolean(state.aiCategorizationEnabled),
+    // v9 → v10: ledgers saved before the Allocate page existed start on the default plan.
+    allocation: normalizeAllocationSettings(state.allocation),
     lastSavedAt: state.lastSavedAt ?? new Date().toISOString(),
   };
 }

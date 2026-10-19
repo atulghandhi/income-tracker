@@ -30,9 +30,28 @@ Starling, Revolut, Chase, first direct, Metro Bank, Virgin Money, American Expre
 banks, and every format lands on the same review screen. A PDF it cannot read (a scanned image,
 say) gets a clear message; pasting the rows still works as a fallback.
 
-Each page has its own URL (`/dashboard`, `/ledger`, `/accounts`, `/goals`, `/insights`, `/settings`),
-so a refresh stays put. The Dashboard and Insights pages are customisable: **Customise** lets you
-drag, resize, remove and add widgets; the arrangement is saved per device and region.
+Each page has its own URL (`/dashboard`, `/ledger`, `/accounts`, `/goals`, `/allocate`, `/insights`,
+`/settings`), so a refresh stays put. The Dashboard and Insights pages are customisable: **Customise**
+lets you drag, resize, remove and add widgets; the arrangement is saved per device and region.
+
+**Allocate** (`/allocate`) decides where spare money goes. It takes the ledger's spare-per-month figure
+and an optional one-off lump sum (a bonus, a refund) and splits them between the debts on Accounts, a
+cash buffer, a tax bill and savings under a priority the user picks: least interest (avalanche), lower
+payments soonest, quick wins (snowball), credit-score recovery (card utilisation down first), cash
+buffer first, tax bill first, balanced (only overpay debts that cost more than savings earn) or a
+custom percentage split. Savings have their own priority (highest safe rate, highest expected return,
+tax wrappers first, or the goals on the Goals page). Every strategy is simulated month by month with
+the same promo-aware compounding as the net-worth forecast and compared against paying minimums only:
+total interest, debt-free date, committed payments, card utilisation, buffer and net position, with
+charts of the lump-sum split and the debt path. Mortgages and UK student loans start outside the plan
+and can be switched in. UK users can mark a lump sum as taxable (freelance income, rental profit,
+interest, dividends or a capital gain): the tax to set aside is worked out from the salary already
+taxed through PAYE and anything already received this tax year, held back before anything is
+allocated, and shown with its Self Assessment due date (`src/lumpSumTax.ts`, pinned by
+`tests/lumpSumTax.spec.ts`). A **Debt payoff plan** widget on Insights (and in the Dashboard tray) shows the
+chosen plan's headline figures and this month's move. The page is an illustration from the user's own
+figures, not advice: it says so, carries the standard assumptions, and links free debt help (MoneyHelper,
+StepChange, National Debtline and Citizens Advice in the UK; the CFPB and NFCC in the US).
 
 ## Repository layout
 
@@ -69,10 +88,11 @@ npm run test:seo   # static-site checks against a production build (separate con
 ```
 
 The calculation suites (`tests/finance.spec.ts`, `tests/finance-baseline.spec.ts`, `tests/tax.spec.ts`,
-`tests/retirement.spec.ts`, `tests/loans.spec.ts`, `tests/region.spec.ts`, `tests/widgets.spec.ts`) pin
+`tests/retirement.spec.ts`, `tests/loans.spec.ts`, `tests/allocate.spec.ts`, `tests/lumpSumTax.spec.ts`, `tests/region.spec.ts`,
+`tests/widgets.spec.ts`) pin
 every figure by hand from the published rules, so a change to a bracket, threshold or forecast shows up
 as a failing number rather than a vague regression. `tests/us-experience.spec.ts` drives the US and UK
-flows end to end.
+flows end to end; `tests/allocate-page.spec.ts` drives the Allocate page and its widget.
 
 `tests/pdfImporter.spec.ts` parses the synthetic statements in `tests/fixtures/statements/` (Barclays,
 HSBC, Monzo and NatWest statements, each with a different table layout, plus two PDFs that must be refused)

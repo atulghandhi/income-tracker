@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { KeyboardEvent, ReactNode, Ref } from "react";
+import { createPortal } from "react-dom";
+import type { CSSProperties, KeyboardEvent, ReactNode, Ref } from "react";
 import { Info } from "lucide-react";
 import { clampPercent, getCurrencyFormatter } from "./finance";
 
@@ -59,11 +60,94 @@ export function PanelTitle({ title, icon, action }: { title: string; icon?: Reac
   );
 }
 
-export function InfoHint({ text, label = "More information" }: { text: string; label?: string }) {
+// The "i" that hides explanatory copy. On a desktop it opens on hover and closes when the pointer
+// leaves the icon; on a touch screen a tap opens it and a tap anywhere else (or Escape) closes it.
+// The bubble is rendered at the document root with fixed coordinates, so it is never clipped by a
+// scrolling table or a panel, and it flips to whichever side and edge of the icon has room.
+export function InfoHint({ text, label = "More information" }: { text: ReactNode; label?: string }) {
+  const [hovering, setHovering] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const [style, setStyle] = useState<CSSProperties | null>(null);
+  const ref = useRef<HTMLSpanElement | null>(null);
+  const visible = hovering || pinned;
+
+  function place() {
+    const rect = ref.current?.getBoundingClientRect();
+    if (!rect) return;
+    const gap = 8;
+    const next: CSSProperties = {};
+    if (rect.top < 200) next.top = rect.bottom + gap;
+    else next.bottom = window.innerHeight - rect.top + gap;
+    const width = Math.min(320, window.innerWidth - 36);
+    if (rect.left < window.innerWidth / 2) next.left = Math.min(Math.max(8, rect.left), window.innerWidth - 8 - width);
+    else next.right = Math.min(Math.max(8, window.innerWidth - rect.right), window.innerWidth - 8 - width);
+    setStyle(next);
+  }
+
+  useEffect(() => {
+    if (!visible) return;
+    const close = () => {
+      setPinned(false);
+      setHovering(false);
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      if (!ref.current?.contains(event.target as Node)) close();
+    };
+    const onKey = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [visible]);
+
   return (
-    <span className="infoHint" tabIndex={0} role="button" aria-label={label}>
+    <span
+      ref={ref}
+      className={`infoHint ${visible ? "isOpen" : ""}`}
+      tabIndex={0}
+      role="button"
+      aria-label={label}
+      aria-expanded={visible}
+      onMouseEnter={() => {
+        place();
+        setHovering(true);
+      }}
+      onMouseLeave={() => setHovering(false)}
+      onFocus={() => {
+        place();
+        setHovering(true);
+      }}
+      onBlur={() => setHovering(false)}
+      onClick={(event) => {
+        event.stopPropagation();
+        place();
+        setPinned((current) => !current);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          place();
+          setPinned((current) => !current);
+        }
+      }}
+    >
       <Info size={15} aria-hidden="true" />
-      <span role="tooltip">{text}</span>
+      {visible &&
+        style &&
+        createPortal(
+          <span role="tooltip" className="infoHintBubble" style={style} onClick={(event) => event.stopPropagation()}>
+            {text}
+          </span>,
+          document.body,
+        )}
     </span>
   );
 }

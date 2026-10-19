@@ -8,6 +8,13 @@
     <language>en-gb</language>
     <lastBuildDate>Tue, 08 Sep 2026 09:00:00 GMT</lastBuildDate>
     <item>
+      <title>Update: Allocate: debt payoff strategies and lump-sum planning</title>
+      <link>https://www.theincometracker.com/whats-new.html</link>
+      <guid isPermaLink="true">https://www.theincometracker.com/whats-new.html#2026-10-18-allocate-debt-payoff-strategies-and-lump</guid>
+      <pubDate>Sun, 18 Oct 2026 09:00:00 GMT</pubDate>
+      <description>A new Allocate page in the sidebar splits your spare money each month, and any one-off lump sum, between the debts on Accounts, a cash buffer, a tax bill and savings. Pick the priority — least interest (avalanche), lower payments soonest, quick wins (snowball), credit-score recovery, cash buffer first, tax bill first, balanced or your own percentages — and choose where savings go: highest safe rate, highest expected return, tax wrappers first or your goals. Every strategy is simulated month by month against paying minimums only and compared on interest, debt-free date, monthly payments, card utilisation, buffer and net position, with a 0% promo guard and payment rollover. UK users can mark a lump sum as taxable — freelance income, rental profit, interest, dividends or a capital gain — and the tax to set aside is worked out from your salary band and held back before anything is allocated. A Debt payoff plan widget joins Insights and the Dashboard tray. Illustrations from your own figures, not advice, with free debt help linked on the page.</description>
+    </item>
+    <item>
       <title>Update: Import PDF bank statements directly</title>
       <link>https://www.theincometracker.com/whats-new.html</link>
       <guid isPermaLink="true">https://www.theincometracker.com/whats-new.html#2026-10-15-import-pdf-bank-statements-directly</guid>
@@ -279,13 +286,6 @@
       <guid isPermaLink="true">https://www.theincometracker.com/compare/vs-ynab.html</guid>
       <pubDate>Tue, 08 Sep 2026 09:00:00 GMT</pubDate>
       <description>YNAB costs about £99 a year and teaches a rigorous zero-based method. The Income Tracker is free and simpler: a monthly ledger built from your bank CSV.</description>
-    </item>
-    <item>
-      <title>The Income Tracker vs Snoop</title>
-      <link>https://www.theincometracker.com/compare/snoop-alternative.html</link>
-      <guid isPermaLink="true">https://www.theincometracker.com/compare/snoop-alternative.html</guid>
-      <pubDate>Tue, 08 Sep 2026 09:00:00 GMT</pubDate>
-      <description>Snoop is free but does little until you connect a bank, and manual accounts need Snoop Plus at £5.99 a month. The Income Tracker is free, CSV-based and private.</description>
     </item>
   </channel>
 </rss>

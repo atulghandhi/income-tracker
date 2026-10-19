@@ -40,7 +40,8 @@ export type AnalyticsEvent =
   | "app_installed"
   | "pdf_notice" // { action: "dismiss"|"import" } — the one-off PDF import announcement
   | "country_changed" // { country }
-  | "layout_changed"; // { page, action: "move"|"resize"|"remove"|"add"|"reset" }
+  | "layout_changed" // { page, action: "move"|"resize"|"remove"|"add"|"reset" }
+  | "allocation_changed"; // { field: "priority"|"savings_priority"|"lump_sum"|"horizon"|..., value? }
 
 let identifiedUserId: string | null = null;
 

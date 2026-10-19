@@ -650,6 +650,6 @@ Who makes The Income Tracker, how it is funded (it is free; no ads, no data sale
 ## What's new
 
 URL: https://www.theincometracker.com/whats-new.html
-Updated: 2026-10-15
+Updated: 2026-10-18
 
 Release notes for The Income Tracker, newest first.

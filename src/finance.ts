@@ -2,6 +2,7 @@ import { applyAccountFlows, isoToday } from "./accountFlow";
 import type {
   Account,
   AccountClass,
+  AllocationSettings,
   AssetSummary,
   CountryCode,
   CurrencyCode,
@@ -27,7 +28,8 @@ import type {
 } from "./types";
 
 // v9 adds the country, tax profile, health plan and optional plan details on accounts.
-export const CURRENT_SCHEMA_VERSION = 9;
+// v10 adds the allocation plan (Allocate page).
+export const CURRENT_SCHEMA_VERSION = 10;
 
 export const DEFAULT_TAX_PROFILE: TaxProfile = {
   grossAnnualSalary: 0,
@@ -50,6 +52,24 @@ export const DEFAULT_HEALTH_PLAN: HealthPlan = {
 };
 
 export const DEFAULT_INVESTMENT_RETURN = 6;
+
+export const DEFAULT_ALLOCATION_SETTINGS: AllocationSettings = {
+  priority: "interest",
+  savingsPriority: "safe-rate",
+  lumpSum: 0,
+  monthlyExtraOverride: null,
+  bufferMonths: 3,
+  taxReserve: 0,
+  taxDueInMonths: 6,
+  horizonMonths: 36,
+  promoGuard: true,
+  rollover: true,
+  safeSavingsRate: 4,
+  customShares: { debts: 60, buffer: 20, savings: 20 },
+  customMethod: "avalanche",
+  debtIncluded: {},
+  lumpSumTax: { taxable: false, source: "self-employed", monthlySalary: null, priorThisYear: 0, studentLoan: null },
+};
 
 export const ASSET_CLASSES: AccountClass[] = ["cash", "savings", "investment"];
 
@@ -146,6 +166,7 @@ export function createInitialState(country: CountryCode = "GB", currency: Curren
     nameRules: [],
     importBatches: [],
     privacyMode: false,
+    allocation: { ...DEFAULT_ALLOCATION_SETTINGS, customShares: { ...DEFAULT_ALLOCATION_SETTINGS.customShares }, debtIncluded: {}, lumpSumTax: { ...DEFAULT_ALLOCATION_SETTINGS.lumpSumTax } },
     lastSavedAt: new Date().toISOString(),
   };
 }

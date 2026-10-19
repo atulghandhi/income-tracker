@@ -292,6 +292,76 @@ export type HealthPlan = {
   planYearStartMonth: number;
 };
 
+// ─── Allocation planner ──────────────────────────────────────────────────────
+// How spare money and lump sums are split between debts, a buffer, a tax reserve and savings,
+// and the order debts are attacked in. See allocate.ts.
+
+export type PayoffMethod = "avalanche" | "snowball" | "cashflow" | "utilisation";
+
+export type PlanPriority =
+  | "interest" // minimise total interest paid
+  | "payments" // free up monthly cash flow as fast as possible
+  | "quick-wins" // clear the most accounts soonest (snowball)
+  | "credit-score" // bring card utilisation down first
+  | "cash-buffer" // build an emergency buffer before overpaying
+  | "tax-buffer" // set aside a tax bill first
+  | "balanced" // starter buffer, then only overpay debts that cost more than savings earn
+  | "custom"; // fixed percentage split chosen by the user
+
+export type SavingsPriority =
+  | "safe-rate" // highest rate on cash-style savings
+  | "growth" // highest expected return, investments included (capital at risk)
+  | "tax-efficient" // tax-advantaged wrappers first
+  | "goals-first"; // fund the Goals page's goals in priority order
+
+export type CustomShares = { debts: number; buffer: number; savings: number };
+
+// UK only: whether the lump sum on the Allocate page is untaxed income or a gain, and what is
+// needed to size the tax to set aside from it. See lumpSumTax.ts.
+export type LumpSumSource = "self-employed" | "other-income" | "rental" | "savings-interest" | "dividends" | "capital-gain";
+
+export type UndergradLoanPlan = Exclude<UkStudentLoanPlan, "postgrad">;
+
+// Student loan repayments collected through Self Assessment on untaxed income. null = follow the
+// tax profile (Insights › Take-home estimate).
+export type LumpSumStudentLoan = { repaying: boolean; plan: UndergradLoanPlan | null; postgrad: boolean };
+
+export type LumpSumTaxSettings = {
+  taxable: boolean;
+  source: LumpSumSource;
+  // Gross monthly salary already taxed through PAYE. null = follow the tax profile's salary.
+  monthlySalary: number | null;
+  // Already received this tax year from the same kind of source, before tax.
+  priorThisYear: number;
+  studentLoan: LumpSumStudentLoan | null;
+};
+
+export type AllocationSettings = {
+  priority: PlanPriority;
+  savingsPriority: SavingsPriority;
+  lumpSum: number;
+  // null = follow the ledger's spare-per-month figure.
+  monthlyExtraOverride: number | null;
+  // Emergency buffer target, in months of recurring expenses.
+  bufferMonths: number;
+  // A tax bill to set aside for (0 = none) and how many months until it is due.
+  taxReserve: number;
+  taxDueInMonths: number;
+  horizonMonths: number;
+  // Clear a 0% balance before its promo ends, whatever the ordering says.
+  promoGuard: boolean;
+  // Roll a cleared debt's payment into the next one (the "snowball" effect, used by every method).
+  rollover: boolean;
+  // Assumed rate for a new easy-access savings account when the user has none to compare with.
+  safeSavingsRate: number;
+  customShares: CustomShares;
+  customMethod: PayoffMethod;
+  // Per-debt overrides of whether it is in the plan, by account id. Absent = the default for its
+  // type (mortgages and UK student loans start left out; see allocate.ts).
+  debtIncluded: Record<string, boolean>;
+  lumpSumTax: LumpSumTaxSettings;
+};
+
 export type LedgerState = {
   schemaVersion: number;
   currency: CurrencyCode;
@@ -321,6 +391,8 @@ export type LedgerState = {
   // Stage C opt-in: allow sending transaction descriptions (never amounts or
   // identity) to the categorize-batch edge function for AI suggestions.
   aiCategorizationEnabled?: boolean;
+  // The Allocate page's plan: priority, lump sum, buffer and tax targets. See allocate.ts.
+  allocation: AllocationSettings;
   lastSavedAt: string;
 };
 

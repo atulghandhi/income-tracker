@@ -128,6 +128,8 @@ const US_TERMS: Array<[RegExp, string]> = [
   [/\brecognis(e|ed|es|ing|able)\b/g, "recogniz$1"],
   [/\borganis(e|ed|es|ing|ation)\b/g, "organiz$1"],
   [/\bprioritis(e|ed|es|ing)\b/g, "prioritiz$1"],
+  [/\bauthoris(e|ed|es|ing|ation)\b/g, "authoriz$1"],
+  [/\bcounselling\b/g, "counseling"],
   [/\banalys(e|ed|es|ing)\b/g, "analyz$1"],
   [/\bcolour(s|ed|ful)?\b/g, "color$1"],
   [/\bfavourite(s)?\b/g, "favorite$1"],
