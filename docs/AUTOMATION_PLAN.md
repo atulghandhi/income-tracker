@@ -4,9 +4,10 @@
 > and e2e tests; C (AI categorization) is code-complete and dormant until the
 > `categorize-batch` function is deployed with an `ANTHROPIC_API_KEY`; D ships as
 > uncompiled Swift services awaiting the FinanceKit entitlement + an Xcode build;
-> E (open banking) is code-complete and dormant until TrueLayer credentials are
-> set and the migrations/functions are deployed. Remaining external prerequisites
-> are listed per stage below and in the commit messages.
+> E (open banking) was prototyped against TrueLayer but never deployed, and the
+> code was removed in Oct 2026: the app stays CSV/OFX/QIF-only for now, and Stage E
+> below remains a future plan. Remaining external prerequisites are listed per
+> stage below and in the commit messages.
 > Companion to `docs/MONETIZATION_PLAN.md` — automation *is* the Pro value
 > proposition, so every stage here maps to a monetization phase.
 > **Goal:** A user should spend seconds per month keeping their ledger true, not minutes
@@ -437,6 +438,10 @@ For banks not in Wallet and users who won't connect anything:
 *Effort: ~1 week. Exit: entries created outside the app appear correctly synced.*
 
 ### Stage E — Full open banking feeds (months 9–15 · Pro · = monetization Phase 4)
+
+> **Not implemented.** An earlier prototype (`src/feeds.ts`, the `feeds-connect` and
+> `feeds-sync` functions and the `bank_feeds` migration) was never deployed and was
+> removed in Oct 2026. It is in git history if this stage is picked up again.
 
 **Effort removed:** everything that remains — Android/web users and non-Wallet
 banks get the same zero-touch feed iOS/Wallet users got in D1.

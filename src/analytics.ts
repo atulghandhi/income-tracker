@@ -28,7 +28,6 @@ export type AnalyticsEvent =
   | "rename_all" // { renamed: bucket }
   | "recurring_marked" // { cadence }
   | "ai_suggestions_applied" // { count }
-  | "feed_connected"
   | "signed_in"
   | "onboarding_completed" // { added: bucket, skipped_steps }
   | "onboarding_skipped" // { added: bucket, skipped_steps }

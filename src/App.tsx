@@ -117,23 +117,6 @@ import {
 
 // The browser's install prompt event (not yet in lib.dom).
 type BeforeInstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: "accepted" | "dismissed" }> };
-import {
-  BANK_FEED_SOURCE_NAME,
-  completeBankConnection,
-  consumeFeedCallbackCode,
-  countStagedFeedRows,
-  daysUntilConsentExpiry,
-  disconnectBankConnection,
-  fetchStagedFeedReview,
-  isFeedBackendConfigured,
-  isFeedsEnabled,
-  listBankConnections,
-  reconfirmBankConnection,
-  resolveFeedRows,
-  startBankConnection,
-  syncFeedsNow,
-  type BankConnection,
-} from "./feeds";
 import { GoalsView } from "./GoalsView";
 import { loadLedgerState, saveLedgerState } from "./storage";
 import {
@@ -369,7 +352,7 @@ type ImportReviewState = {
   errors: string[];
   totalRows: number;
   // Credit-card statements: amounts were auto-negated so charges count as
-  // spending. canFlip is false for sources that can't re-parse (bank feeds).
+  // spending. canFlip is false for sources that can't re-parse.
   signInverted: boolean;
   canFlip: boolean;
   // Every row in one statement comes from one account; the user can change which.
@@ -546,12 +529,6 @@ function App() {
   const [toastVisible, setToastVisible] = useState(false);
   const toastTimerRef = useRef<number | null>(null);
   const toastFirstRenderRef = useRef(true);
-  const [bankConnections, setBankConnections] = useState<BankConnection[]>([]);
-  const [stagedFeedCount, setStagedFeedCount] = useState(0);
-  const [feedsReady, setFeedsReady] = useState(false);
-  const [feedsBusy, setFeedsBusy] = useState(false);
-  // review-row id → feed_transactions.id for the currently open bank-feed review.
-  const feedRowMapRef = useRef<Map<string, string> | null>(null);
   // Raw text of the last file/paste import, so the "flip in/out" toggle can re-parse.
   const lastImportTextRef = useRef<{ text: string; sourceName: string } | null>(null);
   const [transferRuleInput, setTransferRuleInput] = useState("");
@@ -1878,108 +1855,6 @@ function App() {
     }
   }
 
-  // ── Stage E: bank feeds ──────────────────────────────────────────────────
-
-  useEffect(() => {
-    if (!isFeedsEnabled() || !user) return;
-    let alive = true;
-
-    async function bootstrapFeeds() {
-      // Returning from the provider's hosted auth? Finish the connection first.
-      const callbackCode = consumeFeedCallbackCode();
-      if (callbackCode) {
-        const connection = await completeBankConnection(callbackCode);
-        if (connection && alive) {
-          setToast(`${connection.display_name} connected`);
-          track("feed_connected");
-        }
-      }
-
-      const configured = await isFeedBackendConfigured();
-      if (!alive || !configured) return;
-      setFeedsReady(true);
-      const [connections, staged] = await Promise.all([listBankConnections(), countStagedFeedRows()]);
-      if (!alive) return;
-      setBankConnections(connections);
-      setStagedFeedCount(staged);
-    }
-
-    void bootstrapFeeds();
-    return () => {
-      alive = false;
-    };
-  }, [user]);
-
-  async function connectBank() {
-    setFeedsBusy(true);
-    const url = await startBankConnection();
-    if (url) {
-      window.location.href = url;
-      return;
-    }
-    setFeedsBusy(false);
-    setToast("Couldn’t start the bank connection");
-  }
-
-  async function refreshFeedState() {
-    const [connections, staged] = await Promise.all([listBankConnections(), countStagedFeedRows()]);
-    setBankConnections(connections);
-    setStagedFeedCount(staged);
-  }
-
-  async function syncBankFeeds() {
-    setFeedsBusy(true);
-    const summary = await syncFeedsNow();
-    await refreshFeedState();
-    setFeedsBusy(false);
-    setToast(summary ? `Synced — ${summary.staged} new transaction${summary.staged === 1 ? "" : "s"}` : "Sync failed");
-  }
-
-  async function reviewBankFeed() {
-    setFeedsBusy(true);
-    const review = await fetchStagedFeedReview(ledger);
-    setFeedsBusy(false);
-    if (!review.rows.length) {
-      setToast("No new bank transactions to review");
-      setStagedFeedCount(0);
-      return;
-    }
-    feedRowMapRef.current = review.feedIdByRowId;
-    track("import_reviewed", {
-      source: "feed",
-      rows: bucketCount(review.rows.length),
-      auto: review.rows.filter((row) => !row.duplicate && row.confidence >= 0.9).length,
-      check: review.rows.filter((row) => !row.duplicate && row.confidence >= 0.6 && row.confidence < 0.9).length,
-      needs: review.rows.filter((row) => row.duplicate || row.confidence < 0.6).length,
-    });
-    setImportReview({
-      fileName: BANK_FEED_SOURCE_NAME,
-      rows: matchDebtPaymentRows(review.rows, effectiveAccounts, moneyFormatter),
-      errors: [],
-      totalRows: review.total,
-      signInverted: false,
-      canFlip: false,
-      accountId: suggestImportAccount(false),
-    });
-  }
-
-  async function reconfirmBank(connectionId: string) {
-    const connection = await reconfirmBankConnection(connectionId);
-    if (connection) {
-      setBankConnections((current) => current.map((item) => (item.id === connection.id ? connection : item)));
-      setToast("Connection kept for another 90 days");
-    }
-  }
-
-  async function disconnectBank(connectionId: string) {
-    const ok = await disconnectBankConnection(connectionId);
-    if (ok) {
-      setBankConnections((current) => current.filter((item) => item.id !== connectionId));
-      setToast("Bank disconnected — staged data deleted, your ledger is untouched");
-      void countStagedFeedRows().then(setStagedFeedCount);
-    }
-  }
-
   async function importFromClipboard() {
     try {
       const text = await navigator.clipboard.readText();
@@ -2285,22 +2160,6 @@ function App() {
     // entries the new transfer rules swept out.
     const learnedRules = mergeCategoryRules(ledger.categoryRules, [...rowsToImport, ...transferRows], importedAt);
     const removed = sweepTransferEntries(ledger.months, learnedRules).removed;
-
-    // Bank-feed reviews resolve their staged rows: included → imported,
-    // reviewed-but-excluded → dismissed. Cancelling leaves everything staged.
-    if (importReview.fileName === BANK_FEED_SOURCE_NAME && feedRowMapRef.current) {
-      const map = feedRowMapRef.current;
-      const importedIds = importReview.rows.filter((row) => row.include).map((row) => map.get(row.id)).filter((id): id is string => Boolean(id));
-      const dismissedIds = importReview.rows.filter((row) => !row.include).map((row) => map.get(row.id)).filter((id): id is string => Boolean(id));
-      void resolveFeedRows(importedIds, "imported")
-        .then(() => resolveFeedRows(dismissedIds, "dismissed"))
-        .then(() => countStagedFeedRows())
-        .then(setStagedFeedCount)
-        .catch(() => {
-          // Staged rows simply reappear next review — no data loss.
-        });
-      feedRowMapRef.current = null;
-    }
 
     setImportReview(null);
     if (rowsToImport.length) {
@@ -2871,18 +2730,6 @@ function App() {
                   </strong>
                 </div>
               </div>
-
-              {stagedFeedCount > 0 && (
-                <div className="seededBanner feedBanner" role="status">
-                  <CreditCard size={15} />
-                  <span>
-                    {stagedFeedCount} new bank transaction{stagedFeedCount === 1 ? "" : "s"} arrived from your connected accounts.
-                  </span>
-                  <button className="commandButton" type="button" disabled={feedsBusy} onClick={() => void reviewBankFeed()}>
-                    Review
-                  </button>
-                </div>
-              )}
 
               {showSeededBanner && (
                 <div className="seededBanner" role="status">
@@ -3739,67 +3586,6 @@ function App() {
                 </aside>
               </section>
 
-              {isFeedsEnabled() && feedsReady && (
-                <article className="settingsPanel bankFeedsPanel">
-                  <PanelTitle title="Bank connections" icon={<CreditCard size={17} />} />
-                  <p className="panelSubcopy">
-                    Connect a bank through our regulated open-banking partner and new transactions arrive here automatically —
-                    no credentials ever touch this app. UK rules ask you to reconfirm consent every 90 days, right here, one tap.
-                  </p>
-                  {bankConnections.length > 0 && (
-                    <div className="bankConnectionList">
-                      {bankConnections.map((connection) => {
-                        const daysLeft = daysUntilConsentExpiry(connection);
-                        const needsReconfirm = connection.status === "expired" || (daysLeft !== null && daysLeft <= 10);
-                        return (
-                          <div className="bankConnectionRow" key={connection.id}>
-                            <div className="subscriptionName">
-                              <strong>{connection.display_name}</strong>
-                              <em>
-                                {connection.status === "active"
-                                  ? connection.last_synced_at
-                                    ? `Synced ${new Intl.DateTimeFormat("en", { day: "2-digit", month: "short" }).format(new Date(connection.last_synced_at))}`
-                                    : "Waiting for first sync"
-                                  : connection.status}
-                                {daysLeft !== null && daysLeft > 0 ? ` · consent ${daysLeft}d left` : ""}
-                              </em>
-                            </div>
-                            {needsReconfirm && (
-                              <button className="commandButton" type="button" onClick={() => void reconfirmBank(connection.id)}>
-                                Keep connected
-                              </button>
-                            )}
-                            <button className="commandButton" type="button" onClick={() => void disconnectBank(connection.id)}>
-                              Disconnect
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                  <div className="buttonRow">
-                    <button className="commandButton" type="button" disabled={feedsBusy || !user} onClick={() => void connectBank()}>
-                      <Plus size={15} />
-                      Connect a bank
-                    </button>
-                    {bankConnections.length > 0 && (
-                      <>
-                        <button className="commandButton" type="button" disabled={feedsBusy} onClick={() => void syncBankFeeds()}>
-                          <RotateCcw size={15} />
-                          Sync now
-                        </button>
-                        {stagedFeedCount > 0 && (
-                          <button className="commandButton" type="button" disabled={feedsBusy} onClick={() => void reviewBankFeed()}>
-                            Review {stagedFeedCount} new
-                          </button>
-                        )}
-                      </>
-                    )}
-                    {!user && <span className="quickAddHint">Sign in to connect a bank.</span>}
-                  </div>
-                </article>
-              )}
-
               <article className="settingsPanel transferRulesPanel">
                 <PanelTitle title="Transfer rules" icon={<Repeat size={17} />} />
                 <p className="panelSubcopy">
@@ -3981,7 +3767,6 @@ function App() {
             formatter={moneyFormatter}
             onAccountChange={(accountId) => setImportReview((current) => (current ? { ...current, accountId } : current))}
             onClose={() => {
-              feedRowMapRef.current = null; // cancelled feed reviews stay staged
               setImportReview(null);
             }}
             onToggleFlip={toggleImportSignFlip}
@@ -7013,7 +6798,6 @@ function normalizeStateFields(rawState: Partial<LedgerState>): LedgerState {
 
 // Analytics label for an import inlet, derived from the review's source name.
 function importSourceOf(fileName: string): string {
-  if (fileName === BANK_FEED_SOURCE_NAME) return "feed";
   if (fileName === "Pasted transactions") return "paste";
   const lower = fileName.toLowerCase();
   if (lower.endsWith(".ofx")) return "ofx";
