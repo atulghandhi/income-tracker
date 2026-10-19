@@ -16,6 +16,8 @@ import {
   spanFor,
 } from "../src/layout";
 import { APP_VIEWS, isAppPath, pathForView, viewFromPath } from "../src/routes";
+import { INSIGHT_WIDGET_SPECS } from "../src/InsightWidgetCard";
+import { normalizeInsightsState, setWidgetVariant, widgetInstance } from "../src/insightsState";
 import { DEFAULT_HEALTH_PLAN } from "../src/finance";
 import type { Account, MonthBudget } from "../src/types";
 
@@ -154,6 +156,41 @@ test.describe("page layouts", () => {
     // Medical is a US-only widget.
     expect(availableWidgets("dashboard", "GB").map((widget) => widget.id)).not.toContain("medical");
     expect(availableWidgets("dashboard", "US").map((widget) => widget.id)).toContain("medical");
+  });
+
+  test("the money-flow family of widgets is on Insights in both regions, each with a renderer", () => {
+    for (const region of ["GB", "US"] as const) {
+      const ids = availableWidgets("insights", region).map((widget) => widget.id);
+      for (const id of Object.keys(INSIGHT_WIDGET_SPECS)) expect(ids).toContain(id);
+      expect(defaultLayout("insights", region).widgets.map((widget) => widget.id)).toEqual(expect.arrayContaining(["cash-flow", "spending-pace", "savings-rate"]));
+    }
+    // Opt-in widgets wait in the tray.
+    expect(hiddenWidgets(defaultLayout("insights", "GB"), "insights", "GB").map((widget) => widget.id)).toEqual(
+      expect.arrayContaining(["todo", "notes", "calendar", "upcoming", "month-compare", "debt-overview"]),
+    );
+  });
+
+  test("insights widget data is cleaned on load and a look is stored per widget", () => {
+    expect(normalizeInsightsState(undefined)).toEqual({ version: 1, widgets: [], hiddenWarnings: [], notes: {}, todos: {} });
+    const state = normalizeInsightsState({
+      widgets: [{ id: "cash-flow", type: "moneyFlow", variant: "particles" }, { id: "x", type: "bogus" }],
+      // Grid placements from the old free-layout dashboard are simply dropped.
+      layouts: { desktop: { "cash-flow": { x: 0, y: 0, w: 3, h: 3 } } },
+      hiddenWarnings: ["promo-ending-1", 4],
+      notes: { notes: "Call the bank", other: 3 },
+      todos: { todo: [{ id: "t1", text: "Cancel gym", done: 1 }, { text: "no id" }] },
+    });
+    expect(state).toEqual({
+      version: 1,
+      widgets: [{ id: "cash-flow", type: "moneyFlow", variant: "particles" }],
+      hiddenWarnings: ["promo-ending-1"],
+      notes: { notes: "Call the bank" },
+      todos: { todo: [{ id: "t1", text: "Cancel gym", done: true, createdAt: new Date(0).toISOString() }] },
+    });
+    expect(widgetInstance(state, "cash-flow", "moneyFlow").variant).toBe("particles");
+    expect(widgetInstance(state, "todo", "todo")).toEqual({ id: "todo", type: "todo" });
+    const waterfall = setWidgetVariant(state, "cash-flow", "moneyFlow", "waterfall");
+    expect(waterfall.widgets).toEqual([{ id: "cash-flow", type: "moneyFlow", variant: "waterfall" }]);
   });
 
   test("sizes map to a six-column grid", () => {

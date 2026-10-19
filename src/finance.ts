@@ -912,7 +912,7 @@ export function buildFinancialSignals({
       signals.push({
         id: `promo-ending-${debt.id}`,
         title: "Interest-free period ending soon",
-        summary: `${debt.name} has ${debt.promoMonths} 0% ${debt.promoMonths === 1 ? "month" : "months"} left.`,
+        summary: `${debt.name} has ${debt.promoMonths} interest-free ${debt.promoMonths === 1 ? "month" : "months"} left.`,
         detail: "The net-worth forecast starts applying APR after the 0% period. Plan payments before that date if the balance is still material.",
         tone: "warning",
       });
@@ -1385,7 +1385,7 @@ function solveExtraMonthly(
   return Math.ceil(hi);
 }
 
-/** Binary-search for how many extra months are needed at the current surplus. */
+/** How far past its deadline the goal lands at the current surplus: one longer simulation tells. */
 function solveExtraMonths(
   target: SavingsGoal,
   allGoals: SavingsGoal[],

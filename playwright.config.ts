@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { sandboxLaunchOptions } from "./playwright.browser";
 
 export default defineConfig({
   testDir: "./tests",
@@ -8,14 +9,15 @@ export default defineConfig({
   // Generous for slower machines: the dev server compiles on first request.
   timeout: 45_000,
   expect: {
-    timeout: 5_000,
+    timeout: 7_000,
   },
   use: {
     baseURL: "http://127.0.0.1:5173",
     trace: "on-first-retry",
-    // Remote sandboxes ship a pinned Chromium rather than letting Playwright
-    // download one. Point PW_CHROMIUM_PATH at it to run the browser specs there.
-    ...(process.env.PW_CHROMIUM_PATH ? { launchOptions: { executablePath: process.env.PW_CHROMIUM_PATH } } : {}),
+    // Remote sandboxes ship pinned Chromium builds rather than letting Playwright download
+    // the one it wants; when that build is missing the newest pinned one is used instead
+    // (or PW_CHROMIUM_PATH, if set). See playwright.browser.ts.
+    ...sandboxLaunchOptions(),
   },
   webServer: {
     // --strictPort: if 5173 is taken by something else, fail loudly instead of silently starting

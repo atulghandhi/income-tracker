@@ -415,7 +415,51 @@ export type LedgerState = {
   aiCategorizationEnabled?: boolean;
   // The Allocate page's plan: priority, lump sum, buffer and tax targets. See allocate.ts.
   allocation: AllocationSettings;
+  // The Insights widgets' own data: the look each one uses, dismissed warnings, notes and to-dos.
+  // Lives in the ledger so it persists and syncs exactly like transactions do.
+  insights?: InsightsState;
   lastSavedAt: string;
+};
+
+// ─── Insights dashboard ──────────────────────────────────────────────────────
+
+export type InsightWidgetType =
+  | "summary"
+  | "moneyFlow"
+  | "health"
+  | "monthlyCashFlow"
+  | "warnings"
+  | "topCategories"
+  | "recurring"
+  | "annualSnapshot"
+  | "savingsRate"
+  | "spendingPace"
+  | "netWorth"
+  | "debt"
+  | "goals"
+  | "monthCompare"
+  | "upcoming"
+  | "calendar"
+  | "accounts"
+  | "todo"
+  | "notes";
+
+export type InsightWidgetInstance = {
+  id: string;
+  type: InsightWidgetType;
+  // Which look the widget uses ("waterfall" vs "particles" for the money flow, and so on).
+  variant?: string;
+};
+
+export type InsightTodoItem = { id: string; text: string; done: boolean; createdAt: string };
+
+export type InsightsState = {
+  version: 1;
+  // One entry per widget that has a non-default look; the id is the widget's id on the page.
+  widgets: InsightWidgetInstance[];
+  hiddenWarnings: string[];
+  notes: Record<string, string>;
+  todos: Record<string, InsightTodoItem[]>;
 };
 
 export type Projection = {

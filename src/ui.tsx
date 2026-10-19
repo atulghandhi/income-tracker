@@ -3,8 +3,10 @@ import { createPortal } from "react-dom";
 import type { CSSProperties, KeyboardEvent, ReactNode, Ref } from "react";
 import { Info } from "lucide-react";
 import { clampPercent, getCurrencyFormatter } from "./finance";
+import type { NetWorthPoint } from "./types";
 
-// Small presentational pieces shared by the app shell and the region-specific panels.
+// Small presentational pieces shared by the app shell, the region-specific panels and the
+// insights widgets.
 
 export function MetricCard({
   label,
@@ -352,4 +354,168 @@ export function NumberInput({
 
 export function formatDecimal(value: number) {
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 }).format(value);
+}
+
+export type NetWorthHorizon = 12 | 24 | 60;
+
+export function formatShortDate(date: string): string {
+  const [year, month, day] = date.split("-").map(Number);
+  return new Intl.DateTimeFormat("en", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(year, month - 1, day));
+}
+
+// Same bands as the score summary in calculateHealthScore (Strong/Stable,
+// Tight, At risk) so a card's accent matches the word it shows.
+export function healthTone(score: number): "good" | "warn" | "bad" {
+  return score >= 5.8 ? "good" : score >= 3.8 ? "warn" : "bad";
+}
+
+export function NetWorthHorizonTabs({
+  horizon,
+  onChange,
+  compact,
+}: {
+  horizon: NetWorthHorizon;
+  onChange: (horizon: NetWorthHorizon) => void;
+  compact?: boolean;
+}) {
+  return (
+    <div className={compact ? "tabs compactTabs" : "tabs"} role="tablist" aria-label="Net worth horizon">
+      <button className={horizon === 12 ? "selected" : ""} type="button" onClick={() => onChange(12)}>
+        1 year
+      </button>
+      <button className={horizon === 24 ? "selected" : ""} type="button" onClick={() => onChange(24)}>
+        2 years
+      </button>
+      <button className={horizon === 60 ? "selected" : ""} type="button" onClick={() => onChange(60)}>
+        5 years
+      </button>
+    </div>
+  );
+}
+
+export function NetWorthChart({
+  points,
+  formatter,
+  privacy,
+  compact = false,
+  hideStats = false,
+  width = 720,
+  height = 260,
+}: {
+  points: NetWorthPoint[];
+  formatter: Intl.NumberFormat;
+  privacy: boolean;
+  compact?: boolean;
+  hideStats?: boolean;
+  // Drawing-space size. The insights widget passes its real pixel box so the chart fills it.
+  width?: number;
+  height?: number;
+}) {
+  const padding = 28;
+  const plotTop = padding;
+  const plotBottom = height - padding;
+  const plotHeight = plotBottom - plotTop;
+  const values = points.map((point) => point.netWorth);
+  // Scale to the actual data so small movements stay visible even deep in the
+  // red — never anchor the domain to zero (that flattens all-negative data
+  // into a line pinned at the bottom of the plot).
+  const rawMin = Math.min(...values);
+  const rawMax = Math.max(...values);
+  const spread = Math.max(rawMax - rawMin, Math.max(Math.abs(rawMax), Math.abs(rawMin)) * 0.02, 1);
+  const domainPad = spread * 0.12;
+  const minValue = rawMin - domainPad;
+  const maxValue = rawMax + domainPad;
+  const range = maxValue - minValue;
+  const yFor = (value: number) => plotTop + ((maxValue - value) / range) * plotHeight;
+  const zeroY = yFor(0);
+  const zeroVisible = zeroY >= plotTop && zeroY <= plotBottom;
+  // Fraction of the plot height where the zero line sits — the stroke/fill
+  // gradients flip from green to red at this offset.
+  const zeroOffset = Math.min(1, Math.max(0, (zeroY - plotTop) / plotHeight));
+  const areaBaselineY = Math.min(plotBottom, Math.max(plotTop, zeroY));
+  const lastPoint = points[points.length - 1] ?? points[0];
+  const totalInterest = points.reduce((sum, point) => sum + point.interestCharged, 0);
+  const totalGrowth = points.reduce((sum, point) => sum + point.growthEarned, 0);
+  const xFor = (index: number) => padding + (index / Math.max(points.length - 1, 1)) * (width - padding * 2);
+  const path = points
+    .map((point, index) => `${index === 0 ? "M" : "L"} ${xFor(index).toFixed(1)} ${yFor(point.netWorth).toFixed(1)}`)
+    .join(" ");
+  // Shade between the line and the zero axis (or the nearest plot edge when
+  // zero is out of frame) so negative territory reads as a red region.
+  const areaPath = `${path} L ${width - padding} ${areaBaselineY.toFixed(1)} L ${padding} ${areaBaselineY.toFixed(1)} Z`;
+  const markerPoints = points.filter((point) => point.monthIndex % 12 === 0 || point.monthIndex === points.length - 1);
+  const mint = "#00dfc1";
+  const red = "#ff8a7a";
+  const gradientSeed = `${compact ? "c" : "f"}-${points.length}`;
+
+  return (
+    <div className={compact ? "netWorthChart compact" : "netWorthChart"}>
+      {!hideStats && (
+        <div className="netWorthStats">
+          <div>
+            <span>Ending net worth</span>
+            <strong className={`${(lastPoint?.netWorth ?? 0) >= 0 ? "positiveText" : "negativeText"} ${privacy ? "masked" : ""}`}>
+              {formatter.format(lastPoint?.netWorth ?? 0)}
+            </strong>
+          </div>
+          <div>
+            <span>Ending assets</span>
+            <strong className={privacy ? "masked" : ""}>{formatter.format(lastPoint?.assetBalance ?? 0)}</strong>
+          </div>
+          <div>
+            <span>Growth earned</span>
+            <strong className={`positiveText ${privacy ? "masked" : ""}`}>{formatter.format(totalGrowth)}</strong>
+          </div>
+          <div>
+            <span>Interest paid</span>
+            <strong className={`${totalInterest > 0 ? "negativeText" : ""} ${privacy ? "masked" : ""}`}>{formatter.format(totalInterest)}</strong>
+          </div>
+        </div>
+      )}
+      <div className="netWorthSvgWrap">
+        <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Projected net worth over selected horizon">
+          <defs>
+            <linearGradient id={`netWorthStroke-${gradientSeed}`} gradientUnits="userSpaceOnUse" x1="0" y1={plotTop} x2="0" y2={plotBottom}>
+              <stop offset="0" stopColor={mint} />
+              <stop offset={zeroOffset} stopColor={mint} />
+              <stop offset={zeroOffset} stopColor={red} />
+              <stop offset="1" stopColor={red} />
+            </linearGradient>
+            <linearGradient id={`netWorthFill-${gradientSeed}`} gradientUnits="userSpaceOnUse" x1="0" y1={plotTop} x2="0" y2={plotBottom}>
+              <stop offset="0" stopColor="rgba(0, 223, 193, 0.22)" />
+              <stop offset={zeroOffset} stopColor="rgba(0, 223, 193, 0.03)" />
+              <stop offset={zeroOffset} stopColor="rgba(255, 138, 122, 0.05)" />
+              <stop offset="1" stopColor="rgba(255, 138, 122, 0.24)" />
+            </linearGradient>
+          </defs>
+          <line className="netWorthAxis" x1={padding} x2={width - padding} y1={plotBottom} y2={plotBottom} />
+          {zeroVisible && (
+            <>
+              <line className="netWorthZeroAxis" x1={padding} x2={width - padding} y1={zeroY} y2={zeroY} />
+              <text className="netWorthZeroLabel" x={width - padding} y={zeroY - 6} textAnchor="end">
+                {formatter.format(0)}
+              </text>
+            </>
+          )}
+          <path d={areaPath} fill={`url(#netWorthFill-${gradientSeed})`} />
+          <path className="netWorthLine" d={path} style={{ stroke: `url(#netWorthStroke-${gradientSeed})` }} />
+          {markerPoints.map((point) => (
+            <circle
+              key={point.monthIndex}
+              className="netWorthDot"
+              cx={xFor(point.monthIndex)}
+              cy={yFor(point.netWorth)}
+              r="4"
+              style={{ stroke: point.netWorth >= 0 ? mint : red }}
+            />
+          ))}
+        </svg>
+        <div className="netWorthLabels">
+          {markerPoints.map((point) => (
+            <span key={point.monthIndex}>{point.label}</span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }

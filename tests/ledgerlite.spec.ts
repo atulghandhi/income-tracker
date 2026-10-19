@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 // Core ledger behaviour in the app shell: keyboard-first entry, quick add,
 // grouping, CSV review, accounts and insights. Skips the marketing landing and
@@ -18,6 +18,21 @@ const EXPENSE_AMOUNT = ".panel.expense .addRow .moneyInput input";
 
 async function inputValues(page: Page, selector: string) {
   return page.locator(selector).evaluateAll((inputs) => inputs.map((input) => (input as HTMLInputElement).value));
+}
+
+// Phones pin the quick-add bar to the bottom and the annual rail below it, so Playwright's
+// own "scroll into view if needed" can leave a target underneath them. Centre it, then click.
+async function tap(locator: Locator) {
+  await locator.waitFor();
+  await locator.evaluate((element) => element.scrollIntoView({ block: "center", inline: "nearest" }));
+  let box = await locator.boundingBox();
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    await locator.page().waitForTimeout(120);
+    const next = await locator.boundingBox();
+    if (box && next && Math.abs(box.x - next.x) < 0.5 && Math.abs(box.y - next.y) < 0.5) break;
+    box = next;
+  }
+  await locator.page().mouse.click(box!.x + box!.width / 2, box!.y + box!.height / 2);
 }
 
 async function openView(page: Page, name: "Dashboard" | "Ledger" | "Accounts" | "Goals" | "Insights" | "Settings") {
@@ -162,7 +177,8 @@ test.describe("Ledger", () => {
     await expect(page.locator(".panel.income .panelHeader")).toContainText("$0");
   });
 
-  test("groups expenses into a category, collapses it, moves rows in, and deletes it", async ({ page }) => {
+  test("groups expenses into a category, collapses it, moves rows in, and deletes it", async ({ page, isMobile }) => {
+    test.skip(Boolean(isMobile), "Moving a row between categories uses a right-click menu, which needs a mouse.");
     await openLedger(page);
     await addExpense(page, "QA coffee", 45);
     await addExpense(page, "QA lunch", 18);
@@ -190,7 +206,8 @@ test.describe("Ledger", () => {
     );
   });
 
-  test("reorders income by drag, keyboard and the automatic orders", async ({ page }) => {
+  test("reorders income by drag, keyboard and the automatic orders", async ({ page, isMobile }) => {
+    test.skip(Boolean(isMobile), "HTML5 drag and drop is a pointer feature; touch devices reorder with the keyboard handles.");
     await openLedger(page);
     await addIncome(page, "Amazon refund", 12);
     await addIncome(page, "Salary", 2400);
@@ -308,7 +325,8 @@ test.describe("Ledger", () => {
     expect((await expenseNames()).filter((name) => name === "Coffee")).toHaveLength(1);
   });
 
-  test("sorts category sections by total and category items by amount", async ({ page }) => {
+  test("sorts category sections by total and category items by amount", async ({ page, isMobile }) => {
+    test.skip(Boolean(isMobile), "Uses the right-click category menu, which needs a mouse.");
     await openLedger(page);
     await addExpense(page, "Food low", 10);
     await addExpense(page, "Food high", 90);
@@ -379,7 +397,7 @@ test.describe("Ledger", () => {
     );
     await expect.poll(() => inputValues(page, "input[aria-label='Category name']")).toEqual(expect.arrayContaining(["Food", "Work lunch"]));
 
-    await page.getByRole("button", { name: "Undo import" }).click();
+    await tap(page.getByRole("button", { name: "Undo import" }));
     await expect.poll(() => inputValues(page, "input[aria-label='Income source']")).not.toContain("ACME Payroll");
     await expect.poll(() => inputValues(page, "input[aria-label='Expense name']")).not.toContain("Tesco Express");
   });
@@ -579,7 +597,7 @@ test.describe("Ledger", () => {
     await expect(panel.getByRole("button", { name: /^Monzo/ })).toContainText("£960");
 
     // Clicking the dot moves it (and its money) to the card, with a short toast naming the account.
-    await page.getByRole("button", { name: "Tesco is in Monzo. Move to the next account" }).click();
+    await tap(page.getByRole("button", { name: "Tesco is in Monzo. Move to the next account" }));
     await expect(page.locator(".accountToast")).toHaveText("Amex");
     await expect(page.locator(".accountToast")).toHaveCount(0, { timeout: 3000 });
     await expect(panel.getByRole("button", { name: /^Monzo/ })).toContainText("£1,000");
@@ -603,7 +621,8 @@ test.describe("Ledger", () => {
     await expect(page.getByLabel("Balance for Amex")).toHaveValue("50");
   });
 
-  test("explains health score, flags financial anomalies, and switches insight charts", async ({ page }) => {
+  test("explains health score, flags and dismisses anomalies, and switches insight charts", async ({ page }) => {
+    test.slow();
     await openLedger(page);
     await addIncome(page, "Salary", 2000);
     await addExpense(page, "Rent", 1700);
@@ -627,10 +646,27 @@ test.describe("Ledger", () => {
     await charts.getByRole("button", { name: "Monthly cash flow" }).click();
     await expect(charts.getByRole("button", { name: "Monthly cash flow" })).toHaveAttribute("aria-pressed", "true");
 
-    await expect(page.getByText("Outflow is higher than income")).toBeVisible();
-    await expect(page.getByText("Card utilisation over 90%")).toBeVisible();
-    await expect(page.getByText("Overall credit utilisation over 80%")).toBeVisible();
-    await page.getByLabel("Card utilisation over 90% context").hover();
+    // The money flow has two looks; the choice is kept with the ledger.
+    const flow = page.locator('[data-widget-id="cash-flow"]');
+    const looks = flow.getByRole("radiogroup", { name: "Money flow look" });
+    await expect(looks.getByRole("radio", { name: "Waterfall" })).toHaveAttribute("aria-checked", "true");
+    await looks.getByRole("radio", { name: "Particle stream" }).click();
+    await expect(looks.getByRole("radio", { name: "Particle stream" })).toHaveAttribute("aria-checked", "true");
+    await openView(page, "Ledger");
+    await openView(page, "Insights");
+    await expect(looks.getByRole("radio", { name: "Particle stream" })).toHaveAttribute("aria-checked", "true");
+
+    const anomalies = page.locator('[data-widget-id="anomalies"]');
+    await expect(anomalies.getByText("Outflow is higher than income")).toBeVisible();
+    await expect(anomalies.getByText("Card utilisation over 90%")).toBeVisible();
+    await expect(anomalies.getByText("Overall credit utilisation over 80%")).toBeVisible();
+    await anomalies.getByLabel("Card utilisation over 90% context").hover();
     await expect(page.getByText("Very high utilisation can drag down")).toBeVisible();
+
+    // A flag can be dismissed, and brought back.
+    await anomalies.getByRole("button", { name: "Dismiss Card utilisation over 90%" }).click();
+    await expect(anomalies.getByText("Card utilisation over 90%")).toHaveCount(0);
+    await anomalies.getByRole("button", { name: "Show 1 dismissed flag" }).click();
+    await expect(anomalies.getByText("Card utilisation over 90%")).toBeVisible();
   });
 });

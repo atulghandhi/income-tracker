@@ -108,7 +108,7 @@ import {
 } from "./accountFlow";
 import { goalPlanInputs, linkSavingsTransfers, syncLinkedGoals } from "./accountLinks";
 import { matchDebtPaymentRows, skipScheduledPayment, syncScheduledDebtPayments } from "./debtSync";
-import { reconcileSeededEntries } from "./recurrence";
+import { applyRecurringFlag, reconcileSeededEntries } from "./recurrence";
 import {
   deleteSubscription,
   detectSubscriptions,
@@ -184,7 +184,12 @@ import { interpretCreditScore } from "./creditScore";
 import { APP_VIEWS, DEFAULT_VIEW, pathForView, viewFromPath, type AppView } from "./routes";
 import { buildSampleLedger, sampleCountry } from "./sampleData";
 import { WidgetGrid, type WidgetRenderer } from "./WidgetGrid";
-import { addWidget, cycleWidgetSize, defaultLayout, hiddenWidgets, loadLayout, moveWidget, moveWidgetBefore, removeWidget, saveLayout, type LayoutPage, type PageLayout } from "./layout";
+import { INSIGHT_WIDGET_SPECS, InsightWidgetCard } from "./InsightWidgetCard";
+import { buildCategoryRows, buildExpenseGroups, buildMonthlyBars, categoryColor } from "./ledgerGroups";
+import { buildInsightsModel, visibleSignals } from "./insightsData";
+import { normalizeInsightsState, setWidgetVariant } from "./insightsState";
+import type { WidgetActions } from "./insightWidgets";
+import { addWidget, cycleWidgetSize, defaultLayout, hiddenWidgets, loadLayout, moveWidget, moveWidgetBefore, removeWidget, saveLayout, widgetDefinition, type LayoutPage, type PageLayout } from "./layout";
 import {
   AccountPlanDetails,
   CreditScoreWidget,
@@ -199,7 +204,25 @@ import {
   TakeHomeWidget,
 } from "./RegionPanels";
 import { computeTakeHome } from "./takeHome";
-import { AnimatedCurrency, EmptyState, InfoHint, MetricCard, MoneyInput, NumberInput, PanelTitle, ProgressRule, blurOnEnter, focusNextFrame, formatDecimal, handleDraftEnter } from "./ui";
+import {
+  AnimatedCurrency,
+  EmptyState,
+  InfoHint,
+  MetricCard,
+  MoneyInput,
+  NetWorthChart,
+  NetWorthHorizonTabs,
+  NumberInput,
+  PanelTitle,
+  ProgressRule,
+  blurOnEnter,
+  focusNextFrame,
+  formatDecimal,
+  formatShortDate,
+  handleDraftEnter,
+  healthTone,
+  type NetWorthHorizon,
+} from "./ui";
 import { loadLedgerState, saveLedgerState } from "./storage";
 import {
   getCurrentSession,
@@ -231,6 +254,7 @@ import type {
   ImportBatch,
   ImportedTransactionRef,
   IncomeEntry,
+  InsightsState,
   LedgerState,
   MonthBudget,
   MonthlyFlowPoint,
@@ -414,9 +438,10 @@ const TUTORIALS_GB: Record<AppView, PageTutorial> = {
         heading: "",
         bullets: [
           "Your health score rates cash flow, debt and savings.",
-          "Charts show monthly cash flow and your category breakdown.",
-          "Anomalies flag unusual spending worth a second look.",
-          "Where your pay goes charts the Pay & tax estimate; Customise adds or removes widgets.",
+          "The money flow shows where income came from and where it went — click a stream to see what is inside.",
+          "Spending pace and the savings rate say how the month is going against your target.",
+          "Anomalies flag unusual spending worth a second look; dismiss any with the ×.",
+          "Where your pay goes charts the Pay & tax estimate; Customise adds widgets such as to-dos, notes and a spending calendar.",
         ],
       },
     ],
@@ -576,8 +601,9 @@ const TUTORIALS_US: Record<AppView, PageTutorial> = {
           "Your health score rates cash flow, debt and savings; the credit estimate reads on the FICO and VantageScore scales.",
           "Where your paycheck goes charts the Paycheck & tax estimate as taxes, deductions and take-home.",
           "Contribution limits show how much 401(k), IRA, HSA and FSA headroom is left this year.",
-          "Anomalies flag unusual spending, an employer match left on the table, or an FSA about to expire.",
-          "Customize adds or removes widgets; the layout is remembered on this device.",
+          "The money flow shows where income came from and where it went — click a stream to see what is inside.",
+          "Anomalies flag unusual spending, an employer match left on the table, or an FSA about to expire; dismiss any with the ×.",
+          "Customize adds widgets such as to-dos, notes and a spending calendar; the layout is remembered on this device.",
         ],
       },
     ],
@@ -643,7 +669,6 @@ function readSeenTutorials(): Set<AppView> {
 
 type SaveState = "loading" | "saved" | "saving" | "offline";
 type SyncConflict = { local: LedgerState; cloud: LedgerState };
-type NetWorthHorizon = 12 | 24 | 60;
 type InsightChartView = "inflow-outflow" | "cash-flow" | "net-worth";
 type ExpenseDropPreview =
   | { type: "reorder"; targetId: string; edge: "before" | "after" }
@@ -945,7 +970,7 @@ function App() {
       ),
     );
   }, [currentMonth.expenses, expenseGroups, normalizedQuery]);
-  const monthlyBars = useMemo(() => buildMonthlyBars(ledger, currentMonth), [ledger, currentMonth]);
+  const monthlyBars = useMemo(() => buildMonthlyBars(ledger), [ledger, currentMonth]);
   const monthlyFlowPoints = useMemo(() => buildMonthlyFlowPoints(ledger), [ledger]);
   const healthScore = useMemo(
     () => calculateHealthScore({ projection, debtSummary, accounts: effectiveAccounts, savingsTarget: ledger.savingsTarget }),
@@ -974,6 +999,22 @@ function App() {
     const ledgerSignals = financialSignals.filter((signal) => signal.id !== "no-urgent-signals");
     return [...ledgerSignals, ...planSignals].slice(0, 8);
   }, [financialSignals, planSignals]);
+  // The Insights widgets' own data, and the model the money-flow family of widgets draws from.
+  // The model walks every month of the ledger, so it is only built while Insights is open.
+  const insightsState = useMemo(() => normalizeInsightsState(ledger.insights), [ledger.insights]);
+  const insightsModel = useMemo(
+    () => (activeView === "insights" ? buildInsightsModel(ledger, ledger.selectedMonth, { formatter: moneyFormatter }) : null),
+    [activeView, ledger, moneyFormatter],
+  );
+  // Anomalies: the ledger and plan signals, plus the month-on-month ones the Insights model adds
+  // (category spikes, subscription creep, bills that usually would have landed by now).
+  const anomalySignals = useMemo(() => {
+    if (!insightsModel) return allSignals;
+    const known = new Set([...allSignals, ...financialSignals].map((signal) => signal.id));
+    const extra = insightsModel.signals.filter((signal) => !known.has(signal.id) && signal.id !== "no-urgent-signals");
+    if (!extra.length) return allSignals;
+    return [...allSignals.filter((signal) => signal.id !== "no-urgent-signals"), ...extra].slice(0, 10);
+  }, [allSignals, financialSignals, insightsModel]);
   const creditReading = useMemo(() => interpretCreditScore(healthScore.estimatedCreditScore, region), [healthScore.estimatedCreditScore, region]);
   const takeHome = useMemo(() => computeTakeHome(region, ledger.taxProfile, ledger.accounts), [region, ledger.taxProfile, ledger.accounts]);
   const payrollAccounts = useMemo(
@@ -1519,6 +1560,11 @@ function App() {
       ...syncLedgerLinks(updater(current)),
       lastSavedAt: new Date().toISOString(),
     }));
+  }
+
+  // The Insights widgets' own data (looks, dismissed flags, notes, to-dos) lives in the ledger.
+  function patchInsights(updater: (current: InsightsState) => InsightsState) {
+    updateLedger((current) => ({ ...current, insights: updater(normalizeInsightsState(current.insights)) }));
   }
 
   function updateAllocation(patch: Partial<AllocationSettings>) {
@@ -3073,7 +3119,37 @@ function App() {
     }
   };
 
+  const insightWidgetActions: WidgetActions = {
+    patchInsights,
+    markRecurring: (candidate) => {
+      updateLedger((current) => applyRecurringFlag(current, candidate));
+      setToast(`${candidate.label} marked recurring — it now feeds the forecast`);
+      track("recurring_marked", { cadence: candidate.cadence });
+    },
+    navigate: (view) => setActiveView(view),
+    setSavingsTarget: (value) => updateLedger((current) => ({ ...current, savingsTarget: value })),
+    toast: setToast,
+  };
+
   const renderInsightsWidget: WidgetRenderer = (id) => {
+    const spec = INSIGHT_WIDGET_SPECS[id];
+    if (spec && insightsModel) {
+      return (
+        <InsightWidgetCard
+          id={id}
+          title={t(widgetDefinition("insights", id)?.title[region] ?? id)}
+          spec={spec}
+          model={insightsModel}
+          insights={insightsState}
+          actions={insightWidgetActions}
+          formatter={moneyFormatter}
+          privacy={ledger.privacyMode}
+          animations={animationsEnabled}
+          editing={layoutEditing === "insights"}
+          onVariant={(variant) => patchInsights((current) => setWidgetVariant(current, id, spec.type, variant))}
+        />
+      );
+    }
     switch (id) {
       case "summary":
         return (
@@ -3082,13 +3158,6 @@ function App() {
             <MetricCard label="Total expenses" value={projection.monthlyExpenses} tone="red" privacy={ledger.privacyMode} formatter={moneyFormatter} />
             <MetricCard label="Net income" value={projection.monthlySurplus} tone={projection.monthlySurplus >= 0 ? "green" : "red"} privacy={ledger.privacyMode} formatter={moneyFormatter} />
             <MetricCard label="Savings rate" value={projection.savingsRate} suffix="%" tone="amber" privacy={ledger.privacyMode} formatter={moneyFormatter} />
-          </section>
-        );
-      case "cash-flow":
-        return (
-          <section className="miniPanel cashFlowPanel" aria-label="Cash flow">
-            <PanelTitle title="Cash flow" icon={<TrendingUp size={16} />} action={<span className="panelWhen">{formatMonth(ledger.selectedMonth)}</span>} />
-            <CashFlowSankey month={currentMonth} surplus={projection.monthlySurplus} privacy={ledger.privacyMode} formatter={moneyFormatter} />
           </section>
         );
       case "health":
@@ -3166,7 +3235,8 @@ function App() {
             </div>
           </article>
         );
-      case "anomalies":
+      case "anomalies": {
+        const { shown, hiddenCount } = visibleSignals(anomalySignals, insightsState.hiddenWarnings);
         return (
           <article className="miniPanel anomalyPanel">
             <PanelTitle
@@ -3179,12 +3249,28 @@ function App() {
               }
             />
             <div className="anomalyList">
-              {allSignals.map((signal) => (
-                <FinancialSignalCard key={signal.id} signal={signal} t={t} />
+              {shown.map((signal) => (
+                <FinancialSignalCard
+                  key={signal.id}
+                  signal={signal}
+                  t={t}
+                  onDismiss={
+                    signal.id === "no-urgent-signals"
+                      ? undefined
+                      : () => patchInsights((current) => ({ ...current, hiddenWarnings: [...current.hiddenWarnings, signal.id] }))
+                  }
+                />
               ))}
+              {!shown.length && <p className="panelHint">{t("Everything here has been dismissed.")}</p>}
             </div>
+            {hiddenCount > 0 && (
+              <button className="linkButton" type="button" onClick={() => patchInsights((current) => ({ ...current, hiddenWarnings: [] }))}>
+                {t(`Show ${hiddenCount} dismissed ${hiddenCount === 1 ? "flag" : "flags"}`)}
+              </button>
+            )}
           </article>
         );
+      }
       case "paycheck":
         return <PaycheckBreakdownWidget region={region} taxProfile={ledger.taxProfile} accounts={ledger.accounts} formatter={moneyFormatter} privacy={ledger.privacyMode} onOpenPay={openEstimator} />;
       case "limits":
@@ -5674,11 +5760,6 @@ function importKindPatch(kind: TransactionKind, row: CsvImportRow): Partial<CsvI
   };
 }
 
-function formatShortDate(date: string): string {
-  const [year, month, day] = date.split("-").map(Number);
-  return new Intl.DateTimeFormat("en", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(year, month - 1, day));
-}
-
 type GettingStartedItem = {
   id: string;
   label: string;
@@ -7076,263 +7157,7 @@ function TutorialOverlay({ tutorial, t, onClose }: { tutorial: PageTutorial; t: 
   );
 }
 
-function NetWorthHorizonTabs({
-  horizon,
-  onChange,
-  compact,
-}: {
-  horizon: NetWorthHorizon;
-  onChange: (horizon: NetWorthHorizon) => void;
-  compact?: boolean;
-}) {
-  return (
-    <div className={compact ? "tabs compactTabs" : "tabs"} role="tablist" aria-label="Net worth horizon">
-      <button className={horizon === 12 ? "selected" : ""} type="button" onClick={() => onChange(12)}>
-        1 year
-      </button>
-      <button className={horizon === 24 ? "selected" : ""} type="button" onClick={() => onChange(24)}>
-        2 years
-      </button>
-      <button className={horizon === 60 ? "selected" : ""} type="button" onClick={() => onChange(60)}>
-        5 years
-      </button>
-    </div>
-  );
-}
-
-// ─── Cash flow Sankey ────────────────────────────────────────────────────────
-
-type SankeyEndpoint = { id: string; label: string; value: number; color: string };
 type ChartTip = { x: number; y: number; title: string; lines: string[] } | null;
-
-// Left column: income sources aggregated by name (top 5 + "Other income").
-// Right column: Savings first (when the month is in surplus), then expense
-// categories (top 7 + "Other"). A deficit month gets a red "Shortfall" source
-// so both sides of the diagram still conserve flow.
-function buildSankeyEndpoints(month: MonthBudget, surplus: number): { sources: SankeyEndpoint[]; targets: SankeyEndpoint[] } {
-  const bySource = new Map<string, SankeyEndpoint>();
-  month.incomes.forEach((entry, index) => {
-    const label = entry.source.trim() || "Income";
-    const key = label.toLowerCase();
-    const existing = bySource.get(key);
-    if (existing) {
-      existing.value += entry.amount;
-    } else {
-      bySource.set(key, { id: `src-${key}`, label, value: entry.amount, color: entry.color || colors[index % colors.length] });
-    }
-  });
-  let sources = [...bySource.values()].filter((node) => node.value > 0).sort((a, b) => b.value - a.value);
-  if (sources.length > 6) {
-    const rest = sources.slice(5);
-    sources = [
-      ...sources.slice(0, 5),
-      { id: "src-other", label: "Other income", value: rest.reduce((sum, node) => sum + node.value, 0), color: "var(--faint)" },
-    ];
-  }
-  if (surplus < 0) {
-    sources.push({ id: "src-shortfall", label: "Shortfall", value: -surplus, color: "var(--red)" });
-  }
-
-  let targets: SankeyEndpoint[] = buildExpenseGroups(month.expenses)
-    .map((group) => ({
-      id: `cat-${group.id}`,
-      label: group.category || group.items[0]?.name || "Outflow",
-      value: group.total,
-      color: group.color,
-    }))
-    .filter((node) => node.value > 0)
-    .sort((a, b) => b.value - a.value);
-  if (targets.length > 8) {
-    const rest = targets.slice(7);
-    targets = [
-      ...targets.slice(0, 7),
-      { id: "cat-other", label: "Other", value: rest.reduce((sum, node) => sum + node.value, 0), color: "var(--faint)" },
-    ];
-  }
-  if (surplus > 0) {
-    targets.unshift({ id: "cat-savings", label: "Savings", value: surplus, color: "var(--mint)" });
-  }
-
-  return { sources, targets };
-}
-
-function CashFlowSankey({
-  month,
-  surplus,
-  privacy,
-  formatter,
-}: {
-  month: MonthBudget;
-  surplus: number;
-  privacy: boolean;
-  formatter: Intl.NumberFormat;
-}) {
-  const shellRef = useRef<HTMLDivElement | null>(null);
-  const [tip, setTip] = useState<ChartTip>(null);
-  const { sources, targets } = useMemo(() => buildSankeyEndpoints(month, surplus), [month, surplus]);
-
-  // Both sides sum to the same figure by construction: income + shortfall on
-  // the left, expenses + savings on the right.
-  const totalFlow = targets.reduce((sum, node) => sum + node.value, 0);
-
-  if (totalFlow <= 0) {
-    return <EmptyState icon={<TrendingUp size={18} />} title="No cash flow yet" text="Add income and outflows in Ledger, or import a bank CSV, to draw this diagram." />;
-  }
-
-  const width = 1060;
-  const nodeW = 12;
-  const gap = 14;
-  const padY = 10;
-  const xLeft = 236;
-  const xRight = 812;
-  const xHub = (xLeft + xRight) / 2;
-  const rows = Math.max(sources.length, targets.length, 1);
-  const height = Math.max(320, Math.min(560, rows * 62));
-
-  const usable = (count: number) => height - padY * 2 - (count - 1) * gap;
-  // Every node is at least a label's height, so small categories never stack their labels on top
-  // of each other. The scale shrinks a little to make room for those minimums.
-  const minNode = 16;
-  let scale = Math.min(usable(sources.length), usable(targets.length), usable(1)) / totalFlow;
-  for (let pass = 0; pass < 4; pass += 1) {
-    const overflow = Math.max(
-      ...[sources, targets].map((nodes) => nodes.reduce((sum, node) => sum + Math.max(node.value * scale, minNode), 0) - usable(nodes.length)),
-    );
-    if (overflow <= 0) break;
-    scale *= Math.max(0.5, 1 - overflow / (totalFlow * scale));
-  }
-
-  type PlacedNode = SankeyEndpoint & { y0: number; y1: number };
-  const place = (nodes: SankeyEndpoint[]): PlacedNode[] => {
-    const contentHeight = nodes.reduce((sum, node) => sum + Math.max(node.value * scale, minNode), 0) + (nodes.length - 1) * gap;
-    let y = (height - contentHeight) / 2;
-    return nodes.map((node) => {
-      const nodeHeight = Math.max(node.value * scale, minNode);
-      const placed = { ...node, y0: y, y1: y + nodeHeight };
-      y += nodeHeight + gap;
-      return placed;
-    });
-  };
-
-  const leftNodes = place(sources);
-  const rightNodes = place(targets);
-  const hubHeight = totalFlow * scale;
-  const hubY0 = (height - hubHeight) / 2;
-
-  const money = (value: number) => (privacy ? "•••" : formatter.format(value));
-  const percent = (value: number) => `${((value / totalFlow) * 100).toFixed(1)}%`;
-
-  // Ribbons: each left node flows into the hub; the hub fans out to each right
-  // node. Offsets accumulate down the hub in node order on both faces.
-  const ribbon = (x0: number, sy0: number, sy1: number, x1: number, ty0: number, ty1: number) => {
-    const mx = (x0 + x1) / 2;
-    return `M ${x0} ${sy0} C ${mx} ${sy0}, ${mx} ${ty0}, ${x1} ${ty0} L ${x1} ${ty1} C ${mx} ${ty1}, ${mx} ${sy1}, ${x0} ${sy1} Z`;
-  };
-
-  let inOffset = hubY0;
-  const inLinks = leftNodes.map((node) => {
-    const linkHeight = node.value * scale;
-    const link = { node, path: ribbon(xLeft + nodeW, node.y0, node.y1, xHub, inOffset, inOffset + linkHeight) };
-    inOffset += linkHeight;
-    return link;
-  });
-  let outOffset = hubY0;
-  const outLinks = rightNodes.map((node) => {
-    const linkHeight = node.value * scale;
-    const link = { node, path: ribbon(xHub + nodeW, outOffset, outOffset + linkHeight, xRight, node.y0, node.y1) };
-    outOffset += linkHeight;
-    return link;
-  });
-
-  const showTip = (event: ReactMouseEvent, title: string, lines: string[]) => {
-    const rect = shellRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    setTip({ x: event.clientX - rect.left, y: event.clientY - rect.top, title, lines });
-  };
-
-  // Labels carry the name and amount only; the share of flow and the untrimmed name come up on
-  // hover. Long names are trimmed so the label never runs past the chart's edge.
-  const shortName = (label: string) => {
-    const trimmed = label.replace(/\s*\([^)]*\)\s*$/, "").trim() || label;
-    return trimmed.length > 22 ? `${trimmed.slice(0, 21).trimEnd()}…` : trimmed;
-  };
-  const nodeTip = (event: ReactMouseEvent, node: SankeyEndpoint, side: "in" | "out") =>
-    showTip(event, side === "in" ? `${node.label} → Income` : `Income → ${node.label}`, [`${money(node.value)} · ${percent(node.value)} of flow`]);
-
-  return (
-    <div className="sankeyShell" ref={shellRef} onMouseLeave={() => setTip(null)}>
-      <svg className="sankeySvg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Cash flow from income sources to savings and spending categories">
-        <defs>
-          {[...inLinks.map((link, index) => ({ link, id: `sankey-in-${index}`, from: link.node.color, to: "var(--blue)" })), ...outLinks.map((link, index) => ({ link, id: `sankey-out-${index}`, from: "var(--blue)", to: link.node.color }))].map(({ id, from, to }) => (
-            <linearGradient id={id} key={id} x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0" style={{ stopColor: from }} />
-              <stop offset="1" style={{ stopColor: to }} />
-            </linearGradient>
-          ))}
-        </defs>
-        {inLinks.map((link, index) => (
-          <path
-            className="sankeyLink"
-            key={link.node.id}
-            d={link.path}
-            fill={`url(#sankey-in-${index})`}
-            onMouseMove={(event) => showTip(event, `${link.node.label} → Income`, [`${money(link.node.value)} · ${percent(link.node.value)} of flow`])}
-          />
-        ))}
-        {outLinks.map((link, index) => (
-          <path
-            className="sankeyLink"
-            key={link.node.id}
-            d={link.path}
-            fill={`url(#sankey-out-${index})`}
-            onMouseMove={(event) => showTip(event, `Income → ${link.node.label}`, [`${money(link.node.value)} · ${percent(link.node.value)} of flow`])}
-          />
-        ))}
-        {leftNodes.map((node) => (
-          <g key={node.id} onMouseMove={(event) => nodeTip(event, node, "in")}>
-            <title>{`${node.label}: ${money(node.value)} (${percent(node.value)})`}</title>
-            <rect className="sankeyNode" x={xLeft} y={node.y0} width={nodeW} height={node.y1 - node.y0} rx={3} fill={node.color} />
-            <text className="sankeyLabel" x={xLeft - 12} y={(node.y0 + node.y1) / 2} textAnchor="end" dominantBaseline="middle">
-              <tspan className="name">{shortName(node.label)}</tspan>
-              <tspan className={privacy ? "amt masked" : "amt"} dx="7">
-                {money(node.value)}
-              </tspan>
-            </text>
-          </g>
-        ))}
-        <g>
-          <rect className="sankeyNode" x={xHub} y={hubY0} width={nodeW} height={hubHeight} rx={3} fill="var(--blue)" />
-          <text className="sankeyLabel hub" x={xHub + nodeW / 2} y={hubY0 - 10} textAnchor="middle">
-            <tspan className="name">Income</tspan>
-            <tspan className={privacy ? "amt masked" : "amt"} dx="7">
-              {money(totalFlow)}
-            </tspan>
-          </text>
-        </g>
-        {rightNodes.map((node) => (
-          <g key={node.id} onMouseMove={(event) => nodeTip(event, node, "out")}>
-            <title>{`${node.label}: ${money(node.value)} (${percent(node.value)})`}</title>
-            <rect className="sankeyNode" x={xRight} y={node.y0} width={nodeW} height={node.y1 - node.y0} rx={3} fill={node.color} />
-            <text className="sankeyLabel" x={xRight + nodeW + 12} y={(node.y0 + node.y1) / 2} dominantBaseline="middle">
-              <tspan className="name">{shortName(node.label)}</tspan>
-              <tspan className={privacy ? "amt masked" : "amt"} dx="7">
-                {money(node.value)}
-              </tspan>
-            </text>
-          </g>
-        ))}
-      </svg>
-      {tip && (
-        <div className="chartTip" style={{ left: tip.x + 14, top: tip.y + 14 }}>
-          <strong>{tip.title}</strong>
-          {tip.lines.map((line) => (
-            <span key={line}>{line}</span>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 function InsightChartToggle({ value, onChange }: { value: InsightChartView; onChange: (value: InsightChartView) => void }) {
   const options: Array<{ value: InsightChartView; label: string; icon: ReactNode }> = [
@@ -7360,13 +7185,22 @@ function InsightChartToggle({ value, onChange }: { value: InsightChartView; onCh
   );
 }
 
-function FinancialSignalCard({ signal, t }: { signal: FinancialSignal; t: (text: string) => string }) {
+function FinancialSignalCard({ signal, t, onDismiss }: { signal: FinancialSignal; t: (text: string) => string; onDismiss?: () => void }) {
   const title = t(signal.title);
   return (
     <div className={`signalCard ${signal.tone}`}>
       <div className="signalTitle">
         <strong>{title}</strong>
-        <InfoHint label={`${title} context`} text={t(signal.detail)} />
+        {onDismiss ? (
+          <span className="signalActions">
+            <InfoHint label={`${title} context`} text={t(signal.detail)} />
+            <button className="iconButton small signalDismiss" type="button" aria-label={`Dismiss ${title}`} onClick={onDismiss}>
+              <X size={14} />
+            </button>
+          </span>
+        ) : (
+          <InfoHint label={`${title} context`} text={t(signal.detail)} />
+        )}
       </div>
       <span>{t(signal.summary)}</span>
     </div>
@@ -7555,131 +7389,6 @@ function InflowOutflowChart({
   );
 }
 
-function NetWorthChart({
-  points,
-  formatter,
-  privacy,
-  compact = false,
-}: {
-  points: NetWorthPoint[];
-  formatter: Intl.NumberFormat;
-  privacy: boolean;
-  compact?: boolean;
-}) {
-  const width = 720;
-  const height = 260;
-  const padding = 28;
-  const plotTop = padding;
-  const plotBottom = height - padding;
-  const plotHeight = plotBottom - plotTop;
-  const values = points.map((point) => point.netWorth);
-  // Scale to the actual data so small movements stay visible even deep in the
-  // red — never anchor the domain to zero (that flattens all-negative data
-  // into a line pinned at the bottom of the plot).
-  const rawMin = Math.min(...values);
-  const rawMax = Math.max(...values);
-  const spread = Math.max(rawMax - rawMin, Math.max(Math.abs(rawMax), Math.abs(rawMin)) * 0.02, 1);
-  const domainPad = spread * 0.12;
-  const minValue = rawMin - domainPad;
-  const maxValue = rawMax + domainPad;
-  const range = maxValue - minValue;
-  const yFor = (value: number) => plotTop + ((maxValue - value) / range) * plotHeight;
-  const zeroY = yFor(0);
-  const zeroVisible = zeroY >= plotTop && zeroY <= plotBottom;
-  // Fraction of the plot height where the zero line sits — the stroke/fill
-  // gradients flip from green to red at this offset.
-  const zeroOffset = Math.min(1, Math.max(0, (zeroY - plotTop) / plotHeight));
-  const areaBaselineY = Math.min(plotBottom, Math.max(plotTop, zeroY));
-  const lastPoint = points[points.length - 1] ?? points[0];
-  const totalInterest = points.reduce((sum, point) => sum + point.interestCharged, 0);
-  const totalGrowth = points.reduce((sum, point) => sum + point.growthEarned, 0);
-  const xFor = (index: number) => padding + (index / Math.max(points.length - 1, 1)) * (width - padding * 2);
-  const path = points
-    .map((point, index) => `${index === 0 ? "M" : "L"} ${xFor(index).toFixed(1)} ${yFor(point.netWorth).toFixed(1)}`)
-    .join(" ");
-  // Shade between the line and the zero axis (or the nearest plot edge when
-  // zero is out of frame) so negative territory reads as a red region.
-  const areaPath = `${path} L ${width - padding} ${areaBaselineY.toFixed(1)} L ${padding} ${areaBaselineY.toFixed(1)} Z`;
-  const markerPoints = points.filter((point) => point.monthIndex % 12 === 0 || point.monthIndex === points.length - 1);
-  const mint = "#00dfc1";
-  const red = "#ff8a7a";
-
-  return (
-    <div className={compact ? "netWorthChart compact" : "netWorthChart"}>
-      <div className="netWorthStats">
-        <div>
-          <span>Ending net worth</span>
-          <strong className={`${(lastPoint?.netWorth ?? 0) >= 0 ? "positiveText" : "negativeText"} ${privacy ? "masked" : ""}`}>
-            {formatter.format(lastPoint?.netWorth ?? 0)}
-          </strong>
-        </div>
-        <div>
-          <span>Ending assets</span>
-          <strong className={privacy ? "masked" : ""}>{formatter.format(lastPoint?.assetBalance ?? 0)}</strong>
-        </div>
-        <div>
-          <span>Growth earned</span>
-          <strong className={`positiveText ${privacy ? "masked" : ""}`}>{formatter.format(totalGrowth)}</strong>
-        </div>
-        <div>
-          <span>Interest paid</span>
-          <strong className={`${totalInterest > 0 ? "negativeText" : ""} ${privacy ? "masked" : ""}`}>{formatter.format(totalInterest)}</strong>
-        </div>
-      </div>
-      <div className="netWorthSvgWrap">
-        <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Projected net worth over selected horizon">
-          <defs>
-            <linearGradient id="netWorthStroke" gradientUnits="userSpaceOnUse" x1="0" y1={plotTop} x2="0" y2={plotBottom}>
-              <stop offset="0" stopColor={mint} />
-              <stop offset={zeroOffset} stopColor={mint} />
-              <stop offset={zeroOffset} stopColor={red} />
-              <stop offset="1" stopColor={red} />
-            </linearGradient>
-            <linearGradient id="netWorthFill" gradientUnits="userSpaceOnUse" x1="0" y1={plotTop} x2="0" y2={plotBottom}>
-              <stop offset="0" stopColor="rgba(0, 223, 193, 0.22)" />
-              <stop offset={zeroOffset} stopColor="rgba(0, 223, 193, 0.03)" />
-              <stop offset={zeroOffset} stopColor="rgba(255, 138, 122, 0.05)" />
-              <stop offset="1" stopColor="rgba(255, 138, 122, 0.24)" />
-            </linearGradient>
-          </defs>
-          <line className="netWorthAxis" x1={padding} x2={width - padding} y1={plotBottom} y2={plotBottom} />
-          {zeroVisible && (
-            <>
-              <line className="netWorthZeroAxis" x1={padding} x2={width - padding} y1={zeroY} y2={zeroY} />
-              <text className="netWorthZeroLabel" x={width - padding} y={zeroY - 6} textAnchor="end">
-                {formatter.format(0)}
-              </text>
-            </>
-          )}
-          <path d={areaPath} fill="url(#netWorthFill)" />
-          <path className="netWorthLine" d={path} style={{ stroke: "url(#netWorthStroke)" }} />
-          {markerPoints.map((point) => (
-            <circle
-              key={point.monthIndex}
-              className="netWorthDot"
-              cx={xFor(point.monthIndex)}
-              cy={yFor(point.netWorth)}
-              r="4"
-              style={{ stroke: point.netWorth >= 0 ? mint : red }}
-            />
-          ))}
-        </svg>
-        <div className="netWorthLabels">
-          {markerPoints.map((point) => (
-            <span key={point.monthIndex}>{point.label}</span>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Same bands as the score summary in calculateHealthScore (Strong/Stable,
-// Tight, At risk) so the card's accent matches the word it shows.
-function healthTone(score: number): "good" | "warn" | "bad" {
-  return score >= 5.8 ? "good" : score >= 3.8 ? "warn" : "bad";
-}
-
 function LineGraph({ projection }: { projection: Projection }) {
   const income = Math.max(projection.monthlyIncome, 1);
   const expenseRatio = clampPercent((projection.monthlyExpenses / income) * 100);
@@ -7800,6 +7509,8 @@ function normalizeStateFields(rawState: Partial<LedgerState>): LedgerState {
     aiCategorizationEnabled: Boolean(state.aiCategorizationEnabled),
     // v9 → v10: ledgers saved before the Allocate page existed start on the default plan.
     allocation: normalizeAllocationSettings(state.allocation),
+    // The Insights widgets' own data (looks, dismissed warnings, notes, to-dos).
+    insights: normalizeInsightsState(state.insights),
     lastSavedAt: state.lastSavedAt ?? new Date().toISOString(),
   };
 }
@@ -8201,84 +7912,6 @@ function finiteNumber(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
-function buildCategoryRows(month: MonthBudget, projection: Projection) {
-  const total = Math.max(projection.monthlyExpenses, 1);
-  return buildExpenseGroups(month.expenses)
-    .filter((group) => group.category)
-    .map((group) => ({
-      name: group.category,
-      annual: group.total * 12,
-      share: (group.total / total) * 100,
-      color: group.color,
-    }))
-    .sort((a, b) => b.annual - a.annual);
-}
-
-function buildExpenseGroups(expenses: ExpenseEntry[]) {
-  type ExpenseGroup = { id: string; category: string; color: string; total: number; items: ExpenseEntry[]; order: number };
-  const positions = new Map(expenses.map((expense, index) => [expense.id, index]));
-  const groups = new Map<string, ExpenseGroup>();
-  const ungrouped: ExpenseGroup[] = [];
-
-  expenses.forEach((expense, index) => {
-    const category = expense.category.trim();
-    if (!category) {
-      ungrouped.push({
-        id: `expense-${expense.id}`,
-        category: "",
-        color: expense.color,
-        total: expense.amount,
-        items: [expense],
-        order: index,
-      });
-      return;
-    }
-
-    const existing = groups.get(category);
-    if (existing) {
-      existing.items.push(expense);
-      existing.total += expense.amount;
-    } else {
-      const group = {
-        id: `category-${category}`,
-        category,
-        color: expense.color || categoryColor(category, index),
-        total: expense.amount,
-        items: [expense],
-        order: index,
-      };
-      groups.set(category, group);
-    }
-  });
-
-  const categoryGroups = Array.from(groups.values())
-    .map((group) => ({
-      ...group,
-      items: [...group.items].sort((a, b) => b.amount - a.amount || (positions.get(a.id) ?? 0) - (positions.get(b.id) ?? 0)),
-    }))
-    .sort((a, b) => b.total - a.total || a.order - b.order);
-
-  return [...categoryGroups, ...ungrouped].map(({ order, ...group }) => group);
-}
-
-function buildMonthlyBars(ledger: LedgerState, _fallbackMonth: MonthBudget) {
-  const [year] = ledger.selectedMonth.split("-").map(Number);
-  const values = Array.from({ length: 12 }, (_, index) => {
-    const key = `${year}-${String(index + 1).padStart(2, "0")}`;
-    const month = ledger.months[key] ?? { incomes: [], expenses: [], note: "" };
-    const projection = calculateProjection(month);
-    return {
-      label: new Date(year, index, 1).toLocaleString("en", { month: "short" }),
-      value: projection.monthlySurplus,
-    };
-  });
-  const max = Math.max(...values.map((item) => Math.abs(item.value)), 1);
-  return values.map((item) => ({
-    ...item,
-    height: (Math.abs(item.value) / max) * 100,
-  }));
-}
-
 function downloadFile(name: string, content: string, type: string) {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
@@ -8305,13 +7938,6 @@ function randomCategoryColor(expenses: ExpenseEntry[]) {
   const availableColors = colors.filter((color) => !usedColors.has(color));
   const palette = availableColors.length ? availableColors : colors;
   return palette[Math.floor(Math.random() * palette.length)];
-}
-
-function categoryColor(category: string, fallbackIndex: number) {
-  const normalized = category.trim().toLowerCase();
-  const defaultCategories = ["home", "food", "bills", "travel", "health", "personal", "work", "subscriptions", "savings", "other"];
-  const knownIndex = defaultCategories.findIndex((item) => item === normalized);
-  return colors[(knownIndex >= 0 ? knownIndex : fallbackIndex + 2) % colors.length];
 }
 
 function findLastExpenseIndex(expenses: ExpenseEntry[], predicate: (expense: ExpenseEntry) => boolean) {

@@ -137,10 +137,27 @@ const INSIGHTS_WIDGETS: WidgetDefinition[] = [
   },
   {
     id: "cash-flow",
-    title: { GB: "Cash flow", US: "Cash flow" },
-    description: { GB: "Where this month's money came from and went.", US: "Where this month's money came from and went." },
+    title: { GB: "Money flow", US: "Money flow" },
+    description: {
+      GB: "Where this month's money came from and went, with what is left collected as savings. A waterfall or a particle stream.",
+      US: "Where this month's money came from and went, with what is left collected as savings. A waterfall or a particle stream.",
+    },
     defaultSize: "xl",
     sizes: ["l", "xl"],
+  },
+  {
+    id: "spending-pace",
+    title: { GB: "Spending pace", US: "Spending pace" },
+    description: { GB: "How fast the month is being spent and what is safe to spend per day.", US: "How fast the month is being spent and what is safe to spend per day." },
+    defaultSize: "s",
+    sizes: ["s", "m"],
+  },
+  {
+    id: "savings-rate",
+    title: { GB: "Savings rate", US: "Savings rate" },
+    description: { GB: "Annualised savings rate against your target.", US: "Annualized savings rate against your target." },
+    defaultSize: "s",
+    sizes: ["s", "m"],
   },
   {
     id: "health",
@@ -231,6 +248,48 @@ const INSIGHTS_WIDGETS: WidgetDefinition[] = [
     sizes: ["m", "l", "xl"],
   },
   {
+    id: "debt-overview",
+    title: { GB: "Credit & debt", US: "Credit & debt" },
+    description: { GB: "Card utilisation per card, total debt and payment pressure.", US: "Card utilization per card, total debt and payment pressure." },
+    defaultSize: "xl",
+    sizes: ["l", "xl"],
+  },
+  {
+    id: "month-compare",
+    title: { GB: "Versus last month", US: "Versus last month" },
+    description: { GB: "Which categories moved most compared with the previous month.", US: "Which categories moved most compared with the previous month." },
+    defaultSize: "m",
+    sizes: ["m", "l"],
+  },
+  {
+    id: "upcoming",
+    title: { GB: "Upcoming payments", US: "Upcoming payments" },
+    description: { GB: "Bills and card payments expected in the next two weeks.", US: "Bills and card payments expected in the next two weeks." },
+    defaultSize: "s",
+    sizes: ["s", "m"],
+  },
+  {
+    id: "calendar",
+    title: { GB: "Spending calendar", US: "Spending calendar" },
+    description: { GB: "A heat map of daily spending across the month.", US: "A heat map of daily spending across the month." },
+    defaultSize: "m",
+    sizes: ["m", "l"],
+  },
+  {
+    id: "todo",
+    title: { GB: "To-do list", US: "To-do list" },
+    description: { GB: "Money jobs to get done: cancel that subscription, move the savings.", US: "Money jobs to get done: cancel that subscription, move the savings." },
+    defaultSize: "s",
+    sizes: ["s", "m"],
+  },
+  {
+    id: "notes",
+    title: { GB: "Notes", US: "Notes" },
+    description: { GB: "A scratchpad that stays on your Insights page.", US: "A scratchpad that stays on your Insights page." },
+    defaultSize: "s",
+    sizes: ["s", "m"],
+  },
+  {
     id: "annual",
     title: { GB: "Annual projection", US: "Annual projection" },
     description: { GB: "The year ahead from this month's plan.", US: "The year ahead from this month's plan." },
@@ -246,8 +305,8 @@ const DEFAULT_IDS: Record<LayoutPage, Record<RegionKey, string[]>> = {
     US: ["snapshot", "net-worth", "retirement", "take-home", "medical", "loans", "accounts-imports"],
   },
   insights: {
-    GB: ["summary", "cash-flow", "health", "chart", "categories", "anomalies", "payoff", "recurring", "annual"],
-    US: ["summary", "cash-flow", "health", "chart", "categories", "anomalies", "paycheck", "credit", "limits", "payoff", "medical", "loans", "recurring", "annual"],
+    GB: ["summary", "cash-flow", "health", "spending-pace", "savings-rate", "chart", "categories", "anomalies", "payoff", "recurring", "annual"],
+    US: ["summary", "cash-flow", "health", "spending-pace", "savings-rate", "chart", "categories", "anomalies", "paycheck", "credit", "limits", "payoff", "medical", "loans", "recurring", "annual"],
   },
 };
 

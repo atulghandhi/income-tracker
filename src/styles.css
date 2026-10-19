@@ -114,6 +114,9 @@ html {
   min-width: 320px;
   min-height: 100%;
   background: var(--bg);
+  /* The app bar is sticky: keep anything scrolled into view (focus, anchors, scrollIntoView)
+     clear of it. */
+  scroll-padding-top: 80px;
 }
 
 body {
@@ -8989,4 +8992,2473 @@ select:not([multiple]):disabled {
   .subsListHeading .tabs { flex: 1 1 100%; min-width: 0; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
   .subsListHeading .tabs::-webkit-scrollbar { display: none; }
   .subsListHeading .tabs button { white-space: nowrap; flex-shrink: 0; }
+}
+
+
+/* ─── Insights: the money-flow family of widgets ─────────────────────────────
+   Drawn inside .insightCard (InsightWidgetCard.tsx); every rule is scoped to it so the shared
+   class names these widgets reuse (signalCard, flowMonth, netWorthChart…) keep their look
+   everywhere else. */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Insights dashboard — customisable widget grid
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Same height and corner radius as the buttons beside it. */
+
+.insightCard .commandButton.primary {
+  border-color: rgba(var(--blue-rgb), 0.55);
+  background: var(--blue);
+  color: var(--on-accent);
+}
+
+.insightCard .commandButton.primary:hover {
+  border-color: rgba(var(--blue-rgb), 0.8);
+  background: var(--blue-bright);
+  color: var(--on-accent);
+}
+
+.insightCard .quietButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 12px;
+  font-size: 12.5px;
+  font-weight: 680;
+}
+
+.insightCard .linkButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--blue);
+  font-size: 12.5px;
+  font-weight: 680;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  transition: text-decoration-color 150ms ease;
+}
+
+.insightCard .linkButton:hover:not(:disabled) {
+  text-decoration-color: currentColor;
+}
+
+.insightCard .linkButton:disabled {
+  color: var(--faint);
+  cursor: default;
+}
+
+.insightCard .iconButton.small {
+  width: 30px;
+  min-height: 30px;
+}
+
+/* ── Edit toolbar ── */
+
+/* ── Grid ── */
+
+.insightCard {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--glass);
+  backdrop-filter: blur(22px);
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    width 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    height 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 200ms ease,
+    border-color 200ms ease,
+    opacity 200ms ease;
+  /* Position comes from the transform, so the entrance must not touch it. */
+  animation: insightCardIn 360ms ease both;
+}
+
+@keyframes insightCardIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Touch drags start from the header (and the corner handles); the body keeps scrolling the page. */
+
+/* Hover lifts a card a touch and tints it; dragging or resizing goes one step further. */
+
+.insightCard.active,
+.insightCard.active:hover {
+  z-index: 30;
+  cursor: grabbing;
+  border-style: solid;
+  border-color: rgba(var(--blue-rgb), 0.85);
+  background: linear-gradient(rgba(var(--blue-rgb), 0.1), rgba(var(--blue-rgb), 0.1)), var(--glass);
+  box-shadow: 0 0 0 4px rgba(var(--blue-rgb), 0.14), var(--shadow-md);
+  transition: box-shadow 200ms ease, background 200ms ease;
+  opacity: 0.97;
+}
+
+@keyframes cardPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(var(--mint-rgb), 0.5);
+  }
+  60% {
+    box-shadow: 0 0 0 12px rgba(var(--mint-rgb), 0);
+  }
+  100% {
+    box-shadow: var(--shadow-sm);
+  }
+}
+
+.insightCard .insightCardHead {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+  padding: 14px 18px 6px 20px;
+}
+
+.insightCard .insightCardHead h3 {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 15.5px;
+  font-weight: 640;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.insightCard .insightCardActions {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 4px;
+}
+
+.insightCard .insightCardBody {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0 20px 16px;
+}
+
+.insightCard.narrow .insightCardHead {
+  padding: 12px 12px 4px 16px;
+}
+
+.insightCard.narrow .insightCardBody {
+  padding: 0 16px 14px;
+}
+
+/* ── Sample (dummy) data ── */
+
+.insightCard.sampleCard {
+  border-style: dashed;
+  border-color: rgba(var(--amber-rgb), 0.45);
+}
+
+.insightCard.sampleCard .insightCardBody {
+  filter: grayscale(0.75) opacity(0.6);
+}
+
+.insightCard .sampleBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  padding: 0 8px 0 9px;
+  border: 1px dashed rgba(var(--amber-rgb), 0.6);
+  border-radius: 999px;
+  background: rgba(var(--amber-rgb), 0.12);
+  color: var(--amber);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 760;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.insightCard .widgetEmpty {
+  height: 100%;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.insightCard .widgetEmpty.compact {
+  grid-auto-flow: column;
+  align-items: center;
+  justify-content: start;
+  gap: 14px;
+  text-align: left;
+}
+
+.insightCard .summaryStat.empty .summaryValue {
+  color: var(--faint);
+}
+
+.insightCard .sampleToggle {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.insightCard .sampleToggle span {
+  white-space: nowrap;
+}
+
+.insightCard .widgetEmptyDashes {
+  display: flex;
+  gap: 14px;
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.insightCard .widgetEmpty.compact .widgetEmptyDashes {
+  font-size: 24px;
+}
+
+.insightCard .widgetEmpty p {
+  max-width: 340px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.insightCard .widgetEmpty.compact p {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── Card menu (edit mode) ── */
+
+.insightCard .segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--well);
+}
+
+.insightCard .segmented button {
+  flex: 1 1 auto;
+  min-width: 34px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.insightCard .segmented button.selected {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+
+.insightCard .segmented button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ── Widget picker ── */
+
+/* "Added ✓" turns into a red "Remove?" on hover or focus; clicking takes the widget off. */
+
+/* ── Unsaved changes modal ── */
+
+/* ── Month summary ── */
+
+.insightCard .summaryGrid {
+  height: 100%;
+  display: grid;
+  gap: 10px 16px;
+  align-content: center;
+}
+
+.insightCard .summaryStat {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(var(--surface-rgb), 0.55);
+}
+
+.insightCard .summaryGrid.list {
+  align-content: start;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.insightCard .summaryGrid.list .summaryStat {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+}
+
+.insightCard .summaryGrid.list .summaryValue {
+  font-size: 16px;
+}
+
+.insightCard .summaryGrid.list.withDeltas .summaryStat {
+  grid-template-columns: 1fr auto auto;
+  padding: 10px 12px;
+}
+
+.insightCard .summaryGrid.list.withDeltas .delta {
+  font-size: 10.5px;
+}
+
+.insightCard .summaryStat.green {
+  border-color: rgba(var(--mint-rgb), 0.3);
+}
+
+.insightCard .summaryStat.red {
+  border-color: rgba(var(--red-rgb), 0.28);
+}
+
+.insightCard .summaryStat.amber {
+  border-color: rgba(var(--amber-rgb), 0.3);
+}
+
+.insightCard .summaryLabel {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.insightCard .summaryValue {
+  overflow: hidden;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(17px, 2.1vw, 26px);
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.insightCard .summaryGrid.detailed .summaryValue {
+  font-size: clamp(20px, 2.4vw, 30px);
+}
+
+.insightCard .summaryStat.green .summaryValue {
+  color: var(--mint);
+}
+
+.insightCard .summaryStat.red .summaryValue {
+  color: var(--red);
+}
+
+.insightCard .summaryStat.amber .summaryValue {
+  color: var(--amber);
+}
+
+.insightCard .summaryMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.insightCard .delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11.5px;
+  font-style: normal;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.insightCard .delta.good {
+  color: var(--mint);
+}
+
+.insightCard .delta.bad {
+  color: var(--red);
+}
+
+.insightCard .sparkline {
+  flex: 0 0 auto;
+  display: block;
+  overflow: visible;
+}
+
+.insightCard .sparkZero {
+  stroke: var(--line-strong);
+  stroke-dasharray: 2 3;
+}
+
+/* ── Health score ── */
+
+.insightCard .healthWidget {
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 12px;
+}
+
+.insightCard .healthWidget > * {
+  min-width: 0;
+}
+
+.insightCard .healthNumbers {
+  min-width: 0;
+}
+
+/* A full-width single row: score, credit estimate and the five drivers side by side. */
+
+.insightCard .healthHeadline {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.insightCard .healthWidget.meter .healthHeadline {
+  flex-direction: column-reverse;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.insightCard .healthNumbers {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+
+.insightCard .healthWidget .scoreNumber {
+  font-size: 40px;
+}
+
+.insightCard .healthWidget.narrow .scoreNumber {
+  font-size: 34px;
+}
+
+.insightCard .healthWidget.good .scoreNumber {
+  color: var(--mint);
+}
+
+.insightCard .healthWidget.warn .scoreNumber {
+  color: var(--amber);
+}
+
+.insightCard .healthWidget.bad .scoreNumber {
+  color: var(--red);
+}
+
+.insightCard .healthWidget.good .scoreBadge {
+  background: var(--mint-soft);
+  color: var(--mint);
+}
+
+.insightCard .healthWidget.warn .scoreBadge {
+  background: rgba(var(--amber-rgb), 0.14);
+  color: var(--amber);
+}
+
+.insightCard .healthWidget.bad .scoreBadge {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.insightCard .healthWidget .creditEstimate {
+  margin-top: 0;
+}
+
+.insightCard .healthWidget .ruleList {
+  margin-top: 2px;
+  gap: 10px;
+}
+
+.insightCard .healthRing {
+  flex: 0 0 auto;
+  transform: rotate(-90deg);
+}
+
+.insightCard .healthRingTrack {
+  fill: none;
+  stroke: var(--track);
+  stroke-width: 12;
+}
+
+.insightCard .healthRingValue {
+  fill: none;
+  stroke: var(--mint);
+  stroke-width: 12;
+  stroke-linecap: round;
+  transition: stroke-dasharray 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.insightCard .healthWidget.warn .healthRingValue {
+  stroke: var(--amber);
+}
+
+.insightCard .healthWidget.bad .healthRingValue {
+  stroke: var(--red);
+}
+
+.insightCard .healthMeter {
+  display: grid;
+  gap: 4px;
+}
+
+.insightCard .healthMeterTrack {
+  position: relative;
+  height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(var(--red-rgb), 0.55), rgba(var(--amber-rgb), 0.55) 45%, rgba(var(--mint-rgb), 0.6));
+}
+
+.insightCard .healthMeterTrack i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.insightCard .healthMeterTrack b {
+  position: absolute;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  border: 3px solid var(--surface);
+  border-radius: 50%;
+  background: var(--ink);
+  box-shadow: var(--shadow-sm);
+  transform: translate(-50%, -50%);
+  transition: left 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.insightCard .healthMeterScale {
+  display: flex;
+  justify-content: space-between;
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* ── Monthly cash flow ── */
+
+.insightCard .cashFlowWidget {
+  margin-top: 0;
+  gap: 8px;
+  height: 100%;
+}
+
+.insightCard .cashFlowWidget svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.insightCard .cashFlowWidget .flowLegend {
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+  gap: 10px 14px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.insightCard .cashFlowWidget .flowLegend strong {
+  margin-left: auto;
+}
+
+.insightCard .cashFlowWidget text.selected {
+  fill: var(--ink);
+  font-weight: 760;
+}
+
+.insightCard .cashFlowWidget .flowMonth.selected .flowHit {
+  fill: rgba(var(--blue-rgb), 0.08);
+}
+
+.insightCard .flowNetDot.selected {
+  fill: var(--blue);
+}
+
+.insightCard .flowNetDot.negative {
+  fill: var(--red);
+}
+
+.insightCard .flowNetArea {
+  fill: rgba(var(--mint-rgb), 0.16);
+}
+
+/* ── Warnings ── */
+
+.insightCard .warningsWidget {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.insightCard .warningsList {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
+  padding: 2px 2px 4px;
+  scrollbar-gutter: stable;
+}
+
+.insightCard .warningsWidget .signalCard {
+  padding: 12px 14px;
+}
+
+.insightCard .warningsWidget .signalCard.compact {
+  padding: 5px 10px;
+}
+
+.insightCard .warningsWidget .signalCard.compact .signalTitle strong {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.insightCard .warningsWidget.compact .warningsList {
+  gap: 6px;
+}
+
+.insightCard .warningsWidget .signalCard strong {
+  font-size: 13.5px;
+}
+
+.insightCard .warningsWidget .signalCard span {
+  margin-top: 6px;
+  font-size: 12.5px;
+}
+
+.insightCard .signalCard.dimmed {
+  opacity: 0.55;
+  border-style: dashed;
+}
+
+.insightCard .signalActions {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 2px;
+}
+
+.insightCard .signalDismiss {
+  width: 24px;
+  height: 24px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--faint);
+  opacity: 0.7;
+  transition:
+    opacity 150ms ease,
+    background 150ms ease,
+    color 150ms ease;
+}
+
+.insightCard .signalCard:hover .signalDismiss,
+.insightCard .signalDismiss:focus-visible {
+  opacity: 1;
+}
+
+.insightCard .signalDismiss:hover {
+  background: rgba(var(--ink-rgb), 0.08);
+  color: var(--ink);
+}
+
+.insightCard .warningsFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: 0 0 auto;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+}
+
+.insightCard .warningsAllHidden {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+/* ── Top categories ── */
+
+.insightCard .categoryBars {
+  position: relative;
+  height: 100%;
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  overflow: auto;
+}
+
+.insightCard .categoryBarRow {
+  display: grid;
+  gap: 5px;
+}
+
+.insightCard .categoryBarHead {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.insightCard .categoryName,
+.insightCard .legendName,
+.insightCard .cardName,
+.insightCard .goalRowName,
+.insightCard .compareName {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.insightCard .categoryBarHead strong,
+.insightCard .categoryLegend strong {
+  color: var(--ink);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+}
+
+.insightCard .categoryBarHead em,
+.insightCard .categoryLegend em {
+  min-width: 40px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11.5px;
+  font-style: normal;
+  text-align: right;
+}
+
+.insightCard .categoryTrack {
+  position: relative;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: var(--track);
+}
+
+.insightCard .categoryTrack i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--mint);
+  transition: width 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.insightCard .categoryMore {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.insightCard .categoryDonutWrap {
+  position: relative;
+  height: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 18px;
+}
+
+.insightCard .categoryDonutWrap.stacked {
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  align-content: start;
+  gap: 10px;
+}
+
+.insightCard .categoryDonut {
+  display: block;
+  flex: 0 0 auto;
+}
+
+.insightCard .donutSlice {
+  fill: none;
+  stroke-width: 14;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+  transition: stroke-width 150ms ease;
+}
+
+.insightCard .donutSlice:hover {
+  stroke-width: 17;
+}
+
+.insightCard .donutCentre {
+  fill: var(--ink);
+  font-family: var(--mono);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.insightCard .donutCaption {
+  fill: var(--muted);
+  font-size: 7px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.insightCard .categoryLegend {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: auto;
+  max-height: 100%;
+}
+
+.insightCard .categoryLegend li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+}
+
+/* ── Recurring & upcoming ── */
+
+.insightCard .recurringWidget,
+.insightCard .upcomingWidget {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.insightCard .recurringSummary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.insightCard .recurringSummary strong {
+  color: var(--ink);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 16px;
+}
+
+.insightCard .recurringSummary small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.insightCard .recurringList,
+.insightCard .upcomingList {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  overflow: auto;
+}
+
+.insightCard .recurringWidget .subscriptionRow {
+  padding: 5px 6px;
+}
+
+.insightCard .recurringWidget.brief {
+  justify-content: center;
+  gap: 10px;
+}
+
+.insightCard .recurringChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 30px;
+  overflow: hidden;
+}
+
+.insightCard .recurringChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(var(--surface-rgb), 0.7);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.insightCard .recurringChip i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.insightCard .recurringChip > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.insightCard .recurringChip b {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.insightCard .recurringChip.more {
+  color: var(--muted);
+}
+
+.insightCard .recurringWidget .missedRecurring {
+  flex: 0 0 auto;
+  margin-top: 0;
+}
+
+.insightCard .upcomingRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.insightCard .upcomingRow.soon {
+  background: rgba(var(--amber-rgb), 0.08);
+}
+
+.insightCard .upcomingRow > strong {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.insightCard .upcomingDate {
+  display: grid;
+  flex: 0 0 auto;
+  justify-items: center;
+  width: 40px;
+  padding: 4px 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--well);
+  line-height: 1;
+}
+
+.insightCard .upcomingDate b {
+  font-family: var(--mono);
+  font-size: 15px;
+}
+
+.insightCard .upcomingDate small {
+  color: var(--muted);
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+/* ── Annual snapshot ── */
+
+.insightCard .annualWidget {
+  height: 100%;
+  display: grid;
+  align-content: center;
+  gap: 14px;
+}
+
+.insightCard .annualFacts {
+  display: grid;
+  gap: 10px;
+}
+
+.insightCard .annualFact {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(var(--surface-rgb), 0.55);
+}
+
+.insightCard .annualFact span {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.insightCard .annualFact strong {
+  overflow: hidden;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.insightCard .annualFact.good strong {
+  color: var(--mint);
+}
+
+.insightCard .annualFact.bad strong {
+  color: var(--red);
+}
+
+.insightCard .annualRhythm {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 8px;
+  min-height: 0;
+}
+
+.insightCard .annualRhythmBars {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 6px;
+  align-items: end;
+  min-height: 60px;
+}
+
+.insightCard .annualRhythmItem {
+  height: 100%;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  justify-items: center;
+  gap: 4px;
+}
+
+.insightCard .annualRhythmItem .railTrack {
+  height: 100%;
+  min-height: 40px;
+}
+
+.insightCard .annualRhythmItem small {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+.insightCard .annualNote {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+/* ── Savings rate ── */
+
+.insightCard .savingsWidget {
+  height: 100%;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 14px;
+}
+
+.insightCard .savingsWidget .gauge {
+  width: clamp(96px, 28vw, 132px);
+}
+
+.insightCard .savingsWidget .gauge strong {
+  font-size: 24px;
+}
+
+.insightCard .savingsWidget.warn .gauge {
+  background:
+    radial-gradient(circle at center, var(--surface) 0 58%, transparent 59%),
+    conic-gradient(var(--amber) var(--value), rgba(var(--line-rgb), 0.14) 0);
+}
+
+.insightCard .savingsWidget .targetInput span {
+  font-size: 12px;
+}
+
+.insightCard .savingsCompact {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.insightCard .savingsCompact strong {
+  color: var(--mint);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 26px;
+}
+
+.insightCard .savingsWidget.warn .savingsCompact strong {
+  color: var(--amber);
+}
+
+.insightCard .savingsCompact span {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.insightCard .savingsBar,
+.insightCard .paceTrack,
+.insightCard .utilisationBar {
+  position: relative;
+  height: 10px;
+  overflow: visible;
+  border-radius: 999px;
+  background: var(--track);
+}
+
+.insightCard .savingsBar i,
+.insightCard .paceTrack i,
+.insightCard .utilisationBar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--mint);
+  transition: width 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.insightCard .savingsBar b,
+.insightCard .paceTrack b,
+.insightCard .utilisationBar b {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  background: var(--ink);
+  border-radius: 2px;
+  transform: translateX(-50%);
+}
+
+.insightCard .savingsWidget.warn .savingsBar i {
+  background: var(--amber);
+}
+
+.insightCard .savingsExtra {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.insightCard .savingsExtra div {
+  display: grid;
+  gap: 4px;
+}
+
+.insightCard .savingsExtra span {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.insightCard .savingsExtra strong {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 16px;
+}
+
+/* ── Spending pace ── */
+
+.insightCard .paceWidget {
+  height: 100%;
+  display: grid;
+  align-content: center;
+  gap: 10px;
+}
+
+.insightCard .paceHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.insightCard .paceHead strong {
+  color: var(--ink);
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.insightCard .paceHead small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.insightCard .paceWidget.warn .paceTrack i {
+  background: var(--amber);
+}
+
+.insightCard .paceWidget.bad .paceTrack i {
+  background: var(--red);
+}
+
+.insightCard .paceScale {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.insightCard .paceFacts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.insightCard .paceFacts > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.insightCard .paceFacts span {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.insightCard .paceFacts strong {
+  overflow: hidden;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 17px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.insightCard .paceFacts strong small {
+  margin-left: 2px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.insightCard .paceNote {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* ── Credit & debt ── */
+
+.insightCard .debtWidget {
+  height: 100%;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.insightCard .debtStats {
+  display: grid;
+  gap: 8px;
+}
+
+.insightCard .debtStats > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(var(--surface-rgb), 0.55);
+}
+
+.insightCard .debtStats span {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.insightCard .debtStats strong {
+  overflow: hidden;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.insightCard .debtStats .warn strong,
+.insightCard .cardRow.warn .categoryTrack i {
+  color: var(--amber);
+  background-color: var(--amber);
+}
+
+.insightCard .debtStats .bad strong,
+.insightCard .cardRow.bad .categoryTrack i {
+  color: var(--red);
+  background-color: var(--red);
+}
+
+.insightCard .debtStats .good strong,
+.insightCard .debtStats .watch strong {
+  color: var(--mint);
+}
+
+.insightCard .debtStats strong {
+  background: transparent;
+}
+
+.insightCard .utilisationBar.warn i {
+  background: var(--amber);
+}
+
+.insightCard .utilisationBar.bad i {
+  background: var(--red);
+}
+
+.insightCard .cardList {
+  display: grid;
+  gap: 10px;
+  overflow: auto;
+  min-height: 0;
+}
+
+.insightCard .cardRow {
+  display: grid;
+  gap: 5px;
+}
+
+.insightCard .cardRowHead {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+}
+
+.insightCard .cardRowHead em {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.insightCard .cardRowHead strong {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.insightCard .cardRow.watch .categoryTrack i {
+  background: var(--blue);
+}
+
+/* Narrow cards: name on one line, rate and balance on the next. */
+
+.insightCard .cardRow.stacked .cardRowHead {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.insightCard .cardRow.stacked .cardRowHead em {
+  grid-column: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.insightCard .cardRow.stacked .cardRowHead strong {
+  grid-column: 2;
+  font-size: 11.5px;
+}
+
+/* ── Net worth ── */
+
+.insightCard .netWorthWidget {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 6px;
+}
+
+.insightCard .netWorthWidget .chartUtilityRow {
+  margin-top: 0;
+}
+
+.insightCard .netWorthMini {
+  height: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: center;
+  gap: 14px;
+}
+
+.insightCard .netWorthMini div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.insightCard .netWorthMini span {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.insightCard .netWorthMini strong {
+  overflow: hidden;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Goals ── */
+
+.insightCard .goalsWidget {
+  height: 100%;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  overflow: auto;
+}
+
+.insightCard .goalRow {
+  display: grid;
+  gap: 6px;
+}
+
+.insightCard .goalRowHead {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.insightCard .goalRowHead strong {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+}
+
+.insightCard .goalRowHead small {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.insightCard .goalRowMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.insightCard .goalRow.at-risk .goalEta {
+  color: var(--red);
+}
+
+.insightCard .goalRow.tight .goalEta {
+  color: var(--amber);
+}
+
+.insightCard .goalRow.complete .goalEta {
+  color: var(--mint);
+}
+
+/* ── Versus last month ── */
+
+.insightCard .compareWidget {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.insightCard .compareHead {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.insightCard .compareHead strong {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+}
+
+.insightCard .compareList {
+  flex: 1 1 auto;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-height: 0;
+  overflow: auto;
+}
+
+.insightCard .compareRow {
+  display: grid;
+  grid-template-columns: auto minmax(60px, 0.8fr) minmax(60px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+}
+
+.insightCard .compareRow > strong {
+  min-width: 56px;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  text-align: right;
+}
+
+.insightCard .compareTrack {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: 8px;
+}
+
+.insightCard .compareHalf {
+  position: relative;
+  height: 100%;
+  background: var(--track);
+}
+
+.insightCard .compareHalf.left {
+  border-radius: 99px 0 0 99px;
+  border-right: 1px solid var(--surface);
+}
+
+.insightCard .compareHalf.right {
+  border-radius: 0 99px 99px 0;
+}
+
+.insightCard .compareHalf i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: block;
+  border-radius: inherit;
+  transition: width 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.insightCard .compareHalf.left i {
+  right: 0;
+  background: var(--mint);
+}
+
+.insightCard .compareHalf.right i {
+  left: 0;
+  background: var(--red);
+}
+
+/* ── Calendar ── */
+
+.insightCard .calendarWidget {
+  position: relative;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 6px;
+}
+
+.insightCard .calendarHead {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.insightCard .calendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  align-content: start;
+}
+
+.insightCard .calendarCell {
+  --heat: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: rgba(var(--red-rgb), calc(0.08 + var(--heat) * 0.72));
+  color: var(--ink);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  transition: transform 120ms ease;
+}
+
+.insightCard .calendarCell:not(.spent) {
+  background: var(--well);
+  color: var(--muted);
+}
+
+.insightCard .calendarCell.future {
+  background: transparent;
+  border: 1px dashed var(--line);
+  color: var(--faint);
+}
+
+.insightCard .calendarCell.pad {
+  background: transparent;
+}
+
+.insightCard .calendarCell.spent:hover {
+  transform: scale(1.08);
+}
+
+.insightCard .calendarFoot {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* ── Accounts ── */
+
+.insightCard .accountsWidget {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.insightCard .accountsList {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  overflow: auto;
+}
+
+.insightCard .accountRowMini {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.insightCard .accountRowMini > strong {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+
+.insightCard .accountsFoot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.insightCard .accountsFoot strong {
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── To-do & notes ── */
+
+.insightCard .todoWidget {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.insightCard .todoAdd {
+  display: flex;
+  gap: 6px;
+}
+
+.insightCard .todoAdd input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(var(--surface-rgb), 0.8);
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.insightCard .todoAdd input:focus {
+  outline: 2px solid rgba(var(--blue-rgb), 0.4);
+  outline-offset: 1px;
+}
+
+.insightCard .todoList {
+  flex: 1 1 auto;
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  min-height: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.insightCard .todoList li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 4px 4px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.insightCard .todoList li span {
+  overflow-wrap: anywhere;
+}
+
+.insightCard .todoList li.done span {
+  color: var(--faint);
+  text-decoration: line-through;
+}
+
+.insightCard .todoList li .iconButton {
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.insightCard .todoList li:hover .iconButton,
+.insightCard .todoList li .iconButton:focus-visible {
+  opacity: 1;
+}
+
+.insightCard .todoEmpty {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.insightCard .todoCheck {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--on-accent);
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
+}
+
+.insightCard .todoList li.done .todoCheck {
+  border-color: var(--mint);
+  background: var(--mint);
+}
+
+.insightCard .todoFoot,
+.insightCard .notesFoot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.insightCard .notesWidget {
+  height: 100%;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 6px;
+}
+
+.insightCard .notesWidget textarea {
+  width: 100%;
+  min-height: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(var(--surface-rgb), 0.8);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.5;
+  resize: none;
+}
+
+.insightCard .notesWidget textarea:focus {
+  outline: 2px solid rgba(var(--blue-rgb), 0.4);
+  outline-offset: 1px;
+}
+
+/* ── Money flow ── */
+
+.insightCard .moneyFlow {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+
+.insightCard .moneyFlowSvg {
+  display: block;
+  overflow: visible;
+}
+
+.insightCard .flowStream,
+.insightCard .flowNodeGroup,
+.insightCard .flowRibbon {
+  cursor: pointer;
+}
+
+.insightCard .flowStream path:first-child,
+.insightCard .flowRibbon {
+  transition: opacity 150ms ease;
+}
+
+.insightCard .flowStream:hover path:first-child {
+  opacity: 0.85;
+  filter: saturate(1.3);
+}
+
+.insightCard .flowRibbon {
+  fill-opacity: 0.32;
+}
+
+.insightCard .flowRibbon:hover {
+  fill-opacity: 0.58;
+}
+
+/* Water: ripple lines slide down inside each stream, one gap per cycle so the loop is
+   seamless. Fast enough to read as flowing, faint enough to stay calm. */
+
+.insightCard .flowRipples {
+  animation-name: rippleFall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+
+@keyframes rippleFall {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(var(--ripple-gap, 15px));
+  }
+}
+
+.insightCard .flowRipple {
+  fill: none;
+  stroke: var(--flow-ripple);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.insightCard .flowSplit {
+  stroke: var(--line-strong);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+  opacity: 0.5;
+}
+
+.insightCard .flowEyebrow {
+  fill: var(--muted);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 760;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.insightCard .flowTotal {
+  fill: var(--ink);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 26px;
+  font-weight: 680;
+}
+
+.insightCard .flowTotal.tank {
+  font-size: 24px;
+}
+
+.insightCard .flowTotalInline {
+  fill: var(--ink);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.insightCard .flowSources {
+  fill: var(--faint);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.insightCard .flowSources.column {
+  fill: var(--muted);
+  font-weight: 680;
+  pointer-events: none;
+}
+
+.insightCard .flowStream.trunk {
+  cursor: default;
+}
+
+.insightCard .flowBox {
+  fill-opacity: 0.12;
+  stroke-opacity: 0.55;
+  stroke-width: 1.2;
+  transition:
+    fill-opacity 150ms ease,
+    stroke-opacity 150ms ease;
+}
+
+.insightCard .flowNodeGroup:hover .flowBox {
+  fill-opacity: 0.22;
+  stroke-opacity: 0.9;
+}
+
+.insightCard .flowBoxName {
+  fill: var(--ink);
+  font-size: 12.5px;
+  font-weight: 660;
+  pointer-events: none;
+}
+
+.insightCard .flowBoxName.vertical {
+  font-size: 10.5px;
+}
+
+.insightCard .flowBoxAmount {
+  fill: var(--ink);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.insightCard .flowNode {
+  stroke: var(--surface);
+  stroke-width: 1;
+  transition: filter 150ms ease;
+}
+
+.insightCard .flowNodeGroup:hover .flowNode {
+  filter: brightness(1.12);
+}
+
+.insightCard .flowLabel {
+  font-size: 11.5px;
+  pointer-events: none;
+}
+
+.insightCard .flowLabel .name {
+  fill: var(--ink);
+  font-weight: 680;
+}
+
+.insightCard .flowLabel .amt {
+  fill: var(--muted);
+  font-weight: 500;
+}
+
+.insightCard .flowLabel.narrow {
+  font-size: 10px;
+}
+
+.insightCard .flowLeader {
+  stroke: var(--line-strong);
+  stroke-width: 1;
+  pointer-events: none;
+}
+
+.insightCard .flowLabel.pool .name,
+.insightCard .flowLabel.pool .amt {
+  fill: var(--on-accent);
+  font-size: 11px;
+}
+
+.insightCard .flowTank {
+  cursor: pointer;
+}
+
+.insightCard .flowTankGlass {
+  fill: rgba(var(--mint-rgb), 0.06);
+  stroke: none;
+}
+
+.insightCard .flowTank.deficit .flowTankGlass {
+  fill: rgba(var(--red-rgb), 0.06);
+}
+
+.insightCard .flowTankRim {
+  fill: none;
+  stroke: rgba(var(--mint-rgb), 0.45);
+  stroke-width: 1.2;
+  pointer-events: none;
+}
+
+.insightCard .flowTank.deficit .flowTankRim {
+  stroke: rgba(var(--red-rgb), 0.5);
+}
+
+.insightCard .flowTank.deficit .flowEyebrow,
+.insightCard .flowTank.deficit .flowTotal,
+.insightCard .flowTank.deficit .flowBoxAmount {
+  fill: var(--red);
+}
+
+.insightCard .flowEyebrow.tank {
+  fill: var(--mint);
+}
+
+.insightCard .flowTankWater {
+  fill: var(--mint);
+  opacity: 0.5;
+  transition: y 700ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.insightCard .flowTank .flowTotal,
+.insightCard .flowTank .flowBoxAmount,
+.insightCard .flowTank .flowEyebrow,
+.insightCard .flowTank .flowSources {
+  pointer-events: none;
+}
+
+.insightCard .flowWave {
+  fill: var(--mint);
+  opacity: 0.55;
+}
+
+.insightCard .flowWave.soft {
+  opacity: 0.35;
+}
+
+.insightCard .flowWave.animated {
+  animation: waveDrift 3.6s linear infinite;
+}
+
+.insightCard .flowWave.soft.animated {
+  animation-duration: 5.2s;
+  animation-direction: reverse;
+}
+
+@keyframes waveDrift {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(40px);
+  }
+}
+
+.insightCard .flowParticle {
+  filter: drop-shadow(0 0 3px currentColor) drop-shadow(0 0 6px currentColor);
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+.motion-off .insightCard .flowParticle,
+.motion-off .insightCard .flowRipples {
+  animation: none;
+}
+
+.motion-off .insightCard .flowParticle {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .insightCard .flowParticle {
+    display: none;
+  }
+
+  .insightCard .flowRipples {
+    animation: none;
+  }
+}
+
+.insightCard .flowDetail {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  opacity: 0;
+  transform: translateY(14px) scale(0.985);
+  transition:
+    opacity 240ms ease,
+    transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  pointer-events: none;
+}
+
+.insightCard .flowDetail.open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.insightCard .flowDetailCard {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: rgba(var(--bg-rgb), 0.97);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(14px);
+}
+
+.insightCard .flowDetailHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.insightCard .flowDetailHead > div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 8px;
+  min-width: 0;
+}
+
+.insightCard .flowDetailHead h4 {
+  margin: 0;
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 660;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.insightCard .flowDetailHead em {
+  grid-column: 2;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11.5px;
+  font-style: normal;
+}
+
+.insightCard .flowItems {
+  flex: 1 1 auto;
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  margin: 0;
+  padding: 0 2px;
+  min-height: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.insightCard .flowItems li {
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) minmax(40px, 1.2fr) auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  animation: flowItemIn 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes flowItemIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.insightCard .flowItemLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--ink);
+}
+
+.insightCard .flowItemLabel span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.insightCard .flowItemLabel small {
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 10.5px;
+}
+
+.insightCard .flowItemLabel svg {
+  flex: 0 0 auto;
+  color: var(--faint);
+}
+
+.insightCard .flowItemBar {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: var(--track);
+}
+
+.insightCard .flowItemBar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  animation: barGrow 600ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes barGrow {
+  from {
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+  to {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+}
+
+.insightCard .flowItems strong {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  text-align: right;
+}
+
+.insightCard .flowDetailFoot {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.insightCard .flowHistory {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.insightCard .flowHistoryHead {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.insightCard .flowHistoryHead b {
+  color: var(--ink);
+}
+
+.insightCard .flowHistoryBars {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+  height: 58px;
+}
+
+.insightCard .flowHistoryBar {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  justify-items: center;
+  gap: 3px;
+  min-height: 0;
+}
+
+.insightCard .flowHistoryTrack {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  border-radius: 6px;
+  background: var(--well);
+}
+
+.insightCard .flowHistoryTrack i {
+  display: block;
+  width: 60%;
+  border-radius: 3px 3px 0 0;
+  opacity: 0.55;
+  animation: barGrow 500ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  transform-origin: bottom;
+}
+
+.insightCard .flowHistoryBar.current .flowHistoryTrack i {
+  opacity: 1;
+}
+
+.insightCard .flowHistoryBar small {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+.insightCard .flowHistoryBar.current small {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.insightCard .flowDetailNote {
+  display: flex;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(var(--mint-rgb), 0.3);
+  border-radius: var(--radius);
+  background: rgba(var(--mint-rgb), 0.08);
+  color: var(--mint);
+}
+
+.insightCard .flowDetailNote.danger {
+  border-color: rgba(var(--red-rgb), 0.3);
+  background: rgba(var(--red-rgb), 0.08);
+  color: var(--red);
+}
+
+.insightCard .flowDetailNote p {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* ── Responsive ── */
+
+/* In the page grid the card sits in its cell instead of on the old free-placement canvas. */
+.insightCard.inGrid {
+  position: relative;
+  top: auto;
+  left: auto;
+  z-index: auto;
+  width: 100%;
+  min-width: 0;
+  transition:
+    box-shadow 200ms ease,
+    border-color 200ms ease;
+}
+
+.insightCard.inGrid .segmented {
+  flex-wrap: nowrap;
+}
+
+.signalActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.signalTitle .signalDismiss {
+  width: 26px;
+  min-height: 26px;
+  color: var(--muted);
+}
+
+.signalTitle .signalDismiss:hover {
+  color: var(--ink);
 }

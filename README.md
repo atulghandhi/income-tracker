@@ -126,9 +126,29 @@ drives the upload, review and announcement in the browser. The fixtures are gene
 `npm run build:fixtures` rewrites them byte-for-byte from `scripts/build-statement-fixtures.mjs`, so a
 layout tweak is a code change with a diff.
 
+`npm test` covers the app; the static `/public` pages have their own run (`npm run test:seo`)
+because they must be served from the built output rather than the dev server's SPA fallback.
+`tests/insightsData.spec.ts` pins the numbers the money-flow family of Insights widgets draws.
+
 `npm test` first checks that Playwright's Chromium is installed (and downloads it if it can).
-Where no download is possible, point `PW_CHROMIUM_PATH` at any Chromium or Chrome binary. Run `npm install` first on a fresh checkout — the test and dev commands
-are local binaries, not globals.
+Sandboxes that cannot download but ship pinned builds (in `PLAYWRIGHT_BROWSERS_PATH`) work too:
+`playwright.browser.ts` falls back to the newest pinned Chromium, or to `PW_CHROMIUM_PATH` when it
+is set. Run `npm install` first on a fresh checkout — the test and dev commands are local
+binaries, not globals.
+
+## Insights widgets
+
+The Insights page uses the same customisable grid as the Dashboard (`src/WidgetGrid.tsx`,
+`src/layout.ts`). Alongside the health score, trends, categories, anomalies and the region panels
+it offers a family of month widgets: a **money flow** (a waterfall, or a sideways particle stream)
+that shows where income came from and went, **spending pace**, **savings rate**, **versus last
+month**, **upcoming payments**, a **spending calendar**, **credit & debt**, a **to-do list** and
+**notes**. They draw from one pure model, `src/insightsData.ts`, and render through
+`src/InsightWidgetCard.tsx`; an empty one can show greyed-out sample data from `src/demoData.ts`.
+The widgets' own data (their look, dismissed anomaly flags, notes and to-dos) lives in the ledger
+(`LedgerState.insights`, normalised by `src/insightsState.ts`), so it persists and syncs like
+transactions do; the arrangement itself stays a per-device preference.
+
 
 ## Licence
 

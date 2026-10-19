@@ -1,6 +1,8 @@
 // Runs before `npm test`: makes sure Playwright's Chromium is present, and says plainly what to
 // do when it is not, instead of every browser test failing with the same error.
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 if (process.env.PW_CHROMIUM_PATH) {
@@ -16,6 +18,14 @@ if (existsSync(executable)) process.exit(0);
 console.log("Playwright's Chromium is not installed yet — downloading it (npx playwright install chromium)…");
 const install = spawnSync(process.platform === "win32" ? "npx.cmd" : "npx", ["playwright", "install", "chromium"], { stdio: "inherit" });
 if (install.status === 0 && existsSync(chromium.executablePath())) process.exit(0);
+
+// No download possible, but a sandbox may still ship older pinned builds: playwright.browser.ts
+// falls back to the newest of those, so the run can go ahead.
+const browsersRoot = process.env.PLAYWRIGHT_BROWSERS_PATH || join(homedir(), ".cache", "ms-playwright");
+if (existsSync(browsersRoot) && readdirSync(browsersRoot).some((name) => /^chromium-\d+$/.test(name))) {
+  console.log(`Using the newest pinned Chromium in ${browsersRoot} instead (see playwright.browser.ts).`);
+  process.exit(0);
+}
 
 console.error(
   [

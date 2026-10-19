@@ -11,6 +11,7 @@ import {
   monthlyRateFromAnnual,
   promoMonthsRemaining,
   rollForwardDebtBalances,
+  runGoalSequence,
 } from "../src/finance";
 import type { Account, ExpenseEntry, MonthBudget } from "../src/types";
 
@@ -295,5 +296,32 @@ test.describe("debt payoff estimate", () => {
   test("clears a simple 0% loan on schedule", () => {
     const loan = debtAccount({ type: "loan", balance: 1000, rate: 0, minimumPayment: 100 });
     expect(estimateDebtPayoff(loan).monthsToPayoff).toBe(10);
+  });
+});
+
+test.describe("goal sequencing", () => {
+  test("an at-risk goal gets a gap analysis without the solver recursing into itself", () => {
+    const goals = [1, 2, 3].map((index) => ({
+      id: `goal-${index}`,
+      name: `Goal ${index}`,
+      target: 5000,
+      saved: 100,
+      color: "#000",
+      priority: index,
+      fundingMode: "fixed" as const,
+      monthlyAmount: 200,
+      deadlineMonths: 12,
+      interestRate: 0,
+      note: "",
+      createdAt: "",
+    }));
+    const started = Date.now();
+    const result = runGoalSequence({ goals, monthlySurplus: 150, horizonMonths: 60, startDate: new Date(2026, 0, 1) });
+    expect(Date.now() - started).toBeLessThan(2000);
+    const first = result.goals[0];
+    expect(first.status).toBe("at-risk");
+    expect(Number.isFinite(first.extraMonthlyNeeded)).toBe(true);
+    expect(first.extraMonthlyNeeded).toBeGreaterThan(0);
+    expect(first.extraMonthsNeeded).toBeGreaterThan(0);
   });
 });
