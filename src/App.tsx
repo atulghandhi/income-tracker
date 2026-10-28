@@ -57,6 +57,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import {
+  isDebtClass,
   buildCsvExport,
   buildFinancialSignals,
   buildMonthlyFlowPoints,
@@ -181,6 +182,7 @@ import { buildPlanInputs, comparePlans, normalizeAllocationSettings } from "./al
 import { AllocateView, PayoffWidget } from "./AllocateView";
 import { buildPlanSignals } from "./planSignals";
 import { interpretCreditScore } from "./creditScore";
+import { TOOL_VIEWS, initialPinned, isToolView, readNavTools, toolSuggestions, unseenSuggestionCount, writeNavTools, type NavToolsPrefs, type ToolView } from "./navTools";
 import { APP_VIEWS, DEFAULT_VIEW, pathForView, viewFromPath, type AppView } from "./routes";
 import { buildSampleLedger, sampleCountry } from "./sampleData";
 import { WidgetGrid, type WidgetRenderer } from "./WidgetGrid";
@@ -1083,6 +1085,50 @@ function App() {
       imported: ledger.importBatches.length > 0,
     };
   }, [ledger.months, ledger.accounts, ledger.goals, ledger.importBatches, ledger.taxProfile.grossAnnualSalary]);
+
+  // Which specialist pages sit in the sidebar. See navTools.ts.
+  const [navTools, setNavTools] = useState<NavToolsPrefs | null>(readNavTools);
+  const [toolsTrayOpen, setToolsTrayOpen] = useState(false);
+  useEffect(() => {
+    if (!hydrated || navTools) return;
+    const hasData = Object.values(setupProgress).some(Boolean);
+    const initial = { pinned: initialPinned(hasData), seen: [] };
+    setNavTools(initial);
+    writeNavTools(initial);
+  }, [hydrated, navTools, setupProgress]);
+  const toolPrefs: NavToolsPrefs = navTools ?? { pinned: [...TOOL_VIEWS], seen: [] };
+  const suggestedTools = useMemo(
+    () =>
+      toolSuggestions({
+        hasIncome: setupProgress.income,
+        salaryEntered: setupProgress.pay,
+        debtCount: ledger.accounts.filter((account) => isDebtClass(account) && account.balance > 0).length,
+        recurringCount: subscriptionReport.totals.activeCount,
+      }),
+    [setupProgress.income, setupProgress.pay, ledger.accounts, subscriptionReport.totals.activeCount],
+  );
+  function updateNavTools(change: (prefs: NavToolsPrefs) => NavToolsPrefs) {
+    const next = change(toolPrefs);
+    setNavTools(next);
+    writeNavTools(next);
+  }
+  function setToolPinned(tool: ToolView, pinned: boolean) {
+    updateNavTools((prefs) => ({
+      ...prefs,
+      pinned: pinned ? TOOL_VIEWS.filter((t) => t === tool || prefs.pinned.includes(t)) : prefs.pinned.filter((t) => t !== tool),
+    }));
+    track("nav_tool", { tool, action: pinned ? "add" : "remove" });
+  }
+  function toggleToolsTray() {
+    if (!toolsTrayOpen) {
+      // Opening the list shows every current suggestion, so the badge is cleared.
+      const shown = TOOL_VIEWS.filter((tool) => suggestedTools[tool]);
+      if (shown.some((tool) => !toolPrefs.seen.includes(tool))) {
+        updateNavTools((prefs) => ({ ...prefs, seen: TOOL_VIEWS.filter((t) => shown.includes(t) || prefs.seen.includes(t)) }));
+      }
+    }
+    setToolsTrayOpen((open) => !open);
+  }
 
   useEffect(() => {
     let alive = true;
@@ -3238,16 +3284,28 @@ function App() {
   };
 
   const payPageTitle = region === "US" ? "Paycheck & tax" : "Pay & tax";
-  const navItems: Array<{ id: AppView; label: string; icon: ReactNode }> = [
+  const coreNavItems: Array<{ id: AppView; label: string; icon: ReactNode }> = [
     { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard size={20} /> },
     { id: "ledger", label: "Ledger", icon: <ReceiptText size={20} /> },
     { id: "accounts", label: "Accounts", icon: <CreditCard size={20} /> },
-    { id: "pay", label: payPageTitle, icon: <Calculator size={20} /> },
     { id: "goals", label: "Goals", icon: <Target size={20} /> },
-    { id: "allocate", label: "Allocate", icon: <Coins size={20} /> },
-    { id: "subscriptions", label: "Subscriptions", icon: <Repeat size={20} /> },
-    { id: "settings", label: "Settings", icon: <SettingsIcon size={20} /> },
   ];
+  const toolNavItems: Record<ToolView, { id: ToolView; label: string; icon: ReactNode; blurb: string }> = {
+    pay: {
+      id: "pay",
+      label: payPageTitle,
+      icon: <Calculator size={20} />,
+      blurb: region === "US" ? "Gross salary to take-home after federal, state and FICA" : "Gross salary to take-home after tax, NI and student loan",
+    },
+    allocate: { id: "allocate", label: "Allocate", icon: <Coins size={20} />, blurb: "Plan the fastest way to pay off debt and where spare money goes" },
+    subscriptions: { id: "subscriptions", label: "Subscriptions", icon: <Repeat size={20} />, blurb: "Every recurring payment in one place, with price rises flagged" },
+  };
+  // A tool opened from a widget or link shows in the sidebar while it is the page being viewed.
+  const visibleTools = TOOL_VIEWS.filter((tool) => toolPrefs.pinned.includes(tool) || activeView === tool);
+  const navItems = [...coreNavItems, ...visibleTools.map((tool) => toolNavItems[tool])];
+  const unpinnedTools = TOOL_VIEWS.filter((tool) => !toolPrefs.pinned.includes(tool));
+  const toolBadge = unseenSuggestionCount(toolPrefs, suggestedTools);
+  const unpinnedActiveTool = isToolView(activeView) && !toolPrefs.pinned.includes(activeView) ? activeView : null;
   const insightChartTitle =
     insightChartView === "cash-flow"
       ? "Cash flow volatility"
@@ -3319,7 +3377,7 @@ function App() {
           {navItems.map((item) => (
             <button
               key={item.id}
-              className={activeView === item.id ? "navItem active" : "navItem"}
+              className={`navItem${activeView === item.id ? " active" : ""}${item.id === unpinnedActiveTool ? " preview" : ""}`}
               type="button"
               onClick={() => setActiveView(item.id)}
               aria-pressed={activeView === item.id}
@@ -3328,7 +3386,68 @@ function App() {
               {item.label}
             </button>
           ))}
+          <button
+            key="settings"
+            className={activeView === "settings" ? "navItem active" : "navItem"}
+            type="button"
+            onClick={() => setActiveView("settings")}
+            aria-pressed={activeView === "settings"}
+          >
+            <SettingsIcon size={20} />
+            Settings
+          </button>
         </nav>
+
+        {unpinnedTools.length > 0 && (
+          <div className="navTools">
+            <button
+              className={toolsTrayOpen ? "navToolsToggle open" : "navToolsToggle"}
+              type="button"
+              onClick={toggleToolsTray}
+              aria-expanded={toolsTrayOpen}
+              aria-controls="navToolsTray"
+            >
+              <Plus size={16} />
+              More tools
+              {toolBadge > 0 && (
+                <span className="navToolsBadge" aria-label={`${toolBadge} suggested for you`}>
+                  {toolBadge}
+                </span>
+              )}
+              <ChevronDown size={15} className="navToolsChevron" aria-hidden="true" />
+            </button>
+            {toolsTrayOpen && (
+              <ul className="navToolsTray" id="navToolsTray" aria-label="Tools you can add to the sidebar">
+                {unpinnedTools.map((tool) => {
+                  const item = toolNavItems[tool];
+                  const reason = suggestedTools[tool];
+                  return (
+                    <li key={tool} className={reason ? "navToolRow suggested" : "navToolRow"}>
+                      <button
+                        className="navToolOpen"
+                        type="button"
+                        onClick={() => {
+                          setActiveView(tool);
+                          setToolsTrayOpen(false);
+                        }}
+                      >
+                        <span className="navToolIcon" aria-hidden="true">{item.icon}</span>
+                        <span className="navToolText">
+                          <strong>{item.label}</strong>
+                          {reason && <em>{reason}</em>}
+                          <small>{item.blurb}</small>
+                        </span>
+                      </button>
+                      <button className="navToolAdd" type="button" onClick={() => setToolPinned(tool, true)} aria-label={`Add ${item.label} to sidebar`} data-tip="Add to sidebar">
+                        <Plus size={15} />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        )}
 
         <div className={`saveStatusChip ${saveState}`} role="status" aria-live="off">
           <span className="saveDot" aria-hidden="true" />
@@ -3446,6 +3565,18 @@ function App() {
         </header>
 
         <main className="contentCanvas">
+          {unpinnedActiveTool && (
+            <div className="toolPinBanner" role="note">
+              <span>
+                <strong>{toolNavItems[unpinnedActiveTool].label}</strong> isn't in your sidebar yet.
+              </span>
+              <button className="linkButton" type="button" onClick={() => setToolPinned(unpinnedActiveTool, true)}>
+                <Plus size={14} />
+                Add to sidebar
+              </button>
+            </div>
+          )}
+
           {activeView === "dashboard" && (
             <section className="viewStack" aria-label="Dashboard">
               <div className="pageHeader compactHeader">
@@ -4425,6 +4556,31 @@ function App() {
                     >
                       <span />
                     </button>
+                  </article>
+
+                  <article className="settingsPanel compactSetting">
+                    <PanelTitle title="Sidebar tools" icon={<SlidersHorizontal size={17} />} />
+                    <p>Show the specialist pages you use. Hidden ones stay under More tools.</p>
+                    <ul className="sidebarToolsList">
+                      {TOOL_VIEWS.map((tool) => {
+                        const pinned = toolPrefs.pinned.includes(tool);
+                        return (
+                          <li key={tool}>
+                            <span>{toolNavItems[tool].label}</span>
+                            <button
+                              className={pinned ? "switch on" : "switch"}
+                              type="button"
+                              role="switch"
+                              aria-checked={pinned}
+                              aria-label={`Show ${toolNavItems[tool].label} in sidebar`}
+                              onClick={() => setToolPinned(tool, !pinned)}
+                            >
+                              <span />
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
                   </article>
 
                   <MonthlyReminderPanel

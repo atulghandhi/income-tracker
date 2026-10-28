@@ -463,6 +463,185 @@ textarea {
   background: var(--blue-bright);
 }
 
+/* ─── Sidebar tools: optional pages added from "More tools" ─────────────────── */
+.navItem.preview {
+  outline: 1px dashed rgba(var(--blue-rgb), 0.45);
+  outline-offset: -1px;
+}
+
+.navTools {
+  margin-top: 6px;
+}
+
+.navToolsToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: rgba(var(--ink-rgb), 0.62);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.navToolsToggle:hover {
+  background: rgba(var(--surface-higher-rgb), 0.52);
+  color: var(--ink);
+}
+
+.navToolsBadge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--blue);
+  color: var(--on-accent);
+  font-size: 11px;
+  font-weight: 720;
+}
+
+.navToolsChevron {
+  margin-left: auto;
+  transition: transform 150ms ease;
+}
+
+.navToolsToggle.open .navToolsChevron {
+  transform: rotate(180deg);
+}
+
+.navToolsTray {
+  display: grid;
+  gap: 4px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.navToolRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.navToolRow.suggested {
+  border-color: rgba(var(--blue-rgb), 0.45);
+}
+
+.navToolOpen {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  gap: 10px;
+  padding: 9px 4px 9px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+}
+
+.navToolIcon {
+  flex-shrink: 0;
+  color: rgba(var(--ink-rgb), 0.7);
+}
+
+.navToolIcon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.navToolText {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.navToolText strong {
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.navToolText em {
+  color: var(--blue-bright);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 600;
+}
+
+.navToolText small {
+  color: rgba(var(--ink-rgb), 0.62);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.navToolOpen:hover strong {
+  text-decoration: underline;
+}
+
+.navToolAdd {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  margin: 6px 6px 0 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ink);
+}
+
+.navToolAdd:hover {
+  border-color: var(--blue);
+  color: var(--blue-bright);
+}
+
+.toolPinBanner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 18px;
+  padding: 10px 14px;
+  border: 1px solid rgba(var(--blue-rgb), 0.35);
+  border-radius: var(--radius);
+  background: rgba(var(--blue-rgb), 0.07);
+  font-size: 14px;
+}
+
+.toolPinBanner .linkButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  padding: 2px 0;
+}
+
+.sidebarToolsList {
+  display: grid;
+  gap: 10px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sidebarToolsList li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+
 .localIdentity {
   gap: 12px;
   margin-top: auto;

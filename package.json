@@ -15,7 +15,7 @@
     "pretest": "node scripts/ensure-browsers.mjs",
     "test": "playwright test",
     "test:seo": "npm run build && playwright test --config playwright.seo.config.ts",
-    "test:calc": "playwright test tests/finance.spec.ts tests/finance-baseline.spec.ts tests/tax.spec.ts tests/retirement.spec.ts tests/loans.spec.ts tests/region.spec.ts tests/widgets.spec.ts tests/accountFlow.spec.ts tests/accountLinks.spec.ts tests/debtSync.spec.ts tests/allocate.spec.ts tests/lumpSumTax.spec.ts tests/subscriptions.spec.ts tests/insightsData.spec.ts --project=chromium",
+    "test:calc": "playwright test tests/finance.spec.ts tests/finance-baseline.spec.ts tests/tax.spec.ts tests/retirement.spec.ts tests/loans.spec.ts tests/region.spec.ts tests/widgets.spec.ts tests/accountFlow.spec.ts tests/accountLinks.spec.ts tests/debtSync.spec.ts tests/allocate.spec.ts tests/lumpSumTax.spec.ts tests/subscriptions.spec.ts tests/insightsData.spec.ts tests/navTools.spec.ts --project=chromium",
     "build:icons": "node scripts/build-icons.mjs",
     "build:fixtures": "node scripts/build-statement-fixtures.mjs",
     "postbuild": "node scripts/prerender-home.mjs && node scripts/check-seo.mjs",
