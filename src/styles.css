@@ -11218,11 +11218,11 @@ select:not([multiple]):disabled {
 }
 
 .insightCard .flowRibbon {
-  fill-opacity: 0.32;
+  fill-opacity: 0.26;
 }
 
 .insightCard .flowRibbon:hover {
-  fill-opacity: 0.58;
+  fill-opacity: 0.42;
 }
 
 /* Water: ripple lines slide down inside each stream, one gap per cycle so the loop is
@@ -11434,9 +11434,9 @@ select:not([multiple]):disabled {
   }
 }
 
+/* Small solid dots riding the ribbons: movement, not glow. */
 .insightCard .flowParticle {
-  filter: drop-shadow(0 0 3px currentColor) drop-shadow(0 0 6px currentColor);
-  opacity: 0.9;
+  opacity: 0.75;
   pointer-events: none;
 }
 

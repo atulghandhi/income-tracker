@@ -281,6 +281,32 @@ type RenderProps = MoneyFlowProps & {
   showTip: (event: ReactMouseEvent, title: string, lines: string[]) => void;
 };
 
+// Spending categories under 4% of the flow fold into one "Other" node (hover or click it for the
+// list): a dozen slivers with cramped or sideways labels read as noise. Savings stays its own node,
+// first or last as the view needs.
+function foldSmallTargets(flow: FlowModel, savingsAt: "first" | "last"): FlowNode[] {
+  const savings = flow.targets.find((node) => node.id === "cat-savings");
+  const spending = flow.targets.filter((node) => node.id !== "cat-savings");
+  const small = (node: FlowNode) => node.value / Math.max(flow.total, 1) < 0.04;
+  const folded = spending.filter((node) => node.id === "cat-other" || small(node));
+  const kept = spending.filter((node) => !folded.includes(node));
+  const rest =
+    folded.length > 1
+      ? [
+          ...kept,
+          {
+            id: "cat-other",
+            label: "Other",
+            value: folded.reduce((sum, node) => sum + node.value, 0),
+            color: "#8e98a9",
+            items: folded.flatMap((node) => node.items).sort((a, b) => b.value - a.value),
+          },
+        ]
+      : spending;
+  if (!savings) return rest;
+  return savingsAt === "first" ? [savings, ...rest] : [...rest, savings];
+}
+
 // ─── Waterfall ───────────────────────────────────────────────────────────────
 
 function Waterfall({ flow, width, height, formatter, privacy, animations, onSelect, showTip }: RenderProps) {
@@ -310,29 +336,8 @@ function Waterfall({ flow, width, height, formatter, privacy, animations, onSele
 
   // Savings keeps its slot in the bottom band but has no box: its channel carries on past
   // the spending boxes into the tank, like water pouring past them.
-  // Categories under 4% of the flow fold into one "Other" bar (hover or click it for the list):
-  // a dozen slivers with sideways labels read as noise.
-  const targets = useMemo(() => {
-    const savings = flow.targets.find((node) => node.id === "cat-savings");
-    const spending = flow.targets.filter((node) => node.id !== "cat-savings");
-    const small = (node: FlowNode) => node.value / Math.max(flow.total, 1) < 0.04;
-    const folded = spending.filter((node) => node.id === "cat-other" || small(node));
-    const kept = spending.filter((node) => !folded.includes(node));
-    const rest =
-      folded.length > 1
-        ? [
-            ...kept,
-            {
-              id: "cat-other",
-              label: "Other",
-              value: folded.reduce((sum, node) => sum + node.value, 0),
-              color: "#8e98a9",
-              items: folded.flatMap((node) => node.items).sort((a, b) => b.value - a.value),
-            },
-          ]
-        : spending;
-    return savings ? [...rest, savings] : rest;
-  }, [flow.targets, flow.total]);
+  // Savings keeps its slot at the end of the bottom band, pouring past the bars into the tank.
+  const targets = useMemo(() => foldSmallTargets(flow, "last"), [flow]);
 
   const sourceBands = layoutBand(flow.sources, flow.total, topX0, topWidth, sourceGap, compact ? 14 : 22);
   const targetBands = layoutBand(targets, flow.total, padX, usable, gap, compact ? 18 : 24);
@@ -610,7 +615,10 @@ function Particles({ flow, width, height, formatter, privacy, animations, onSele
 
   const compact = width < 520;
   const labelWidth = Math.max(60, Math.min(compact ? 96 : 170, width * 0.26));
-  const nodeW = 12;
+  const nodeW = 8;
+  const targets = useMemo(() => foldSmallTargets(flow, "first"), [flow]);
+  // One source: the hub is that source's colour; several: a neutral body they all pour into.
+  const hubColor = flow.sources.length === 1 ? flow.sources[0].color : "var(--muted)";
   const padY = 18;
   const gap = 10;
   const xLeft = labelWidth;
@@ -618,7 +626,7 @@ function Particles({ flow, width, height, formatter, privacy, animations, onSele
   const xHub = (xLeft + xRight) / 2;
 
   const usable = (count: number) => height - padY * 2 - Math.max(0, count - 1) * gap;
-  const scale = Math.min(usable(flow.sources.length), usable(flow.targets.length), usable(1)) / Math.max(flow.total, 1);
+  const scale = Math.min(usable(flow.sources.length), usable(targets.length), usable(1)) / Math.max(flow.total, 1);
 
   type Placed = { node: FlowNode; y0: number; y1: number };
   const place = (nodes: FlowNode[]): Placed[] => {
@@ -632,21 +640,21 @@ function Particles({ flow, width, height, formatter, privacy, animations, onSele
     });
   };
   const left = place(flow.sources);
-  const right = place(flow.targets);
+  const right = place(targets);
   const hubHeight = Math.max(3, flow.total * scale);
   const hubY0 = (height - hubHeight) / 2;
 
   let inOffset = hubY0;
   const inLinks = left.map((placed) => {
     const linkHeight = Math.max(placed.node.value * scale, 3);
-    const link = { placed, y0: inOffset, y1: inOffset + linkHeight };
+    const link = { placed, y0: inOffset + 0.5, y1: Math.max(inOffset + 0.5, inOffset + linkHeight - 0.5) };
     inOffset += linkHeight;
     return link;
   });
   let outOffset = hubY0;
   const outLinks = right.map((placed) => {
     const linkHeight = Math.max(placed.node.value * scale, 3);
-    const link = { placed, y0: outOffset, y1: outOffset + linkHeight };
+    const link = { placed, y0: outOffset + 0.5, y1: Math.max(outOffset + 0.5, outOffset + linkHeight - 0.5) };
     outOffset += linkHeight;
     return link;
   });
@@ -703,18 +711,6 @@ function Particles({ flow, width, height, formatter, privacy, animations, onSele
   return (
     <svg className="moneyFlowSvg" width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Income sources flowing through to savings and spending categories">
       <defs>
-        {inLinks.map((link) => (
-          <linearGradient key={link.placed.node.id} id={`${uid}-in-${safeId(link.placed.node.id)}`} x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0" style={{ stopColor: link.placed.node.color }} />
-            <stop offset="1" style={{ stopColor: "var(--blue)" }} />
-          </linearGradient>
-        ))}
-        {outLinks.map((link) => (
-          <linearGradient key={link.placed.node.id} id={`${uid}-out-${safeId(link.placed.node.id)}`} x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0" style={{ stopColor: "var(--blue)" }} />
-            <stop offset="1" style={{ stopColor: link.placed.node.color }} />
-          </linearGradient>
-        ))}
         {particles.map((lane) => (
           <path key={lane.id} id={`${uid}-lane-${lane.id}`} d={lane.d} fill="none" />
         ))}
@@ -724,7 +720,7 @@ function Particles({ flow, width, height, formatter, privacy, animations, onSele
           key={link.placed.node.id}
           className="sankeyLink flowRibbon"
           d={horizontalRibbon(xLeft + nodeW, link.placed.y0, link.placed.y1, xHub, link.y0, link.y1)}
-          fill={`url(#${uid}-in-${safeId(link.placed.node.id)})`}
+          fill={link.placed.node.color}
           onMouseMove={(event) => showTip(event, `${link.placed.node.label} → Income`, [`${money(link.placed.node.value)} · ${percent(link.placed.node.value)} of flow`])}
           onClick={() => onSelect(link.placed.node)}
         />
@@ -734,14 +730,14 @@ function Particles({ flow, width, height, formatter, privacy, animations, onSele
           key={link.placed.node.id}
           className="sankeyLink flowRibbon"
           d={horizontalRibbon(xHub + nodeW, link.y0, link.y1, xRight, link.placed.y0, link.placed.y1)}
-          fill={`url(#${uid}-out-${safeId(link.placed.node.id)})`}
+          fill={link.placed.node.color}
           onMouseMove={(event) => showTip(event, `Income → ${link.placed.node.label}`, [`${money(link.placed.node.value)} · ${percent(link.placed.node.value)} of flow`])}
           onClick={() => onSelect(link.placed.node)}
         />
       ))}
       {particles.map((lane) =>
         Array.from({ length: lane.count }, (_, index) => (
-          <circle key={`${lane.id}-${index}`} className="flowParticle" r={compact ? 2 : 2.6} fill={lane.color} style={{ color: lane.color }}>
+          <circle key={`${lane.id}-${index}`} className="flowParticle" r={compact ? 1.8 : 2.2} fill={lane.color}>
             <animateMotion dur={`${lane.dur}s`} repeatCount="indefinite" begin={`${-((index / lane.count) * lane.dur).toFixed(2)}s`}>
               <mpath href={`#${uid}-lane-${lane.id}`} />
             </animateMotion>
@@ -753,7 +749,7 @@ function Particles({ flow, width, height, formatter, privacy, animations, onSele
         const labelY = leftLabelY[index];
         return (
           <g key={placed.node.id} className="flowNodeGroup" onClick={() => onSelect(placed.node)} onMouseMove={(event) => showTip(event, placed.node.label, [`${money(placed.node.value)} · ${percent(placed.node.value)}`])}>
-            <rect className="flowNode" x={xLeft} y={placed.y0} width={nodeW} height={placed.y1 - placed.y0} rx={3} fill={placed.node.color} />
+            <rect className="flowNode" x={xLeft} y={placed.y0} width={nodeW} height={placed.y1 - placed.y0} rx={2} fill={placed.node.color} />
             {Math.abs(labelY - centre) > 2 && <line className="flowLeader" x1={xLeft - 4} y1={centre} x2={xLeft - 4} y2={labelY} />}
             <text className="flowLabel" x={xLeft - 8} y={labelY - (twoLine ? 7 : 0)} textAnchor="end" dominantBaseline="middle">
               <tspan className="name">{truncate(placed.node.label, twoLine ? leftChars : leftChars - 7)}</tspan>
@@ -773,7 +769,7 @@ function Particles({ flow, width, height, formatter, privacy, animations, onSele
         );
       })}
       <g className="flowPool">
-        <rect x={xHub} y={hubY0} width={nodeW} height={hubHeight} rx={3} fill="var(--blue)" />
+        <rect x={xHub} y={hubY0} width={nodeW} height={hubHeight} rx={2} fill={hubColor} />
         <text className="flowLabel hub" x={xHub + nodeW / 2} y={hubY0 - 8} textAnchor="middle">
           <tspan className="name">{flow.surplus < 0 ? "Income + shortfall" : "Income"}</tspan>
           {!compact && (
@@ -788,10 +784,13 @@ function Particles({ flow, width, height, formatter, privacy, animations, onSele
         const labelY = rightLabelY[index];
         return (
           <g key={placed.node.id} className="flowNodeGroup" onClick={() => onSelect(placed.node)} onMouseMove={(event) => showTip(event, placed.node.label, [`${money(placed.node.value)} · ${percent(placed.node.value)}`])}>
-            <rect className="flowNode" x={xRight} y={placed.y0} width={nodeW} height={placed.y1 - placed.y0} rx={3} fill={placed.node.color} />
+            <rect className="flowNode" x={xRight} y={placed.y0} width={nodeW} height={placed.y1 - placed.y0} rx={2} fill={placed.node.color} />
             {Math.abs(labelY - centre) > 2 && <line className="flowLeader" x1={xRight + nodeW + 4} y1={centre} x2={xRight + nodeW + 4} y2={labelY} />}
             <text className="flowLabel" x={xRight + nodeW + 8} y={labelY - (twoLine ? 7 : 0)} dominantBaseline="middle">
-              <tspan className="name">{truncate(placed.node.label, twoLine ? rightChars : rightChars - 6)}</tspan>
+              <tspan className="name">
+                {categoryEmoji(placed.node.label) && rightChars >= 10 ? `${categoryEmoji(placed.node.label)} ` : ""}
+                {truncate(placed.node.label, twoLine ? rightChars : rightChars - 6)}
+              </tspan>
               {twoLine ? (
                 <tspan className={privacy ? "amt masked" : "amt"} x={xRight + nodeW + 8} dy="14">
                   {money(placed.node.value)} · {percent(placed.node.value)}
