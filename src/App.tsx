@@ -1112,9 +1112,10 @@ function App() {
         hasIncome: setupProgress.income,
         salaryEntered: setupProgress.pay,
         debtCount: ledger.accounts.filter((account) => isDebtClass(account) && account.balance > 0).length,
-        recurringCount: subscriptionReport.totals.activeCount,
+        monthlySurplus: projection.monthlySurplus,
+        hasGoals: ledger.goals.length > 0,
       }),
-    [setupProgress.income, setupProgress.pay, ledger.accounts, subscriptionReport.totals.activeCount],
+    [setupProgress.income, setupProgress.pay, ledger.accounts, projection.monthlySurplus, ledger.goals.length],
   );
   function updateNavTools(change: (prefs: NavToolsPrefs) => NavToolsPrefs) {
     const next = change(toolPrefs);
@@ -3327,7 +3328,7 @@ function App() {
     { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard size={20} /> },
     { id: "ledger", label: "Ledger", icon: <ReceiptText size={20} /> },
     { id: "accounts", label: "Accounts", icon: <CreditCard size={20} /> },
-    { id: "goals", label: "Goals", icon: <Target size={20} /> },
+    { id: "subscriptions", label: "Subscriptions", icon: <Repeat size={20} /> },
   ];
   const toolNavItems: Record<ToolView, { id: ToolView; label: string; icon: ReactNode; blurb: string }> = {
     pay: {
@@ -3337,7 +3338,7 @@ function App() {
       blurb: region === "US" ? "Gross salary to take-home after federal, state and FICA" : "Gross salary to take-home after tax, NI and student loan",
     },
     allocate: { id: "allocate", label: "Allocate", icon: <Coins size={20} />, blurb: "Plan the fastest way to pay off debt and where spare money goes" },
-    subscriptions: { id: "subscriptions", label: "Subscriptions", icon: <Repeat size={20} />, blurb: "Every recurring payment in one place, with price rises flagged" },
+    goals: { id: "goals", label: "Goals", icon: <Target size={20} />, blurb: "Save towards things you want and see when you'll get there" },
   };
   // A tool opened from a widget or link shows in the sidebar while it is the page being viewed.
   const visibleTools = TOOL_VIEWS.filter((tool) => toolPrefs.pinned.includes(tool) || activeView === tool);
@@ -4593,31 +4594,6 @@ function App() {
                         ))}
                       </select>
                     </label>
-                  </article>
-
-                  <article className="settingsPanel compactSetting">
-                    <PanelTitle title="Sidebar tools" icon={<SlidersHorizontal size={17} />} />
-                    <p>Show the specialist pages you use. Hidden ones stay under More tools.</p>
-                    <ul className="sidebarToolsList">
-                      {TOOL_VIEWS.map((tool) => {
-                        const pinned = toolPrefs.pinned.includes(tool);
-                        return (
-                          <li key={tool}>
-                            <span>{toolNavItems[tool].label}</span>
-                            <button
-                              className={pinned ? "switch on" : "switch"}
-                              type="button"
-                              role="switch"
-                              aria-checked={pinned}
-                              aria-label={`Show ${toolNavItems[tool].label} in sidebar`}
-                              onClick={() => setToolPinned(tool, !pinned)}
-                            >
-                              <span />
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
                   </article>
 
                   <MonthlyReminderPanel

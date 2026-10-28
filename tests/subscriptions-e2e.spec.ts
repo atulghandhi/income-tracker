@@ -95,14 +95,8 @@ test.describe("subscriptions page", () => {
   test("finds subscriptions, bills and renewals in imported statements and lets the user manage them", async ({ page }) => {
     await importStatement(page);
 
-    // A new user's sidebar keeps it under More tools, which suggests it once recurring payments
-    // are found; opening it from there gives the page its own URL.
-    const nav = page.locator(".sideNav");
-    await expect(nav.getByRole("button", { name: "Subscriptions", exact: true })).toHaveCount(0);
-    await tap(nav.getByRole("button", { name: /^More tools.*suggested for you/ }));
-    const toolRow = nav.locator(".navToolRow", { hasText: "Subscriptions" });
-    await expect(toolRow).toContainText(/recurring payments? found/);
-    await tap(toolRow.getByRole("button", { name: /^Subscriptions/ }));
+    // An everyday page: in every sidebar, with its own URL.
+    await tap(page.locator(".sideNav").getByRole("button", { name: "Subscriptions", exact: true }));
     await expect(page).toHaveURL(/\/subscriptions$/);
     const view = page.getByLabel("Subscriptions", { exact: true });
     await expect(view.getByRole("heading", { name: "Subscriptions", exact: true })).toBeVisible();

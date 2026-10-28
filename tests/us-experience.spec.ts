@@ -15,8 +15,10 @@ test.beforeEach(async ({ page }) => {
 async function openView(page: Page, name: "Dashboard" | "Ledger" | "Accounts" | "Pay & tax" | "Paycheck & tax" | "Goals" | "Settings") {
   const nav = page.locator(".sideNav");
   const item = nav.getByRole("button", { name, exact: true });
-  // A new user's sidebar leaves the pay page under More tools until it is added.
-  if (!(await item.isVisible())) {
+  // A new user's sidebar leaves the pay page and Goals under More tools until they are added.
+  await expect(nav.getByRole("button", { name: "Dashboard", exact: true })).toBeVisible();
+  const isTool = name === "Goals" || name === "Pay & tax" || name === "Paycheck & tax";
+  if (isTool && !(await item.isVisible())) {
     await nav.getByRole("button", { name: /^More tools/ }).click();
     await nav.getByRole("button", { name: `Add ${name} to sidebar` }).click();
   }

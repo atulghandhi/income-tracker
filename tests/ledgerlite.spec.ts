@@ -36,7 +36,15 @@ async function tap(locator: Locator) {
 }
 
 async function openView(page: Page, name: "Dashboard" | "Ledger" | "Accounts" | "Goals" | "Settings") {
-  await page.locator(".sideNav").getByRole("button", { name, exact: true }).click();
+  const nav = page.locator(".sideNav");
+  const item = nav.getByRole("button", { name, exact: true });
+  // A new user's sidebar leaves Goals under More tools until it is added.
+  await expect(nav.getByRole("button", { name: "Dashboard", exact: true })).toBeVisible();
+  if (name === "Goals" && !(await item.isVisible())) {
+    await nav.getByRole("button", { name: /^More tools/ }).click();
+    await nav.getByRole("button", { name: `Add ${name} to sidebar` }).click();
+  }
+  await item.click();
 }
 
 async function openLedger(page: Page) {
