@@ -183,7 +183,22 @@ import { buildPlanInputs, comparePlans } from "./allocate";
 import { AllocateView, PayoffWidget } from "./AllocateView";
 import { buildPlanSignals } from "./planSignals";
 import { interpretCreditScore } from "./creditScore";
-import { TOOL_VIEWS, initialPinned, isToolView, readNavTools, toolSuggestions, unseenSuggestionCount, writeNavTools, type NavToolsPrefs, type ToolView } from "./navTools";
+import { clearDismissedRecs, readDismissedRecs, recommendWidgets, writeDismissedRecs } from "./widgetRecs";
+import {
+  HIDEABLE_VIEWS,
+  TOOL_VIEWS,
+  canHide,
+  initialPinned,
+  isHideableView,
+  isToolView,
+  readNavTools,
+  toolSuggestions,
+  unseenSuggestionCount,
+  withSidebarItem,
+  writeNavTools,
+  type NavToolsPrefs,
+  type ToolView,
+} from "./navTools";
 import { APP_VIEWS, DEFAULT_VIEW, pathForView, viewFromPath, type AppView } from "./routes";
 import { buildSampleLedger, sampleCountry } from "./sampleData";
 import { WidgetGrid, type WidgetRenderer } from "./WidgetGrid";
@@ -192,7 +207,7 @@ import { buildCategoryRows, buildExpenseGroups, buildMonthlyBars, categoryColor,
 import { buildInsightsModel, visibleSignals } from "./insightsData";
 import { normalizeInsightsState, setWidgetVariant } from "./insightsState";
 import type { WidgetActions } from "./insightWidgets";
-import { addWidget, clearLayout, cycleWidgetSize, defaultLayout, hiddenWidgets, loadLayout, moveWidget, moveWidgetBefore, removeWidget, resizeWidget, saveLayout, widgetDefinition, type LayoutPage, type PageLayout } from "./layout";
+import { addWidget, availableWidgets, clearLayout, cycleWidgetSize, defaultLayout, hasStoredLayout, hiddenWidgets, loadLayout, starterLayout, moveWidget, moveWidgetBefore, removeWidget, resizeWidget, saveLayout, widgetDefinition, type LayoutPage, type PageLayout } from "./layout";
 import {
   AccountPlanDetails,
   CreditScoreWidget,
@@ -1159,13 +1174,31 @@ function App() {
     setNavTools(next);
     writeNavTools(next);
   }
-  function setToolPinned(tool: ToolView, pinned: boolean) {
-    updateNavTools((prefs) => ({
-      ...prefs,
-      pinned: pinned ? TOOL_VIEWS.filter((t) => t === tool || prefs.pinned.includes(t)) : prefs.pinned.filter((t) => t !== tool),
-    }));
-    track("nav_tool", { tool, action: pinned ? "add" : "remove" });
+  // Puts a page in the sidebar or takes it out: a tool is pinned or unpinned, an everyday page
+  // hidden or shown. Either way a page out of the sidebar waits under More tools.
+  function setSidebarItem(view: AppView, shown: boolean) {
+    updateNavTools((prefs) => withSidebarItem(prefs, view, shown));
+    track("nav_tool", { tool: view, action: shown ? "add" : "remove" });
   }
+  // Right-click (or long-press) on a sidebar page: a one-item menu to hide it.
+  const [navMenu, setNavMenu] = useState<{ view: AppView; x: number; y: number } | null>(null);
+  useEffect(() => {
+    if (!navMenu) return;
+    const close = () => setNavMenu(null);
+    const onKey = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [navMenu]);
   function toggleToolsTray() {
     if (!toolsTrayOpen) {
       // Opening the list shows every current suggestion, so the badge is cleared.
@@ -1175,6 +1208,43 @@ function App() {
       }
     }
     setToolsTrayOpen((open) => !open);
+  }
+
+  // A device with no saved dashboard: a brand-new user starts on the starter widgets, while someone
+  // who already has data (from before the starter set existed) keeps the full default.
+  useEffect(() => {
+    if (!hydrated || hasStoredLayout("dashboard", region)) return;
+    const initial = Object.values(setupProgress).some(Boolean) ? defaultLayout("dashboard", region) : starterLayout("dashboard", region);
+    saveLayout("dashboard", region, initial);
+    setDashboardLayout(initial);
+    // Deliberately once per hydration and region: adding data later must not swap the layout.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, region]);
+
+  // Widgets the ledger's data now supports, offered on the dashboard until added or dismissed.
+  const [dismissedRecs, setDismissedRecs] = useState<string[]>(readDismissedRecs);
+  const widgetRecs = useMemo(() => {
+    const onPage = new Set(dashboardLayout.widgets.map((widget) => widget.id));
+    const available = new Set(availableWidgets("dashboard", region).map((widget) => widget.id));
+    const retirementTypes = ["pension", "sipp", "lisa", "401k", "403b", "traditional-ira", "roth-ira"];
+    return recommendWidgets({
+      hasIncomeAndSpending: setupProgress.income && setupProgress.expenses,
+      debtCount: ledger.accounts.filter((account) => isDebtClass(account) && account.balance > 0).length,
+      goalCount: ledger.goals.length,
+      recurringCount: subscriptionReport.totals.activeCount,
+      accountCount: ledger.accounts.filter((account) => !isDebtClass(account)).length,
+      monthsWithData: Object.values(ledger.months).filter((month) => month.incomes.length || month.expenses.length).length,
+      salaryEntered: setupProgress.pay,
+      hasRetirementAccount: ledger.accounts.some((account) => retirementTypes.includes(account.type)),
+      signalCount: anomalySignals.filter((signal) => signal.id !== "no-urgent-signals").length,
+    })
+      .filter((rec) => available.has(rec.id) && !onPage.has(rec.id) && !dismissedRecs.includes(rec.id))
+      .slice(0, 3);
+  }, [dashboardLayout, region, setupProgress, ledger.accounts, ledger.goals.length, ledger.months, subscriptionReport.totals.activeCount, anomalySignals, dismissedRecs]);
+  function dismissWidgetRec(id: string) {
+    const next = [...dismissedRecs, id];
+    setDismissedRecs(next);
+    writeDismissedRecs(next);
   }
 
   useEffect(() => {
@@ -2942,11 +3012,13 @@ function App() {
       // localStorage unavailable — nothing was stored there either.
     }
     for (const key of ["GB", "US"] as const) clearLayout("dashboard", key);
-    const tools = { pinned: initialPinned(false), seen: [] };
+    const tools = { pinned: initialPinned(false), hidden: [], seen: [] };
     writeNavTools(tools);
     setNavTools(tools);
     setToolsTrayOpen(false);
-    setDashboardLayout(defaultLayout("dashboard", region));
+    setDashboardLayout(starterLayout("dashboard", region));
+    clearDismissedRecs();
+    setDismissedRecs([]);
     setChecklistDismissed(false);
     setConfirmClearAll(false);
     setLedger(fresh);
@@ -3367,13 +3439,14 @@ function App() {
   };
 
   const payPageTitle = region === "US" ? "Paycheck & tax" : "Pay & tax";
-  const coreNavItems: Array<{ id: AppView; label: string; icon: ReactNode }> = [
-    { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard size={20} /> },
-    { id: "ledger", label: "Ledger", icon: <ReceiptText size={20} /> },
-    { id: "accounts", label: "Accounts", icon: <CreditCard size={20} /> },
-    { id: "subscriptions", label: "Subscriptions", icon: <Repeat size={20} /> },
+  type NavEntry = { id: AppView; label: string; icon: ReactNode; blurb: string };
+  const coreNavItems: NavEntry[] = [
+    { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard size={20} />, blurb: "" },
+    { id: "ledger", label: "Ledger", icon: <ReceiptText size={20} />, blurb: "" },
+    { id: "accounts", label: "Accounts", icon: <CreditCard size={20} />, blurb: "Balances, cards and loans that make up your net worth" },
+    { id: "subscriptions", label: "Subscriptions", icon: <Repeat size={20} />, blurb: "Every recurring payment in one place, with price rises flagged" },
   ];
-  const toolNavItems: Record<ToolView, { id: ToolView; label: string; icon: ReactNode; blurb: string }> = {
+  const toolNavItems: Record<ToolView, NavEntry & { id: ToolView }> = {
     pay: {
       id: "pay",
       label: payPageTitle,
@@ -3383,12 +3456,16 @@ function App() {
     allocate: { id: "allocate", label: "Allocate", icon: <Coins size={20} />, blurb: "Plan the fastest way to pay off debt and where spare money goes" },
     goals: { id: "goals", label: "Goals", icon: <Target size={20} />, blurb: "Save towards things you want and see when you'll get there" },
   };
-  // A tool opened from a widget or link shows in the sidebar while it is the page being viewed.
-  const visibleTools = TOOL_VIEWS.filter((tool) => toolPrefs.pinned.includes(tool) || activeView === tool);
-  const navItems = [...coreNavItems, ...visibleTools.map((tool) => toolNavItems[tool])];
-  const unpinnedTools = TOOL_VIEWS.filter((tool) => !toolPrefs.pinned.includes(tool));
+  const hiddenViews = toolPrefs.hidden ?? [];
+  const inSidebar = (view: AppView) => (isToolView(view) ? toolPrefs.pinned.includes(view) : !(isHideableView(view) && hiddenViews.includes(view)));
+  const navEntry = (view: AppView): NavEntry => (isToolView(view) ? toolNavItems[view] : coreNavItems.find((item) => item.id === view)!);
+  // A page out of the sidebar still shows there while it is the page being viewed (opened from a
+  // widget or link), marked as a preview.
+  const navItems = [...coreNavItems.map((item) => item.id), ...TOOL_VIEWS].filter((view) => inSidebar(view) || activeView === view).map(navEntry);
+  // Everything out of the sidebar, listed under More tools: hidden everyday pages first, then tools.
+  const offSidebar: AppView[] = [...HIDEABLE_VIEWS.filter((view) => hiddenViews.includes(view)), ...TOOL_VIEWS.filter((tool) => !toolPrefs.pinned.includes(tool))];
   const toolBadge = unseenSuggestionCount(toolPrefs, suggestedTools);
-  const unpinnedActiveTool = isToolView(activeView) && !toolPrefs.pinned.includes(activeView) ? activeView : null;
+  const offSidebarActive = canHide(activeView) && !inSidebar(activeView) ? activeView : null;
   const insightChartTitle =
     insightChartView === "cash-flow"
       ? "Cash flow volatility"
@@ -3460,9 +3537,14 @@ function App() {
           {navItems.map((item) => (
             <button
               key={item.id}
-              className={`navItem${activeView === item.id ? " active" : ""}${item.id === unpinnedActiveTool ? " preview" : ""}`}
+              className={`navItem${activeView === item.id ? " active" : ""}${item.id === offSidebarActive ? " preview" : ""}`}
               type="button"
               onClick={() => setActiveView(item.id)}
+              onContextMenu={(event) => {
+                if (!canHide(item.id) || item.id === offSidebarActive) return;
+                event.preventDefault();
+                setNavMenu({ view: item.id, x: event.clientX, y: event.clientY });
+              }}
               aria-pressed={activeView === item.id}
             >
               {item.icon}
@@ -3481,7 +3563,32 @@ function App() {
           </button>
         </nav>
 
-        {unpinnedTools.length > 0 && (
+        {navMenu && (
+          <div
+            className="navContextMenu"
+            role="menu"
+            aria-label={`${navEntry(navMenu.view).label} options`}
+            style={{ left: Math.min(navMenu.x, window.innerWidth - 200), top: Math.min(navMenu.y, window.innerHeight - 60) }}
+            onPointerDown={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              role="menuitem"
+              autoFocus
+              onClick={() => {
+                const label = navEntry(navMenu.view).label;
+                setSidebarItem(navMenu.view, false);
+                setNavMenu(null);
+                setToast(`${label} hidden — add it back from More tools`);
+              }}
+            >
+              <EyeOff size={15} />
+              Hide from sidebar
+            </button>
+          </div>
+        )}
+
+        {offSidebar.length > 0 && (
           <div className="navTools">
             <button
               className={toolsTrayOpen ? "navToolsToggle open" : "navToolsToggle"}
@@ -3500,10 +3607,10 @@ function App() {
               <ChevronDown size={15} className="navToolsChevron" aria-hidden="true" />
             </button>
             {toolsTrayOpen && (
-              <ul className="navToolsTray" id="navToolsTray" aria-label="Tools you can add to the sidebar">
-                {unpinnedTools.map((tool) => {
-                  const item = toolNavItems[tool];
-                  const reason = suggestedTools[tool];
+              <ul className="navToolsTray" id="navToolsTray" aria-label="Pages you can add to the sidebar">
+                {offSidebar.map((tool) => {
+                  const item = navEntry(tool);
+                  const reason = isToolView(tool) ? suggestedTools[tool] : undefined;
                   return (
                     <li key={tool} className={reason ? "navToolRow suggested" : "navToolRow"}>
                       <button
@@ -3521,7 +3628,7 @@ function App() {
                           <small>{item.blurb}</small>
                         </span>
                       </button>
-                      <button className="navToolAdd" type="button" onClick={() => setToolPinned(tool, true)} aria-label={`Add ${item.label} to sidebar`} data-tip="Add to sidebar">
+                      <button className="navToolAdd" type="button" onClick={() => setSidebarItem(tool, true)} aria-label={`Add ${item.label} to sidebar`} data-tip="Add to sidebar">
                         <Plus size={15} />
                       </button>
                     </li>
@@ -3650,12 +3757,12 @@ function App() {
         </header>
 
         <main className="contentCanvas">
-          {unpinnedActiveTool && (
+          {offSidebarActive && (
             <div className="toolPinBanner" role="note">
               <span>
-                <strong>{toolNavItems[unpinnedActiveTool].label}</strong> isn't in your sidebar yet.
+                <strong>{navEntry(offSidebarActive).label}</strong> isn't in your sidebar.
               </span>
-              <button className="linkButton" type="button" onClick={() => setToolPinned(unpinnedActiveTool, true)}>
+              <button className="linkButton" type="button" onClick={() => setSidebarItem(offSidebarActive, true)}>
                 <Plus size={14} />
                 Add to sidebar
               </button>
@@ -3810,6 +3917,44 @@ function App() {
                 />
               )}
 
+              {layoutEditing !== "dashboard" && widgetRecs.length > 0 && (
+                <section className="widgetRecs" aria-label="Suggested widgets">
+                  <div className="widgetRecsHead">
+                    <Sparkles size={15} aria-hidden="true" />
+                    <strong>Suggested for you</strong>
+                    <span>Widgets your data can fill now</span>
+                  </div>
+                  <ul>
+                    {widgetRecs.map((rec) => {
+                      const title = widgetDefinition("dashboard", rec.id)?.title[region] ?? rec.id;
+                      return (
+                        <li key={rec.id}>
+                          <div className="widgetRecText">
+                            <strong>{title}</strong>
+                            <small>{rec.reason}</small>
+                          </div>
+                          <button
+                            className="commandButton widgetRecAdd"
+                            type="button"
+                            aria-label={`Add ${title} widget`}
+                            onClick={() => {
+                              changeLayout("dashboard", "add", (layout) => addWidget(layout, "dashboard", region, rec.id));
+                              window.requestAnimationFrame(() => document.querySelector(`[data-widget-id="${rec.id}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" }));
+                            }}
+                          >
+                            <Plus size={14} />
+                            Add
+                          </button>
+                          <button className="iconButton" type="button" aria-label={`Dismiss the ${title} suggestion`} data-tip="Not now" onClick={() => dismissWidgetRec(rec.id)}>
+                            <X size={15} />
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              )}
+
               <WidgetGrid
                 page="dashboard"
                 region={region}
@@ -3823,7 +3968,7 @@ function App() {
                 onSetSize={(id, size) => changeLayout("dashboard", "resize", (layout) => resizeWidget(layout, "dashboard", id, size))}
                 onRemove={(id) => changeLayout("dashboard", "remove", (layout) => removeWidget(layout, id))}
                 onAdd={(id) => changeLayout("dashboard", "add", (layout) => addWidget(layout, "dashboard", region, id))}
-                onReset={() => changeLayout("dashboard", "reset", () => defaultLayout("dashboard", region))}
+                onReset={() => changeLayout("dashboard", "reset", () => starterLayout("dashboard", region))}
               />
             </section>
           )}

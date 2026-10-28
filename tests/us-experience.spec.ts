@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { useFullDashboard } from "./helpers/dashboard";
 
 // The US experience end to end: country switch, American account types with plan details,
 // employer match and contribution limits, the gross-to-net estimate, loans and medical tracking —
@@ -90,6 +91,7 @@ test.describe("US experience", () => {
   });
 
   test("a 401(k) with an employer match feeds the gross-to-net estimate, the retirement widget and the forecast", async ({ page }) => {
+    await useFullDashboard(page);
     await switchToUs(page);
     await openView(page, "Accounts");
     await addAccount(page, "investment", "401k", "Fidelity 401k", 25000, async (editor) => {
@@ -153,6 +155,7 @@ test.describe("US experience", () => {
   });
 
   test("federal student loans get repayment-plan estimates and medical spending tracks the deductible", async ({ page }) => {
+    await useFullDashboard(page);
     await switchToUs(page);
     await openView(page, "Paycheck & tax");
     await page.getByLabel("Take-home pay estimator").getByLabel("Gross annual salary", { exact: true }).fill("60000");
@@ -191,39 +194,19 @@ test.describe("US experience", () => {
   test("the dashboard layout can be rearranged, resized, trimmed and extended, and survives a reload", async ({ page }) => {
     await switchToUs(page);
     const grid = page.getByLabel("dashboard widgets");
-    const defaults = [
-      "snapshot",
-      "cash-flow",
-      "health",
-      "spending-pace",
-      "savings-rate",
-      "net-worth",
-      "chart",
-      "categories",
-      "anomalies",
-      "debt-overview",
-      "retirement",
-      "paycheck",
-      "credit",
-      "payoff",
-      "medical",
-      "loans",
-      "subscriptions",
-      "annual",
-    ];
+    // A new user starts on the starter widgets; the rest wait in the tray.
+    const defaults = ["snapshot", "cash-flow", "spending-pace", "categories"];
     const ids = () => grid.locator(".widgetCell").evaluateAll((cells) => cells.map((cell) => (cell as HTMLElement).dataset.widgetId));
     await expect.poll(ids).toEqual(defaults);
 
     await page.getByRole("button", { name: "Customize the dashboard layout" }).click();
-    await page.getByRole("button", { name: "Remove Net worth outlook" }).click();
+    await page.getByRole("button", { name: "Remove Spending pace" }).click();
     await page.getByRole("button", { name: "Make Monthly snapshot narrower" }).click();
-    await page.getByRole("button", { name: "Move Loans & student loans earlier" }).click();
+    await page.getByRole("button", { name: "Move Top categories earlier" }).click();
     await page.getByRole("button", { name: "Add Goals widget" }).click();
     await page.getByRole("button", { name: "Finish customizing the dashboard" }).click();
 
-    const edited = [...defaults.filter((id) => id !== "net-worth" && id !== "loans")];
-    edited.splice(edited.indexOf("medical"), 0, "loans");
-    edited.push("goals");
+    const edited = ["snapshot", "categories", "cash-flow", "goals"];
     await expect.poll(ids).toEqual(edited);
     await expect(grid.locator('[data-widget-id="snapshot"]')).toHaveClass(/size-l/);
 
@@ -231,7 +214,7 @@ test.describe("US experience", () => {
     await expect.poll(ids).toEqual(edited);
     await expect(grid.locator('[data-widget-id="snapshot"]')).toHaveClass(/size-l/);
 
-    // Reset puts the default back.
+    // Reset goes back to the starter widgets.
     await page.getByRole("button", { name: "Customize the dashboard layout" }).click();
     await page.getByRole("button", { name: "Reset layout" }).click();
     await expect.poll(ids).toEqual(defaults);
@@ -260,6 +243,7 @@ test.describe("UK parity", () => {
   test.slow();
 
   test("workplace pensions, ISA allowances and student-loan plans work for UK users without changing the default dashboard", async ({ page }) => {
+    await useFullDashboard(page);
     await page.goto("/");
     await expect(page.getByLabel("Country", { exact: true })).toHaveValue("GB");
     // The UK dashboard carries no US panels and no pension panel by default; those wait in the tray.

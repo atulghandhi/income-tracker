@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { initialPinned, toolSuggestions, unseenSuggestionCount } from "../src/navTools";
+import { canHide, initialPinned, toolSuggestions, unseenSuggestionCount, withSidebarItem } from "../src/navTools";
 
 test.describe("Sidebar tools", () => {
   test("a fresh start gets the short sidebar; someone with data keeps every tool", () => {
@@ -24,5 +24,19 @@ test.describe("Sidebar tools", () => {
     expect(unseenSuggestionCount({ pinned: [], seen: [] }, suggestions)).toBe(2);
     expect(unseenSuggestionCount({ pinned: ["allocate"], seen: [] }, suggestions)).toBe(1);
     expect(unseenSuggestionCount({ pinned: [], seen: ["goals"] }, suggestions)).toBe(1);
+  });
+
+  test("everyday pages can be hidden and shown; Dashboard, Ledger and Settings never", () => {
+    expect(["dashboard", "ledger", "settings"].map((view) => canHide(view as never))).toEqual([false, false, false]);
+    expect(["accounts", "subscriptions", "goals", "pay", "allocate"].map((view) => canHide(view as never))).toEqual([true, true, true, true, true]);
+    const start = { pinned: ["goals" as const], hidden: [], seen: [] };
+    const hidden = withSidebarItem(withSidebarItem(start, "subscriptions", false), "goals", false);
+    expect(hidden.hidden).toEqual(["subscriptions"]);
+    expect(hidden.pinned).toEqual([]);
+    const shown = withSidebarItem(withSidebarItem(hidden, "subscriptions", true), "goals", true);
+    expect(shown.hidden).toEqual([]);
+    expect(shown.pinned).toEqual(["goals"]);
+    // Nothing happens to a page that can't be hidden.
+    expect(withSidebarItem(start, "ledger", false)).toEqual(start);
   });
 });

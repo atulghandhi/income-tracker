@@ -493,6 +493,41 @@ textarea {
   margin-top: 6px;
 }
 
+/* Right-click a sidebar page: a one-item menu to hide it (styled like the ledger's menus). */
+.navContextMenu {
+  position: fixed;
+  z-index: 140;
+  width: 188px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+  animation: menuIn 130ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.navContextMenu button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.navContextMenu button:hover,
+.navContextMenu button:focus-visible {
+  outline: none;
+  background: var(--accent-soft);
+}
+
 .navToolsToggle {
   display: flex;
   align-items: center;
@@ -7076,6 +7111,85 @@ hr {
   display: flex;
   align-items: flex-end;
   gap: 18px;
+}
+
+/* Dashboard widget suggestions: a quiet strip above the grid, one row per widget. */
+.widgetRecs {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.widgetRecsHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  color: var(--accent);
+}
+
+.widgetRecsHead strong {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 680;
+}
+
+.widgetRecsHead span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.widgetRecs ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.widgetRecs li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-high);
+}
+
+.widgetRecText {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.widgetRecText strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.widgetRecText small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.widgetRecAdd {
+  min-height: 32px;
+  border: 1px solid rgba(var(--accent-rgb), 0.55);
+  border-radius: var(--radius);
+  background: rgba(var(--accent-rgb), 0.12);
+  color: var(--accent-strong);
 }
 
 .pageTitleRow {

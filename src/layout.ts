@@ -258,6 +258,11 @@ const DEFAULT_IDS: Record<RegionKey, string[]> = {
   ],
 };
 
+// A new user's dashboard: the few widgets that make sense with a little data. Everything else waits
+// in the widget tray, and the dashboard suggests widgets as the ledger fills (see widgetRecs.ts).
+// Someone who already had data before this keeps the full default above.
+const STARTER_IDS = ["snapshot", "cash-flow", "spending-pace", "categories"];
+
 // Until 2026-10-19 the Dashboard and Insights were two pages with a layout each, and a few
 // widgets existed on both under different ids. Stored layouts from then still use those ids.
 const LEGACY_IDS: Record<string, string> = { summary: "snapshot", recurring: "subscriptions", limits: "retirement" };
@@ -288,10 +293,18 @@ export function widgetDefinition(page: LayoutPage, id: string): WidgetDefinition
 }
 
 export function defaultLayout(page: LayoutPage, region: RegionKey): PageLayout {
+  return layoutOf(page, region, DEFAULT_IDS[region]);
+}
+
+export function starterLayout(page: LayoutPage, region: RegionKey): PageLayout {
+  return layoutOf(page, region, STARTER_IDS);
+}
+
+function layoutOf(page: LayoutPage, region: RegionKey, ids: string[]): PageLayout {
   const available = availableWidgets(page, region);
   return {
     version: LAYOUT_VERSION,
-    widgets: DEFAULT_IDS[region]
+    widgets: ids
       .map((id) => available.find((widget) => widget.id === id))
       .filter((widget): widget is WidgetDefinition => Boolean(widget))
       .map((widget) => ({ id: widget.id, size: widget.defaultSize })),
@@ -420,6 +433,15 @@ export function loadLayout(page: LayoutPage, region: RegionKey): PageLayout {
     return merged;
   } catch {
     return defaultLayout(page, region);
+  }
+}
+
+// Whether this device has a saved arrangement (or one from before the pages merged) for the region.
+export function hasStoredLayout(page: LayoutPage, region: RegionKey): boolean {
+  try {
+    return Boolean(localStorage.getItem(layoutStorageKey(page, region)) || localStorage.getItem(`it_layout_insights_${region.toLowerCase()}`));
+  } catch {
+    return false;
   }
 }
 

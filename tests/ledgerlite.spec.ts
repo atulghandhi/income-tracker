@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { useFullDashboard } from "./helpers/dashboard";
 
 // Core ledger behaviour in the app shell: keyboard-first entry, quick add,
 // grouping, CSV review, accounts and the dashboard's insight widgets. Skips the marketing landing and
@@ -411,6 +412,7 @@ test.describe("Ledger", () => {
   });
 
   test("adds a credit card account and shows it on the dashboard outlook", async ({ page }) => {
+    await useFullDashboard(page);
     await page.goto("/");
     await addDebtAccount(page, { name: "Visa Classic", balance: 1200, limit: 3000, apr: 19.9, promoMonths: 12, payment: 75, dueDay: 12 });
 
@@ -631,6 +633,7 @@ test.describe("Ledger", () => {
   });
 
   test("explains health score, flags and dismisses anomalies, and switches insight charts", async ({ page }) => {
+    await useFullDashboard(page);
     test.slow();
     await openLedger(page);
     await addIncome(page, "Salary", 2000);

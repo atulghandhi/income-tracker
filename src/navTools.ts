@@ -3,8 +3,10 @@ import type { AppView } from "./routes";
 // The sidebar starts with the everyday pages only. The specialist pages (Pay & tax, Allocate,
 // Goals) are "tools": a new user adds them from the sidebar's "More tools" list, which flags the
 // ones their own data says they need (debts → Allocate, money left over → Goals). A tool not in
-// the sidebar still opens from a widget, link or the checklist, and offers to add itself. Which tools are pinned is a per-device view preference, like the
-// theme and dashboard layout, so it lives in localStorage.
+// the sidebar still opens from a widget, link or the checklist, and offers to add itself. The
+// everyday pages can be hidden too (right-click → Hide), except the few the app can't do without.
+// All of this is a per-device view preference, like the theme and dashboard layout, so it lives
+// in localStorage.
 
 export type ToolView = Extract<AppView, "pay" | "allocate" | "goals">;
 
@@ -14,10 +16,27 @@ export function isToolView(view: AppView): view is ToolView {
   return (TOOL_VIEWS as AppView[]).includes(view);
 }
 
+// Everyday pages someone can hide. Dashboard, Ledger and Settings always stay: without them there
+// is nowhere to land, nothing to record money in, and no way back to these preferences.
+export type HideableView = Extract<AppView, "accounts" | "subscriptions">;
+
+export const HIDEABLE_VIEWS: HideableView[] = ["accounts", "subscriptions"];
+
+export function isHideableView(view: AppView): view is HideableView {
+  return (HIDEABLE_VIEWS as AppView[]).includes(view);
+}
+
+// Whether a sidebar item offers "Hide": any tool, or a hideable everyday page.
+export function canHide(view: AppView): boolean {
+  return isToolView(view) || isHideableView(view);
+}
+
 export type NavToolsPrefs = {
   // 2: Goals became a tool and Subscriptions an everyday page (2026-10-28).
   version?: 2;
   pinned: ToolView[];
+  // Everyday pages taken out of the sidebar.
+  hidden?: HideableView[];
   // Suggestions already shown in the open "Add tools" list, so the badge stops counting them.
   seen: ToolView[];
 };
@@ -29,6 +48,11 @@ function cleanTools(value: unknown): ToolView[] {
   return TOOL_VIEWS.filter((tool) => value.includes(tool));
 }
 
+function cleanHidden(value: unknown): HideableView[] {
+  if (!Array.isArray(value)) return [];
+  return HIDEABLE_VIEWS.filter((view) => value.includes(view));
+}
+
 // null = never decided on this device; the caller picks a starting set (see initialPinned).
 export function readNavTools(): NavToolsPrefs | null {
   try {
@@ -38,7 +62,7 @@ export function readNavTools(): NavToolsPrefs | null {
     const pinned = cleanTools(parsed.pinned);
     // Goals was always in the sidebar before it became a tool, so it stays for anyone who had it.
     if (parsed.version !== 2 && !pinned.includes("goals")) pinned.unshift("goals");
-    return { version: 2, pinned, seen: cleanTools(parsed.seen) };
+    return { version: 2, pinned, hidden: cleanHidden(parsed.hidden), seen: cleanTools(parsed.seen) };
   } catch {
     return null;
   }
@@ -73,6 +97,18 @@ export function toolSuggestions(inputs: ToolSuggestionInputs): Partial<Record<To
   if (inputs.debtCount > 0) out.allocate = inputs.debtCount === 1 ? "You have a debt" : `You have ${inputs.debtCount} debts`;
   if (inputs.monthlySurplus > 0 && !inputs.hasGoals) out.goals = "You have money left over each month";
   return out;
+}
+
+// The same preferences with one page shown in or hidden from the sidebar.
+export function withSidebarItem(prefs: NavToolsPrefs, view: AppView, shown: boolean): NavToolsPrefs {
+  if (isToolView(view)) {
+    return { ...prefs, pinned: shown ? TOOL_VIEWS.filter((tool) => tool === view || prefs.pinned.includes(tool)) : prefs.pinned.filter((tool) => tool !== view) };
+  }
+  if (isHideableView(view)) {
+    const hidden = prefs.hidden ?? [];
+    return { ...prefs, hidden: shown ? hidden.filter((item) => item !== view) : HIDEABLE_VIEWS.filter((item) => item === view || hidden.includes(item)) };
+  }
+  return prefs;
 }
 
 // Suggestions for tools not yet in the sidebar that the user hasn't looked at yet.
