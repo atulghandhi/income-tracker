@@ -104,17 +104,13 @@ struct RootView: View {
             }
         }
         .task {
-            // 1. Install the cloud pusher so every debounced local save is followed
-            //    by a push while signed in (never while a conflict is unresolved).
-            store.cloudPusher = { state in
-                guard sync.isSignedIn, sync.mergeConflict == nil, let userId = sync.currentUser?.id else { return true }
-                do {
-                    try await sync.saveCloudState(state, userId: userId)
-                    return true
-                } catch {
-                    sync.lastSyncError = error.localizedDescription
-                    return false
-                }
+            // 1. Install the cloud pusher: every debounced local save of a user edit asks
+            //    the Sync v2 engine to push (compare-and-swap, merging if another device
+            //    saved first). Never while the first-sync choice is still open.
+            store.cloudPusher = { _ in
+                guard sync.isSignedIn, sync.mergeConflict == nil else { return true }
+                store.ensureSyncEngine(sync: sync).requestPush()
+                return true
             }
 
             // 2. Restore any persisted auth session before touching the cloud.
@@ -123,6 +119,7 @@ struct RootView: View {
             // 3. Hydrate store: local first, then cloud if signed in.
             await store.hydrate(sync: sync)
             hasHydratedOnce = true
+            startRealtime()
 
             // 4. First run: a short setup sheet for anyone with an empty ledger.
             if !onboardingCompleted && !store.state.hasLocalData && sync.mergeConflict == nil {
@@ -142,19 +139,26 @@ struct RootView: View {
         // copy and merges it with whatever exists locally.
         .onChange(of: sync.isSignedIn) { wasSignedIn, isSignedIn in
             if !wasSignedIn && isSignedIn {
-                Task { await store.hydrate(sync: sync) }
+                Task {
+                    await store.hydrate(sync: sync)
+                    startRealtime()
+                }
+            } else if wasSignedIn && !isSignedIn {
+                sync.stopRealtime()
             }
         }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .background:
                 if requireFaceID { isLocked = true }
+                sync.stopRealtime()
                 Task { await store.flushPendingSave() }
             case .active:
                 if isLocked {
                     authenticate()
                 } else if hasHydratedOnce {
                     Task { await store.refreshFromCloudIfIdle(sync: sync) }
+                    startRealtime()
                 }
             default:
                 break
@@ -166,6 +170,20 @@ struct RootView: View {
                 authenticate()
             }
         }
+    }
+
+    // MARK: - Live sync
+
+    /// Listens for other devices' saves while the app is in the foreground. The poke
+    /// carries only a revision; the engine fetches and merges. Joining (or rejoining
+    /// after a drop) also fetches, to catch anything missed while disconnected.
+    private func startRealtime() {
+        guard sync.isSignedIn, hasHydratedOnce, scenePhase == .active, !isLocked else { return }
+        let engine = store.ensureSyncEngine(sync: sync)
+        sync.startRealtime(
+            onPoke: { revision, schemaVersion in engine.onPoke(revision: revision, schemaVersion: schemaVersion) },
+            onJoined: { joined in if joined { engine.requestPull() } }
+        )
     }
 
     // MARK: - Privacy lock
@@ -190,6 +208,7 @@ struct RootView: View {
             if unlocked {
                 withAnimation(Motion.snappy) { isLocked = false }
                 await store.refreshFromCloudIfIdle(sync: sync)
+                startRealtime()
             }
         }
     }

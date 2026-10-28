@@ -14,6 +14,7 @@
     "indexnow": "node scripts/indexnow.mjs",
     "pretest": "node scripts/ensure-browsers.mjs",
     "test": "playwright test",
+    "test:sync": "playwright test -c playwright.sync.config.ts",
     "test:seo": "npm run build && playwright test --config playwright.seo.config.ts",
     "test:calc": "playwright test tests/finance.spec.ts tests/finance-baseline.spec.ts tests/tax.spec.ts tests/retirement.spec.ts tests/loans.spec.ts tests/region.spec.ts tests/widgets.spec.ts tests/accountFlow.spec.ts tests/accountLinks.spec.ts tests/debtSync.spec.ts tests/allocate.spec.ts tests/lumpSumTax.spec.ts tests/subscriptions.spec.ts tests/insightsData.spec.ts tests/navTools.spec.ts tests/categoryEmoji.spec.ts --project=chromium",
     "build:icons": "node scripts/build-icons.mjs",

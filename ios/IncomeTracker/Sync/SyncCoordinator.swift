@@ -18,7 +18,7 @@ import CryptoKit
 
 @MainActor
 @Observable
-final class SyncCoordinator {
+final class SyncCoordinator: LedgerSyncTransport {
 
     // MARK: - Public state
 
@@ -313,56 +313,107 @@ final class SyncCoordinator {
     }
 
     private func signOutLocally() async {
+        stopRealtime()
+        realtime = nil
         clearKeychain()
         currentUser = nil
         isSignedIn = false
         lastSyncedAt = nil
     }
 
-    // MARK: - Data sync (mirrors src/supabase.ts)
+    // MARK: - Ledger sync (Sync v2, mirrors src/supabase.ts)
+    //
+    // Writes go through the ledgerlite_push_state RPC, a compare-and-swap on the row's
+    // revision, so this device can never overwrite changes it has not seen. SyncEngine
+    // drives these calls; nothing else should write ledgerlite_states.
 
-    /// Fetches the stored `LedgerState` JSON blob for the current user.
-    /// Returns nil when no row exists yet (first-time user).
-    func loadCloudState() async throws -> LedgerState? {
+    /// The ledger row as stored: raw JSON (so fields this build does not know survive),
+    /// its revision and which device wrote it. Nil when the account has no row yet.
+    func fetchLedgerRow() async throws -> LedgerRow? {
         let data = try await authorizedRequest(
-            path: "/rest/v1/ledgerlite_states?select=state&limit=1",
+            path: "/rest/v1/ledgerlite_states?select=state,revision,updated_by&limit=1",
             method: "GET",
             body: nil
         )
-
-        // The response is a JSON array: [{ "state": { ... } }]
         struct Row: Decodable {
-            let state: LedgerState
+            let state: JSONValue
+            let revision: Double
+            let updated_by: String?
         }
-        let rows = try JSONDecoder.supabase.decode([Row].self, from: data)
-        return rows.first?.state
+        guard let row = try JSONDecoder().decode([Row].self, from: data).first else { return nil }
+        return LedgerRow(state: row.state, revision: Int(row.revision), updatedBy: row.updated_by)
     }
 
-    /// Upserts the full `LedgerState` for `userId` into ledgerlite_states.
-    /// Uses `Prefer: resolution=merge-duplicates` to update if a row exists.
-    func saveCloudState(_ state: LedgerState, userId: String) async throws {
-        struct UpsertPayload: Encodable {
-            let user_id: String          // snake_case to match Postgres column
-            let state: LedgerState
-            let schema_version: Int
-            let updated_at: String
-        }
-        let payload = UpsertPayload(
-            user_id: userId,
-            state: state,
-            schema_version: state.schemaVersion,
-            updated_at: isoTimestampNow()
+    func fetchLedgerRevision() async throws -> Int? {
+        let data = try await authorizedRequest(
+            path: "/rest/v1/ledgerlite_states?select=revision&limit=1",
+            method: "GET",
+            body: nil
         )
-        let body = try JSONEncoder.ledgerState.encode(payload)
+        struct Row: Decodable { let revision: Double }
+        return try JSONDecoder().decode([Row].self, from: data).first.map { Int($0.revision) }
+    }
 
-        _ = try await authorizedRequest(
-            path: "/rest/v1/ledgerlite_states",
-            method: "POST",
-            body: body,
-            extraHeaders: ["Prefer": "resolution=merge-duplicates,return=minimal"]
-        )
-        lastSyncedAt = .now
-        lastSyncError = nil
+    func pushLedger(_ state: JSONValue, baseRevision: Int, deviceId: String) async throws -> PushOutcome {
+        struct Body: Encodable {
+            let p_state: JSONValue
+            let p_base_revision: Int
+            let p_device_id: String
+        }
+        let body = try JSONEncoder().encode(Body(p_state: state, p_base_revision: baseRevision, p_device_id: deviceId))
+        let data = try await authorizedRequest(path: "/rest/v1/rpc/ledgerlite_push_state", method: "POST", body: body)
+
+        struct Row: Decodable {
+            let status: String
+            let revision: Double
+            let state: JSONValue?
+            let updated_by: String?
+        }
+        guard let row = try JSONDecoder().decode([Row].self, from: data).first,
+              let status = PushStatus(rawValue: row.status) else {
+            throw SyncError.decodingFailed
+        }
+        let returned: JSONValue? = row.state == .null ? nil : row.state
+        if status == .ok {
+            lastSyncedAt = .now
+            lastSyncError = nil
+        }
+        return PushOutcome(status: status, revision: Int(row.revision), state: returned, updatedBy: row.updated_by)
+    }
+
+    // MARK: - Realtime
+
+    @ObservationIgnored private var realtime: LedgerRealtime?
+
+    /// Listens for other devices' saves while the app is in the foreground.
+    func startRealtime(onPoke: @escaping @MainActor (Int?, Int?) -> Void, onJoined: @escaping @MainActor (Bool) -> Void) {
+        guard let userId = currentUser?.id else { return }
+        if realtime == nil {
+            realtime = LedgerRealtime(
+                baseURL: supabaseURL,
+                apiKey: supabaseAnonKey,
+                tokenProvider: { [weak self] in
+                    guard let self else { throw SyncError.notSignedIn }
+                    return try await self.freshAccessToken()
+                },
+                onPoke: onPoke,
+                onJoined: onJoined
+            )
+        }
+        realtime?.connect(userId: userId)
+    }
+
+    func stopRealtime() {
+        realtime?.disconnect()
+    }
+
+    /// An access token valid for at least another minute.
+    func freshAccessToken() async throws -> String {
+        guard let session = loadStoredSession() else { throw SyncError.notSignedIn }
+        if let expiresAt = session.expiresAt, expiresAt.timeIntervalSinceNow < 60 {
+            return try await refreshAccessToken()
+        }
+        return session.accessToken
     }
 
     /// Upserts the user's profile row in ledgerlite_profiles.

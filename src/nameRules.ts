@@ -129,6 +129,8 @@ export function normalizeNameRules(rules: unknown): NameRule[] {
     .filter((rule): rule is NameRule => Boolean(rule) && typeof rule.from === "string" && typeof rule.to === "string")
     .filter((rule) => rule.from.trim() && rule.to.trim() && rule.from.trim() !== rule.to.trim())
     .map((rule) => ({
+      // Keep fields this build doesn't know, so an older client never erases a newer one's data.
+      ...rule,
       id: typeof rule.id === "string" && rule.id ? rule.id : createId("name-rule"),
       kind: rule.kind === "income" ? "income" : "expense",
       from: rule.from.trim(),

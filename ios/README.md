@@ -76,10 +76,18 @@ Everything a user does funnels through one `@Observable` store (`Models/LedgerSt
   device look like the newest writer.
 - Cloud pushes are gated until `hydrate` finishes, saves never overlap, and the
   app flushes pending writes when it goes to the background.
-- Hydration (`App/LedgerStore+Persistence.swift`) shows local data first, then
-  resolves against the cloud with a three-way check (which side moved since the last
-  sync) before falling back to the web's coarse equivalence test and, only then, the
-  merge-conflict sheet.
+- Cloud sync is Sync v2 (`Sync/SyncEngine.swift`, spec in
+  `docs/ANDROID_APP_SPEC.md` §4), shared with the web and Android. Pushes are
+  compare-and-swap on the row's revision through the `ledgerlite_push_state` RPC;
+  when another device saved first, the engine three-way merges (last synced state,
+  this iPhone, the server) with `Sync/LedgerMerge.swift`, a line-for-line port of
+  `src/sync/merge.ts`, and pushes again. Other devices' saves arrive as a realtime
+  poke (`Sync/LedgerRealtime.swift`, foreground only), on returning to the
+  foreground, or from "Sync now". The first sync of an iPhone that has its own data
+  asks once: combine (recommended), use the account's data, or use this iPhone's.
+- Keys the typed model doesn't know (written by a newer web or Android build) are
+  carried over from the server copy on every push (`Sync/UnknownFields.swift`), and
+  a cloud ledger on a newer schema puts sync in read-only mode until the app updates.
 - JSON decoding is lenient (`Models/LenientDecoding.swift`, custom `init(from:)`
   in `Models/Types.swift`) and mirrors the web's `normalizeState`: legacy `goal` /
   `debts` / `apr` / `interestFreeMonths` keys, unknown enum values and missing
@@ -107,11 +115,17 @@ appearance, and learned rules. Widgets, Siri intents and deep links
 
 ### Verifying without Xcode
 
-The Foundation layers compile with the Linux Swift 6 toolchain. A harness that
-type-checks them and replays the web-generated parity vectors lives in
-`IncomeTrackerTests/Engine/ImporterParityTests.swift`; the same assertions run on
-macOS through `xcodebuild test`. SwiftUI files cannot be compiled on Linux, so the
-first Xcode build after a large change is expected to surface small API drift.
+The Foundation layers compile with the Linux Swift 6 toolchain. `LinuxTests/run.sh`
+builds models, engine, importers, `LedgerStore` and the whole Sync v2 layer (with
+small stubs for widget and notification types) and runs
+`IncomeTrackerTests/Sync/SyncV2Tests.swift`: merge parity against
+`IncomeTrackerTests/Fixtures/data/merge-fixtures.json` (written from
+`src/sync/merge.ts` by `GENERATE_MERGE_FIXTURES=1 npx playwright test
+tests/generateMergeFixtures.spec.ts`), unknown-field carrying, and the engine
+against a fake compare-and-swap server. The same tests run on macOS through
+`xcodebuild test`. SwiftUI, Keychain and networking code (`SyncCoordinator`,
+`RootView`, the sheets) cannot be compiled on Linux, so the first Xcode build after
+a large change is expected to surface small API drift.
 
 ## Automatic transaction capture (Stage D of docs/AUTOMATION_PLAN.md)
 
