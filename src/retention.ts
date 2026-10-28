@@ -39,7 +39,7 @@ export function bankName(slug: string): string {
 // Counts visits (one per calendar day) so nudges can wait for a returning user.
 export function recordVisit(today = new Date()): number {
   try {
-    const key = today.toISOString().slice(0, 10);
+    const key = ymd(today); // the user's own calendar day, not UTC's
     const raw = localStorage.getItem(VISITS_KEY);
     const parsed = raw ? (JSON.parse(raw) as { count: number; last: string }) : { count: 0, last: "" };
     if (parsed.last === key) return parsed.count;
@@ -74,6 +74,11 @@ export function shouldShowNewMonthNudge({
 }
 
 // ── Calendar reminder ────────────────────────────────────────────────────────
+
+// "20260909T103000Z": an RFC 5545 UTC timestamp, every part taken in UTC.
+function utcStamp(date: Date) {
+  return `${date.getUTCFullYear()}${pad(date.getUTCMonth() + 1)}${pad(date.getUTCDate())}T${pad(date.getUTCHours())}${pad(date.getUTCMinutes())}00Z`;
+}
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
@@ -120,7 +125,7 @@ export function buildReminderIcs({ dayOfMonth, bankSlug, today = new Date(), uid
   const end = new Date(start);
   end.setDate(end.getDate() + 1);
   const { summary, description } = reminderText(bankSlug);
-  const stamp = `${ymd(new Date(today.getTime() - today.getTimezoneOffset() * 60000))}T${pad(today.getUTCHours())}${pad(today.getUTCMinutes())}00Z`;
+  const stamp = utcStamp(today);
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
@@ -204,7 +209,7 @@ function debtReminderText(reminder: DebtReminder) {
 }
 
 export function buildDebtRemindersIcs({ reminders, today = new Date() }: { reminders: DebtReminder[]; today?: Date }): string {
-  const stamp = `${ymd(new Date(today.getTime() - today.getTimezoneOffset() * 60000))}T${pad(today.getUTCHours())}${pad(today.getUTCMinutes())}00Z`;
+  const stamp = utcStamp(today);
   const events = reminders.flatMap((reminder) => {
     const start = nextDueDate(reminder.dueDay, today);
     const end = new Date(start);

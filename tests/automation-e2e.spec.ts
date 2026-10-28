@@ -8,7 +8,7 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem("hasSeenLanding", "1");
     localStorage.setItem("onboardingComplete", "1");
-    localStorage.setItem("tutorialSeenPages", JSON.stringify(["ledger", "dashboard", "accounts", "goals", "insights", "settings"]));
+    localStorage.setItem("tutorialSeenPages", JSON.stringify(["ledger", "dashboard", "accounts", "goals", "settings"]));
   });
 });
 

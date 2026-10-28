@@ -27,6 +27,8 @@ export type AnalyticsEvent =
   | "rule_learned" // { retro_applied }
   | "rename_all" // { renamed: bucket }
   | "recurring_marked" // { cadence }
+  | "subscription_cancelled" // { cadence, detected } — detected = it had already stopped being paid
+  | "subscription_deleted" // { status }
   | "ai_suggestions_applied" // { count }
   | "feed_connected"
   | "signed_in"
@@ -37,7 +39,12 @@ export type AnalyticsEvent =
   | "reminder_added" // { method: "ics"|"google" }
   | "new_month_nudge" // { action: "shown"|"import"|"guide"|"dismiss" }
   | "install_prompt" // { action: "shown"|"accepted"|"dismissed"|"ios_hint" }
-  | "app_installed";
+  | "app_installed"
+  | "pdf_notice" // { action: "dismiss"|"import" } — the one-off PDF import announcement
+  | "country_changed" // { country }
+  | "layout_changed" // { page, action: "move"|"resize"|"remove"|"add"|"reset" }
+  | "allocation_changed" // { field: "priority"|"savings_priority"|"lump_sum"|"horizon"|..., value? }
+  | "nav_tool"; // { tool, action: "add"|"remove" } — a specialist page added to or removed from the sidebar
 
 let identifiedUserId: string | null = null;
 

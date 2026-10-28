@@ -4,6 +4,38 @@
 
 export const CHANGELOG = [
   {
+    date: "2026-10-19",
+    title: "Insights moves onto the Dashboard",
+    body:
+      "Insights and the Dashboard showed the same kind of thing, so they are now one page. Everything Insights had (the money flow, health score, trends, categories, anomalies, spending pace and the rest) sits on the Dashboard, and Customise arranges all of it together; if you had arranged both pages, your two layouts are combined. Widgets that were on both pages appear once, the Accounts and imports card gives way to Credit & debt, which shows the same debt figures card by card, and an old Insights bookmark opens the Dashboard. Anomaly flags can now be dismissed, and the Debt payoff plan compares every strategy when you make it wide.",
+  },
+  {
+    date: "2026-10-18",
+    title: "Allocate: debt payoff strategies and lump-sum planning",
+    body:
+      "A new Allocate page in the sidebar splits your spare money each month, and any one-off lump sum, between the debts on Accounts, a cash buffer, a tax bill and savings. Pick the priority — least interest (avalanche), lower payments soonest, quick wins (snowball), credit-score recovery, cash buffer first, tax bill first, balanced or your own percentages — and choose where savings go: highest safe rate, highest expected return, tax wrappers first or your goals. Every strategy is simulated month by month against paying minimums only and compared on interest, debt-free date, monthly payments, card utilisation, buffer and net position, with a 0% promo guard and payment rollover. UK users can mark a lump sum as taxable — freelance income, rental profit, interest, dividends or a capital gain — and the tax to set aside is worked out from your salary band and held back before anything is allocated. A Debt payoff plan widget joins Insights and the Dashboard tray. Illustrations from your own figures, not advice, with free debt help linked on the page.",
+  },
+  {
+    date: "2026-10-15",
+    title: "A Subscriptions page",
+    body:
+      "Everything you pay for repeatedly, found in your own ledger with nothing to set up: subscriptions, bills and yearly renewals, each with its cost per year. Payments every 4 weeks count 13 times a year, not 12. Price rises are flagged with the extra cost per year, while charges billed in another currency are left alone when they only wobble with the exchange rate. Yearly renewals show their next date, several plans with one company are kept apart, and a direct debit nudged by a weekend or bank holiday still counts as on time. Anything that stops being paid moves to a Cancelled list; you can mark a subscription cancelled yourself, bring it back, or delete it from the list for good. Also on Insights and the Dashboard as a widget.",
+  },
+  {
+    date: "2026-10-15",
+    title: "Import PDF bank statements directly",
+    body:
+      "Choose the PDF statement your bank gives you from Import data in Settings and review its transactions on the same screen as a CSV: categories suggested, duplicates unticked, transfers skipped, one-click undo. The statement's table is read in your browser and never uploaded. Built around Barclays, HSBC, Lloyds, Halifax, NatWest, Santander, Nationwide, TSB, Monzo, Starling, Revolut, Chase, first direct, Metro Bank, Virgin Money and American Express layouts, and it copes with most other UK and US banks. Dates printed without a year take it from the statement period, and the running balance is checked against every amount. A PDF it cannot read (a scanned image, say) gets a clear message and the paste route still works.",
+    href: "/guides/import-pdf-bank-statement.html",
+    hrefLabel: "How to import a PDF statement",
+  },
+  {
+    date: "2026-10-12",
+    title: "A US experience, customisable pages and page URLs",
+    body:
+      "Pick your country from the top bar. United States users get American account types — checking, HYSA, CDs, HSA and FSA, 401(k) and 403(b), traditional and Roth IRA, 529 plans, auto and student loans — with plan details for contributions, employer match, tax treatment and annual limits, a gross-to-net paycheck estimate on its own Pay & tax page, federal student-loan repayment plans, medical spending against your deductible, and FICO and VantageScore credit bands. UK users gain workplace pensions and SIPPs with employer contributions, ISA and pension allowance tracking, and a PAYE, National Insurance and student-loan take-home estimate. The Dashboard and Insights pages can now be rearranged, resized and trimmed, and every page has its own address so a refresh stays where you were.",
+  },
+  {
     date: "2026-09-16",
     title: "Seven more bank guides, four calculators, four templates and six guides",
     body:

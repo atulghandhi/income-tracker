@@ -63,7 +63,7 @@ export function humanDate(iso) {
 const UPDATED_HUMAN = humanDate(UPDATED);
 
 const PAGE_UPDATES = new Map([
-  ["/", "2026-09-16"], ["/tools/", "2026-09-16"], ["/whats-new.html", "2026-09-16"],
+  ["/", "2026-09-16"], ["/tools/", "2026-09-16"], ["/whats-new.html", "2026-10-18"],
   ["/import/", "2026-09-16"], ["/guides/", "2026-09-16"], ["/templates/", "2026-09-16"],
   ...BANKS.map(p => [`/import/${p.slug}.html`, p.updated || UPDATED]),
   ...GUIDES.map(p => [`/guides/${p.slug}.html`, p.updated || UPDATED]),

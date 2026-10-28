@@ -8,6 +8,41 @@
     <language>en-gb</language>
     <lastBuildDate>Tue, 08 Sep 2026 09:00:00 GMT</lastBuildDate>
     <item>
+      <title>Update: Insights moves onto the Dashboard</title>
+      <link>https://www.theincometracker.com/whats-new.html</link>
+      <guid isPermaLink="true">https://www.theincometracker.com/whats-new.html#2026-10-19-insights-moves-onto-the-dashboard</guid>
+      <pubDate>Mon, 19 Oct 2026 09:00:00 GMT</pubDate>
+      <description>Insights and the Dashboard showed the same kind of thing, so they are now one page. Everything Insights had (the money flow, health score, trends, categories, anomalies, spending pace and the rest) sits on the Dashboard, and Customise arranges all of it together; if you had arranged both pages, your two layouts are combined. Widgets that were on both pages appear once, the Accounts and imports card gives way to Credit &amp; debt, which shows the same debt figures card by card, and an old Insights bookmark opens the Dashboard. Anomaly flags can now be dismissed, and the Debt payoff plan compares every strategy when you make it wide.</description>
+    </item>
+    <item>
+      <title>Update: Allocate: debt payoff strategies and lump-sum planning</title>
+      <link>https://www.theincometracker.com/whats-new.html</link>
+      <guid isPermaLink="true">https://www.theincometracker.com/whats-new.html#2026-10-18-allocate-debt-payoff-strategies-and-lump</guid>
+      <pubDate>Sun, 18 Oct 2026 09:00:00 GMT</pubDate>
+      <description>A new Allocate page in the sidebar splits your spare money each month, and any one-off lump sum, between the debts on Accounts, a cash buffer, a tax bill and savings. Pick the priority — least interest (avalanche), lower payments soonest, quick wins (snowball), credit-score recovery, cash buffer first, tax bill first, balanced or your own percentages — and choose where savings go: highest safe rate, highest expected return, tax wrappers first or your goals. Every strategy is simulated month by month against paying minimums only and compared on interest, debt-free date, monthly payments, card utilisation, buffer and net position, with a 0% promo guard and payment rollover. UK users can mark a lump sum as taxable — freelance income, rental profit, interest, dividends or a capital gain — and the tax to set aside is worked out from your salary band and held back before anything is allocated. A Debt payoff plan widget joins Insights and the Dashboard tray. Illustrations from your own figures, not advice, with free debt help linked on the page.</description>
+    </item>
+    <item>
+      <title>Update: Import PDF bank statements directly</title>
+      <link>https://www.theincometracker.com/whats-new.html</link>
+      <guid isPermaLink="true">https://www.theincometracker.com/whats-new.html#2026-10-15-import-pdf-bank-statements-directly</guid>
+      <pubDate>Thu, 15 Oct 2026 09:00:00 GMT</pubDate>
+      <description>Choose the PDF statement your bank gives you from Import data in Settings and review its transactions on the same screen as a CSV: categories suggested, duplicates unticked, transfers skipped, one-click undo. The statement's table is read in your browser and never uploaded. Built around Barclays, HSBC, Lloyds, Halifax, NatWest, Santander, Nationwide, TSB, Monzo, Starling, Revolut, Chase, first direct, Metro Bank, Virgin Money and American Express layouts, and it copes with most other UK and US banks. Dates printed without a year take it from the statement period, and the running balance is checked against every amount. A PDF it cannot read (a scanned image, say) gets a clear message and the paste route still works.</description>
+    </item>
+    <item>
+      <title>Update: A Subscriptions page</title>
+      <link>https://www.theincometracker.com/whats-new.html</link>
+      <guid isPermaLink="true">https://www.theincometracker.com/whats-new.html#2026-10-15-a-subscriptions-page</guid>
+      <pubDate>Thu, 15 Oct 2026 09:00:00 GMT</pubDate>
+      <description>Everything you pay for repeatedly, found in your own ledger with nothing to set up: subscriptions, bills and yearly renewals, each with its cost per year. Payments every 4 weeks count 13 times a year, not 12. Price rises are flagged with the extra cost per year, while charges billed in another currency are left alone when they only wobble with the exchange rate. Yearly renewals show their next date, several plans with one company are kept apart, and a direct debit nudged by a weekend or bank holiday still counts as on time. Anything that stops being paid moves to a Cancelled list; you can mark a subscription cancelled yourself, bring it back, or delete it from the list for good. Also on Insights and the Dashboard as a widget.</description>
+    </item>
+    <item>
+      <title>Update: A US experience, customisable pages and page URLs</title>
+      <link>https://www.theincometracker.com/whats-new.html</link>
+      <guid isPermaLink="true">https://www.theincometracker.com/whats-new.html#2026-10-12-a-us-experience-customisable-pages-and-p</guid>
+      <pubDate>Mon, 12 Oct 2026 09:00:00 GMT</pubDate>
+      <description>Pick your country from the top bar. United States users get American account types — checking, HYSA, CDs, HSA and FSA, 401(k) and 403(b), traditional and Roth IRA, 529 plans, auto and student loans — with plan details for contributions, employer match, tax treatment and annual limits, a gross-to-net paycheck estimate on its own Pay &amp; tax page, federal student-loan repayment plans, medical spending against your deductible, and FICO and VantageScore credit bands. UK users gain workplace pensions and SIPPs with employer contributions, ISA and pension allowance tracking, and a PAYE, National Insurance and student-loan take-home estimate. The Dashboard and Insights pages can now be rearranged, resized and trimmed, and every page has its own address so a refresh stays where you were.</description>
+    </item>
+    <item>
       <title>Update: Seven more bank guides, four calculators, four templates and six guides</title>
       <link>https://www.theincometracker.com/whats-new.html</link>
       <guid isPermaLink="true">https://www.theincometracker.com/whats-new.html#2026-09-16-seven-more-bank-guides-four-calculators-</guid>
@@ -251,41 +286,6 @@
       <guid isPermaLink="true">https://www.theincometracker.com/compare/monzo-trends-alternative.html</guid>
       <pubDate>Tue, 08 Sep 2026 09:00:00 GMT</pubDate>
       <description>Trends is free inside Monzo and adds one other bank free, more on paid plans. The Income Tracker is free, works with every UK bank via CSV and needs no Monzo account.</description>
-    </item>
-    <item>
-      <title>The Income Tracker vs Plum</title>
-      <link>https://www.theincometracker.com/compare/plum-alternative.html</link>
-      <guid isPermaLink="true">https://www.theincometracker.com/compare/plum-alternative.html</guid>
-      <pubDate>Tue, 08 Sep 2026 09:00:00 GMT</pubDate>
-      <description>Plum links your bank to save and invest automatically, with paid tiers from £3.99 a month and no manual mode. The Income Tracker is a free CSV budget with no bank link.</description>
-    </item>
-    <item>
-      <title>The Income Tracker vs YNAB</title>
-      <link>https://www.theincometracker.com/compare/vs-ynab.html</link>
-      <guid isPermaLink="true">https://www.theincometracker.com/compare/vs-ynab.html</guid>
-      <pubDate>Tue, 08 Sep 2026 09:00:00 GMT</pubDate>
-      <description>YNAB costs about £99 a year and teaches a rigorous zero-based method. The Income Tracker is free and simpler: a monthly ledger built from your bank CSV.</description>
-    </item>
-    <item>
-      <title>The Income Tracker vs Snoop</title>
-      <link>https://www.theincometracker.com/compare/snoop-alternative.html</link>
-      <guid isPermaLink="true">https://www.theincometracker.com/compare/snoop-alternative.html</guid>
-      <pubDate>Tue, 08 Sep 2026 09:00:00 GMT</pubDate>
-      <description>Snoop is free but does little until you connect a bank, and manual accounts need Snoop Plus at £5.99 a month. The Income Tracker is free, CSV-based and private.</description>
-    </item>
-    <item>
-      <title>The Income Tracker vs Emma</title>
-      <link>https://www.theincometracker.com/compare/emma-alternative.html</link>
-      <guid isPermaLink="true">https://www.theincometracker.com/compare/emma-alternative.html</guid>
-      <pubDate>Tue, 08 Sep 2026 09:00:00 GMT</pubDate>
-      <description>Emma's tiers cost £4.99 to £14.99 a month and lock CSV import behind Pro. The Income Tracker is free, needs no bank connection and keeps data in your browser.</description>
-    </item>
-    <item>
-      <title>The best free budgeting apps in the UK (2026)</title>
-      <link>https://www.theincometracker.com/compare/best-free-budgeting-apps-uk.html</link>
-      <guid isPermaLink="true">https://www.theincometracker.com/compare/best-free-budgeting-apps-uk.html</guid>
-      <pubDate>Tue, 08 Sep 2026 09:00:00 GMT</pubDate>
-      <description>Ten free budgeting apps for UK users compared on price, open banking, manual or CSV entry and who each suits. Prices checked September 2026. Our own weaknesses included.</description>
     </item>
   </channel>
 </rss>

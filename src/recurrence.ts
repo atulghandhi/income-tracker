@@ -3,8 +3,10 @@ import type { ExpenseEntry, IncomeEntry, LedgerState, MonthBudget } from "./type
 
 // Local recurring-transaction detection — no server, works in privacy mode.
 // Groups ledger entries by canonical merchant and looks for a steady cadence
-// with a steady amount. Powers the subscriptions panel, "mark as recurring"
-// suggestions, missed-payment signals, and the seeded↔imported reconciliation.
+// with a steady amount. Powers "mark as recurring" suggestions, missed-payment
+// signals, and the seeded↔imported reconciliation. The Subscriptions page and
+// widget use the fuller engine in subscriptions.ts (price history, annual
+// renewals, several plans per payee, cancellation).
 
 export type RecurrenceCadence = "weekly" | "4-weekly" | "monthly" | "quarterly" | "annual";
 
@@ -83,13 +85,6 @@ export function detectRecurringCandidates(state: LedgerState): RecurrenceCandida
 // Detected-but-unflagged candidates: the "mark as recurring?" suggestion list.
 export function suggestRecurringFlags(state: LedgerState): RecurrenceCandidate[] {
   return detectRecurringCandidates(state).filter((candidate) => !candidate.alreadyRecurring && candidate.confidence >= 0.6);
-}
-
-// Expense candidates on a repeating cadence — the subscriptions/bills panel.
-export function detectSubscriptions(state: LedgerState): RecurrenceCandidate[] {
-  return detectRecurringCandidates(state).filter(
-    (candidate) => candidate.kind === "expense" && candidate.confidence >= 0.6,
-  );
 }
 
 // Candidates whose next expected date has passed with no matching entry — the

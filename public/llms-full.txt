@@ -71,7 +71,7 @@ Where to find the export in the Revolut app or web app, the exact steps, formats
 URL: https://www.theincometracker.com/import/nationwide-csv.html
 Updated: 2026-09-08
 
-Where to find the export in the Nationwide Internet Bank on a computer (the Banking app only offers PDF statements), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Download transactions appears on current accounts and credit cards. Some savings accounts only offer PDF statements, which you can still paste in. Older months live under Documents, then Statements, as PDFs going back 36 months.
+Where to find the export in the Nationwide Internet Bank on a computer (the Banking app only offers PDF statements), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Download transactions appears on current accounts and credit cards. Some savings accounts only offer PDF statements, which import directly too. Older months live under Documents, then Statements, as PDFs going back 36 months.
 
 ## How to export your Halifax statement to CSV
 
@@ -120,7 +120,7 @@ Where to find the export in your American Express online account in a desktop br
 URL: https://www.theincometracker.com/import/virgin-money-csv.html
 Updated: 2026-09-08
 
-Where to find the export in Virgin Money Internet Banking in a desktop browser (the app offers PDF statements only), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Virgin Money says the export is not available on every account type. If yours only shows PDF statements, copy the transactions out of the PDF and paste them in instead.
+Where to find the export in Virgin Money Internet Banking in a desktop browser (the app offers PDF statements only), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Virgin Money says the export is not available on every account type. If yours only shows PDF statements, import the PDF directly instead.
 
 ## How to export your Co-operative Bank statement to CSV
 
@@ -183,7 +183,7 @@ Where to find the export in the Starling app or Starling Online Banking in a bro
 URL: https://www.theincometracker.com/import/zopa-csv.html
 Updated: 2026-09-16
 
-Where to find the export in the Zopa app, the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Zopa issues one PDF statement per month and no CSV, so the paste route is the way in. It reads the dates, descriptions and amounts from the copied text. Do a month at a time and check the totals against the statement.
+Where to find the export in the Zopa app, the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Zopa issues one PDF statement per month and no CSV, so import the PDF itself. The app reads the dates, descriptions and amounts from the statement's table. Do a month at a time and check the totals against the statement.
 
 ## How to export your Kroo statement to CSV
 
@@ -197,7 +197,7 @@ Where to find the export in the Kroo app, the exact steps, formats offered, limi
 URL: https://www.theincometracker.com/import/marcus-csv.html
 Updated: 2026-09-16
 
-Where to find the export in the Marcus website or app, under Documents, the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Marcus offers no CSV, OFX or QIF download and no accounting-software connection. For a savings account you mostly want the interest and transfer lines, which is a quick paste once a month or once a quarter.
+Where to find the export in the Marcus website or app, under Documents, the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Marcus offers no CSV, OFX or QIF download and no accounting-software connection. For a savings account you mostly want the interest and transfer lines, which is a quick PDF import once a month or once a quarter.
 
 ## Budgeting guides (hub)
 
@@ -230,9 +230,9 @@ It depends on where the file goes. The safest setup is a local-first tool that r
 ## How to import a PDF bank statement
 
 URL: https://www.theincometracker.com/guides/import-pdf-bank-statement.html
-Updated: 2026-09-08
+Updated: 2026-10-15
 
-Open the PDF, select the transaction rows, copy them, and paste them into The Income Tracker. Each line needs a date, a description and an amount, which is exactly what a statement row is. No PDF converter, no upload to a stranger's server, nothing typed by hand.
+Open The Income Tracker, go to Settings, then Import data, click Import CSV / OFX / QIF / PDF and choose the PDF statement. The app reads the dates, descriptions and amounts from the statement's table and shows them on the same review screen as a CSV import. The PDF is read on your own device and never uploaded. If the PDF is a scanned image with no text, copy the rows and paste them in instead.
 
 ## How to read a bank statement CSV
 
@@ -650,6 +650,6 @@ Who makes The Income Tracker, how it is funded (it is free; no ads, no data sale
 ## What's new
 
 URL: https://www.theincometracker.com/whats-new.html
-Updated: 2026-09-16
+Updated: 2026-10-18
 
 Release notes for The Income Tracker, newest first.

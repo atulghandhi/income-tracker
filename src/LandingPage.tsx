@@ -87,7 +87,7 @@ const CMP = [
 const FAQ = [
   { q: "Is The Income Tracker free?", a: "Yes. Completely free: no credit card, no subscription, no sign-up. Open it and start." },
   { q: "Do I need to connect or log in to my bank?", a: "No. Download a CSV from your bank and drop it in. There is no open banking connection and you never enter bank credentials." },
-  { q: "Which UK banks does it work with?", a: "Any bank that exports CSV, OFX or QIF: Barclays, HSBC, Lloyds, NatWest, Santander, Nationwide, Halifax, TSB, Monzo, Starling, Revolut, Chase, Amex and more. Step-by-step export guides cover 27 banks, and PDF statements can be pasted in." },
+  { q: "Which UK banks does it work with?", a: "Any bank that exports CSV, OFX, QIF or a PDF statement: Barclays, HSBC, Lloyds, NatWest, Santander, Nationwide, Halifax, TSB, Monzo, Starling, Revolut, Chase, Amex and more. Step-by-step export guides cover 27 banks, and PDF statements import directly." },
   { q: "Where is my financial data stored?", a: "In your browser, on your device. Nothing is uploaded unless you choose to sign in to sync across devices, and you can export everything at any time." },
   { q: "Is it an alternative to YNAB, Emma or Money Dashboard?", a: "For a free, private monthly picture of income, spending and surplus, yes. The comparison pages say plainly where each of those wins." },
   { q: "Does it work on a phone?", a: "Yes. It runs in any browser, installs to your home screen like an app, and works offline once loaded." },
@@ -720,7 +720,7 @@ export default function LandingPage({ onEnter, onFeedback }: { onEnter: () => vo
           <h2 className="lp-cmp-h2" id="lp-banks-h2">CSV export guides for {BANK_GUIDES.length} UK banks</h2>
           <p className="lp-section-p">
             Every major UK bank lets you download your own transactions. Pick yours for the exact steps, then import the file here.
-            Only got a PDF? <a href="/guides/import-pdf-bank-statement.html">Paste it in</a>.
+            Only got a PDF? <a href="/guides/import-pdf-bank-statement.html">Import it directly</a>.
           </p>
           <ul className="lp-bank-grid">
             {BANK_GUIDES.map(bank => (

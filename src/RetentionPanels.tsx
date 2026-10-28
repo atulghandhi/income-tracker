@@ -185,13 +185,13 @@ export function NewMonthNudge({
       <div className="nudgeBody">
         <strong>New month. Import {previousMonthLabel}&rsquo;s statement.</strong>
         <p>
-          Export {previousMonthLabel} from {bankSlug ? bankName(bankSlug) : "your bank"} as a CSV and drop it in. Duplicates and transfers are skipped
-          automatically.
+          Export {previousMonthLabel} from {bankSlug ? bankName(bankSlug) : "your bank"} as a CSV or PDF statement and drop it in. Duplicates and transfers
+          are skipped automatically.
         </p>
         {!bankSlug && <BankSelect value={bankSlug} onChange={onBankChange} id="nudge-bank" />}
         <div className="buttonRow">
           <button className="commandButton" type="button" onClick={onImport}>
-            Import CSV
+            Import statement
           </button>
           <a className="quietButton" href={bankGuideUrl(bankSlug)} target="_blank" rel="noopener noreferrer" onClick={onGuideOpened}>
             Export guide
