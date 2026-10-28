@@ -299,22 +299,40 @@ function Waterfall({ flow, width, height, formatter, privacy, animations, onSele
   const boxH = tall ? 46 : 30;
   const tankTop = height - tankH;
   const boxY = tankTop - (tall ? 16 : 9) - boxH;
-  // Each income source starts as its own labelled column; the columns merge into one trunk
-  // (mergeY) that fans out to the full width at the split (splitY), where spending peels off.
+  // Each income source starts as its own labelled column; the columns merge into one straight
+  // trunk (mergeY → splitY), and at the split every category peels off it to its own bar.
   const funnelTop = headerH + 16;
-  const splitY = Math.round(funnelTop + (boxY - funnelTop) * 0.56);
-  const mergeY = Math.round(funnelTop + (splitY - funnelTop) * 0.48);
+  const splitY = Math.round(funnelTop + (boxY - funnelTop) * 0.4);
+  const mergeY = Math.round(funnelTop + (splitY - funnelTop) * 0.55);
   const topWidth = usable * (compact ? 0.84 : 0.62);
   const topX0 = padX + (usable - topWidth) / 2;
   const sourceGap = compact ? 8 : 14;
 
   // Savings keeps its slot in the bottom band but has no box: its channel carries on past
   // the spending boxes into the tank, like water pouring past them.
+  // Categories under 4% of the flow fold into one "Other" bar (hover or click it for the list):
+  // a dozen slivers with sideways labels read as noise.
   const targets = useMemo(() => {
     const savings = flow.targets.find((node) => node.id === "cat-savings");
-    const rest = flow.targets.filter((node) => node.id !== "cat-savings");
+    const spending = flow.targets.filter((node) => node.id !== "cat-savings");
+    const small = (node: FlowNode) => node.value / Math.max(flow.total, 1) < 0.04;
+    const folded = spending.filter((node) => node.id === "cat-other" || small(node));
+    const kept = spending.filter((node) => !folded.includes(node));
+    const rest =
+      folded.length > 1
+        ? [
+            ...kept,
+            {
+              id: "cat-other",
+              label: "Other",
+              value: folded.reduce((sum, node) => sum + node.value, 0),
+              color: "#8e98a9",
+              items: folded.flatMap((node) => node.items).sort((a, b) => b.value - a.value),
+            },
+          ]
+        : spending;
     return savings ? [...rest, savings] : rest;
-  }, [flow.targets]);
+  }, [flow.targets, flow.total]);
 
   const sourceBands = layoutBand(flow.sources, flow.total, topX0, topWidth, sourceGap, compact ? 14 : 22);
   const targetBands = layoutBand(targets, flow.total, padX, usable, gap, compact ? 18 : 24);
@@ -333,15 +351,20 @@ function Waterfall({ flow, width, height, formatter, privacy, animations, onSele
   const trunkWidth = topWidth - sourceGap * Math.max(0, flow.sources.length - 1);
   const trunkX0 = padX + (usable - trunkWidth) / 2;
   const inSlices = sliceAt(flow.sources, trunkX0, trunkWidth);
-  const outSlices = sliceAt(targets, padX, usable);
+  const outSlices = sliceAt(targets, trunkX0, trunkWidth).map((slice) => ({ x0: slice.x0 + 0.75, x1: Math.max(slice.x0 + 0.75, slice.x1 - 0.75) }));
+  // One source: the trunk is that source's colour; several: a neutral body they all pour into.
+  const trunkColor = flow.sources.length === 1 ? flow.sources[0].color : "var(--muted)";
 
   const savingsShare = flow.income > 0 ? Math.max(0, Math.min(1, flow.surplus / flow.income)) : 0;
   const savingsNode = targets.find((node) => node.id === "cat-savings");
   const savingsBand = targetBands.find((band) => band.node.id === "cat-savings");
 
   type Stream = { key: string; node: FlowNode | null; d: string; x0: number; x1: number; yTop: number; yBottom: number; color: string; fill: string };
+  // With one source the column and the trunk are the same water: draw a single column, or the
+  // two translucent shapes leave a seam where they meet.
+  const singleSource = flow.sources.length === 1;
   const streams: Stream[] = [
-    ...sourceBands.map((band, index) => ({
+    ...(singleSource ? [] : sourceBands).map((band, index) => ({
       key: `in-${band.node.id}`,
       node: band.node,
       d: verticalRibbon(band.x0, band.x1, funnelTop, inSlices[index].x0, inSlices[index].x1, mergeY),
@@ -350,23 +373,23 @@ function Waterfall({ flow, width, height, formatter, privacy, animations, onSele
       yTop: funnelTop,
       yBottom: mergeY,
       color: band.node.color,
-      fill: `url(#${uid}-in-${safeId(band.node.id)})`,
+      fill: band.node.color,
     })),
-    // Everything coming in, as one body of water, fanning out to the full width.
+    // Everything coming in, as one straight column.
     {
       key: "trunk",
-      node: null,
-      d: verticalRibbon(trunkX0, trunkX0 + trunkWidth, mergeY, padX, padX + usable, splitY),
-      x0: padX,
-      x1: padX + usable,
-      yTop: mergeY,
+      node: singleSource ? flow.sources[0] : null,
+      d: `M ${trunkX0} ${singleSource ? funnelTop : mergeY} H ${trunkX0 + trunkWidth} V ${splitY} H ${trunkX0} Z`,
+      x0: trunkX0,
+      x1: trunkX0 + trunkWidth,
+      yTop: singleSource ? funnelTop : mergeY,
       yBottom: splitY,
-      color: "var(--blue)",
-      fill: `url(#${uid}-trunk)`,
+      color: trunkColor,
+      fill: trunkColor,
     },
     ...targetBands.map((band, index) => {
       const isSavings = band.node.id === "cat-savings";
-      const bottom = isSavings ? tankTop + (tall ? 10 : 6) : boxY;
+      const bottom = isSavings ? tankTop : boxY;
       return {
         key: `out-${band.node.id}`,
         node: band.node,
@@ -376,7 +399,7 @@ function Waterfall({ flow, width, height, formatter, privacy, animations, onSele
         yTop: splitY,
         yBottom: bottom,
         color: band.node.color,
-        fill: `url(#${uid}-out-${safeId(band.node.id)})`,
+        fill: band.node.color,
       };
     }),
   ];
@@ -414,22 +437,6 @@ function Waterfall({ flow, width, height, formatter, privacy, animations, onSele
       aria-label="Income pouring down into spending categories, with what is left over collecting in a tank"
     >
       <defs>
-        {sourceBands.map((band) => (
-          <linearGradient key={band.node.id} id={`${uid}-in-${safeId(band.node.id)}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" style={{ stopColor: band.node.color, stopOpacity: 0.5 }} />
-            <stop offset="1" style={{ stopColor: "var(--blue)", stopOpacity: 0.34 }} />
-          </linearGradient>
-        ))}
-        <linearGradient id={`${uid}-trunk`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" style={{ stopColor: "var(--blue)", stopOpacity: 0.34 }} />
-          <stop offset="1" style={{ stopColor: "var(--blue)", stopOpacity: 0.3 }} />
-        </linearGradient>
-        {targetBands.map((band) => (
-          <linearGradient key={band.node.id} id={`${uid}-out-${safeId(band.node.id)}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" style={{ stopColor: "var(--blue)", stopOpacity: 0.3 }} />
-            <stop offset="1" style={{ stopColor: band.node.color, stopOpacity: 0.52 }} />
-          </linearGradient>
-        ))}
         {streams.map((stream) => (
           <clipPath key={stream.key} id={`${uid}-clip-${safeId(stream.key)}`}>
             <path d={stream.d} />
@@ -501,21 +508,19 @@ function Waterfall({ flow, width, height, formatter, privacy, animations, onSele
         </g>
       ))}
 
-      {/* The weir: where everything coming in splits into where it goes */}
-      <line className="flowSplit" x1={padX} x2={width - padX} y1={splitY} y2={splitY} />
-
-      {/* Category boxes */}
+      {/* Category bars: a thin bar where each stream lands, its name and amount beneath */}
       {targetBands.map((band) => {
         if (band.node.id === "cat-savings") return null;
-        const boxWidth = band.x1 - band.x0;
+        const barWidth = band.x1 - band.x0;
         const label = band.node.label;
         const emoji = categoryEmoji(label);
         const amount = money(band.node.value);
-        // Wide enough for a (possibly shortened) name and the amount; otherwise the name
-        // turns on its side, and the narrowest boxes rely on hover.
-        const wide = boxWidth >= 58;
-        const vertical = !wide && boxH >= 40 && boxWidth >= 18;
-        const shown = wide ? `${emoji && boxWidth >= 84 ? `${emoji} ` : ""}${truncate(label, charsFor(boxWidth - (emoji && boxWidth >= 84 ? 30 : 10), 12.5))}` : label;
+        const room = barWidth + gap - 4;
+        const named = emoji && fits(`${emoji} ${label}`, room, 12.5) ? `${emoji} ${label}` : label;
+        const name = fits(named, room, 12.5) ? named : truncate(label, charsFor(room, 12.5));
+        // Too narrow for even a short name: the bar relies on its hover tip.
+        const showName = name.length >= 4;
+        const showAmount = showName && fits(amount, room, 12);
         return (
           <g
             key={band.node.id}
@@ -523,26 +528,16 @@ function Waterfall({ flow, width, height, formatter, privacy, animations, onSele
             onClick={() => onSelect(band.node)}
             onMouseMove={(event) => showTip(event, label, [`${amount} · ${percent(band.node.value)}`])}
           >
-            <path className="flowBox" d={boxPath(band.x0, boxY, boxWidth, boxH, 10)} style={{ fill: band.node.color, stroke: band.node.color }} />
-            {wide && (
-              <>
-                <text className="flowBoxName" x={band.x0 + boxWidth / 2} y={boxY + (tall ? 19 : 13)} textAnchor="middle">
-                  {shown}
-                </text>
-                <text className={`flowBoxAmount ${privacy ? "masked" : ""}`} x={band.x0 + boxWidth / 2} y={boxY + (tall ? 36 : 25)} textAnchor="middle">
-                  {amount}
-                </text>
-              </>
+            <rect className="flowHit" x={band.x0} y={boxY} width={barWidth} height={boxH} />
+            <rect className="flowBar" x={band.x0} y={boxY} width={barWidth} height={5} rx={2.5} style={{ fill: band.node.color }} />
+            {showName && (
+              <text className="flowBoxName" x={band.x0 + barWidth / 2} y={boxY + (tall ? 22 : 18)} textAnchor="middle">
+                {name}
+              </text>
             )}
-            {vertical && (
-              <text
-                className="flowBoxName vertical"
-                x={band.x0 + boxWidth / 2}
-                y={boxY + boxH / 2}
-                textAnchor="middle"
-                transform={`rotate(-90 ${(band.x0 + boxWidth / 2).toFixed(1)} ${(boxY + boxH / 2).toFixed(1)})`}
-              >
-                {truncate(label, charsFor(boxH - 8, 10.5))}
+            {showAmount && tall && (
+              <text className={`flowBoxAmount ${privacy ? "masked" : ""}`} x={band.x0 + barWidth / 2} y={boxY + 38} textAnchor="middle">
+                {amount}
               </text>
             )}
           </g>
@@ -594,12 +589,6 @@ function Waterfall({ flow, width, height, formatter, privacy, animations, onSele
       </g>
     </svg>
   );
-}
-
-// A box with square top corners (the stream lands flush on it) and rounded bottom corners.
-function boxPath(x: number, y: number, width: number, height: number, radius: number): string {
-  const r = Math.min(radius, width / 2, height / 2);
-  return `M ${x} ${y} H ${x + width} V ${y + height - r} Q ${x + width} ${y + height} ${x + width - r} ${y + height} H ${x + r} Q ${x} ${y + height} ${x} ${y + height - r} Z`;
 }
 
 function wavePath(x: number, y: number, width: number, amplitude: number, wavelength: number): string {
