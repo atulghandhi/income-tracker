@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { ArrowLeft, Droplets, Repeat } from "lucide-react";
 import type { FlowModel, FlowNode } from "./insightsData";
+import { categoryEmoji } from "./ledgerGroups";
 
 // ─── Money flow ──────────────────────────────────────────────────────────────
 //
@@ -190,7 +191,7 @@ function FlowBreakdown({
         </button>
         <div>
           <span className="swatch small" style={{ background: node.color }} />
-          <h4>{node.label}</h4>
+          <h4>{categoryEmoji(node.label) ? `${categoryEmoji(node.label)} ${node.label}` : node.label}</h4>
           <em className={privacy ? "masked" : ""}>
             {money(node.value)} · {percent(node.value)} of the flow
           </em>
@@ -508,12 +509,13 @@ function Waterfall({ flow, width, height, formatter, privacy, animations, onSele
         if (band.node.id === "cat-savings") return null;
         const boxWidth = band.x1 - band.x0;
         const label = band.node.label;
+        const emoji = categoryEmoji(label);
         const amount = money(band.node.value);
         // Wide enough for a (possibly shortened) name and the amount; otherwise the name
         // turns on its side, and the narrowest boxes rely on hover.
         const wide = boxWidth >= 58;
         const vertical = !wide && boxH >= 40 && boxWidth >= 18;
-        const shown = wide ? truncate(label, charsFor(boxWidth - 10, 12.5)) : label;
+        const shown = wide ? `${emoji && boxWidth >= 84 ? `${emoji} ` : ""}${truncate(label, charsFor(boxWidth - (emoji && boxWidth >= 84 ? 30 : 10), 12.5))}` : label;
         return (
           <g
             key={band.node.id}

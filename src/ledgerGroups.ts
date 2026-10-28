@@ -15,6 +15,40 @@ export function categoryColor(category: string, fallbackIndex: number) {
   return colors[(knownIndex >= 0 ? knownIndex : fallbackIndex + 2) % colors.length];
 }
 
+// A friendly emoji for a category name. Categories are free text, so this matches on keywords;
+// the more specific words are listed first ("eating out" before "food"). Unknown names get none.
+const CATEGORY_EMOJI: Array<[RegExp, string]> = [
+  [/\b(eat(ing)? out|restaurant|dining|takeaway|take-away|fast food|bars?|pubs?)\b/, "🍔"],
+  [/\b(coffee|caf[eé])\b/, "☕"],
+  [/\b(groceries|grocery|supermarket|food)\b/, "🛒"],
+  [/\b(rent|mortgage|housing|home|house|council tax)\b/, "🏠"],
+  [/\b(debt|loan|credit card|card payments?|repayments?)\b/, "💳"],
+  [/\b(phone|mobile|internet|broadband|wifi)\b/, "📱"],
+  [/\b(bills?|utilit(y|ies)|energy|electric(ity)?|gas|water)\b/, "💡"],
+  [/\b(holidays?|flights?|vacation|hotels?)\b/, "✈️"],
+  [/\b(travel|transport|commute|fuel|petrol|car|auto|train|bus|taxi|uber)\b/, "🚗"],
+  [/\b(gym|fitness|sport)\b/, "🏋️"],
+  [/\b(health|medical|doctor|dental|pharmacy|prescriptions?)\b/, "🩺"],
+  [/\b(subscriptions?|streaming|netflix|spotify)\b/, "📺"],
+  [/\b(entertainment|fun|hobbies|games?|going out)\b/, "🎉"],
+  [/\b(clothes|clothing|fashion|shopping|amazon)\b/, "🛍️"],
+  [/\b(personal|beauty|hair|self care)\b/, "💅"],
+  [/\b(kids|children|childcare|baby|school)\b/, "🧸"],
+  [/\b(pets?|dog|cat|vet)\b/, "🐾"],
+  [/\b(insurance)\b/, "☂️"],
+  [/\b(education|courses?|books?|tuition)\b/, "🎓"],
+  [/\b(gifts?|charity|donations?)\b/, "🎁"],
+  [/\b(tax|taxes)\b/, "🧾"],
+  [/\b(savings?|investments?|invest|pension|isa|401k)\b/, "🐷"],
+  [/\b(work|business|office)\b/, "💼"],
+];
+
+export function categoryEmoji(category: string): string {
+  const name = category.trim().toLowerCase();
+  if (!name) return "";
+  return CATEGORY_EMOJI.find(([pattern]) => pattern.test(name))?.[1] ?? "";
+}
+
 // Expenses grouped by category (largest group first, items largest first),
 // followed by every ungrouped expense as its own single-item group.
 export function buildExpenseGroups(expenses: ExpenseEntry[]): ExpenseGroup[] {

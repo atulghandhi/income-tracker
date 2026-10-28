@@ -29,12 +29,15 @@ export type InsightWidgetSpec = {
   rowsAt?: (width: number) => number;
   hint?: { label: string; text: string };
   variants?: Array<{ id: string; label: string }>;
+  // Muted words beside the title saying what the card covers, e.g. "October 2026".
+  context?: (model: InsightsModel) => string;
 };
 
 export const INSIGHT_WIDGET_SPECS: Record<string, InsightWidgetSpec> = {
   "cash-flow": {
     type: "moneyFlow",
     rows: 3,
+    context: (model) => model.label,
     hint: { label: "About the money flow", text: "Income pours in at the top and out into each category. Click a stream, bucket or the tank to see every transaction behind it." },
     variants: [
       { id: "waterfall", label: "Waterfall" },
@@ -44,16 +47,18 @@ export const INSIGHT_WIDGET_SPECS: Record<string, InsightWidgetSpec> = {
   "spending-pace": {
     type: "spendingPace",
     rows: 2,
+    context: (model) => (model.isCurrentMonth ? "This month" : model.label),
     hint: { label: "About spending pace", text: "Compares how much of the month's income has gone out with how much of the month has passed. Safe to spend is what is left, spread over the remaining days." },
   },
   "savings-rate": {
     type: "savingsRate",
     rows: 2,
+    context: (model) => model.label,
     hint: { label: "About the savings rate", text: "Net income divided by income for the month. The target slider sets the rate the health score and warnings measure against." },
   },
   // Four figures and a row per card: one row at full width, taller as the tiles stack.
   "debt-overview": { type: "debt", rows: 1, rowsAt: (width) => (width >= 760 ? 1 : width >= 480 ? 2 : 3) },
-  "month-compare": { type: "monthCompare", rows: 2 },
+  "month-compare": { type: "monthCompare", rows: 2, context: (model) => `vs ${model.previous.label}` },
   upcoming: { type: "upcoming", rows: 2 },
   calendar: { type: "calendar", rows: 2 },
   todo: { type: "todo", rows: 2 },
@@ -134,7 +139,10 @@ export function InsightWidgetCard({
       aria-label={title}
     >
       <header className="insightCardHead">
-        <h3>{title}</h3>
+        <h3>
+          {title}
+          {spec.context && !narrow && <span className="cardContext">{spec.context(showSample && sampleModel ? sampleModel : model)}</span>}
+        </h3>
         <div className="insightCardActions">
           {spec.variants && !editing && (
             <div className="segmented" role="radiogroup" aria-label={`${title} look`}>

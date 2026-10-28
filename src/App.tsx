@@ -187,7 +187,7 @@ import { APP_VIEWS, DEFAULT_VIEW, pathForView, viewFromPath, type AppView } from
 import { buildSampleLedger, sampleCountry } from "./sampleData";
 import { WidgetGrid, type WidgetRenderer } from "./WidgetGrid";
 import { INSIGHT_WIDGET_SPECS, InsightWidgetCard } from "./InsightWidgetCard";
-import { buildCategoryRows, buildExpenseGroups, buildMonthlyBars, categoryColor } from "./ledgerGroups";
+import { buildCategoryRows, buildExpenseGroups, buildMonthlyBars, categoryColor, categoryEmoji } from "./ledgerGroups";
 import { buildInsightsModel, visibleSignals } from "./insightsData";
 import { normalizeInsightsState, setWidgetVariant } from "./insightsState";
 import type { WidgetActions } from "./insightWidgets";
@@ -4016,6 +4016,11 @@ function App() {
                                 >
                                   {categoryCollapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
                                 </button>
+                                {categoryEmoji(group.category) && (
+                                  <span className="categoryEmoji" aria-hidden="true">
+                                    {categoryEmoji(group.category)}
+                                  </span>
+                                )}
                                 <input
                                   className="categoryNameInput"
                                   aria-label="Category name"

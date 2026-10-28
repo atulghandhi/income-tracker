@@ -17,7 +17,7 @@
   --surface: #ffffff;
   --surface-high: #f6f5f2;
   --surface-higher: #edecf3;
-  --glass: rgba(255, 255, 255, 0.88);
+  --glass: var(--surface);
   --ink: #1c2333;
   --muted: #5f6b7e;
   --faint: #5c687c;
@@ -29,11 +29,17 @@
   --blue-soft: rgba(37, 99, 217, 0.1);
   --mint: #066f60;
   --mint-soft: rgba(6, 111, 96, 0.12);
+  /* -strong: hover / active text shade; on-: text that sits on a solid fill of the colour. */
+  --mint-strong: #04594d;
+  --mint-strong-rgb: 4, 89, 77;
+  --on-mint: #ffffff;
+  --blue-strong: var(--blue-bright);
+  --blue-strong-rgb: var(--blue-bright-rgb);
+  --on-blue: #ffffff;
   --red: #b92e2e;
   --red-soft: rgba(185, 46, 46, 0.1);
   --amber: #835508;
   --on-ink: #ffffff;
-  --on-accent: #ffffff;
   --ink-rgb: 28, 35, 51;
   --line-rgb: 24, 32, 56;
   --surface-rgb: 255, 255, 255;
@@ -70,7 +76,7 @@
   --surface: #122131;
   --surface-high: #1c2b3c;
   --surface-higher: #273647;
-  --glass: rgba(18, 33, 49, 0.78);
+  --glass: var(--surface);
   --ink: #d4e4fa;
   --muted: #a3adbc;
   --faint: #97a2b3;
@@ -81,11 +87,16 @@
   --blue-soft: rgba(var(--blue-rgb), 0.15);
   --mint: #00dfc1;
   --mint-soft: rgba(var(--mint-rgb), 0.14);
+  --mint-strong: #6cf2de;
+  --mint-strong-rgb: 108, 242, 222;
+  --on-mint: #00332b;
+  --blue-strong: var(--blue-bright);
+  --blue-strong-rgb: var(--blue-bright-rgb);
+  --on-blue: #001b3c;
   --red: #ffb4ab;
   --red-soft: rgba(255, 180, 171, 0.12);
   --amber: #f4c36a;
   --on-ink: #071526;
-  --on-accent: #001b3c;
   --ink-rgb: 212, 228, 250;
   --line-rgb: 198, 198, 203;
   --surface-rgb: 18, 33, 49;
@@ -106,6 +117,20 @@
   --track: rgba(1, 15, 31, 0.8);
 }
 
+/* ─── The accent ─────────────────────────────────────────────────────────────
+   One colour for everything interactive: buttons, links, focus rings, active and selected
+   states. It points at a palette colour, so each theme supplies its own readable shade; to
+   re-colour the app, change "mint" below to another palette name (blue, amber, …).
+   Data colours (charts, money up/down, categories) use the palette directly and are unaffected. */
+:root {
+  --accent: var(--mint);
+  --accent-rgb: var(--mint-rgb);
+  --accent-strong: var(--mint-strong);
+  --accent-strong-rgb: var(--mint-strong-rgb);
+  --accent-soft: rgba(var(--accent-rgb), 0.12);
+  --on-accent: var(--on-mint);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -124,7 +149,7 @@ body {
   min-width: 320px;
   min-height: 100vh;
   overflow-x: hidden;
-  background: linear-gradient(180deg, var(--bg), var(--bg-deep));
+  background: var(--bg);
   color: var(--ink);
 }
 
@@ -172,10 +197,7 @@ textarea {
 
 .appShell {
   min-height: 100vh;
-  background:
-    radial-gradient(1100px 520px at 78% -12%, rgba(var(--blue-rgb), 0.09), transparent 60%),
-    radial-gradient(900px 480px at -10% 32%, rgba(var(--mint-rgb), 0.06), transparent 55%),
-    var(--bg);
+  background: var(--bg);
 }
 
 .authShell {
@@ -183,9 +205,7 @@ textarea {
   display: grid;
   place-items: center;
   padding: 24px;
-  background:
-    radial-gradient(1000px 500px at 70% -10%, rgba(var(--blue-rgb), 0.09), transparent 60%),
-    linear-gradient(180deg, var(--bg), var(--bg-deep));
+  background: var(--bg);
 }
 
 .authPanel {
@@ -395,9 +415,9 @@ textarea {
   gap: 10px;
   min-height: 44px;
   margin: 14px 4px 0;
-  border: 1px solid rgba(var(--blue-rgb), 0.55);
+  border: 1px solid rgba(var(--accent-rgb), 0.55);
   border-radius: var(--radius);
-  background: var(--blue);
+  background: var(--accent);
   color: var(--on-accent);
   font-weight: 720;
   transition:
@@ -407,7 +427,7 @@ textarea {
 }
 
 .navCta:hover {
-  background: var(--blue);
+  background: var(--accent);
 }
 
 .navCta:active,
@@ -451,7 +471,7 @@ textarea {
 
 .navItem.active {
   background: rgba(var(--surface-higher-rgb), 0.48);
-  color: var(--blue-bright);
+  color: var(--accent-strong);
 }
 
 .navItem.active::after {
@@ -460,12 +480,12 @@ textarea {
   inset: 5px 0 5px auto;
   width: 2px;
   border-radius: 2px;
-  background: var(--blue-bright);
+  background: var(--accent-strong);
 }
 
 /* ─── Sidebar tools: optional pages added from "More tools" ─────────────────── */
 .navItem.preview {
-  outline: 1px dashed rgba(var(--blue-rgb), 0.45);
+  outline: 1px dashed rgba(var(--accent-rgb), 0.45);
   outline-offset: -1px;
 }
 
@@ -501,7 +521,7 @@ textarea {
   height: 18px;
   padding: 0 5px;
   border-radius: 999px;
-  background: var(--blue);
+  background: var(--accent);
   color: var(--on-accent);
   font-size: 11px;
   font-weight: 720;
@@ -533,7 +553,7 @@ textarea {
 }
 
 .navToolRow.suggested {
-  border-color: rgba(var(--blue-rgb), 0.45);
+  border-color: rgba(var(--accent-rgb), 0.45);
 }
 
 .navToolOpen {
@@ -570,7 +590,7 @@ textarea {
 }
 
 .navToolText em {
-  color: var(--blue-bright);
+  color: var(--accent-strong);
   font-size: 12px;
   font-style: normal;
   font-weight: 600;
@@ -600,8 +620,8 @@ textarea {
 }
 
 .navToolAdd:hover {
-  border-color: var(--blue);
-  color: var(--blue-bright);
+  border-color: var(--accent);
+  color: var(--accent-strong);
 }
 
 .toolPinBanner {
@@ -612,9 +632,9 @@ textarea {
   gap: 8px 16px;
   margin-bottom: 18px;
   padding: 10px 14px;
-  border: 1px solid rgba(var(--blue-rgb), 0.35);
+  border: 1px solid rgba(var(--accent-rgb), 0.35);
   border-radius: var(--radius);
-  background: rgba(var(--blue-rgb), 0.07);
+  background: rgba(var(--accent-rgb), 0.07);
   font-size: 14px;
 }
 
@@ -672,7 +692,7 @@ textarea {
 }
 
 .profileTrigger:hover {
-  background: rgba(var(--blue-bright-rgb), 0.07);
+  background: rgba(var(--accent-strong-rgb), 0.07);
 }
 
 .profilePopup {
@@ -822,7 +842,7 @@ textarea {
 }
 
 .searchShell:focus-within {
-  border-color: rgba(var(--blue-bright-rgb), 0.35);
+  border-color: rgba(var(--accent-strong-rgb), 0.35);
   background: rgba(var(--surface-rgb), 0.96);
 }
 
@@ -909,7 +929,7 @@ textarea::placeholder {
 .commandButton:hover,
 .quietButton:hover,
 .checkButton:hover {
-  border-color: rgba(var(--blue-bright-rgb), 0.38);
+  border-color: rgba(var(--accent-strong-rgb), 0.38);
   background: rgba(var(--surface-higher-rgb), 0.88);
   color: var(--ink);
 }
@@ -1136,21 +1156,33 @@ textarea::placeholder {
   animation: cardIn 420ms ease both;
 }
 
-/* Toned stat cards: tinted hairline + a whisper of colour glow, replacing the
-   old accent-underline bars. */
-.metricCard.green {
-  border-color: rgba(var(--mint-rgb), 0.3);
-  box-shadow: 0 0 0 3px rgba(var(--mint-rgb), 0.05), 0 12px 28px -12px rgba(var(--mint-rgb), 0.3), var(--shadow-sm);
+/* Flat stat cards: the figure stays in ink and the tone is a small dot by the label, so a row
+   of cards reads calmly instead of four competing colours. */
+.metricCard.green,
+.metricCard.red,
+.metricCard.amber {
+  --tone: var(--mint);
 }
 
 .metricCard.red {
-  border-color: rgba(var(--red-rgb), 0.28);
-  box-shadow: 0 0 0 3px rgba(var(--red-rgb), 0.05), 0 12px 28px -12px rgba(var(--red-rgb), 0.28), var(--shadow-sm);
+  --tone: var(--red);
 }
 
 .metricCard.amber {
-  border-color: rgba(var(--amber-rgb), 0.3);
-  box-shadow: 0 0 0 3px rgba(var(--amber-rgb), 0.05), 0 12px 28px -12px rgba(var(--amber-rgb), 0.28), var(--shadow-sm);
+  --tone: var(--amber);
+}
+
+.metricCard.green > span::before,
+.metricCard.red > span::before,
+.metricCard.amber > span::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  border-radius: 99px;
+  background: var(--tone);
+  vertical-align: 1px;
 }
 
 .metricCard strong {
@@ -1160,16 +1192,8 @@ textarea::placeholder {
   line-height: 1;
 }
 
-.metricCard.green strong {
-  color: var(--mint);
-}
-
-.metricCard.red strong {
-  color: var(--red);
-}
-
-.metricCard.amber strong {
-  color: var(--amber);
+.metricCard strong {
+  color: var(--ink);
 }
 
 .monthlyGrid {
@@ -1184,14 +1208,9 @@ textarea::placeholder {
   min-height: 420px;
 }
 
-.panel.income {
-  border-color: rgba(var(--mint-rgb), 0.22);
-  box-shadow: 0 0 0 3px rgba(var(--mint-rgb), 0.04), var(--shadow-sm);
-}
-
+.panel.income,
 .panel.expense {
-  border-color: rgba(var(--red-rgb), 0.2);
-  box-shadow: 0 0 0 3px rgba(var(--red-rgb), 0.04), var(--shadow-sm);
+  border-color: var(--line);
 }
 
 .panelHeader {
@@ -1477,9 +1496,9 @@ textarea,
 textarea:focus,
 .selectField:focus-within {
   outline: none;
-  border-color: rgba(var(--blue-bright-rgb), 0.42);
+  border-color: rgba(var(--accent-strong-rgb), 0.42);
   background: rgba(var(--surface-higher-rgb), 0.42);
-  box-shadow: 0 0 0 3px rgba(var(--blue-rgb), 0.13);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.13);
 }
 
 .dragDots {
@@ -1507,7 +1526,7 @@ textarea:focus,
 .dragHandle:hover,
 .dragHandle:focus-visible {
   outline: none;
-  background: rgba(var(--blue-bright-rgb), 0.12);
+  background: rgba(var(--accent-strong-rgb), 0.12);
   color: var(--ink);
 }
 
@@ -1606,13 +1625,11 @@ textarea:focus,
   overflow: hidden;
   border: 0;
   background: color-mix(in srgb, var(--category-color, var(--faint)) 2.5%, transparent);
-  border: 1px solid color-mix(in srgb, var(--category-color, var(--faint)) 22%, transparent);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--category-color, var(--faint)) 4%, transparent);
 }
 
-/* Category identity is carried by the tinted ring, header wash, and swatch dot
-   — no side strip. */
+/* Category identity is carried by the emoji, the header wash and the swatch dot. */
 
 .expenseGroup:last-child,
 .expenseGroup.ungrouped {
@@ -1657,11 +1674,15 @@ textarea:focus,
     rgba(var(--surface-higher-rgb), 0.28);
 }
 
+.categoryEmoji {
+  flex: 0 0 auto;
+  font-size: 15px;
+  line-height: 1;
+}
+
 .expenseGroup.categoryDropTarget {
-  background: rgba(var(--mint-rgb), 0.07);
-  box-shadow:
-    0 0 0 1px rgba(var(--mint-rgb), 0.34),
-    0 12px 34px rgba(var(--mint-rgb), 0.12);
+  background: rgba(var(--accent-rgb), 0.07);
+  box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.4);
 }
 
 .expenseGroup.categoryDropTarget .expenseGroupHeader {
@@ -1691,7 +1712,7 @@ textarea:focus,
 .categoryCollapseButton:hover,
 .categoryCollapseButton:focus-visible {
   outline: none;
-  background: rgba(var(--blue-bright-rgb), 0.13);
+  background: rgba(var(--accent-strong-rgb), 0.13);
   color: var(--ink);
 }
 
@@ -1715,7 +1736,7 @@ textarea:focus,
 
 .categoryNameInput:focus {
   outline: none;
-  border-color: rgba(var(--blue-bright-rgb), 0.38);
+  border-color: rgba(var(--accent-strong-rgb), 0.38);
   background: rgba(var(--surface-higher-rgb), 0.45);
 }
 
@@ -1824,7 +1845,7 @@ textarea:focus,
 .contextMenuItem:hover,
 .contextMenuItem:focus-visible {
   outline: none;
-  background: rgba(var(--blue-bright-rgb), 0.12);
+  background: rgba(var(--accent-strong-rgb), 0.12);
   transform: translateX(2px);
 }
 
@@ -1983,7 +2004,7 @@ textarea:focus,
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: rgba(var(--surface-higher-rgb), 0.36);
-  color: var(--blue);
+  color: var(--accent);
 }
 
 .emptyState strong {
@@ -2216,8 +2237,7 @@ textarea:focus,
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: rgba(var(--surface-rgb), 0.62);
-  border-color: color-mix(in srgb, var(--account-color, var(--mint)) 32%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--account-color, var(--mint)) 5%, transparent), var(--shadow-sm);
+  border-color: var(--line);
 }
 
 .debtAccountRow .swatchButton {
@@ -2280,7 +2300,7 @@ textarea:focus,
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--surface);
-  color: var(--blue);
+  color: var(--accent);
   font-size: 11.5px;
   font-weight: 700;
   transition:
@@ -2290,8 +2310,8 @@ textarea:focus,
 
 .debtAccountRow .detailsToggle:hover,
 .debtAccountRow .detailsToggle.open {
-  border-color: rgba(var(--blue-rgb), 0.4);
-  background: var(--blue-soft);
+  border-color: rgba(var(--accent-rgb), 0.4);
+  background: var(--accent-soft);
 }
 
 .typeSelectWrap {
@@ -2713,27 +2733,11 @@ textarea:focus,
   min-height: 340px;
 }
 
-/* Toned like the stat cards: a tinted hairline and a soft glow in the score's
-   band colour, on the same glass surface as every other panel. */
-.healthPanel.good {
-  border-color: rgba(var(--mint-rgb), 0.3);
-  box-shadow: 0 0 0 3px rgba(var(--mint-rgb), 0.05), 0 12px 28px -12px rgba(var(--mint-rgb), 0.3), var(--shadow-sm);
-}
-
-.healthPanel.warn {
-  border-color: rgba(var(--amber-rgb), 0.3);
-  box-shadow: 0 0 0 3px rgba(var(--amber-rgb), 0.05), 0 12px 28px -12px rgba(var(--amber-rgb), 0.28), var(--shadow-sm);
-}
-
-.healthPanel.bad {
-  border-color: rgba(var(--red-rgb), 0.28);
-  box-shadow: 0 0 0 3px rgba(var(--red-rgb), 0.05), 0 12px 28px -12px rgba(var(--red-rgb), 0.28), var(--shadow-sm);
-}
 
 .panelTitle {
   justify-content: space-between;
   gap: 10px;
-  color: var(--mint);
+  color: var(--muted);
 }
 
 .panelTitleActions {
@@ -2747,8 +2751,8 @@ textarea:focus,
 .panelTitle h3 {
   margin: 0;
   color: var(--ink);
-  font-size: 17px;
-  font-weight: 620;
+  font-size: 16px;
+  font-weight: 680;
 }
 
 .infoHint {
@@ -2765,7 +2769,7 @@ textarea:focus,
 }
 
 .infoHint.isOpen {
-  color: var(--blue);
+  color: var(--accent);
 }
 
 .infoHintBubble {
@@ -2998,7 +3002,6 @@ hr {
 .bar.positive,
 .railTrack .positive {
   background: var(--mint);
-  box-shadow: 0 0 18px rgba(var(--mint-rgb), 0.14);
 }
 
 .bar.negative,
@@ -3165,14 +3168,14 @@ hr {
   height: 8px;
   overflow: hidden;
   border-radius: 99px;
-  background: rgba(var(--blue-bright-rgb), 0.18);
+  background: rgba(var(--accent-strong-rgb), 0.18);
 }
 
 .progressLine span {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--mint), var(--blue-bright));
+  background: linear-gradient(90deg, var(--mint), var(--accent-strong));
   transition: width 420ms ease;
 }
 
@@ -3398,7 +3401,7 @@ hr {
 }
 
 .mutedLine {
-  color: var(--blue-bright);
+  color: var(--accent-strong);
   opacity: 0.52;
 }
 
@@ -3670,8 +3673,7 @@ hr {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
-  border-color: rgba(var(--blue-rgb), 0.24);
-  box-shadow: 0 0 0 3px rgba(var(--blue-rgb), 0.04), var(--shadow-sm);
+  border-left: 3px solid var(--line-strong);
 }
 
 .signalCard:hover,
@@ -3680,18 +3682,15 @@ hr {
 }
 
 .signalCard.danger {
-  border-color: rgba(var(--red-rgb), 0.32);
-  box-shadow: 0 0 0 3px rgba(var(--red-rgb), 0.05), var(--shadow-sm);
+  border-left-color: var(--red);
 }
 
 .signalCard.warning {
-  border-color: rgba(var(--amber-rgb), 0.3);
-  box-shadow: 0 0 0 3px rgba(var(--amber-rgb), 0.05), var(--shadow-sm);
+  border-left-color: var(--amber);
 }
 
 .signalCard.good {
-  border-color: rgba(var(--mint-rgb), 0.28);
-  box-shadow: 0 0 0 3px rgba(var(--mint-rgb), 0.05), var(--shadow-sm);
+  border-left-color: var(--mint);
 }
 
 .signalTitle {
@@ -4218,7 +4217,7 @@ hr {
   padding: 2px;
   border: 0;
   border-radius: 999px;
-  background: rgba(var(--blue-bright-rgb), 0.16);
+  background: rgba(var(--accent-strong-rgb), 0.16);
 }
 
 .switch span {
@@ -4244,7 +4243,6 @@ hr {
   gap: 24px;
   padding: 24px 28px;
   border-color: rgba(var(--red-rgb), 0.3);
-  box-shadow: 0 0 0 3px rgba(var(--red-rgb), 0.05), var(--shadow-sm);
 }
 
 .dangerPanel h3,
@@ -4923,8 +4921,8 @@ hr {
   display: grid;
   place-items: center;
   border-radius: 14px;
-  background: var(--blue-soft);
-  color: var(--blue);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .noticeModal h2 {
@@ -5138,9 +5136,9 @@ hr {
 }
 
 .feedbackTypeBtn.active {
-  border-color: rgba(var(--blue-rgb), 0.6);
-  background: rgba(var(--blue-rgb), 0.12);
-  color: var(--blue);
+  border-color: rgba(var(--accent-rgb), 0.6);
+  background: rgba(var(--accent-rgb), 0.12);
+  color: var(--accent);
 }
 
 .feedbackLabel {
@@ -5167,7 +5165,7 @@ hr {
 .feedbackModal input:focus,
 .feedbackModal textarea:focus {
   outline: none;
-  border-color: rgba(var(--blue-rgb), 0.6);
+  border-color: rgba(var(--accent-rgb), 0.6);
 }
 
 .feedbackOptional {
@@ -5193,14 +5191,14 @@ hr {
 }
 
 .feedbackSubmit {
-  background: rgba(var(--blue-rgb), 0.15);
-  border-color: rgba(var(--blue-rgb), 0.35);
-  color: var(--blue);
+  background: rgba(var(--accent-rgb), 0.15);
+  border-color: rgba(var(--accent-rgb), 0.35);
+  color: var(--accent);
 }
 
 .feedbackSubmit:hover:not(:disabled) {
-  background: rgba(var(--blue-rgb), 0.25);
-  border-color: rgba(var(--blue-rgb), 0.5);
+  background: rgba(var(--accent-rgb), 0.25);
+  border-color: rgba(var(--accent-rgb), 0.5);
 }
 
 .feedbackSuccess {
@@ -5453,7 +5451,7 @@ hr {
   width: 7px;
   height: 7px;
   border-radius: 999px;
-  background: rgba(var(--blue-bright-rgb), 0.25);
+  background: rgba(var(--accent-strong-rgb), 0.25);
   transition:
     background 150ms ease,
     width 150ms ease;
@@ -5500,9 +5498,9 @@ hr {
   justify-content: center;
   min-height: 40px;
   padding: 0 20px;
-  border: 1px solid rgba(var(--blue-rgb), 0.55);
+  border: 1px solid rgba(var(--accent-rgb), 0.55);
   border-radius: var(--radius);
-  background: var(--blue);
+  background: var(--accent);
   color: var(--on-accent);
   font-weight: 720;
   font-size: 14px;
@@ -5513,7 +5511,7 @@ hr {
 }
 
 .tutorialNext:hover {
-  background: var(--blue);
+  background: var(--accent);
 }
 
 .tutorialNext:active {
@@ -5631,7 +5629,7 @@ hr {
 }
 .goalsSurplusField { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 220px; }
 .goalsSurplusLabel { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.goalsSurplusHint  { color: var(--blue); font-size: 11.5px; display: flex; align-items: center; gap: 4px; }
+.goalsSurplusHint  { color: var(--accent); font-size: 11.5px; display: flex; align-items: center; gap: 4px; }
 
 .inlineLinkBtn {
   background: none; border: none; color: var(--mint); cursor: pointer;
@@ -5902,7 +5900,7 @@ hr {
   border-radius: var(--radius); box-shadow: var(--shadow-sm);
   padding: 8px 12px;
 }
-.quickAddBar > svg { color: var(--blue); flex-shrink: 0; }
+.quickAddBar > svg { color: var(--accent); flex-shrink: 0; }
 .quickAddBar input {
   flex: 1; border: none; background: none; color: var(--ink);
   font-size: 13px; padding: 6px 0; min-width: 0;
@@ -5910,13 +5908,13 @@ hr {
 .quickAddBar input:focus { outline: none; }
 .quickAddPreview {
   display: flex; align-items: center; gap: 8px; flex-shrink: 0;
-  background: rgba(var(--blue-rgb), 0.08);
-  border: 1px solid rgba(var(--blue-rgb), 0.28);
+  background: rgba(var(--accent-rgb), 0.08);
+  border: 1px solid rgba(var(--accent-rgb), 0.28);
   border-radius: 999px; color: var(--ink);
   font-size: 12px; padding: 5px 12px; cursor: pointer;
   transition: background 120ms;
 }
-.quickAddPreview:hover { background: rgba(var(--blue-rgb), 0.15); }
+.quickAddPreview:hover { background: rgba(var(--accent-rgb), 0.15); }
 .quickAddPreview em { color: var(--muted); font-style: normal; }
 .quickAddPreview svg:last-child { color: var(--mint); }
 .quickAddHint { color: var(--faint); font-size: 12px; flex-shrink: 0; }
@@ -5936,7 +5934,7 @@ hr {
 .importBucketHeader span { flex: 1; }
 .importBucketHeader b { font-weight: 700; }
 .importBucket.auto .importBucketHeader svg:first-child { color: var(--mint); }
-.importBucket.check .importBucketHeader svg:first-child { color: var(--blue); }
+.importBucket.check .importBucketHeader svg:first-child { color: var(--accent); }
 .importBucket.needs .importBucketHeader svg:first-child { color: var(--amber); }
 .importBucket .importTable { border-top: 1px solid var(--line); }
 
@@ -5969,8 +5967,8 @@ hr {
 
 /* ─── Stage E: bank feeds ─────────────────────────────────────────────────── */
 
-.feedBanner { border-color: rgba(var(--blue-rgb), 0.3); background: rgba(var(--blue-rgb), 0.07); }
-.feedBanner svg { color: var(--blue); }
+.feedBanner { border-color: rgba(var(--accent-rgb), 0.3); background: rgba(var(--accent-rgb), 0.07); }
+.feedBanner svg { color: var(--accent); }
 .feedBanner .commandButton { flex-shrink: 0; }
 
 .bankFeedsPanel { display: flex; flex-direction: column; gap: 12px; }
@@ -6098,9 +6096,9 @@ hr {
 }
 
 .obProgress span.active {
-  border-color: var(--blue);
-  background: var(--blue-soft);
-  color: var(--blue);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .obProgress span.done {
@@ -6139,9 +6137,9 @@ hr {
   gap: 6px;
   padding: 5px 12px;
   border-radius: 999px;
-  border: 1px solid rgba(var(--blue-rgb), 0.32);
-  background: var(--blue-soft);
-  color: var(--blue);
+  border: 1px solid rgba(var(--accent-rgb), 0.32);
+  background: var(--accent-soft);
+  color: var(--accent);
   font-size: 11.5px;
   font-weight: 700;
   letter-spacing: 0.03em;
@@ -6172,7 +6170,7 @@ hr {
 }
 
 .obWelcomeList svg {
-  color: var(--blue);
+  color: var(--accent);
   flex-shrink: 0;
 }
 
@@ -6243,9 +6241,9 @@ hr {
 }
 
 .obChip.selected {
-  border-color: var(--blue);
-  background: var(--blue-soft);
-  color: var(--blue);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .obRows {
@@ -6274,7 +6272,7 @@ hr {
 
 .obRow > input:focus-visible,
 .obAmount input:focus-visible {
-  outline: 2px solid rgba(var(--blue-rgb), 0.55);
+  outline: 2px solid rgba(var(--accent-rgb), 0.55);
   outline-offset: 1px;
 }
 
@@ -6358,7 +6356,7 @@ hr {
   padding: 6px 4px;
   border: none;
   background: none;
-  color: var(--blue);
+  color: var(--accent);
   font: inherit;
   font-size: 13px;
   font-weight: 620;
@@ -6399,7 +6397,7 @@ hr {
   padding: 0 22px;
   border: none;
   border-radius: var(--radius);
-  background: var(--blue);
+  background: var(--accent);
   color: var(--on-accent);
   font: inherit;
   font-size: 14px;
@@ -6409,7 +6407,7 @@ hr {
 }
 
 .obPrimary:hover {
-  background: var(--blue-bright);
+  background: var(--accent-strong);
   transform: translateY(-1px);
 }
 
@@ -6530,8 +6528,8 @@ hr {
 }
 
 .gsItem:hover:not(:disabled) {
-  border-color: var(--blue);
-  background: var(--blue-soft);
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .gsItem:disabled {
@@ -6997,18 +6995,18 @@ hr {
 
 .layoutEditButton {
   min-height: 34px;
-  border: 1px solid rgba(var(--blue-rgb), 0.55);
+  border: 1px solid rgba(var(--accent-rgb), 0.55);
   border-radius: var(--radius);
-  background: rgba(var(--blue-rgb), 0.12);
-  color: var(--blue-bright);
+  background: rgba(var(--accent-rgb), 0.12);
+  color: var(--accent-strong);
   transition:
     background 150ms ease,
     border-color 150ms ease;
 }
 
 .layoutEditButton:hover {
-  border-color: var(--blue);
-  background: rgba(var(--blue-rgb), 0.2);
+  border-color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.2);
 }
 
 .layoutEditButton.active {
@@ -7050,9 +7048,9 @@ hr {
 
 .widgetGrid.isEditing .widgetCell {
   padding: 8px;
-  border: 2px dashed rgba(var(--blue-rgb), 0.35);
+  border: 2px dashed rgba(var(--accent-rgb), 0.35);
   border-radius: calc(var(--radius-lg) + 6px);
-  background: rgba(var(--blue-rgb), 0.03);
+  background: rgba(var(--accent-rgb), 0.03);
   transition:
     border-color 150ms ease,
     opacity 150ms ease;
@@ -7080,27 +7078,27 @@ hr {
 
 .widgetResizeCorner.right {
   right: -2px;
-  border-right: 3px solid var(--blue);
-  border-bottom: 3px solid var(--blue);
+  border-right: 3px solid var(--accent);
+  border-bottom: 3px solid var(--accent);
   border-bottom-right-radius: calc(var(--radius-lg) + 6px);
   cursor: nwse-resize;
 }
 
 .widgetResizeCorner.left {
   left: -2px;
-  border-left: 3px solid var(--blue);
-  border-bottom: 3px solid var(--blue);
+  border-left: 3px solid var(--accent);
+  border-bottom: 3px solid var(--accent);
   border-bottom-left-radius: calc(var(--radius-lg) + 6px);
   cursor: nesw-resize;
 }
 
 .widgetResizeCorner:hover,
 .widgetCell.isResizing .widgetResizeCorner {
-  border-color: var(--blue-bright);
+  border-color: var(--accent-strong);
 }
 
 .widgetCell.isResizing {
-  border-color: var(--blue) !important;
+  border-color: var(--accent) !important;
   border-style: solid !important;
 }
 
@@ -7111,7 +7109,7 @@ hr {
   z-index: 3;
   padding: 4px 10px;
   border-radius: 999px;
-  background: var(--blue);
+  background: var(--accent);
   color: var(--on-accent);
   font-size: 12px;
   font-weight: 700;
@@ -7133,8 +7131,8 @@ hr {
   bottom: 8px;
   width: 4px;
   border-radius: 2px;
-  background: var(--blue);
-  box-shadow: 0 0 0 3px rgba(var(--blue-rgb), 0.2);
+  background: var(--accent);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.2);
 }
 
 .widgetCell.drop-before::before {
@@ -7436,7 +7434,7 @@ hr {
   width: 16px;
   height: 16px;
   margin: 0;
-  accent-color: var(--blue);
+  accent-color: var(--accent);
 }
 
 .planCheck span {
@@ -7572,7 +7570,7 @@ hr {
 }
 
 .limitRow.done .ruleTrack strong {
-  background: var(--blue);
+  background: var(--accent);
 }
 
 .retirementStats {
@@ -7619,7 +7617,7 @@ hr {
   padding: 6px 0;
   border: 0;
   background: transparent;
-  color: var(--blue);
+  color: var(--accent);
   font-size: 13px;
   font-weight: 650;
   text-align: left;
@@ -8099,9 +8097,9 @@ select:not([multiple]):disabled {
   gap: 8px;
   margin: 14px 0 0;
   padding: 10px 12px;
-  border: 1px solid rgba(var(--blue-rgb), 0.25);
+  border: 1px solid rgba(var(--accent-rgb), 0.25);
   border-radius: var(--radius);
-  background: rgba(var(--blue-rgb), 0.06);
+  background: rgba(var(--accent-rgb), 0.06);
   color: var(--ink);
   font-size: 12.5px;
   line-height: 1.45;
@@ -8110,7 +8108,7 @@ select:not([multiple]):disabled {
 .allocateNote svg {
   flex: 0 0 auto;
   margin-top: 2px;
-  color: var(--blue);
+  color: var(--accent);
 }
 
 .allocateNote.warn {
@@ -8124,7 +8122,7 @@ select:not([multiple]):disabled {
 
 .allocateNote .inlineLinkBtn {
   font-size: 12.5px;
-  color: var(--blue);
+  color: var(--accent);
 }
 
 /* Taxable lump sum (UK) */
@@ -8233,12 +8231,12 @@ select:not([multiple]):disabled {
 }
 
 .priorityOption:hover {
-  border-color: rgba(var(--blue-rgb), 0.35);
+  border-color: rgba(var(--accent-rgb), 0.35);
 }
 
 .priorityOption.isActive {
-  border-color: rgba(var(--blue-rgb), 0.55);
-  background: rgba(var(--blue-rgb), 0.08);
+  border-color: rgba(var(--accent-rgb), 0.55);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 
 .priorityRadio {
@@ -8254,8 +8252,8 @@ select:not([multiple]):disabled {
 }
 
 .priorityOption.isActive .priorityRadio {
-  border-color: var(--blue);
-  background: var(--blue);
+  border-color: var(--accent);
+  background: var(--accent);
 }
 
 .priorityText {
@@ -8504,7 +8502,7 @@ select:not([multiple]):disabled {
   width: 16px;
   height: 16px;
   margin: 0;
-  accent-color: var(--blue);
+  accent-color: var(--accent);
 }
 
 .compareTable tbody tr:not(.isBaseline) {
@@ -8513,20 +8511,20 @@ select:not([multiple]):disabled {
 }
 
 .compareTable tbody tr:not(.isBaseline):hover {
-  background: rgba(var(--blue-rgb), 0.05);
+  background: rgba(var(--accent-rgb), 0.05);
 }
 
 .compareTable tbody tr:focus-visible {
-  outline: 2px solid var(--blue);
+  outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
 
 .compareTable tr.isSelected td {
-  background: rgba(var(--blue-rgb), 0.08);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 
 .compareTable tr.isSelected td:first-child {
-  box-shadow: inset 3px 0 0 var(--blue);
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
 .compareTable tr.isBaseline td {
@@ -8589,7 +8587,7 @@ select:not([multiple]):disabled {
 }
 
 .chartLine.selected {
-  stroke: var(--blue);
+  stroke: var(--accent);
 }
 
 .chartLine.baseline {
@@ -8603,14 +8601,14 @@ select:not([multiple]):disabled {
 }
 
 .chartMarker {
-  stroke: var(--blue);
+  stroke: var(--accent);
   stroke-width: 1.2;
   stroke-dasharray: 3 3;
   opacity: 0.7;
 }
 
 .chartMarkerLabel {
-  fill: var(--blue);
+  fill: var(--accent);
   font-family: var(--mono);
   font-size: 10.5px;
   font-weight: 700;
@@ -8635,7 +8633,7 @@ select:not([multiple]):disabled {
   display: inline-block;
   width: 22px;
   height: 0;
-  border-top: 2.5px solid var(--blue);
+  border-top: 2.5px solid var(--accent);
 }
 
 .legendLine.baseline {
@@ -8701,12 +8699,12 @@ select:not([multiple]):disabled {
 }
 
 .strategyBar:hover {
-  background: rgba(var(--blue-rgb), 0.05);
+  background: rgba(var(--accent-rgb), 0.05);
 }
 
 .strategyBar.isSelected {
-  border-color: rgba(var(--blue-rgb), 0.35);
-  background: rgba(var(--blue-rgb), 0.07);
+  border-color: rgba(var(--accent-rgb), 0.35);
+  background: rgba(var(--accent-rgb), 0.07);
 }
 
 .strategyBarName {
@@ -8728,7 +8726,7 @@ select:not([multiple]):disabled {
   display: block;
   height: 100%;
   border-radius: 999px;
-  background: rgba(var(--blue-rgb), 0.55);
+  background: rgba(var(--accent-rgb), 0.55);
   transition: width 320ms ease;
 }
 
@@ -8854,7 +8852,7 @@ select:not([multiple]):disabled {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  color: var(--blue);
+  color: var(--accent);
   font-weight: 650;
   text-decoration: none;
 }
@@ -9072,7 +9070,7 @@ select:not([multiple]):disabled {
   font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 650;
   white-space: nowrap;
 }
-.subsAsOf svg { color: var(--blue); }
+.subsAsOf svg { color: var(--accent); }
 
 .subsSummary .metricCard { gap: 8px; min-height: 124px; }
 .subsSummary .metricCard strong { font-size: 26px; }
@@ -9090,7 +9088,7 @@ select:not([multiple]):disabled {
   padding: 11px 14px; border: 1px solid var(--line); border-radius: var(--radius);
   background: rgba(var(--surface-rgb), 0.6);
 }
-.subsAlert > svg { flex-shrink: 0; color: var(--blue); }
+.subsAlert > svg { flex-shrink: 0; color: var(--accent); }
 .subsAlert > div { flex: 1; min-width: 0; display: grid; gap: 2px; }
 .subsAlert strong { color: var(--ink); font-size: 13.5px; }
 .subsAlert span { color: var(--muted); font-size: 12.5px; line-height: 1.45; }
@@ -9109,7 +9107,7 @@ select:not([multiple]):disabled {
   background: rgba(var(--ink-rgb), 0.08); color: var(--muted);
   font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 11px; font-weight: 760;
 }
-.subsListHeading .tabs button.selected b { background: rgba(var(--blue-rgb), 0.12); color: var(--blue); }
+.subsListHeading .tabs button.selected b { background: rgba(var(--accent-rgb), 0.12); color: var(--accent); }
 .subsListTotal { margin: 0; color: var(--muted); font-size: 13px; }
 .subsListTotal strong { color: var(--ink); font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
@@ -9119,8 +9117,8 @@ select:not([multiple]):disabled {
   background: rgba(var(--surface-rgb), 0.55);
   transition: border-color 150ms ease, background 150ms ease;
 }
-.subsRow:hover { border-color: rgba(var(--blue-bright-rgb), 0.3); }
-.subsRow.open { border-color: rgba(var(--blue-bright-rgb), 0.38); background: rgba(var(--surface-rgb), 0.8); }
+.subsRow:hover { border-color: rgba(var(--accent-strong-rgb), 0.3); }
+.subsRow.open { border-color: rgba(var(--accent-strong-rgb), 0.38); background: rgba(var(--surface-rgb), 0.8); }
 .subsRow.status-cancelled, .subsRow.status-stopped { opacity: 0.92; }
 
 .subsRowMain {
@@ -9174,7 +9172,7 @@ select:not([multiple]):disabled {
   background: none; border: 0; padding: 0; color: var(--muted); font: inherit; font-size: 12.5px;
   cursor: pointer; text-decoration: underline dotted transparent; transition: color 120ms, text-decoration-color 120ms;
 }
-.subsHistoryDate:hover { color: var(--blue); text-decoration-color: currentColor; }
+.subsHistoryDate:hover { color: var(--accent); text-decoration-color: currentColor; }
 
 .subsFacts { margin: 0; display: grid; gap: 8px; }
 .subsFacts > div { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 12px; align-items: center; }
@@ -9212,7 +9210,7 @@ select:not([multiple]):disabled {
 
 /* ── Widget ── */
 .subsWidget { gap: 14px; }
-.subsWidgetOpen { font-size: 12px; font-weight: 700; color: var(--blue); text-transform: none; }
+.subsWidgetOpen { font-size: 12px; font-weight: 700; color: var(--accent); text-transform: none; }
 .subsWidgetStats { margin-top: 4px; }
 .subsWidgetStats div.alert { border-color: rgba(var(--red-rgb), 0.32); }
 .subsWidgetStats div.alert strong { color: var(--red); }
@@ -9222,7 +9220,7 @@ select:not([multiple]):disabled {
   padding: 8px 11px; border: 1px solid var(--line); border-radius: var(--radius-sm);
   background: rgba(var(--surface-rgb), 0.6); color: var(--ink); font: inherit; font-size: 12.5px; text-align: left; cursor: pointer;
 }
-.subsWidgetAlert svg { flex-shrink: 0; color: var(--blue); }
+.subsWidgetAlert svg { flex-shrink: 0; color: var(--accent); }
 .subsWidgetAlert.danger { border-color: rgba(var(--red-rgb), 0.3); }
 .subsWidgetAlert.danger svg { color: var(--red); }
 .subsWidgetAlert.warning { border-color: rgba(var(--amber-rgb), 0.3); }
@@ -9280,14 +9278,14 @@ select:not([multiple]):disabled {
 /* Same height and corner radius as the buttons beside it. */
 
 .insightCard .commandButton.primary {
-  border-color: rgba(var(--blue-rgb), 0.55);
-  background: var(--blue);
+  border-color: rgba(var(--accent-rgb), 0.55);
+  background: var(--accent);
   color: var(--on-accent);
 }
 
 .insightCard .commandButton.primary:hover {
-  border-color: rgba(var(--blue-rgb), 0.8);
-  background: var(--blue-bright);
+  border-color: rgba(var(--accent-rgb), 0.8);
+  background: var(--accent-strong);
   color: var(--on-accent);
 }
 
@@ -9307,7 +9305,7 @@ select:not([multiple]):disabled {
   padding: 4px 2px;
   border: 0;
   background: transparent;
-  color: var(--blue);
+  color: var(--accent);
   font-size: 12.5px;
   font-weight: 680;
   text-decoration: underline;
@@ -9376,9 +9374,9 @@ select:not([multiple]):disabled {
   z-index: 30;
   cursor: grabbing;
   border-style: solid;
-  border-color: rgba(var(--blue-rgb), 0.85);
-  background: linear-gradient(rgba(var(--blue-rgb), 0.1), rgba(var(--blue-rgb), 0.1)), var(--glass);
-  box-shadow: 0 0 0 4px rgba(var(--blue-rgb), 0.14), var(--shadow-md);
+  border-color: rgba(var(--accent-rgb), 0.85);
+  background: linear-gradient(rgba(var(--accent-rgb), 0.1), rgba(var(--accent-rgb), 0.1)), var(--glass);
+  box-shadow: var(--shadow-md);
   transition: box-shadow 200ms ease, background 200ms ease;
   opacity: 0.97;
 }
@@ -9404,16 +9402,24 @@ select:not([multiple]):disabled {
   padding: 14px 18px 6px 20px;
 }
 
+/* Card header pattern, shared with .panelTitle: bold title, then muted context in the same line. */
 .insightCard .insightCardHead h3 {
   flex: 1 1 auto;
   min-width: 0;
   margin: 0;
   overflow: hidden;
   color: var(--ink);
-  font-size: 15.5px;
-  font-weight: 640;
+  font-size: 16px;
+  font-weight: 680;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.cardContext {
+  margin-left: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .insightCard .insightCardActions {
@@ -9883,11 +9889,11 @@ select:not([multiple]):disabled {
 }
 
 .insightCard .cashFlowWidget .flowMonth.selected .flowHit {
-  fill: rgba(var(--blue-rgb), 0.08);
+  fill: rgba(var(--accent-rgb), 0.08);
 }
 
 .insightCard .flowNetDot.selected {
-  fill: var(--blue);
+  fill: var(--accent);
 }
 
 .insightCard .flowNetDot.negative {
@@ -10697,7 +10703,7 @@ select:not([multiple]):disabled {
 }
 
 .insightCard .cardRow.watch .categoryTrack i {
-  background: var(--blue);
+  background: var(--accent);
 }
 
 /* Narrow cards: name on one line, rate and balance on the next. */
@@ -11049,7 +11055,7 @@ select:not([multiple]):disabled {
 }
 
 .insightCard .todoAdd input:focus {
-  outline: 2px solid rgba(var(--blue-rgb), 0.4);
+  outline: 2px solid rgba(var(--accent-rgb), 0.4);
   outline-offset: 1px;
 }
 
@@ -11150,7 +11156,7 @@ select:not([multiple]):disabled {
 }
 
 .insightCard .notesWidget textarea:focus {
-  outline: 2px solid rgba(var(--blue-rgb), 0.4);
+  outline: 2px solid rgba(var(--accent-rgb), 0.4);
   outline-offset: 1px;
 }
 
