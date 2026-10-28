@@ -191,7 +191,7 @@ import { buildCategoryRows, buildExpenseGroups, buildMonthlyBars, categoryColor 
 import { buildInsightsModel, visibleSignals } from "./insightsData";
 import { normalizeInsightsState, setWidgetVariant } from "./insightsState";
 import type { WidgetActions } from "./insightWidgets";
-import { addWidget, cycleWidgetSize, defaultLayout, hiddenWidgets, loadLayout, moveWidget, moveWidgetBefore, removeWidget, saveLayout, widgetDefinition, type LayoutPage, type PageLayout } from "./layout";
+import { addWidget, clearLayout, cycleWidgetSize, defaultLayout, hiddenWidgets, loadLayout, moveWidget, moveWidgetBefore, removeWidget, resizeWidget, saveLayout, widgetDefinition, type LayoutPage, type PageLayout } from "./layout";
 import {
   AccountPlanDetails,
   CreditScoreWidget,
@@ -756,6 +756,7 @@ function App() {
   const [theme, setTheme] = useState<ThemeMode>(readStoredTheme);
   const [tutorialView, setTutorialView] = useState<AppView | null>(null);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [confirmClearAll, setConfirmClearAll] = useState(false);
   const [checklistDismissed, setChecklistDismissed] = useState(() => readFlag(GETTING_STARTED_KEY));
   const [showPdfNotice, setShowPdfNotice] = useState(false);
   // Whether hydration found a saved ledger — the difference between a returning user and a new one.
@@ -796,7 +797,15 @@ function App() {
       window.removeEventListener("appinstalled", onInstalled);
     };
   }, []);
-  const [animationsEnabled, setAnimationsEnabled] = useState(true);
+  // Motion is on for everyone, except people who have asked their system to reduce it.
+  const [animationsEnabled, setAnimationsEnabled] = useState(() => !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
+  useEffect(() => {
+    const query = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    if (!query) return;
+    const onChange = () => setAnimationsEnabled(!query.matches);
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
   const [query, setQuery] = useState("");
   // Starts empty so nothing flashes on load — the toast effect ignores empty values.
   const [toast, setToast] = useState("");
@@ -2866,6 +2875,36 @@ function App() {
     setToast("Month cleared");
   }
 
+  // Everything back to how a brand-new user finds it: an empty ledger (overwriting the cloud copy
+  // when signed in), the short sidebar, the default dashboard, the checklist and the setup wizard.
+  // Only the country, theme and sign-in survive.
+  async function clearAllData() {
+    const fresh = { ...createInitialState(ledger.country), lastSavedAt: new Date().toISOString() };
+    try {
+      for (const key of [ONBOARDING_KEY, GETTING_STARTED_KEY, TUTORIAL_SEEN_KEY]) localStorage.removeItem(key);
+    } catch {
+      // localStorage unavailable — nothing was stored there either.
+    }
+    for (const key of ["GB", "US"] as const) clearLayout("dashboard", key);
+    const tools = { pinned: initialPinned(false), seen: [] };
+    writeNavTools(tools);
+    setNavTools(tools);
+    setToolsTrayOpen(false);
+    setDashboardLayout(defaultLayout("dashboard", region));
+    setChecklistDismissed(false);
+    setConfirmClearAll(false);
+    setLedger(fresh);
+    try {
+      await saveLedgerState(fresh);
+      if (user) await saveCloudLedgerState(user.id, fresh);
+      setToast("All data cleared");
+    } catch {
+      setToast("Cleared here — the cloud copy will update when you're back online");
+    }
+    setActiveView("dashboard");
+    setOnboardingOpen(true);
+  }
+
   function openNewTransaction() {
     setActiveView("ledger");
     focusNextFrame(incomeSourceInputRef);
@@ -3581,11 +3620,15 @@ function App() {
             <section className="viewStack" aria-label="Dashboard">
               <div className="pageHeader compactHeader">
                 <div>
-                  <h2>Dashboard</h2>
+                  {/* Customise sits with the page title, apart from the month's figure on the right:
+                      one changes the page, the other is what the page tells you. */}
+                  <div className="pageTitleRow">
+                    <h2>Dashboard</h2>
+                    <LayoutEditButton page="dashboard" editing={layoutEditing === "dashboard"} onToggle={() => setLayoutEditing((current) => (current === "dashboard" ? null : "dashboard"))} t={t} />
+                  </div>
                   <p>Your money at a glance — this month and where it&rsquo;s heading.</p>
                 </div>
                 <div className="pageHeaderSide">
-                  <LayoutEditButton page="dashboard" editing={layoutEditing === "dashboard"} onToggle={() => setLayoutEditing((current) => (current === "dashboard" ? null : "dashboard"))} t={t} />
                   <div className="netBlock">
                     <span>Left this month</span>
                     <strong className={projection.monthlySurplus >= 0 ? "positiveText sensitive" : "negativeText sensitive"}>
@@ -3660,7 +3703,8 @@ function App() {
                 />
               )}
 
-              {!checklistDismissed && (
+              {/* Out of the way while the layout is being customised; back once it is done. */}
+              {!checklistDismissed && layoutEditing !== "dashboard" && (
                 <GettingStartedCard
                   items={[
                     {
@@ -3730,6 +3774,7 @@ function App() {
                 onMove={(id, delta) => changeLayout("dashboard", "move", (layout) => moveWidget(layout, id, delta))}
                 onDrop={(id, targetId, edge) => changeLayout("dashboard", "move", (layout) => moveWidgetBefore(layout, id, targetId, edge))}
                 onResize={(id, direction) => changeLayout("dashboard", "resize", (layout) => cycleWidgetSize(layout, "dashboard", id, direction))}
+                onSetSize={(id, size) => changeLayout("dashboard", "resize", (layout) => resizeWidget(layout, "dashboard", id, size))}
                 onRemove={(id) => changeLayout("dashboard", "remove", (layout) => removeWidget(layout, id))}
                 onAdd={(id) => changeLayout("dashboard", "add", (layout) => addWidget(layout, "dashboard", region, id))}
                 onReset={() => changeLayout("dashboard", "reset", () => defaultLayout("dashboard", region))}
@@ -4546,19 +4591,6 @@ function App() {
                   </article>
 
                   <article className="settingsPanel compactSetting">
-                    <PanelTitle title="Animations" icon={<LineChart size={17} />} />
-                    <p>Enable interface motion and animated totals.</p>
-                    <button
-                      className={animationsEnabled ? "switch on" : "switch"}
-                      type="button"
-                      aria-label="Toggle animations"
-                      onClick={() => setAnimationsEnabled((enabled) => !enabled)}
-                    >
-                      <span />
-                    </button>
-                  </article>
-
-                  <article className="settingsPanel compactSetting">
                     <PanelTitle title="Sidebar tools" icon={<SlidersHorizontal size={17} />} />
                     <p>Show the specialist pages you use. Hidden ones stay under More tools.</p>
                     <ul className="sidebarToolsList">
@@ -4815,6 +4847,31 @@ function App() {
                 <button className="dangerButton" type="button" onClick={resetMonth}>
                   Clear selected month
                 </button>
+              </article>
+
+              <article className="dangerPanel">
+                <div>
+                  <h3>Clear all data</h3>
+                  <p>
+                    {confirmClearAll
+                      ? `This permanently deletes every month, account, goal, rule and import${user ? ", here and in the cloud" : ""}. It can't be undone — export a backup first if you might want it.`
+                      : "Delete everything and start again as a new user. Your sign-in, country and theme stay."}
+                  </p>
+                </div>
+                {confirmClearAll ? (
+                  <div className="dangerConfirm">
+                    <button className="commandButton" type="button" onClick={() => setConfirmClearAll(false)}>
+                      Cancel
+                    </button>
+                    <button className="dangerButton" type="button" onClick={() => void clearAllData()}>
+                      Yes, delete everything
+                    </button>
+                  </div>
+                ) : (
+                  <button className="dangerButton" type="button" onClick={() => setConfirmClearAll(true)}>
+                    Clear all data
+                  </button>
+                )}
               </article>
             </section>
           )}

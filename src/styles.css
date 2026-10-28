@@ -4245,6 +4245,18 @@ hr {
   margin: 0;
 }
 
+.dangerConfirm {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  align-self: center;
+  gap: 10px;
+}
+
+.dangerConfirm .commandButton {
+  min-height: 40px;
+}
+
 .dangerPanel h3 {
   color: var(--red);
   font-size: 20px;
@@ -6969,9 +6981,27 @@ hr {
   gap: 18px;
 }
 
+.pageTitleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 18px;
+}
+
 .layoutEditButton {
-  min-height: 36px;
-  margin-bottom: 2px;
+  min-height: 34px;
+  border: 1px solid rgba(var(--blue-rgb), 0.55);
+  border-radius: var(--radius);
+  background: rgba(var(--blue-rgb), 0.12);
+  color: var(--blue-bright);
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
+}
+
+.layoutEditButton:hover {
+  border-color: var(--blue);
+  background: rgba(var(--blue-rgb), 0.2);
 }
 
 .layoutEditButton.active {
@@ -7029,6 +7059,63 @@ hr {
 
 .widgetCell.isDragging {
   opacity: 0.45;
+}
+
+/* Bottom-corner resize grips (edit mode, wide screens only: narrower ones stack every widget). */
+.widgetResizeCorner {
+  position: absolute;
+  bottom: -2px;
+  z-index: 3;
+  width: 22px;
+  height: 22px;
+  touch-action: none;
+}
+
+.widgetResizeCorner.right {
+  right: -2px;
+  border-right: 3px solid var(--blue);
+  border-bottom: 3px solid var(--blue);
+  border-bottom-right-radius: calc(var(--radius-lg) + 6px);
+  cursor: nwse-resize;
+}
+
+.widgetResizeCorner.left {
+  left: -2px;
+  border-left: 3px solid var(--blue);
+  border-bottom: 3px solid var(--blue);
+  border-bottom-left-radius: calc(var(--radius-lg) + 6px);
+  cursor: nesw-resize;
+}
+
+.widgetResizeCorner:hover,
+.widgetCell.isResizing .widgetResizeCorner {
+  border-color: var(--blue-bright);
+}
+
+.widgetCell.isResizing {
+  border-color: var(--blue) !important;
+  border-style: solid !important;
+}
+
+.widgetResizeLabel {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  z-index: 3;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--blue);
+  color: var(--on-accent);
+  font-size: 12px;
+  font-weight: 700;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+@media (max-width: 1180px) {
+  .widgetResizeCorner {
+    display: none;
+  }
 }
 
 .widgetCell.drop-before::before,

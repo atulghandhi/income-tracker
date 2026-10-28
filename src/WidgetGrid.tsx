@@ -1,16 +1,26 @@
-import { useState } from "react";
-import type { DragEvent, ReactNode } from "react";
+import { useRef, useState } from "react";
+import type { DragEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { ArrowLeft, ArrowRight, Check, GripVertical, Minus, Plus, RotateCcw, SlidersHorizontal, X } from "lucide-react";
 import { SIZE_LABELS, spanFor, widgetDefinition, type LayoutPage, type PageLayout, type WidgetDefinition, type WidgetSize } from "./layout";
 import type { RegionKey } from "./region";
 
 // The customisable grid behind the Dashboard. In normal use it simply lays the
 // widgets out; in edit mode each widget grows a toolbar (drag handle, move, resize, remove) and a
-// tray of hidden widgets appears underneath so they can be added back.
+// tray of hidden widgets appears underneath so they can be added back. Its bottom corners can also be
+// dragged to resize: the width snaps to the nearest size the widget allows.
 
 export type WidgetRenderer = (id: string, size: WidgetSize) => ReactNode;
 
 type DropPreview = { targetId: string; edge: "before" | "after" } | null;
+
+const GRID_COLUMNS = 6;
+
+// The allowed size whose column span is closest to the dragged width.
+export function sizeForWidth(width: number, gridWidth: number, gap: number, sizes: WidgetSize[]): WidgetSize {
+  const column = (gridWidth - gap * (GRID_COLUMNS - 1)) / GRID_COLUMNS;
+  const span = (width + gap) / (column + gap);
+  return sizes.reduce((best, size) => (Math.abs(spanFor(size) - span) < Math.abs(spanFor(best) - span) ? size : best), sizes[0]);
+}
 
 export function WidgetGrid({
   page,
@@ -22,6 +32,7 @@ export function WidgetGrid({
   onMove,
   onDrop,
   onResize,
+  onSetSize,
   onRemove,
   onAdd,
   onReset,
@@ -35,12 +46,47 @@ export function WidgetGrid({
   onMove: (id: string, delta: number) => void;
   onDrop: (id: string, targetId: string, edge: "before" | "after") => void;
   onResize: (id: string, direction: 1 | -1) => void;
+  onSetSize: (id: string, size: WidgetSize) => void;
   onRemove: (id: string) => void;
   onAdd: (id: string) => void;
   onReset: () => void;
 }) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropPreview, setDropPreview] = useState<DropPreview>(null);
+  const [resizing, setResizing] = useState<{ id: string; size: WidgetSize } | null>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+
+  function startCornerResize(event: ReactPointerEvent<HTMLElement>, id: string, corner: "left" | "right", sizes: WidgetSize[], current: WidgetSize) {
+    const grid = gridRef.current;
+    const cell = event.currentTarget.closest<HTMLElement>(".widgetCell");
+    if (!grid || !cell) return;
+    event.preventDefault();
+    const gridWidth = grid.getBoundingClientRect().width;
+    const gap = parseFloat(getComputedStyle(grid).columnGap) || 0;
+    // The edge that stays put while the other is dragged.
+    const anchor = corner === "right" ? cell.getBoundingClientRect().left : cell.getBoundingClientRect().right;
+    let size = current;
+    setResizing({ id, size });
+    const move = (moveEvent: PointerEvent) => {
+      const width = corner === "right" ? moveEvent.clientX - anchor : anchor - moveEvent.clientX;
+      const next = sizeForWidth(width, gridWidth, gap, sizes);
+      if (next !== size) {
+        size = next;
+        setResizing({ id, size });
+      }
+    };
+    // On the window, so the drag keeps tracking when the pointer leaves the small grip.
+    const end = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+      setResizing(null);
+      if (size !== current) onSetSize(id, size);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+  }
 
   function previewDrop(event: DragEvent<HTMLElement>, targetId: string) {
     if (!draggingId || draggingId === targetId) return;
@@ -59,18 +105,19 @@ export function WidgetGrid({
 
   return (
     <>
-      <div className={`widgetGrid ${editing ? "isEditing" : ""}`} aria-label={`${page} widgets`}>
+      <div ref={gridRef} className={`widgetGrid ${editing ? "isEditing" : ""}`} aria-label={`${page} widgets`}>
         {layout.widgets.map((placement, index) => {
           const definition = widgetDefinition(page, placement.id);
           if (!definition) return null;
           const title = definition.title[region];
           const sizeIndex = definition.sizes.indexOf(placement.size);
           const preview = dropPreview?.targetId === placement.id ? dropPreview.edge : null;
+          const size = resizing?.id === placement.id ? resizing.size : placement.size;
           return (
             <section
               key={placement.id}
-              className={`widgetCell size-${placement.size} ${draggingId === placement.id ? "isDragging" : ""} ${preview ? `drop-${preview}` : ""}`}
-              style={{ gridColumn: `span ${spanFor(placement.size)}` }}
+              className={`widgetCell size-${size} ${draggingId === placement.id ? "isDragging" : ""} ${preview ? `drop-${preview}` : ""} ${resizing?.id === placement.id ? "isResizing" : ""}`}
+              style={{ gridColumn: `span ${spanFor(size)}` }}
               data-widget-id={placement.id}
               aria-label={title}
               onDragOver={editing ? (event) => previewDrop(event, placement.id) : undefined}
@@ -133,6 +180,18 @@ export function WidgetGrid({
                 </div>
               )}
               <div className="widgetBody">{render(placement.id, placement.size)}</div>
+              {editing &&
+                definition.sizes.length > 1 &&
+                (["left", "right"] as const).map((corner) => (
+                  <span
+                    key={corner}
+                    className={`widgetResizeCorner ${corner}`}
+                    title="Drag to resize"
+                    aria-hidden="true"
+                    onPointerDown={(event) => startCornerResize(event, placement.id, corner, definition.sizes, placement.size)}
+                  />
+                ))}
+              {resizing?.id === placement.id && <span className="widgetResizeLabel">{SIZE_LABELS[size]}</span>}
             </section>
           );
         })}
@@ -149,7 +208,7 @@ export function WidgetGrid({
           <div className="widgetTrayHead">
             <div>
               <h3>Add widgets</h3>
-              <p>Drag widgets to rearrange them, use − / + to resize, × to remove. Changes save on this device.</p>
+              <p>Drag widgets to rearrange them, drag a bottom corner or use − / + to resize, × to remove. Changes save on this device.</p>
             </div>
             <button className="commandButton" type="button" onClick={onReset}>
               <RotateCcw size={14} />
