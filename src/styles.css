@@ -1888,6 +1888,13 @@ textarea:focus,
   z-index: 10;
 }
 
+/* The add row is the panel's last child and opaque, so it must follow the panel's rounded bottom
+   corners (less the 1px border) or its square corners poke past the panel's rounded outline. */
+.panel > .addRow:last-child {
+  border-bottom-left-radius: calc(var(--radius-lg) - 1px);
+  border-bottom-right-radius: calc(var(--radius-lg) - 1px);
+}
+
 .expenseAddRow {
   grid-template-columns: 42px minmax(132px, 1fr) 124px 42px;
 }
