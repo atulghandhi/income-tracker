@@ -10,6 +10,8 @@ export default defineConfig({
     dedupe: ["react", "react-dom"],
   },
   optimizeDeps: {
-    include: ["@vercel/analytics/react", "@vercel/speed-insights"],
+    // pdfjs-dist is only imported on demand (first PDF chosen); pre-bundling it
+    // here keeps the dev server from re-optimising and reloading mid-session.
+    include: ["@vercel/analytics/react", "@vercel/speed-insights", "pdfjs-dist"],
   },
 });

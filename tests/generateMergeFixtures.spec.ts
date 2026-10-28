@@ -65,8 +65,34 @@ function baseLedger(random: () => number): Json {
     importBatches: [{ id: "b0", fileName: "bank.csv", importedAt: NOW, totalRows: 2, importedRows: 2, skippedRows: 0, transactionRefs: [{ monthKey: "2026-09", entryId: "exp-2026-09-3", kind: "expense" }, { monthKey: "2026-10", entryId: "exp-2026-10-3", kind: "expense" }] }],
     privacyMode: false,
     aiCategorizationEnabled: false,
+    // Newer root fields, merged one level down (see mergeObjectFields, mergeIdList, mergeInsights).
+    taxProfile: { grossAnnualSalary: 40000, payFrequency: "monthly", pensionMonthly: 0, pensionMethod: "sacrifice", bonusAmount: 0, bonusOneOff: true },
+    allocation: { priority: "avalanche", lumpSum: 0, customShares: { a2: 100 } },
+    subscriptionPrefs: [{ id: "netflix", status: "cancelled", updatedAt: NOW }, { id: "gym", kind: "bill", updatedAt: NOW }],
+    insights: {
+      version: 1,
+      widgets: [{ id: "cash-flow", type: "moneyFlow", variant: "waterfall" }],
+      hiddenWarnings: ["w1"],
+      notes: { notes: "start" },
+      todos: { todo: [{ id: "t1", text: "Call bank", done: false, createdAt: NOW }] },
+    },
     lastSavedAt: NOW,
   };
+}
+
+// Edits to the newer root fields, so the Swift merge is held to the same rules for them.
+function mutateSettings(next: Json, random: () => number, side: string) {
+  const roll = random();
+  if (roll < 0.2) next.taxProfile.grossAnnualSalary = side === "local" ? 42000 : 45000;
+  else if (roll < 0.35) next.taxProfile.pensionMonthly = side === "local" ? 100 : 200;
+  else if (roll < 0.45) next.allocation.lumpSum = side === "local" ? 500 : 900;
+  else if (roll < 0.55) next.subscriptionPrefs.push({ id: `${side}-sub`, status: "deleted", updatedAt: NOW });
+  else if (roll < 0.65) next.subscriptionPrefs[0].status = undefined;
+  else if (roll < 0.75) next.insights.todos.todo.push({ id: `${side}-todo`, text: `${side} task`, done: false, createdAt: NOW });
+  else if (roll < 0.82) next.insights.todos.todo[0].done = true;
+  else if (roll < 0.88) next.insights.hiddenWarnings.push(`${side}-warning`);
+  else if (roll < 0.94) next.insights.notes.notes = `${side} note`;
+  else next.insights.widgets[0].variant = "particles";
 }
 
 // Random edits one device might make between syncs.
@@ -121,8 +147,9 @@ function mutate(state: Json, random: () => number, side: string): Json {
       month.note = `${side} note`;
     }
   }
+  if (random() < 0.7) mutateSettings(next, random, side);
   next.selectedMonth = side === "local" ? "2026-09" : "2026-10";
-  return next;
+  return JSON.parse(JSON.stringify(next));
 }
 
 test("generate merge fixtures", () => {

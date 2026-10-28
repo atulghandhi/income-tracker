@@ -44,6 +44,8 @@ interface GoalsViewProps {
   symbol: string;
   formatter: Intl.NumberFormat;
   privacy: boolean;
+  // Localises copy for the user's country (UK → US spellings and terms).
+  t?: (text: string) => string;
   onAddGoal: () => string;
   onUpdateGoal: (id: string, patch: Partial<SavingsGoal>) => void;
   onRemoveGoal: (id: string) => void;
@@ -65,6 +67,7 @@ export function GoalsView({
   symbol,
   formatter,
   privacy,
+  t = (text) => text,
   onAddGoal,
   onUpdateGoal,
   onRemoveGoal,
@@ -201,6 +204,7 @@ export function GoalsView({
             const outcome = goalSequence.goals.find((o) => o.goalId === goal.id) ?? null;
             return (
               <GoalCard
+                t={t}
                 key={goal.id}
                 goal={goal}
                 outcome={outcome}
@@ -273,26 +277,22 @@ function WaterfallTimeline({
         viewBox={`0 0 ${LABEL_W + BAR_AREA_W + PAD} ${totalH}`}
         preserveAspectRatio="xMinYMid meet"
       >
-        {/* X-axis grid lines & labels */}
-        {quarterMonths.map((m) => (
+        {/* X-axis grid lines & labels (labels thinned so they never run into each other) */}
+        {quarterMonths.map((m, index) => (
           <g key={m}>
             <line
               x1={xForMonth(m)}
               y1={PAD}
               x2={xForMonth(m)}
               y2={totalH - 26}
-              stroke="rgba(212,228,250,0.07)"
+              stroke="rgba(var(--ink-rgb), 0.1)"
               strokeWidth={1}
             />
-            <text
-              x={xForMonth(m)}
-              y={totalH - 8}
-              textAnchor="middle"
-              fontSize={10}
-              fill="rgba(212,228,250,0.35)"
-            >
-              {m === 0 ? "Now" : sequence.timeline[m - 1]?.label ?? ""}
-            </text>
+            {index % Math.max(1, Math.ceil(quarterMonths.length / 9)) === 0 && (
+              <text x={xForMonth(m)} y={totalH - 8} textAnchor="middle" fontSize={10} fill="var(--muted)">
+                {m === 0 ? "Now" : sequence.timeline[m - 1]?.label ?? ""}
+              </text>
+            )}
           </g>
         ))}
 
@@ -302,7 +302,7 @@ function WaterfallTimeline({
           y1={PAD}
           x2={xForMonth(0)}
           y2={totalH - 26}
-          stroke="rgba(0,223,193,0.5)"
+          stroke="var(--mint)"
           strokeWidth={1.5}
           strokeDasharray="4 3"
         />
@@ -329,7 +329,7 @@ function WaterfallTimeline({
                 y={y + ROW_H / 2 + 4}
                 textAnchor="end"
                 fontSize={11}
-                fill="rgba(212,228,250,0.65)"
+                fill="var(--ink)"
                 style={{ fontFamily: "var(--sans, sans-serif)" }}
               >
                 {(goal.name || "Goal").slice(0, 16)}
@@ -342,7 +342,7 @@ function WaterfallTimeline({
                 width={BAR_AREA_W}
                 height={barH}
                 rx={4}
-                fill="rgba(212,228,250,0.04)"
+                fill="rgba(var(--ink-rgb), 0.06)"
               />
 
               {/* Fill bar */}
@@ -352,7 +352,7 @@ function WaterfallTimeline({
                 width={barW}
                 height={barH}
                 rx={4}
-                fill={notReached ? "rgba(255,180,80,0.25)" : isComplete ? "rgba(0,223,193,0.2)" : goal.color}
+                fill={notReached ? "rgba(var(--amber-rgb), 0.35)" : isComplete ? "rgba(var(--mint-rgb), 0.35)" : goal.color}
                 opacity={0.85}
               />
 
@@ -362,7 +362,7 @@ function WaterfallTimeline({
                   cx={xForMonth(outcome.completionMonth)}
                   cy={barY + barH / 2}
                   r={5}
-                  fill={isComplete ? "rgba(0,223,193,0.9)" : goal.color}
+                  fill={isComplete ? "var(--mint)" : goal.color}
                 />
               )}
             </g>
@@ -376,6 +376,7 @@ function WaterfallTimeline({
 // ─── GoalCard ─────────────────────────────────────────────────────────────────
 
 function GoalCard({
+  t,
   goal,
   outcome,
   account,
@@ -398,6 +399,7 @@ function GoalCard({
   onDelete,
   onCancelDelete,
 }: {
+  t: (text: string) => string;
   goal: SavingsGoal;
   outcome: GoalOutcome | null;
   account: Account | null;
@@ -514,6 +516,7 @@ function GoalCard({
 
       {isEditing && (
         <GoalEditor
+          t={t}
           goal={goal}
           account={account}
           savingsAccounts={savingsAccounts}
@@ -534,6 +537,7 @@ function GoalCard({
 // ─── GoalEditor ───────────────────────────────────────────────────────────────
 
 function GoalEditor({
+  t,
   goal,
   account,
   savingsAccounts,
@@ -546,6 +550,7 @@ function GoalEditor({
   onDelete,
   onCancelDelete,
 }: {
+  t: (text: string) => string;
   goal: SavingsGoal;
   account: Account | null;
   savingsAccounts: Account[];
@@ -697,7 +702,7 @@ function GoalEditor({
             >
               <Info size={13} />
               <span className="goalEditorInfoTooltip">
-                Optional. If set, the engine compounds interest monthly on the accumulated balance — simulating the return you'd earn in a savings account or ISA.
+                {t("Optional. If set, the engine compounds interest monthly on the accumulated balance — simulating the return you'd earn in a savings account or ISA.")}
               </span>
             </span>
           </div>
@@ -705,7 +710,7 @@ function GoalEditor({
       </div>
 
       <div className="goalEditorRow">
-        <label>Colour</label>
+        <label>{t("Colour")}</label>
         <div className="goalColorPicker">
           {colors.slice(0, 8).map((c) => (
             <button

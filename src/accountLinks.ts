@@ -1,5 +1,5 @@
 import { nameMentionsAccount } from "./debtSync";
-import { deriveLiveAccounts, effectiveContribution, getMonthKey, recurringAccountTransfersByAccount } from "./finance";
+import { accountInflow, cashContribution, deriveLiveAccounts, getMonthKey, recurringAccountTransfersByAccount } from "./finance";
 import type { Account, ExpenseEntry, LedgerState, MonthBudget, SavingsGoal } from "./types";
 
 // Keeps Goals, Accounts and the ledger agreeing about savings.
@@ -98,7 +98,9 @@ export type GoalPlanInputs = {
 
 // The recurring surplus already has any linked transfer rows taken out. Every account's monthly
 // contribution is money that leaves the shared pot, so it is taken out here — except where the
-// ledger row already did it. A goal's own account then pays its contribution straight into it.
+// ledger row already did it, and except payroll contributions, which never reach the budget in the
+// first place. A goal's own account then pays everything it receives (the user's money and any
+// employer match) straight into the goal.
 export function goalPlanInputs({
   goals,
   accounts,
@@ -121,14 +123,15 @@ export function goalPlanInputs({
   let routedToGoals = 0;
   const dedicatedMonthly: Record<string, number> = {};
   for (const account of assets) {
-    const contribution = effectiveContribution(account, linked);
+    const fromCash = cashContribution(account, linked);
+    const inflow = accountInflow(account, linked);
     if (account.id in linked) addBack += Math.max(0, linked[account.id]);
     const goalId = goalByAccount.get(account.id);
     if (goalId) {
-      if (contribution > 0) dedicatedMonthly[goalId] = contribution;
-      routedToGoals += contribution;
+      if (inflow > 0) dedicatedMonthly[goalId] = inflow;
+      routedToGoals += fromCash;
     } else {
-      routedElsewhere += contribution;
+      routedElsewhere += fromCash;
     }
   }
 

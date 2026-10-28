@@ -33,6 +33,8 @@ cat > "$WORK/Package.swift" <<'SWIFT'
 import PackageDescription
 let package = Package(
   name: "Core",
+  // Lets the same script run on a Mac (Observation needs macOS 14); Linux ignores it.
+  platforms: [.macOS(.v14)],
   targets: [
     .target(name: "Core", path: "Sources/Core"),
     .testTarget(name: "CoreTests", dependencies: ["Core"], path: "Tests/CoreTests"),

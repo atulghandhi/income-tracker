@@ -150,53 +150,59 @@ export const GUIDES = [
   {
     slug: "import-pdf-bank-statement",
     topic: "Importing your bank data",
-    cardD: "Copy, paste, done. No converter needed.",
+    cardD: "Upload the PDF. No converter needed.",
     published: "2026-09-08",
+    updated: "2026-10-15",
     readMinutes: 4,
     title: "How to import a PDF bank statement (free, no converter)",
     description:
-      "Bank only gives you a PDF? You do not need a converter. Copy the transaction rows out of the PDF and paste them in. The app reads the dates, descriptions and amounts.",
+      "Bank only gives you a PDF? Import it directly. The Income Tracker reads the transaction table out of the PDF in your browser, from Barclays, HSBC, Lloyds, NatWest, Santander, Nationwide, Monzo, Starling, Revolut and more. Nothing is uploaded.",
     h1: "How to import a PDF bank statement",
     tldr:
-      "Open the PDF, select the transaction rows, copy them, and paste them into The Income Tracker. Each line needs a date, a description and an amount, which is exactly what a statement row is. No PDF converter, no upload to a stranger's server, nothing typed by hand.",
+      "Open The Income Tracker, go to Settings, then Import data, click Import CSV / OFX / QIF / PDF and choose the PDF statement. The app reads the dates, descriptions and amounts from the statement's table and shows them on the same review screen as a CSV import. The PDF is read on your own device and never uploaded. If the PDF is a scanned image with no text, copy the rows and paste them in instead.",
     sections: [
       {
-        h: "Why paste beats a PDF converter",
+        h: "Why this beats a PDF converter",
         p: [
           "Search for \"PDF bank statement to CSV\" and you will find a dozen sites offering to convert it for you. Every one of them needs you to upload a document that lists your name, your account number and everything you spent. Some are fine. You cannot tell which from the outside.",
-          "Copy and paste sidesteps the whole question. The text never leaves your computer. The Income Tracker reads it in your browser, shows you every row it found, and lets you fix anything it misread before a single entry is saved.",
+          "Importing the PDF straight into The Income Tracker sidesteps the whole question. The file is read in your browser, the text never leaves your computer, and you see every row it found and can fix anything it misread before a single entry is saved.",
         ],
       },
       {
         h: "Step by step",
         ol: [
-          "Open the PDF statement in any viewer: your browser, Preview on a Mac, Adobe Reader, whatever you have.",
-          "Click at the start of the first transaction row and drag to the end of the last one. Do not worry about grabbing headers or the balance column; extra text is ignored.",
-          "Copy (Ctrl+C on Windows, Cmd+C on a Mac).",
-          "Open The Income Tracker, go to Settings, then Import data, and click Paste. On a phone, long-press in the paste box instead.",
-          "Check the review screen. Each row shows the date, description and amount it found. Flip any row that landed as spending when it was income, then confirm.",
+          "Download the PDF statement from your bank's app or website. Most banks keep years of them under Statements or Documents.",
+          "Open The Income Tracker, go to Settings, then Import data, and click Import CSV / OFX / QIF / PDF.",
+          "Choose the PDF. A two-page statement takes a second or two to read.",
+          "Check the review screen. It is the same one a CSV import uses: each row shows the date, description, amount and suggested category, duplicates are unticked, and transfers between your own accounts are skipped.",
+          "Confirm. The import appears under Recent imports, with a one-click undo.",
         ],
       },
       {
-        h: "What the app does with each line",
-        ul: [
-          "It looks for a date anywhere on the line. Day and month without a year (\"13 Jun\") get the year of the month you are importing into.",
-          "It takes the last money-looking number as the amount. If a line ends with two such numbers, the pattern of a statement with a running balance, it uses the first of them and ignores the balance.",
-          "Amounts with no sign are treated as spending, because that is what most rows are. Salary and refund wording flips them to income automatically, and you can flip the rest with one click.",
-          "Lines with no amount at all (page headers, \"Balance brought forward\", addresses) are skipped.",
-          "Rows you have already imported are flagged as duplicates and unticked, so overlapping statements are safe.",
-        ],
-      },
-      {
-        h: "When the text will not copy",
+        h: "Which statements it reads",
         p: [
-          "If you select the rows and get nothing, the PDF is a scanned image rather than text. Two options. Use the bank's app or website to export a CSV instead, which every bank in our guides can do for current accounts. Or, for a short statement, type the handful of lines into the paste box yourself: a date, a description and an amount per line is all it needs.",
+          "Any statement laid out as a table with a date column and either money out and money in columns or a single amount column. That covers the current account and credit card statements from Barclays, HSBC, first direct, Lloyds, Halifax, Bank of Scotland, NatWest, RBS, Santander, Nationwide, TSB, Monzo, Starling, Revolut, Chase, Metro Bank, Virgin Money and American Express, and most US banks.",
+        ],
+        ul: [
+          "Dates printed without a year, such as Barclays' \"15 Dec\", take the year from the statement period, so a statement that runs from December into January lands in the right months.",
+          "Banks that print the date once per day and the balance once per day, the HSBC layout, are read correctly: rows beneath a date share it.",
+          "Transactions that run over two or three rows, the NatWest layout with the payee on one line and the reference and figures on the rows beneath, come through as one transaction each, named after the payee: the figures settle where a transaction ends, not the line count.",
+          "Reference lines, \"On 14 Dec\" lines and town names printed under a transaction are folded into its description, and the name shown is the merchant.",
+          "The running balance is checked against every amount, so money in and money out are never mixed up, even on statements with a single unsigned amount column.",
+          "Credit card statements that list purchases as positive numbers are detected and flipped, exactly as they are for CSV files, with a one-click undo.",
+        ],
+      },
+      {
+        h: "When the PDF cannot be read",
+        p: [
+          "If the app says it could not find a transaction table, the statement is either laid out in a way it does not recognise or, more often, a scanned image rather than text. Open the PDF and try to select a word: if nothing highlights, it is a scan. Two options. Use the bank's app or website to export a CSV instead, which every bank in our guides can do for current accounts. Or copy the transaction rows from the PDF (or type the handful of lines yourself) and use Paste under Import data: a date, a description and an amount per line is all it needs.",
+          "Password-protected PDFs are refused with a message saying so. Open the file in a PDF viewer, save a copy without the password, and import that.",
         ],
       },
       {
         h: "Where this matters most",
         ul: [
-          "Savings accounts that only offer PDF statements, such as some Nationwide savings products.",
+          "Banks and savings providers that only issue PDF statements, such as Zopa, Kroo, Marcus and some Nationwide savings products.",
           "Virgin Money accounts where the CSV export is not offered.",
           "Older months at banks that keep a short CSV window but years of PDFs.",
           "Credit card statements older than the export limit, such as Amex beyond two years.",
@@ -206,17 +212,18 @@ export const GUIDES = [
     howto: {
       name: "How to import a PDF bank statement",
       steps: [
-        "Open the PDF statement in any viewer.",
-        "Select the transaction rows and copy them.",
-        "In The Income Tracker open Settings, then Import data, then Paste.",
-        "Review the parsed rows, flip any wrong signs, and confirm.",
+        "Download the PDF statement from your bank.",
+        "In The Income Tracker open Settings, then Import data, then Import CSV / OFX / QIF / PDF.",
+        "Choose the PDF file.",
+        "Review the rows, fix any category, and confirm.",
       ],
     },
     faqs: [
-      { q: "Can I import a PDF bank statement directly?", a: "Not as a file, and you do not need to. Copy the transaction rows from the PDF and paste them into The Income Tracker. It reads the date, description and amount from each line." },
-      { q: "Is it safe to use an online PDF to CSV converter for a bank statement?", a: "Only if you trust the site with a document that lists your name, account number and every transaction. Copy and paste keeps the text on your own computer, which is why we recommend it." },
-      { q: "What if my statement has a running balance column?", a: "The importer notices a line ending in two amounts and takes the first as the transaction, ignoring the balance." },
-      { q: "The dates only show the day and month. Which year is used?", a: "The year of the month you are importing into. Switch to the right month first if you are pasting an older statement." },
+      { q: "Can I import a PDF bank statement directly?", a: "Yes. Choose the PDF from Import data in Settings. The Income Tracker reads the transaction table out of the PDF in your browser and shows the rows on the usual review screen. Nothing is uploaded anywhere." },
+      { q: "Is it safe to use an online PDF to CSV converter for a bank statement?", a: "Only if you trust the site with a document that lists your name, account number and every transaction. Importing the PDF into The Income Tracker keeps it on your own computer, which is why we recommend it." },
+      { q: "What if my statement has a running balance column?", a: "The importer reads it and uses it to check every amount. The balance itself is never imported as a transaction." },
+      { q: "The dates only show the day and month. Which year is used?", a: "The year from the statement period printed on the PDF. If the statement does not state a period, the month you are importing into is used." },
+      { q: "My PDF is a scanned image. Can it still be imported?", a: "Not as a file, because there is no text to read. Export a CSV from your bank instead, or type the lines and use Paste." },
     ],
     related: ["import", "how-to-read-a-bank-statement-csv", "is-it-safe-to-upload-bank-statements", "nationwide-csv"],
   },

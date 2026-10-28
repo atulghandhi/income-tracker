@@ -1,5 +1,6 @@
 import { colors, getMonthKey } from "./finance";
 import { applyNameRules } from "./nameRules";
+import { dateOrderFor, regionOf } from "./region";
 import type { CategoryRule, CategorySource, LedgerState, MonthBudget, TransactionKind } from "./types";
 
 export type CsvImportRow = {
@@ -56,7 +57,36 @@ type ParseBankCsvOptions = {
   // Negate single-amount-column values (credit-card statements). Ignored for
   // files with separate debit/credit columns — those are already unambiguous.
   flipSigns?: boolean;
+  // How to read "03/04/2026": day-first (UK) or month-first (US). Defaults from the ledger's
+  // country; a file whose dates only make sense one way overrides it.
+  dateOrder?: DateOrder;
 };
+
+export type DateOrder = "dmy" | "mdy";
+
+function defaultDateOrder(state: Pick<LedgerState, "country">, explicit?: DateOrder): DateOrder {
+  if (explicit) return explicit;
+  return state.country ? dateOrderFor(regionOf(state.country)) : "dmy";
+}
+
+const SLASH_DATE = /^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/;
+
+// Settles day-first vs month-first from the dates in a file: any value with a first part over 12
+// must be day-first, any with a second part over 12 must be month-first. Otherwise the region's
+// convention stands.
+export function detectDateOrder(values: string[], fallback: DateOrder): DateOrder {
+  let dayFirst = false;
+  let monthFirst = false;
+  for (const value of values) {
+    const match = value.trim().match(SLASH_DATE);
+    if (!match) continue;
+    if (Number(match[1]) > 12) dayFirst = true;
+    if (Number(match[2]) > 12) monthFirst = true;
+  }
+  if (dayFirst && !monthFirst) return "dmy";
+  if (monthFirst && !dayFirst) return "mdy";
+  return fallback;
+}
 
 type ColumnMap = {
   date: number;
@@ -87,20 +117,21 @@ const SYSTEM_RULES: Array<{ pattern: RegExp; category: string; kind?: Transactio
   { pattern: /\b(salary|payroll|wages?|employer|pay\s?slip)\b/i, category: "Income", kind: "income", confidence: 0.92, note: "Matched income wording" },
   { pattern: /\b(rent|mortgage|letting|landlord)\b/i, category: "Home", confidence: 0.88, note: "Matched housing wording" },
   { pattern: /\b(council tax|electric|electricity|gas|water|broadband|internet|mobile|phone|utility)\b/i, category: "Bills", confidence: 0.86, note: "Matched bill wording" },
-  { pattern: /\b(tesco|sainsbury|asda|aldi|lidl|waitrose|morrisons|coop|co-op|grocery|supermarket)\b/i, category: "Food", confidence: 0.88, note: "Matched grocery merchant" },
+  { pattern: /\b(tesco|sainsbury(?:['’]?s)?|asda|aldi|lidl|waitrose|morrisons|coop|co-op|grocery|supermarket)\b/i, category: "Food", confidence: 0.88, note: "Matched grocery merchant" },
   { pattern: /\b(restaurant|cafe|coffee|deliveroo|ubereats|just eat|pret|starbucks|costa)\b/i, category: "Food", confidence: 0.82, note: "Matched food merchant" },
   { pattern: /\b(tfl|uber|bolt|train|rail|petrol|fuel|parking|bus|tube|transport)\b/i, category: "Travel", confidence: 0.85, note: "Matched travel wording" },
   { pattern: /\b(netflix|spotify|prime|apple\.com|google|microsoft|disney|subscription)\b/i, category: "Subscriptions", confidence: 0.86, note: "Matched subscription merchant" },
   { pattern: /\b(pharmacy|chemist|dentist|doctor|hospital|optician|health)\b/i, category: "Health", confidence: 0.82, note: "Matched health wording" },
   { pattern: /\b(hmrc|tax|national insurance)\b/i, category: "Tax", confidence: 0.84, note: "Matched tax wording" },
-  { pattern: /\b(amex|barclaycard|capital one|credit card|mastercard|visa payment|card payment)\b/i, category: "Debt payments", kind: "debt-payment", confidence: 0.86, note: "Matched debt payment wording" },
+  { pattern: /\b(amex|barclaycard|capital one|credit card|mastercard|visa payment|card payment(?!\s+to\b))\b/i, category: "Debt payments", kind: "debt-payment", confidence: 0.86, note: "Matched debt payment wording" },
   { pattern: /\b(transfer|internal|savings?|standing order to self)\b/i, category: "Transfers", kind: "transfer", confidence: 0.78, note: "Matched transfer wording" },
 ];
 
-export function parseBankCsv({ text, fileName, state, fallbackMonthKey, flipSigns }: ParseBankCsvOptions): CsvImportResult {
+export function parseBankCsv({ text, fileName, state, fallbackMonthKey, flipSigns, dateOrder }: ParseBankCsvOptions): CsvImportResult {
   const table = parseCsvTable(text);
   const nonEmptyRows = table.filter((row) => row.some((cell) => cell.trim()));
   const fallbackMonth = fallbackMonthKey ?? state.selectedMonth ?? getMonthKey();
+  const regionOrder = defaultDateOrder(state, dateOrder);
 
   if (nonEmptyRows.length < 2) {
     return {
@@ -129,12 +160,16 @@ export function parseBankCsv({ text, fileName, state, fallbackMonthKey, flipSign
   // Sign flipping only applies to single-amount files; debit/credit columns
   // already carry unambiguous direction.
   const applyFlip = Boolean(flipSigns) && columns.amount !== undefined && columns.debit === undefined && columns.credit === undefined;
+  const order = detectDateOrder(
+    nonEmptyRows.slice(1).map((cells) => getCell(cells, columns.date)),
+    regionOrder,
+  );
 
   const rows = nonEmptyRows.slice(1).flatMap((cells, index) => {
     const rowNumber = index + 2;
     const description = getCell(cells, columns.description).trim();
     const parsedAmount = readAmount(cells, columns);
-    const isoDate = parseDateValue(getCell(cells, columns.date), fallbackMonth) ?? monthStartDate(fallbackMonth);
+    const isoDate = parseDateValue(getCell(cells, columns.date), fallbackMonth, order) ?? monthStartDate(fallbackMonth);
 
     if (!description || parsedAmount === null) return [];
 
@@ -476,7 +511,7 @@ function parseAmount(value: string): number | null {
   return Number((negativeByParentheses ? -Math.abs(parsed) : parsed).toFixed(2));
 }
 
-function parseDateValue(value: string, fallbackMonth?: string): string | null {
+export function parseDateValue(value: string, fallbackMonth?: string, dateOrder: DateOrder = "dmy"): string | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
 
@@ -491,13 +526,15 @@ function parseDateValue(value: string, fallbackMonth?: string): string | null {
   const iso = trimmed.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
   if (iso) return formatDateParts(Number(iso[1]), Number(iso[2]), Number(iso[3]));
 
-  const slash = trimmed.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  const slash = trimmed.match(SLASH_DATE);
   if (slash) {
     const first = Number(slash[1]);
     const second = Number(slash[2]);
     const year = normalizeYear(Number(slash[3]));
-    const day = first > 12 ? first : second > 12 ? second : first;
-    const month = first > 12 ? second : second > 12 ? first : second;
+    // Only one reading works when a part exceeds 12; otherwise the region's convention decides.
+    const monthFirst = first > 12 ? false : second > 12 ? true : dateOrder === "mdy";
+    const day = monthFirst ? second : first;
+    const month = monthFirst ? first : second;
     return formatDateParts(year, month, day);
   }
 
@@ -651,7 +688,8 @@ const MERCHANT_ALIASES: Array<[RegExp, string]> = [
   [/\bsq\s*\*/g, "square "],
   [/\bcrv\b/g, ""],
   [/\bgoogle\s*\*/g, "google "],
-  [/\bapple\.com\/bill\b/g, "apple"],
+  // Aliases run on the normalised text, where punctuation has already become spaces.
+  [/\bapple\s+com\s+bill\b/g, "apple"],
   [/\bamznprime\b/g, "amazon prime"],
 ];
 
@@ -753,10 +791,17 @@ const DISPLAY_NAME_MAX_LENGTH = 28;
 // Card number + transaction date that Barclays, NatWest and RBS lead with ("4332 07OCT26", "4332 07OCT26 CD").
 const CARD_DATE_PREFIX = /^\d{4}\s+\d{1,2}[a-z]{3}\d{2,4}(?:\s+(?:c|cd|d))?(?:\s+|$)/i;
 const LEADING_TYPE_WORDS =
-  /^(?:card payment to|card purchase(?: at)?|contactless payment(?: to)?|contactless|direct debit(?: payment)?(?: to)?|standing order(?: to)?|bill payment(?: to)?|faster payments?(?: receipt| payment)?(?: from| to)?|payment (?:to|from)|debit card(?: payment)?(?: to)?|purchase at|pos|visa)\b[\s:-]*/i;
+  /^(?:card payment to|card purchase(?: at)?|contactless payment(?: to)?|contactless|direct debit(?: payment)?(?: to)?|standing order(?: to)?|bill payment(?: to)?|faster payments?(?: receipt| payment)?(?: from| to)?|payment (?:to|from)|(?:giro |bacs )?received from|refund from|bacs credit(?: from)?|automated (?:credit|debit|pay(?:ment)?)(?: from| to)?|(?:bank )?giro credit(?: from)?|(?:debit |credit )?card transaction(?: at| to)?|online (?:transaction|payment)(?: to)?|mobile payment(?: to)?|debit card(?: payment)?(?: to)?|purchase at|pos|visa)\b[\s:-]*/i;
 const TRAILING_ON_DATE = /\s+on\s+\d{1,2}(?:[\s-]?[a-z]{3}|[-/.]\d{1,2})\b.*$/i;
 const TRAILING_REFERENCE = /\s+(?:ref|reference|mandate(?: no)?)\b.*$/i;
-const TRAILING_TYPE_CODE = /\s+(?:bcc|cpm|clp|ddr|bgc|dd|ft|so|sto|deb|tfr|chg|obp|bbp|fpi|fpo|bac|vis|pymts?|payments?)$/i;
+// NatWest/RBS Faster Payment references: "FP 28/08/26 12 34567890123456789012".
+const TRAILING_FP_REFERENCE = /\s+FP\s+\d{1,2}\/\d{1,2}\/\d{2,4}\b.*$/i;
+// A date stamp after the merchant: "ATM 05AUG26", "KINGS CROSS 05 AUG 26".
+const TRAILING_DATE_STAMP = /\s+\d{1,2}\s?[a-z]{3}\s?\d{2,4}$/i;
+const TRAILING_TYPE_CODE = /\s+(?:bcc|cpm|clp|ddr|bgc|dd|ft|so|sto|deb|tfr|chg|obp|bbp|fpi|fpo|fps|bac|vis|cr|dr|bp|atm|chq|cpt|cdm|pos|pymts?|payments?)$/i;
+// Statement apps add the payment type under the merchant, sometimes with the
+// reference after a colon: "Faster Payment: SALARY JAN 26", "Pot transfer".
+const TRAILING_TYPE_PHRASE = /\s+(?:direct debit|standing order|card payment|contactless(?: payment)?|faster payments?(?: (?:in|out))?|bank transfer|pot transfer|cash withdrawal)(?::.*)?$/i;
 const TRAILING_SUFFIX = /\s+(?:gb|gbr|uk|irl|ie|usa|us|ltd|limited|plc|llp|inc|llc)\.?$/i;
 const LOCATION_SEGMENT = /^[a-z .'-]+\s(?:gb|gbr|uk|irl|ie|us|usa|fr|de|es|nl|lu)$/i;
 const NOISE_SEGMENT = /^(?:[\d\s.,/-]*(?:gbp|eur|usd)?|rate\b.*|mandate\b.*|ref\b.*|reference\b.*)$/i;
@@ -807,6 +852,8 @@ const DISPLAY_CASING: Record<string, string> = {
   jd: "JD",
   asos: "ASOS",
   sa: "SA",
+  uab: "UAB",
+  gmbh: "GmbH",
 };
 const DISPLAY_SMALL_WORDS = new Set(["and", "of", "the", "to", "for", "at", "on", "in", "by"]);
 
@@ -814,11 +861,12 @@ export function cleanMerchantName(description: string): string {
   const raw = description.replace(/\s+/g, " ").trim();
   if (!raw) return "";
 
-  let name = pickMerchantSegment(raw.replace(CARD_DATE_PREFIX, (match) => `${match.trim()} , `));
+  // The payment type goes first so "BANK GIRO CREDIT REF SALARY, ACME LTD" picks the payer segment.
+  let name = pickMerchantSegment(stripRepeatedly(raw, [LEADING_TYPE_WORDS], "").replace(CARD_DATE_PREFIX, (match) => `${match.trim()} , `));
   name = stripRepeatedly(name, [LEADING_TYPE_WORDS], "");
   const segmentKey = normalizeMerchant(name);
-  name = name.replace(TRAILING_ON_DATE, "").replace(TRAILING_REFERENCE, "");
-  name = stripRepeatedly(name, [TRAILING_TYPE_CODE, TRAILING_SUFFIX], "");
+  name = name.replace(TRAILING_ON_DATE, "").replace(TRAILING_REFERENCE, "").replace(TRAILING_FP_REFERENCE, "");
+  name = stripRepeatedly(name, [TRAILING_TYPE_CODE, TRAILING_TYPE_PHRASE, TRAILING_DATE_STAMP, TRAILING_SUFFIX], "");
   name = resolveProcessorStar(name);
   // A store number or reference ends the merchant name: "TESCO STORES 3412 LONDON".
   name = name.replace(/^(.*?[a-z].*?)\s+#?\d{4,}\b.*$/i, "$1");
@@ -926,6 +974,8 @@ function recaseShouting(value: string): string {
     .map((word, index) => {
       if (DISPLAY_CASING[word]) return DISPLAY_CASING[word];
       if (word.includes("&") && word.length <= 4) return word.toUpperCase();
+      // Dotted abbreviations stay as written: "S.A.", "N.A.", "A.G."
+      if (/^(?:[a-z]\.){2,}$/.test(word) || /^[a-z]\.[a-z]$/.test(word)) return word.toUpperCase();
       if (index > 0 && DISPLAY_SMALL_WORDS.has(word)) return word;
       return word.charAt(0).toUpperCase() + word.slice(1);
     })
@@ -950,6 +1000,7 @@ export function parseBankText({
   state,
   fallbackMonthKey,
   flipSigns,
+  dateOrder,
 }: ParseBankCsvOptions): CsvImportResult {
   const trimmed = text.trimStart();
   const lowerName = fileName.toLowerCase();
@@ -958,20 +1009,20 @@ export function parseBankText({
     return withTransferPairs(parseOfx({ text, fileName, state, fallbackMonthKey }));
   }
   if (/^!type:/i.test(trimmed) || lowerName.endsWith(".qif")) {
-    return withTransferPairs(parseQif({ text, fileName, state, fallbackMonthKey }));
+    return withTransferPairs(parseQif({ text, fileName, state, fallbackMonthKey, dateOrder }));
   }
 
-  let csvResult = parseBankCsv({ text, fileName, state, fallbackMonthKey, flipSigns });
+  let csvResult = parseBankCsv({ text, fileName, state, fallbackMonthKey, flipSigns, dateOrder });
   // Auto-flip credit-card statements — unless the caller chose explicitly
   // (the review modal's "flip in/out" toggle passes flipSigns either way).
   if (flipSigns === undefined && detectLikelySignInversion(csvResult)) {
-    csvResult = parseBankCsv({ text, fileName, state, fallbackMonthKey, flipSigns: true });
+    csvResult = parseBankCsv({ text, fileName, state, fallbackMonthKey, flipSigns: true, dateOrder });
   }
   if (csvResult.rows.length) return withTransferPairs(csvResult);
 
   // No recognizable header row — pasted blocks from bank apps and spreadsheets
   // usually aren't CSV. Fall back to per-line parsing before giving up.
-  const looseResult = parseLooseLines({ text, fileName, state, fallbackMonthKey });
+  const looseResult = parseLooseLines({ text, fileName, state, fallbackMonthKey, dateOrder });
   return looseResult.rows.length ? withTransferPairs(looseResult) : csvResult;
 }
 
@@ -1084,9 +1135,13 @@ function parseOfxDate(value: string): string | null {
 
 // ─── QIF (Quicken Interchange Format) ────────────────────────────────────────
 
-export function parseQif({ text, state, fallbackMonthKey }: ParseBankCsvOptions): CsvImportResult {
+export function parseQif({ text, state, fallbackMonthKey, dateOrder }: ParseBankCsvOptions): CsvImportResult {
   const existingHashes = collectExistingTransactionHashes(state);
   const fallbackMonth = fallbackMonthKey ?? state.selectedMonth ?? getMonthKey();
+  const order = detectDateOrder(
+    text.split(/\r?\n/).filter((line) => line.startsWith("D")).map((line) => line.slice(1)),
+    defaultDateOrder(state, dateOrder),
+  );
   const rows: CsvImportRow[] = [];
   let record: { date?: string; amount?: number; payee?: string; memo?: string; category?: string } = {};
   let recordCount = 0;
@@ -1116,7 +1171,7 @@ export function parseQif({ text, state, fallbackMonthKey }: ParseBankCsvOptions)
     const code = line[0];
     const value = line.slice(1).trim();
     if (code === "^") flush();
-    else if (code === "D") record.date = parseDateValue(value) ?? record.date;
+    else if (code === "D") record.date = parseDateValue(value, undefined, order) ?? record.date;
     else if (code === "T" || code === "U") record.amount = parseAmount(value) ?? record.amount;
     else if (code === "P") record.payee = value;
     else if (code === "M") record.memo = value;
@@ -1138,14 +1193,15 @@ export function parseQif({ text, state, fallbackMonthKey }: ParseBankCsvOptions)
 // default to spending — the common case when copying a transaction list — and the
 // rule/category pipeline can still flip a row to income (salary wording etc.).
 
-export function parseLooseLines({ text, state, fallbackMonthKey }: ParseBankCsvOptions): CsvImportResult {
+export function parseLooseLines({ text, state, fallbackMonthKey, dateOrder }: ParseBankCsvOptions): CsvImportResult {
   const existingHashes = collectExistingTransactionHashes(state);
   const fallbackMonth = fallbackMonthKey ?? state.selectedMonth ?? getMonthKey();
   const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const order = detectDateOrder(lines.flatMap((line) => line.split(/\s+|,|\t/)), defaultDateOrder(state, dateOrder));
   const rows: CsvImportRow[] = [];
 
   lines.forEach((line, index) => {
-    const parsed = parseLooseLine(line, fallbackMonth);
+    const parsed = parseLooseLine(line, fallbackMonth, order);
     if (!parsed) return;
     rows.push(
       buildImportRow({
@@ -1169,7 +1225,7 @@ export function parseLooseLines({ text, state, fallbackMonthKey }: ParseBankCsvO
   };
 }
 
-function parseLooseLine(line: string, fallbackMonth: string): { date: string; description: string; amount: number; signed: boolean } | null {
+function parseLooseLine(line: string, fallbackMonth: string, dateOrder: DateOrder = "dmy"): { date: string; description: string; amount: number; signed: boolean } | null {
   // Cells first: tab, 2+ spaces, or comma separated (spreadsheet / bank web page copies).
   // Thousands separators are collapsed before the comma split so "1,234.56" stays whole.
   const collapsed = line.replace(/(\d),(\d{3})/g, "$1$2");
@@ -1210,7 +1266,7 @@ function parseLooseLine(line: string, fallbackMonth: string): { date: string; de
   let dateIndex = -1;
   for (let index = 0; index < tokens.length; index += 1) {
     if (index === amountIndex) continue;
-    const candidate = parseDateValue(tokens[index], fallbackMonth);
+    const candidate = parseDateValue(tokens[index], fallbackMonth, dateOrder);
     if (candidate) {
       date = candidate;
       dateIndex = index;
@@ -1222,7 +1278,7 @@ function parseLooseLine(line: string, fallbackMonth: string): { date: string; de
       const dayMonth = parseDayMonth(tokens[index], tokens[index + 1]);
       const pair = dayMonth
         ? formatDateParts(yearForDayMonth(dayMonth.month, fallbackMonth), dayMonth.month, dayMonth.day)
-        : parseDateValue(`${tokens[index]} ${tokens[index + 1]}`, fallbackMonth);
+        : parseDateValue(`${tokens[index]} ${tokens[index + 1]}`, fallbackMonth, dateOrder);
       if (pair) {
         date = pair;
         dateIndex = index;

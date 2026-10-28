@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Analytics } from "@vercel/analytics/react";
 import LandingPage from "./LandingPage";
 import Onboarding, { type OnboardingResult } from "./Onboarding";
@@ -6,6 +6,8 @@ import type { CSSProperties, Dispatch, DragEvent, FormEvent, KeyboardEvent, Mous
 import {
   Clock3,
   AlertCircle,
+  Calculator,
+  Landmark,
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
@@ -17,12 +19,14 @@ import {
   CircleHelp,
   ClipboardPaste,
   Cloud,
+  Coins,
   CreditCard,
   Database,
   Download,
   Eye,
   EyeOff,
   FileSpreadsheet,
+  FileText,
   FileJson,
   FolderPlus,
   Gauge,
@@ -43,6 +47,7 @@ import {
   Search,
   Settings as SettingsIcon,
   ShieldCheck,
+  SlidersHorizontal,
   Sparkles,
   Sun,
   Target,
@@ -52,6 +57,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import {
+  isDebtClass,
   buildCsvExport,
   buildFinancialSignals,
   buildMonthlyFlowPoints,
@@ -67,11 +73,11 @@ import {
   colors,
   createId,
   createInitialState,
-  CURRENT_SCHEMA_VERSION,
   currencyOptions,
   DEFAULT_INVESTMENT_RETURN,
   formatMonth,
   getCurrencyFormatter,
+  getPreciseCurrencyFormatter,
   getCurrencySymbol,
   getMonthKey,
   isValidMonthKey,
@@ -83,12 +89,13 @@ import {
   shiftMonth,
 } from "./finance";
 import { INCOME_SORT_OPTIONS, isIncomeSortMode, moveEntry, orderIncomes, type IncomeSortMode } from "./ledgerOrder";
-import { buildRulePattern, canonicalizeMerchant, descriptionMatchesPattern, isTransferDescription, normalizeMerchant, parseBankText, sortImportRows, tidyImportedNames, type CsvImportRow } from "./importer";
+import { buildRulePattern, canonicalizeMerchant, descriptionMatchesPattern, isTransferDescription, normalizeMerchant, parseBankText, sortImportRows, type CsvImportResult, type CsvImportRow } from "./importer";
 import { buildMerchantMemory } from "./merchantMemory";
-import { countSameName, findRuleTargeting, normalizeNameRules, renameEverywhere, type NameKind } from "./nameRules";
+import { extractPdfPages } from "./pdfExtract";
+import { PDF_SUPPORTED_BANKS, PdfImportError, looksLikePdf, parsePdfStatementWithDetection, type PdfPageText } from "./pdfImporter";
+import { countSameName, findRuleTargeting, renameEverywhere, type NameKind } from "./nameRules";
 import { parseQuickAdd } from "./quickAdd";
 import {
-  assignMissingAccounts,
   countedFlowFor,
   defaultAccountId,
   distinctAccountColors,
@@ -98,9 +105,20 @@ import {
   nextAccountId,
   pickAccountColor,
 } from "./accountFlow";
-import { goalPlanInputs, linkSavingsTransfers, syncLinkedGoals } from "./accountLinks";
-import { matchDebtPaymentRows, skipScheduledPayment, syncScheduledDebtPayments } from "./debtSync";
-import { applyRecurringFlag, detectSubscriptions, findMissedRecurring, reconcileSeededEntries, suggestRecurringFlags, type RecurrenceCandidate } from "./recurrence";
+import { goalPlanInputs } from "./accountLinks";
+import { matchDebtPaymentRows, skipScheduledPayment } from "./debtSync";
+import { applyRecurringFlag, reconcileSeededEntries } from "./recurrence";
+import {
+  deleteSubscription,
+  detectSubscriptions,
+  markSubscriptionCancelled,
+  reactivateSubscription,
+  restoreDeletedSubscriptions,
+  setSubscriptionKind,
+  setSubscriptionRecurring,
+  setSubscriptionTolerance,
+  type Subscription,
+} from "./subscriptions";
 import { aiCategorizeRows, applyAiSuggestions, isAiCategorizationAvailable, testAiConnection } from "./aiCategorize";
 import { bucketCount, identifyAnalytics, track } from "./analytics";
 import { DebtRemindersPanel, InstallBanner, MonthlyReminderPanel, NewMonthNudge } from "./RetentionPanels";
@@ -138,13 +156,76 @@ import { GoalsView } from "./GoalsView";
 import { clearSyncMeta, getDeviceId, loadLedgerState, loadSyncMeta, saveLedgerState, saveSyncMeta } from "./storage";
 import { rebaseOnto, SyncEngine, type FirstSyncChoice } from "./sync/engine";
 import {
-  ACCOUNT_TYPE_OPTIONS,
-  DEFAULT_TYPE_BY_CLASS,
   hasLocalData,
   ledgerSummary,
   normalizeState,
   syncLedgerLinks,
 } from "./ledgerState";
+import { SubscriptionsView, SubscriptionsWidget } from "./SubscriptionsView";
+import {
+  accountClassOptions,
+  accountTypeOption,
+  accountTypeOptions,
+  accountTypeOptionsFor,
+  countryOption,
+  countryOptions,
+  defaultContributionSource,
+  defaultTaxTreatment,
+  defaultTypeForClass,
+  detectCountryFromBrowser,
+  isLoanType,
+  regionOf,
+  supportsPlanDetails,
+  textLocalizer,
+  type RegionKey,
+} from "./region";
+import { buildPlanInputs, comparePlans } from "./allocate";
+import { AllocateView, PayoffWidget } from "./AllocateView";
+import { buildPlanSignals } from "./planSignals";
+import { interpretCreditScore } from "./creditScore";
+import { TOOL_VIEWS, initialPinned, isToolView, readNavTools, toolSuggestions, unseenSuggestionCount, writeNavTools, type NavToolsPrefs, type ToolView } from "./navTools";
+import { APP_VIEWS, DEFAULT_VIEW, pathForView, viewFromPath, type AppView } from "./routes";
+import { buildSampleLedger, sampleCountry } from "./sampleData";
+import { WidgetGrid, type WidgetRenderer } from "./WidgetGrid";
+import { INSIGHT_WIDGET_SPECS, InsightWidgetCard } from "./InsightWidgetCard";
+import { buildCategoryRows, buildExpenseGroups, buildMonthlyBars, categoryColor, categoryEmoji } from "./ledgerGroups";
+import { buildInsightsModel, visibleSignals } from "./insightsData";
+import { normalizeInsightsState, setWidgetVariant } from "./insightsState";
+import type { WidgetActions } from "./insightWidgets";
+import { addWidget, clearLayout, cycleWidgetSize, defaultLayout, hiddenWidgets, loadLayout, moveWidget, moveWidgetBefore, removeWidget, resizeWidget, saveLayout, widgetDefinition, type LayoutPage, type PageLayout } from "./layout";
+import {
+  AccountPlanDetails,
+  CreditScoreWidget,
+  GoalsWidget,
+  HousingWidget,
+  LoanDetails,
+  LoansWidget,
+  MedicalWidget,
+  PaycheckBreakdownWidget,
+  RetirementWidget,
+  TakeHomeEstimator,
+  TakeHomeWidget,
+} from "./RegionPanels";
+import { computeTakeHome } from "./takeHome";
+import {
+  AnimatedCurrency,
+  EmptyState,
+  InfoHint,
+  MetricCard,
+  MoneyInput,
+  NetWorthChart,
+  NetWorthHorizonTabs,
+  NumberInput,
+  PanelTitle,
+  ProgressRule,
+  blurOnEnter,
+  focusNextFrame,
+  formatDecimal,
+  formatShortDate,
+  handleDraftEnter,
+  healthTone,
+  type NetWorthHorizon,
+} from "./ui";
 import {
   getCurrentSession,
   isSupabaseConfigured,
@@ -167,7 +248,9 @@ import type {
   Account,
   AccountClass,
   AccountType,
+  AllocationSettings,
   CategoryRule,
+  CountryCode,
   CurrencyCode,
   ExpenseEntry,
   FinancialSignal,
@@ -178,6 +261,7 @@ import type {
   ImportBatch,
   ImportedTransactionRef,
   IncomeEntry,
+  InsightsState,
   LedgerState,
   MonthBudget,
   MonthlyFlowPoint,
@@ -188,7 +272,6 @@ import type {
 } from "./types";
 
 type ProjectionView = "overview" | "category" | "month";
-type AppView = "dashboard" | "ledger" | "accounts" | "goals" | "insights" | "settings";
 
 type ThemeMode = "light" | "dark";
 
@@ -230,7 +313,7 @@ function capitalizeFirst(s: string) {
 // Short, skimmable per-page walkthroughs, replayable anytime from the sidebar
 // "Tutorial" button. They no longer auto-open on first visit — the setup wizard
 // and the dashboard getting-started checklist cover first-run guidance instead.
-const TUTORIALS: Record<AppView, PageTutorial> = {
+const TUTORIALS_GB: Record<AppView, PageTutorial> = {
   ledger: {
     title: "Track a month in seconds",
     badge: "Ledger",
@@ -268,9 +351,10 @@ const TUTORIALS: Record<AppView, PageTutorial> = {
       {
         heading: "",
         bullets: [
-          "The net-worth outlook projects where your finances are heading.",
-          "The ledger summary shows this month's income vs spending.",
-          "Quick links jump you straight to accounts and imports.",
+          "This month's snapshot and the money flow show where income came from and where it went — click a stream to see what is inside.",
+          "The health score rates cash flow, debt and savings; spending pace and the savings rate say how the month is going against your target.",
+          "Anomalies flag unusual spending worth a second look; dismiss any with the ×.",
+          "Customise rearranges, resizes, adds and removes widgets, such as to-dos, notes, a spending calendar or where your pay goes. The layout is remembered on this device.",
         ],
       },
     ],
@@ -286,6 +370,22 @@ const TUTORIALS: Record<AppView, PageTutorial> = {
           "Add credit cards, loans and overdrafts as debts.",
           "Net worth = assets minus debts, updated as you type.",
           "Set rates, limits and 0% intro periods to power the forecast.",
+          "Open Plan details on a pension or retirement account for contributions, employer match and limits.",
+        ],
+      },
+    ],
+  },
+  pay: {
+    title: "From gross salary to take-home",
+    badge: "Pay & tax",
+    steps: [
+      {
+        heading: "",
+        bullets: [
+          "Enter your gross annual salary and how often you're paid.",
+          "Pick your student loan plan; pension contributions set to come from pay on Accounts are deducted automatically.",
+          "Income tax, National Insurance and student loan are worked out for the current tax year — an estimate, not a payslip.",
+          "Use the net figure as this month's income with one click.",
         ],
       },
     ],
@@ -305,16 +405,34 @@ const TUTORIALS: Record<AppView, PageTutorial> = {
       },
     ],
   },
-  insights: {
-    title: "Spot the trends",
-    badge: "Insights",
+  allocate: {
+    title: "Decide where spare money goes",
+    badge: "Allocate",
     steps: [
       {
         heading: "",
         bullets: [
-          "Your health score rates cash flow, debt and savings.",
-          "Charts show monthly cash flow and your category breakdown.",
-          "Anomalies flag unusual spending worth a second look.",
+          "Type a one-off lump sum (a bonus, a refund) and check the spare-per-month figure from your ledger.",
+          "Pick a priority: least interest (avalanche), quick wins (snowball), lower payments soonest, credit score recovery, a cash buffer or a tax bill first.",
+          "Charts compare every strategy against paying minimums only: interest, debt-free date, payments and card utilisation.",
+          "Choose where savings go too — highest safe rate, highest expected return, tax wrappers or your goals.",
+          "Illustrations from your figures, not advice — free debt help is linked at the bottom.",
+        ],
+      },
+    ],
+  },
+  subscriptions: {
+    title: "Everything you pay for repeatedly",
+    badge: "Subscriptions",
+    steps: [
+      {
+        heading: "",
+        bullets: [
+          "Subscriptions, bills and renewals are detected from your ledger — nothing to set up.",
+          "Each one shows what it costs per year; 4-weekly payments count 13 times, not 12.",
+          "Price rises are flagged with the extra cost per year. Charges in another currency wobble with the exchange rate and are not flagged.",
+          "Yearly renewals show their next date. Anything that stops being paid moves to Cancelled — or mark it cancelled yourself, and delete it from there.",
+          "Open a row for its payment history, to widen the on-time window, or to say it is not a subscription.",
         ],
       },
     ],
@@ -328,16 +446,175 @@ const TUTORIALS: Record<AppView, PageTutorial> = {
         bullets: [
           "Export or import your whole vault as JSON or CSV.",
           "Transfer rules auto-skip money moved between your own accounts.",
-          "Privacy mode hides amounts; switch currency or animations anytime.",
+          "Privacy mode hides amounts; switch country, currency or animations anytime.",
         ],
       },
     ],
   },
 };
 
+// The same walkthroughs for the US experience: American instruments, the gross-to-net estimate,
+// medical tracking and month-first statements, in American English.
+const TUTORIALS_US: Record<AppView, PageTutorial> = {
+  ledger: {
+    title: "Track a month in seconds",
+    badge: "Ledger",
+    steps: [
+      {
+        heading: "Add what comes in and goes out",
+        bullets: [
+          "Left column is income, right column is expenses.",
+          "Type a name and an amount — totals update as you type.",
+          "Enter your take-home pay as income; the Paycheck & tax page can work it out from your salary.",
+          "Use the arrows up top to move between months.",
+        ],
+      },
+      {
+        heading: "Organize it",
+        bullets: [
+          "Drag one expense onto another to group them into a category — Housing, Utilities, Medical, Transportation.",
+          "Toggle the loop icon to mark an item recurring, so it counts every month.",
+          "Name medical bills clearly (doctor, pharmacy, dental) and they count toward your deductible automatically.",
+        ],
+      },
+      {
+        heading: "See the picture",
+        bullets: [
+          "Your surplus (income minus expenses) updates live.",
+          "Import a CSV from Chase, Bank of America, Capital One or any bank — dates are read month-first.",
+          "Rough estimates are fine — you still get useful insights.",
+        ],
+      },
+    ],
+  },
+  dashboard: {
+    title: "Your money at a glance",
+    badge: "Dashboard",
+    steps: [
+      {
+        heading: "",
+        bullets: [
+          "This month's snapshot and the money flow show where income came from and where it went — click a stream to see what is inside.",
+          "Retirement & tax-advantaged accounts tracks 401(k), IRA and HSA contributions against this year's limits, plus your employer match.",
+          "Where your paycheck goes charts the Paycheck & tax estimate; the credit estimate reads on the FICO and VantageScore scales.",
+          "Anomalies flag unusual spending, an employer match left on the table, or an FSA about to expire; dismiss any with the ×.",
+          "Customize rearranges, resizes, adds and removes widgets, such as to-dos, notes or a spending calendar. The layout is remembered on this device.",
+        ],
+      },
+    ],
+  },
+  accounts: {
+    title: "Your whole net worth",
+    badge: "Accounts",
+    steps: [
+      {
+        heading: "",
+        bullets: [
+          "Add checking, savings (HYSA, CD, money market), brokerage and retirement accounts as assets.",
+          "Add credit cards, mortgages, auto loans and student loans as debts.",
+          "Net worth = assets minus debts, updated as you type.",
+          "Tap the i beside a type for a plain-English explanation — 401(k), Roth IRA, HSA, 529 and the rest.",
+          "Open Plan details on a 401(k), IRA or HSA for contribution source, % of pay, employer match, tax treatment and annual limits.",
+          "Open Loan details on a student loan to set federal vs private and the repayment plan; mortgages and auto loans take a remaining term.",
+        ],
+      },
+    ],
+  },
+  pay: {
+    title: "From gross salary to your paycheck",
+    badge: "Paycheck & tax",
+    steps: [
+      {
+        heading: "",
+        bullets: [
+          "Enter your gross annual salary, filing status, state and pay frequency.",
+          "401(k), HSA and FSA contributions set to come from your paycheck on Accounts are deducted automatically; add your pre-tax health premium.",
+          "Federal brackets, Social Security, Medicare and a state rate give the net paycheck — an estimate, not tax advice.",
+          "Use the net figure as this month's income with one click.",
+        ],
+      },
+    ],
+  },
+  goals: {
+    title: "Plan what you're saving for",
+    badge: "Goals",
+    steps: [
+      {
+        heading: "",
+        bullets: [
+          "Add a goal with a target amount and an optional deadline.",
+          "Pick how it's funded: Fixed, Auto, or Fill from spare surplus.",
+          "Link a goal to a HYSA or brokerage account and its balance and contributions flow in automatically.",
+          "The timeline shows when each goal completes; higher-priority goals are funded first.",
+        ],
+      },
+    ],
+  },
+  allocate: {
+    title: "Decide where spare money goes",
+    badge: "Allocate",
+    steps: [
+      {
+        heading: "",
+        bullets: [
+          "Type a one-off lump sum (a bonus, a tax refund) and check the spare-per-month figure from your ledger.",
+          "Pick a priority: least interest (avalanche), quick wins (snowball), lower payments soonest, credit score recovery, a cash buffer or estimated taxes first.",
+          "Charts compare every strategy against paying minimums only: interest, debt-free date, payments and card utilization.",
+          "Choose where savings go too — highest safe APY, highest expected return, tax-advantaged accounts or your goals.",
+          "Illustrations from your figures, not advice — free credit counseling is linked at the bottom.",
+        ],
+      },
+    ],
+  },
+  subscriptions: {
+    title: "Everything you pay for repeatedly",
+    badge: "Subscriptions",
+    steps: [
+      {
+        heading: "",
+        bullets: [
+          "Subscriptions, bills and renewals are detected from your ledger — nothing to set up.",
+          "Each one shows what it costs per year; every-4-weeks payments count 13 times, not 12.",
+          "Price increases are flagged with the extra cost per year. Charges in another currency move with the exchange rate and are not flagged.",
+          "Annual renewals show their next date. Anything that stops being paid moves to Canceled — or mark it canceled yourself, and delete it from there.",
+          "Open a row for its payment history, to widen the on-time window, or to say it is not a subscription.",
+        ],
+      },
+    ],
+  },
+  settings: {
+    title: "Data, privacy & rules",
+    badge: "Settings",
+    steps: [
+      {
+        heading: "",
+        bullets: [
+          "Export or import your whole vault as JSON or CSV.",
+          "Transfer rules auto-skip money moved between your own accounts.",
+          "Privacy mode hides amounts; switch country, currency or animations anytime.",
+        ],
+      },
+    ],
+  },
+};
+
+function tutorialsFor(region: RegionKey): Record<AppView, PageTutorial> {
+  return region === "US" ? TUTORIALS_US : TUTORIALS_GB;
+}
+
+// Development only (never in a production build): the dev server starts a brand-new browser
+// profile on a filled-in sample ledger for the detected country, so every screen can be tried
+// without typing data in. ?sample=us / ?sample=uk force a country, ?sample=blank starts empty.
+// Automated browsers (Playwright sets navigator.webdriver) start blank unless they ask.
+const DEV_SAMPLE_PARAM = import.meta.env.DEV ? new URLSearchParams(window.location.search).get("sample") : null;
+const DEV_SAMPLE_COUNTRY: CountryCode | null = import.meta.env.DEV ? sampleCountry(DEV_SAMPLE_PARAM) : null;
+const DEV_AUTO_SAMPLE = import.meta.env.DEV && import.meta.env.VITE_DEV_SAMPLE !== "0" && DEV_SAMPLE_PARAM === null && !navigator.webdriver;
+
 const TUTORIAL_SEEN_KEY = "tutorialSeenPages";
 const ONBOARDING_KEY = "onboardingComplete";
 const GETTING_STARTED_KEY = "gettingStartedDismissed";
+// One-off announcement of PDF statement imports for people who were already using the app.
+const PDF_NOTICE_KEY = "it_pdf_import_notice";
 
 function readFlag(key: string): boolean {
   try {
@@ -366,7 +643,6 @@ function readSeenTutorials(): Set<AppView> {
 
 type SaveState = "loading" | "saved" | "saving" | "offline" | "update";
 type SyncConflict = { local: LedgerState; cloud: LedgerState };
-type NetWorthHorizon = 12 | 24 | 60;
 type InsightChartView = "inflow-outflow" | "cash-flow" | "net-worth";
 type ExpenseDropPreview =
   | { type: "reorder"; targetId: string; edge: "before" | "after" }
@@ -388,7 +664,15 @@ type ImportReviewState = {
   canFlip: boolean;
   // Every row in one statement comes from one account; the user can change which.
   accountId?: string;
+  // Where the rows came from, for the header ("PDF statement review") and analytics.
+  format: ImportFormat;
+  // Issuer read from a PDF's letterhead, when recognised.
+  bank?: string;
 };
+// What a review was parsed from. Text sources re-parse from the raw text when the
+// sign-flip toggle is used; PDF sources re-parse from the extracted page text.
+type ImportSource = { kind: "text"; text: string } | { kind: "pdf"; pages: PdfPageText[] };
+type ImportFormat = "csv" | "ofx" | "qif" | "pdf" | "paste" | "feed";
 type LastImportAction = {
   batchId: string;
   fileName: string;
@@ -419,6 +703,9 @@ type AccountDraft = {
   dueDay: string;
 };
 
+// Account sub-types and their labels come from the user's country (region.ts): a UK user sees
+// "Current account" and "Cash ISA", a US user "Checking account" and "401(k)".
+
 const initialIncomeDraft: IncomeDraft = {
   source: "",
   amount: "",
@@ -444,8 +731,10 @@ const initialAccountDraft: AccountDraft = {
 };
 
 function App() {
-  const [showLanding, setShowLanding] = useState(() => !localStorage.getItem("hasSeenLanding"));
-  const [ledger, setLedger] = useState<LedgerState>(() => createInitialState());
+  // A deep link straight into an app page (/accounts) skips the marketing landing.
+  const [showLanding, setShowLanding] = useState(() => !DEV_SAMPLE_COUNTRY && !viewFromPath(window.location.pathname) && !localStorage.getItem("hasSeenLanding"));
+  // A brand-new ledger starts on the country the browser suggests; anything stored replaces it.
+  const [ledger, setLedger] = useState<LedgerState>(() => createInitialState(detectCountryFromBrowser()));
   const [hydrated, setHydrated] = useState(false);
   const [session, setSession] = useState<AuthSession | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -468,11 +757,17 @@ function App() {
   const [netWorthHorizon, setNetWorthHorizon] = useState<NetWorthHorizon>(24);
   // Dashboard first: it matches the nav order and hosts the getting-started
   // checklist, so new users land on an overview instead of a data-entry screen.
-  const [activeView, setActiveView] = useState<AppView>("dashboard");
+  // The URL names the page (/ledger, /accounts, …) so a refresh stays put.
+  const [activeView, setActiveViewState] = useState<AppView>(() => viewFromPath(window.location.pathname) ?? DEFAULT_VIEW);
+  const [layoutEditing, setLayoutEditing] = useState<LayoutPage | null>(null);
   const [theme, setTheme] = useState<ThemeMode>(readStoredTheme);
   const [tutorialView, setTutorialView] = useState<AppView | null>(null);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [confirmClearAll, setConfirmClearAll] = useState(false);
   const [checklistDismissed, setChecklistDismissed] = useState(() => readFlag(GETTING_STARTED_KEY));
+  const [showPdfNotice, setShowPdfNotice] = useState(false);
+  // Whether hydration found a saved ledger — the difference between a returning user and a new one.
+  const storedLedgerRef = useRef(false);
 
   // Retention: remembered bank, the new-month nudge, and the install prompt.
   const [bankSlug, setBankSlugState] = useState(() => readBankSlug());
@@ -509,7 +804,15 @@ function App() {
       window.removeEventListener("appinstalled", onInstalled);
     };
   }, []);
-  const [animationsEnabled, setAnimationsEnabled] = useState(true);
+  // Motion is on for everyone, except people who have asked their system to reduce it.
+  const [animationsEnabled, setAnimationsEnabled] = useState(() => !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
+  useEffect(() => {
+    const query = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    if (!query) return;
+    const onChange = () => setAnimationsEnabled(!query.matches);
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
   const [query, setQuery] = useState("");
   // Starts empty so nothing flashes on load — the toast effect ignores empty values.
   const [toast, setToast] = useState("");
@@ -536,8 +839,8 @@ function App() {
   const [feedsBusy, setFeedsBusy] = useState(false);
   // review-row id → feed_transactions.id for the currently open bank-feed review.
   const feedRowMapRef = useRef<Map<string, string> | null>(null);
-  // Raw text of the last file/paste import, so the "flip in/out" toggle can re-parse.
-  const lastImportTextRef = useRef<{ text: string; sourceName: string } | null>(null);
+  // The last file/paste import's source, so the "flip in/out" toggle can re-parse.
+  const lastImportSourceRef = useRef<{ source: ImportSource; sourceName: string } | null>(null);
   const [transferRuleInput, setTransferRuleInput] = useState("");
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(() => new Set());
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -579,8 +882,43 @@ function App() {
   }
   const syncEngine = syncEngineRef.current;
 
+  function setActiveView(view: AppView) {
+    setActiveViewState(view);
+    const path = pathForView(view);
+    if (window.location.pathname !== path) {
+      window.history.pushState({ view }, "", path + window.location.search + window.location.hash);
+    }
+  }
+
+  useEffect(() => {
+    const onPopState = () => setActiveViewState(viewFromPath(window.location.pathname) ?? DEFAULT_VIEW);
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  // Keep the address bar naming the page on show: "/" becomes "/dashboard" once the shell is up,
+  // and going back to the homepage clears it again.
+  useEffect(() => {
+    const path = showLanding ? "/" : pathForView(activeView);
+    if (window.location.pathname !== path) {
+      window.history.replaceState({ view: activeView }, "", path + window.location.search + window.location.hash);
+    }
+  }, [showLanding, activeView]);
+
+  // Country decides the experience: US labels, account types and tools, or the UK-geared original.
+  const region: RegionKey = regionOf(ledger.country);
+  const t = useMemo(() => textLocalizer(region), [region]);
+  const [dashboardLayout, setDashboardLayout] = useState<PageLayout>(() => loadLayout("dashboard", region));
+  // Each region keeps its own arrangement; switching country loads that region's saved layout.
+  useEffect(() => {
+    setDashboardLayout(loadLayout("dashboard", region));
+    setLayoutEditing(null);
+  }, [region]);
+
   const currentMonth = ledger.months[ledger.selectedMonth] ?? seedMonthFromPrevious();
   const moneyFormatter = useMemo(() => getCurrencyFormatter(ledger.currency), [ledger.currency]);
+  // Prices to the penny, for subscriptions where £10.99 → £12.99 is the whole story.
+  const preciseFormatter = useMemo(() => getPreciseCurrencyFormatter(ledger.currency), [ledger.currency]);
   const currencySymbol = useMemo(() => getCurrencySymbol(ledger.currency), [ledger.currency]);
   const projection = useMemo(() => calculateProjection(currentMonth), [currentMonth]);
   // Debt balances rolled forward from their snapshot month to today, and 0%/intro windows
@@ -614,25 +952,17 @@ function App() {
     [expenseGroups],
   );
   const importCategoryOptions = useMemo(() => {
-    const names = new Set([
-      "Unsorted",
-      "Income",
-      "Home",
-      "Food",
-      "Bills",
-      "Travel",
-      "Subscriptions",
-      "Health",
-      "Tax",
-      "Debt payments",
-      "Transfers",
-    ]);
+    const names = new Set(
+      region === "US"
+        ? ["Unsorted", "Income", "Housing", "Food", "Utilities", "Transportation", "Subscriptions", "Medical", "Health", "Tax", "Debt payments", "Transfers"]
+        : ["Unsorted", "Income", "Home", "Food", "Bills", "Travel", "Subscriptions", "Health", "Tax", "Debt payments", "Transfers"],
+    );
     categoryOptions.forEach((option) => names.add(option.name));
     importReview?.rows.forEach((row) => {
       if (row.category) names.add(row.category);
     });
     return Array.from(names).sort((a, b) => a.localeCompare(b));
-  }, [categoryOptions, importReview?.rows]);
+  }, [categoryOptions, importReview?.rows, region]);
   const transferRules = useMemo(
     () => ledger.categoryRules.filter((rule) => rule.kind === "transfer"),
     [ledger.categoryRules],
@@ -653,7 +983,7 @@ function App() {
       ),
     );
   }, [currentMonth.expenses, expenseGroups, normalizedQuery]);
-  const monthlyBars = useMemo(() => buildMonthlyBars(ledger, currentMonth), [ledger, currentMonth]);
+  const monthlyBars = useMemo(() => buildMonthlyBars(ledger), [ledger, currentMonth]);
   const monthlyFlowPoints = useMemo(() => buildMonthlyFlowPoints(ledger), [ledger]);
   const healthScore = useMemo(
     () => calculateHealthScore({ projection, debtSummary, accounts: effectiveAccounts, savingsTarget: ledger.savingsTarget }),
@@ -662,6 +992,47 @@ function App() {
   const financialSignals = useMemo(
     () => buildFinancialSignals({ projection, debtSummary, accounts: effectiveAccounts, assetSummary, month: currentMonth, savingsTarget: ledger.savingsTarget }),
     [currentMonth, debtSummary, assetSummary, effectiveAccounts, ledger.savingsTarget, projection],
+  );
+  // Plan-level signals (employer match left behind, limits exceeded, FSA expiring) join the
+  // ledger-based anomalies.
+  const planSignals = useMemo(
+    () =>
+      buildPlanSignals({
+        accounts: effectiveAccounts,
+        taxProfile: ledger.taxProfile,
+        healthPlan: ledger.healthPlan,
+        months: ledger.months,
+        region,
+        formatter: moneyFormatter,
+      }),
+    [effectiveAccounts, ledger.taxProfile, ledger.healthPlan, ledger.months, region, moneyFormatter],
+  );
+  const allSignals = useMemo(() => {
+    if (!planSignals.length) return financialSignals;
+    const ledgerSignals = financialSignals.filter((signal) => signal.id !== "no-urgent-signals");
+    return [...ledgerSignals, ...planSignals].slice(0, 8);
+  }, [financialSignals, planSignals]);
+  // The Insights widgets' own data, and the model the money-flow family of widgets draws from.
+  // The model walks every month of the ledger, so it is only built while the Dashboard is open.
+  const insightsState = useMemo(() => normalizeInsightsState(ledger.insights), [ledger.insights]);
+  const insightsModel = useMemo(
+    () => (activeView === "dashboard" ? buildInsightsModel(ledger, ledger.selectedMonth, { formatter: moneyFormatter }) : null),
+    [activeView, ledger, moneyFormatter],
+  );
+  // Anomalies: the ledger and plan signals, plus the month-on-month ones the insights model adds
+  // (category spikes, subscription creep, bills that usually would have landed by now).
+  const anomalySignals = useMemo(() => {
+    if (!insightsModel) return allSignals;
+    const known = new Set([...allSignals, ...financialSignals].map((signal) => signal.id));
+    const extra = insightsModel.signals.filter((signal) => !known.has(signal.id) && signal.id !== "no-urgent-signals");
+    if (!extra.length) return allSignals;
+    return [...allSignals.filter((signal) => signal.id !== "no-urgent-signals"), ...extra].slice(0, 10);
+  }, [allSignals, financialSignals, insightsModel]);
+  const creditReading = useMemo(() => interpretCreditScore(healthScore.estimatedCreditScore, region), [healthScore.estimatedCreditScore, region]);
+  const takeHome = useMemo(() => computeTakeHome(region, ledger.taxProfile, ledger.accounts), [region, ledger.taxProfile, ledger.accounts]);
+  const payrollAccounts = useMemo(
+    () => ledger.accounts.filter((account) => account.accountClass !== "debt" && account.contributionSource === "payroll" && Number(account.monthlyContribution) > 0),
+    [ledger.accounts],
   );
   // Goals share only the money that isn't already routed into an account each month; a goal's
   // own account pays its contribution straight in.
@@ -687,6 +1058,30 @@ function App() {
       }),
     [ledger.goals, goalPlannerSurplus, ledger.goalsHorizonMonths, goalPlan.dedicatedMonthly],
   );
+  // The Allocate page and its widget: every payoff strategy simulated from the live debts, the
+  // same spare-per-month figure the goal planner uses, and the saved plan settings.
+  // "Spare each month" for the plan is the ledger's own figure, whatever the Goals page was told.
+  const ledgerSpare = ledger.goalPlannerSurplus === null
+    ? goalPlannerSurplus
+    : goalPlanInputs({ goals: ledger.goals, accounts: effectiveAccounts, month: currentMonth, recurringSurplus: projection.recurringMonthlySurplus, override: null }).monthlySurplus;
+  const allocationPlan = useMemo(
+    () =>
+      comparePlans(
+        buildPlanInputs({
+          accounts: effectiveAccounts,
+          goals: ledger.goals,
+          settings: ledger.allocation,
+          monthlySurplus: ledgerSpare,
+          monthlyExpenses: projection.recurringMonthlyExpenses,
+          assumedInvestmentReturn: ledger.assumedInvestmentReturn,
+          region,
+          country: ledger.country,
+          taxProfile: ledger.taxProfile,
+        }),
+        ledger.allocation.priority,
+      ),
+    [effectiveAccounts, ledger.goals, ledger.allocation, ledgerSpare, projection.recurringMonthlyExpenses, ledger.assumedInvestmentReturn, region, ledger.country, ledger.taxProfile],
+  );
   const selectedYear = ledger.selectedMonth.split("-")[0];
   const menuExpense = categoryMenu ? currentMonth.expenses.find((expense) => expense.id === categoryMenu.expenseId) : undefined;
   const debtAccountNameById = useMemo(
@@ -707,12 +1102,8 @@ function App() {
     [currentMonth],
   );
   const showSeededBanner = seededEntryCount > 0 && !seededBannerDismissed.has(ledger.selectedMonth);
-  const detectedSubscriptions = useMemo(() => detectSubscriptions(ledger), [ledger]);
-  const recurringSuggestions = useMemo(() => suggestRecurringFlags(ledger).slice(0, 5), [ledger]);
-  const missedRecurring = useMemo(
-    () => findMissedRecurring(ledger, new Date().toISOString().slice(0, 10)).slice(0, 4),
-    [ledger],
-  );
+  // Subscriptions, bills and renewals detected from the ledger, with the user's decisions applied.
+  const subscriptionReport = useMemo(() => detectSubscriptions(ledger), [ledger]);
   // Learned (non-transfer) rules with live match counts, for the hygiene panel.
   const learnedRules = useMemo(() => {
     const rules = ledger.categoryRules.filter((rule) => rule.kind !== "transfer");
@@ -735,10 +1126,56 @@ function App() {
       income: monthsList.some((month) => month.incomes.length > 0),
       expenses: monthsList.some((month) => month.expenses.length > 0),
       account: ledger.accounts.length > 0,
+      pay: Number(ledger.taxProfile.grossAnnualSalary) > 0,
       goal: ledger.goals.length > 0,
       imported: ledger.importBatches.length > 0,
     };
-  }, [ledger.months, ledger.accounts, ledger.goals, ledger.importBatches]);
+  }, [ledger.months, ledger.accounts, ledger.goals, ledger.importBatches, ledger.taxProfile.grossAnnualSalary]);
+
+  // Which specialist pages sit in the sidebar. See navTools.ts.
+  const [navTools, setNavTools] = useState<NavToolsPrefs | null>(readNavTools);
+  const [toolsTrayOpen, setToolsTrayOpen] = useState(false);
+  useEffect(() => {
+    if (!hydrated || navTools) return;
+    const hasData = Object.values(setupProgress).some(Boolean);
+    const initial = { pinned: initialPinned(hasData), seen: [] };
+    setNavTools(initial);
+    writeNavTools(initial);
+  }, [hydrated, navTools, setupProgress]);
+  const toolPrefs: NavToolsPrefs = navTools ?? { pinned: [...TOOL_VIEWS], seen: [] };
+  const suggestedTools = useMemo(
+    () =>
+      toolSuggestions({
+        hasIncome: setupProgress.income,
+        salaryEntered: setupProgress.pay,
+        debtCount: ledger.accounts.filter((account) => isDebtClass(account) && account.balance > 0).length,
+        monthlySurplus: projection.monthlySurplus,
+        hasGoals: ledger.goals.length > 0,
+      }),
+    [setupProgress.income, setupProgress.pay, ledger.accounts, projection.monthlySurplus, ledger.goals.length],
+  );
+  function updateNavTools(change: (prefs: NavToolsPrefs) => NavToolsPrefs) {
+    const next = change(toolPrefs);
+    setNavTools(next);
+    writeNavTools(next);
+  }
+  function setToolPinned(tool: ToolView, pinned: boolean) {
+    updateNavTools((prefs) => ({
+      ...prefs,
+      pinned: pinned ? TOOL_VIEWS.filter((t) => t === tool || prefs.pinned.includes(t)) : prefs.pinned.filter((t) => t !== tool),
+    }));
+    track("nav_tool", { tool, action: pinned ? "add" : "remove" });
+  }
+  function toggleToolsTray() {
+    if (!toolsTrayOpen) {
+      // Opening the list shows every current suggestion, so the badge is cleared.
+      const shown = TOOL_VIEWS.filter((tool) => suggestedTools[tool]);
+      if (shown.some((tool) => !toolPrefs.seen.includes(tool))) {
+        updateNavTools((prefs) => ({ ...prefs, seen: TOOL_VIEWS.filter((t) => shown.includes(t) || prefs.seen.includes(t)) }));
+      }
+    }
+    setToolsTrayOpen((open) => !open);
+  }
 
   useEffect(() => {
     let alive = true;
@@ -747,9 +1184,16 @@ function App() {
       try {
         const stored = await loadLedgerState();
         if (!alive) return;
+        if (DEV_SAMPLE_COUNTRY) {
+          loadSampleData(DEV_SAMPLE_COUNTRY);
+          return;
+        }
         // Successful loads are silent — startup toasts were noise.
         if (stored) {
+          storedLedgerRef.current = true;
           setLedger(normalizeState(stored));
+        } else if (DEV_AUTO_SAMPLE) {
+          loadSampleData(detectCountryFromBrowser());
         }
       } catch {
         setToast("Storage unavailable — changes won't survive a refresh");
@@ -837,6 +1281,27 @@ function App() {
       alive = false;
     };
   }, [hydrated, user?.id]);
+
+  // Returning users are told once that PDF statements now import directly. Someone
+  // opening the app for the first time after the feature shipped has nothing to be
+  // told, so the flag is stamped straight away and the notice never appears for them.
+  useEffect(() => {
+    if (!hydrated || showLanding || readFlag(PDF_NOTICE_KEY)) return;
+    const hasData = setupProgress.income || setupProgress.expenses || setupProgress.account || setupProgress.imported;
+    const returning = storedLedgerRef.current && (hasData || visitCount > 1);
+    if (returning) setShowPdfNotice(true);
+    else writeFlag(PDF_NOTICE_KEY);
+  }, [hydrated, showLanding]);
+
+  function dismissPdfNotice(action: "dismiss" | "import") {
+    writeFlag(PDF_NOTICE_KEY);
+    setShowPdfNotice(false);
+    track("pdf_notice", { action });
+    if (action === "import") {
+      setActiveView("settings");
+      csvInputRef.current?.click();
+    }
+  }
 
   // Nudge unsigned-in users to back up — but not in their first minutes.
   // Interrupting a brand-new user mid-setup cost more than the nudge earned.
@@ -943,6 +1408,10 @@ function App() {
       params.delete("feedback");
       changed = true;
     }
+    if (params.has("sample")) {
+      params.delete("sample");
+      changed = true;
+    }
     // Static pages tag their CTAs with ?ref=<page> so we can see which guides,
     // calculators and comparisons actually send people into the app.
     const ref = params.get("ref");
@@ -1033,6 +1502,12 @@ function App() {
             name: row.name,
             accountClass: row.accountClass,
             type: row.type,
+            ...(row.accountClass === "debt"
+              ? {}
+              : {
+                  taxTreatment: defaultTaxTreatment(regionOf(result.country), row.accountClass, row.type),
+                  contributionSource: defaultContributionSource(regionOf(result.country), row.accountClass, row.type),
+                }),
             balance: row.balance,
             rate: row.accountClass === "investment" ? current.assumedInvestmentReturn : 0,
             promoRate: 0,
@@ -1075,6 +1550,7 @@ function App() {
 
         return {
           ...current,
+          country: result.country,
           currency: result.currency,
           months: { ...current.months, [monthKey]: { ...month, incomes, expenses } },
           accounts: distinctAccountColors(accounts),
@@ -1082,6 +1558,9 @@ function App() {
         };
       });
       setToast("Setup saved — your dashboard is live");
+    } else if (result.country !== ledger.country || result.currency !== ledger.currency) {
+      // Nothing else entered, but the country/currency choice still counts.
+      updateLedger((current) => ({ ...current, country: result.country, currency: result.currency }));
     }
 
     setActiveView("dashboard");
@@ -1129,18 +1608,24 @@ function App() {
   useEffect(() => {
     if (!categoryMenu) return;
 
+    const openedAt = performance.now();
     function closeMenu() {
       setCategoryMenu(null);
+    }
+    // Opening the menu can itself nudge the page (touch browsers settle the tap target into view
+    // a frame later); only scrolling that happens after that counts as "scrolled away".
+    function closeOnScroll() {
+      if (performance.now() - openedAt > 400) closeMenu();
     }
 
     window.addEventListener("click", closeMenu);
     window.addEventListener("resize", closeMenu);
-    window.addEventListener("scroll", closeMenu, true);
+    window.addEventListener("scroll", closeOnScroll, true);
 
     return () => {
       window.removeEventListener("click", closeMenu);
       window.removeEventListener("resize", closeMenu);
-      window.removeEventListener("scroll", closeMenu, true);
+      window.removeEventListener("scroll", closeOnScroll, true);
     };
   }, [categoryMenu]);
 
@@ -1151,6 +1636,17 @@ function App() {
       ...syncLedgerLinks(updater(current)),
       lastSavedAt: new Date().toISOString(),
     }));
+  }
+
+  // The Insights widgets' own data (looks, dismissed flags, notes, to-dos) lives in the ledger.
+  function patchInsights(updater: (current: InsightsState) => InsightsState) {
+    updateLedger((current) => ({ ...current, insights: updater(normalizeInsightsState(current.insights)) }));
+  }
+
+  function updateAllocation(patch: Partial<AllocationSettings>) {
+    updateLedger((current) => ({ ...current, allocation: { ...current.allocation, ...patch } }));
+    const field = Object.keys(patch)[0];
+    if (field) track("allocation_changed", { field, ...(field === "priority" || field === "savingsPriority" ? { value: String(patch[field as keyof AllocationSettings]) } : {}) });
   }
 
   function updateCurrentMonth(updater: (month: MonthBudget) => MonthBudget) {
@@ -1433,10 +1929,10 @@ function App() {
     setToast(entry?.seededFrom ? "Removed — won’t auto-add next month" : "Expense removed");
   }
 
-  function markCandidateRecurring(candidate: RecurrenceCandidate) {
-    updateLedger((current) => applyRecurringFlag(current, candidate));
-    setToast(`${candidate.label} marked recurring — it now feeds the forecast`);
-    track("recurring_marked", { cadence: candidate.cadence });
+  function cancelSubscription(subscription: Subscription, cancelledAt: string) {
+    updateLedger((current) => markSubscriptionCancelled(current, subscription, cancelledAt));
+    setToast(t(`${subscription.label} marked cancelled — it won't be copied into new months`));
+    track("subscription_cancelled", { cadence: subscription.cadence, detected: subscription.status === "stopped" });
   }
 
   function addAccount() {
@@ -1448,9 +1944,16 @@ function App() {
 
     const cls = accountDraft.accountClass;
     const isDebt = cls === "debt";
+    const type = accountDraft.type;
     // Investment accounts default their rate to the global assumed return when left blank.
     const fallbackRate = cls === "investment" ? ledger.assumedInvestmentReturn : 0;
     const rate = accountDraft.rate.trim() === "" ? fallbackRate : Math.max(-50, Number(accountDraft.rate) || 0);
+    // Tax treatment and where contributions come from follow the type; both can be changed later.
+    const planDefaults: Partial<Account> = isDebt
+      ? type === "student-loan" && region === "US"
+        ? { studentLoanType: "federal", repaymentPlan: "standard" }
+        : {}
+      : { taxTreatment: defaultTaxTreatment(region, cls, type), contributionSource: defaultContributionSource(region, cls, type) };
 
     updateLedger((current) => ({
       ...current,
@@ -1466,7 +1969,7 @@ function App() {
           promoRate: Math.max(0, Number(accountDraft.promoRate) || 0),
           promoMonths: clampWholeNumber(Number(accountDraft.promoMonths) || 0, 120),
           monthlyContribution: isDebt ? 0 : Math.max(0, Number(accountDraft.monthlyContribution) || 0),
-          creditLimit: isDebt && accountDraft.type !== "loan" ? Math.max(0, Number(accountDraft.creditLimit) || 0) : 0,
+          creditLimit: isDebt && !isLoanType(type) ? Math.max(0, Number(accountDraft.creditLimit) || 0) : 0,
           minimumPayment: isDebt ? Math.max(0, Number(accountDraft.minimumPayment) || 0) : 0,
           dueDay: isDebt ? clampDueDay(Number(accountDraft.dueDay) || 1) : 1,
           balanceAsOf: getMonthKey(),
@@ -1476,6 +1979,7 @@ function App() {
           includeInNetWorth: true,
           color: pickAccountColor(current.accounts.map((account) => account.color)),
           note: "",
+          ...planDefaults,
         },
       ],
     }));
@@ -1513,9 +2017,38 @@ function App() {
     setToast("Account removed");
   }
 
+  // Replaces the ledger with the sample for a country (development aid; see sampleData.ts).
+  function loadSampleData(country: CountryCode) {
+    writeFlag(ONBOARDING_KEY);
+    try {
+      localStorage.setItem("hasSeenLanding", "1");
+    } catch {
+      // Storage unavailable; the sample still loads.
+    }
+    setLedger(normalizeState(buildSampleLedger(country)));
+    setShowLanding(false);
+    setToast(country === "US" ? "US sample data loaded" : "UK sample data loaded");
+  }
+
   function changeCurrency(currency: CurrencyCode) {
     updateLedger((current) => ({ ...current, currency }));
     setToast(`Currency set to ${currency}`);
+  }
+
+  // Picking a country also sets its currency ("Other" keeps whatever is set — pick one in Settings).
+  function changeCountry(country: CountryCode) {
+    const option = countryOption(country);
+    updateLedger((current) => ({ ...current, country, currency: option.currency ?? current.currency }));
+    setToast(option.region === "US" ? "Switched to the US experience" : country === "GB" ? "Switched to the UK experience" : `Country set to ${option.label}`);
+    track("country_changed", { country });
+  }
+
+  function updateLayout(page: LayoutPage, updater: (layout: PageLayout) => PageLayout) {
+    setDashboardLayout((current) => {
+      const next = updater(current);
+      if (next !== current) saveLayout(page, region, next);
+      return next;
+    });
   }
 
   function addGoal() {
@@ -1897,12 +2430,26 @@ function App() {
     }
   }
 
-  async function importCsv(file: File) {
+  // One picker for every statement format. PDFs are sniffed from their bytes
+  // (not just the extension) and read locally with pdf.js; everything else is text.
+  async function importStatementFile(file: File) {
     try {
-      const text = await file.text();
-      openImportReview(text, file.name);
-    } catch {
-      setToast("Import failed");
+      const bytes = await file.arrayBuffer();
+      if (looksLikePdf(bytes, file.name)) {
+        setToast("Reading PDF…");
+        const pages = await extractPdfPages(bytes);
+        openImportReview({ kind: "pdf", pages }, file.name);
+        return;
+      }
+      openImportReview({ kind: "text", text: new TextDecoder().decode(bytes) }, file.name);
+    } catch (error) {
+      if (error instanceof PdfImportError) {
+        setImportReview({ fileName: file.name, rows: [], errors: [error.message], totalRows: 0, signInverted: false, canFlip: false, format: "pdf" });
+        setToast("Couldn’t read this PDF");
+        track("import_reviewed", { source: "pdf", rows: bucketCount(0), auto: 0, check: 0, needs: 0 });
+      } else {
+        setToast("Import failed");
+      }
     } finally {
       if (csvInputRef.current) {
         csvInputRef.current.value = "";
@@ -1992,6 +2539,7 @@ function App() {
       signInverted: false,
       canFlip: false,
       accountId: suggestImportAccount(false),
+      format: "feed",
     });
   }
 
@@ -2019,7 +2567,7 @@ function App() {
         setToast("Clipboard is empty");
         return;
       }
-      openImportReview(text, "Pasted transactions");
+      openImportReview({ kind: "text", text }, "Pasted transactions");
     } catch {
       setToast("Couldn’t read the clipboard — check browser permissions");
     }
@@ -2034,18 +2582,27 @@ function App() {
     return defaultAccountId(ledger);
   }
 
-  // Shared inlet for every text capture path (file upload, paste). Parses whatever
-  // format arrives, opens the review, and — when the user opted in — asks the AI
-  // backstop to upgrade the low-confidence rows in the background.
-  function openImportReview(text: string, sourceName: string, flipOverride?: boolean) {
-    lastImportTextRef.current = { text, sourceName };
-    const result = parseBankText({
-      text,
-      fileName: sourceName,
-      state: ledger,
-      fallbackMonthKey: ledger.selectedMonth,
-      flipSigns: flipOverride,
-    });
+  // Shared inlet for every capture path (file upload, PDF statement, paste). Parses
+  // whatever format arrives, opens the review, and — when the user opted in — asks
+  // the AI backstop to upgrade the low-confidence rows in the background.
+  function openImportReview(source: ImportSource, sourceName: string, flipOverride?: boolean) {
+    lastImportSourceRef.current = { source, sourceName };
+    const common = { fileName: sourceName, state: ledger, fallbackMonthKey: ledger.selectedMonth, flipSigns: flipOverride };
+    let result: CsvImportResult;
+    let bank: string | undefined;
+    if (source.kind === "pdf") {
+      const statement = parsePdfStatementWithDetection({ ...common, pages: source.pages });
+      result = statement;
+      bank = statement.bank;
+      // Counts only, never transaction text: enough to see which page lost rows.
+      console.info(
+        `[import] ${sourceName}: ${statement.pageCount} page(s), ${statement.bank ?? "bank not recognised"}, ${statement.layout} layout — ` +
+          statement.diagnostics.map((page) => `p${page.page}: ${page.lines} lines, header ${page.header ? "found" : "missing"}, ${page.rows} rows`).join("; "),
+      );
+    } else {
+      result = parseBankText({ ...common, text: source.text });
+    }
+    const format: ImportFormat = source.kind === "pdf" ? "pdf" : importSourceOf(sourceName);
     setImportReview({
       fileName: sourceName,
       rows: matchDebtPaymentRows(result.rows, effectiveAccounts, moneyFormatter),
@@ -2054,17 +2611,24 @@ function App() {
       signInverted: Boolean(result.signInverted),
       canFlip: true,
       accountId: suggestImportAccount(Boolean(result.signInverted)),
+      format,
+      bank,
     });
+    const count = result.rows.length;
     setToast(
-      !result.rows.length
-        ? "Nothing recognisable to import"
+      !count
+        ? source.kind === "pdf"
+          ? "No transactions found in this PDF"
+          : "Nothing recognisable to import"
         : result.signInverted
           ? "Credit-card statement detected — amounts flipped"
-          : "Transactions ready for review",
+          : source.kind === "pdf"
+            ? `${bank ? `${bank} statement` : "PDF statement"} read — ${count} transaction${count === 1 ? "" : "s"} ready for review`
+            : "Transactions ready for review",
     );
     if (result.rows.length) {
       track("import_reviewed", {
-        source: importSourceOf(sourceName),
+        source: format,
         rows: bucketCount(result.rows.length),
         auto: result.rows.filter((row) => !row.duplicate && row.confidence >= 0.9).length,
         check: result.rows.filter((row) => !row.duplicate && row.confidence >= 0.6 && row.confidence < 0.9).length,
@@ -2074,7 +2638,10 @@ function App() {
 
     if (result.rows.length && isAiCategorizationAvailable(Boolean(user), Boolean(ledger.aiCategorizationEnabled))) {
       const categories = Array.from(
-        new Set(["Home", "Food", "Bills", "Travel", "Subscriptions", "Health", "Personal", "Work", ...categoryOptions.map((option) => option.name)]),
+        new Set([
+          ...(region === "US" ? ["Housing", "Food", "Utilities", "Transportation", "Subscriptions", "Medical", "Personal", "Work"] : ["Home", "Food", "Bills", "Travel", "Subscriptions", "Health", "Personal", "Work"]),
+          ...categoryOptions.map((option) => option.name),
+        ]),
       );
       void aiCategorizeRows(result.rows, categories)
         .then((suggestions) => {
@@ -2096,9 +2663,9 @@ function App() {
   // "This is a card statement" toggle in the review — re-parses the original
   // text with the opposite sign convention (user edits reset by design).
   function toggleImportSignFlip() {
-    const source = lastImportTextRef.current;
-    if (!source || !importReview) return;
-    openImportReview(source.text, source.sourceName, !importReview.signInverted);
+    const last = lastImportSourceRef.current;
+    if (!last || !importReview) return;
+    openImportReview(last.source, last.sourceName, !importReview.signInverted);
   }
 
   function updateImportReviewRow(id: string, patch: Partial<CsvImportRow>) {
@@ -2364,6 +2931,35 @@ function App() {
     setToast("Month cleared");
   }
 
+  // Everything back to how a brand-new user finds it: an empty ledger (signed in, the sync engine
+  // pushes it like any other edit, so other devices empty too), the short sidebar, the default
+  // dashboard, the checklist and the setup wizard. Only the country, theme and sign-in survive.
+  async function clearAllData() {
+    const fresh = { ...createInitialState(ledger.country), lastSavedAt: new Date().toISOString() };
+    try {
+      for (const key of [ONBOARDING_KEY, GETTING_STARTED_KEY, TUTORIAL_SEEN_KEY]) localStorage.removeItem(key);
+    } catch {
+      // localStorage unavailable — nothing was stored there either.
+    }
+    for (const key of ["GB", "US"] as const) clearLayout("dashboard", key);
+    const tools = { pinned: initialPinned(false), seen: [] };
+    writeNavTools(tools);
+    setNavTools(tools);
+    setToolsTrayOpen(false);
+    setDashboardLayout(defaultLayout("dashboard", region));
+    setChecklistDismissed(false);
+    setConfirmClearAll(false);
+    setLedger(fresh);
+    try {
+      await saveLedgerState(fresh);
+      setToast("All data cleared");
+    } catch {
+      setToast("Cleared here — the cloud copy will update when you're back online");
+    }
+    setActiveView("dashboard");
+    setOnboardingOpen(true);
+  }
+
   function openNewTransaction() {
     setActiveView("ledger");
     focusNextFrame(incomeSourceInputRef);
@@ -2386,7 +2982,7 @@ function App() {
     try {
       await signOut();
       await syncEngine.reset();
-      const fresh = createInitialState();
+      const fresh = createInitialState(detectCountryFromBrowser());
       await saveLedgerState(fresh);
       setLedger(fresh);
       setSyncConflict(null);
@@ -2471,26 +3067,328 @@ function App() {
     return () => window.removeEventListener("keydown", handleGlobalShortcuts);
   }, [categoryMenu, groupingSourceId, query]);
 
-  const navItems: Array<{ id: AppView; label: string; icon: ReactNode }> = [
+  function changeLayout(page: LayoutPage, action: "move" | "resize" | "remove" | "add" | "reset", updater: (layout: PageLayout) => PageLayout) {
+    updateLayout(page, updater);
+    track("layout_changed", { page, action });
+  }
+
+  // The Ledger's "see the year" link: the annual projection on the Dashboard, added back if it was
+  // removed, and scrolled to.
+  function openAnnualView() {
+    updateLayout("dashboard", (layout) => addWidget(layout, "dashboard", region, "annual"));
+    setActiveView("dashboard");
+    window.requestAnimationFrame(() => document.querySelector('[data-widget-id="annual"]')?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
+
+  // The estimator lives on its own page; every "estimate your pay" link lands there.
+  function openEstimator() {
+    setActiveView("pay");
+  }
+
+  // "Use as monthly income" on the estimator: one recurring take-home row in the current month,
+  // updated in place if it already exists.
+  function applyTakeHomeIncome(monthlyNet: number) {
+    const amount = Math.round(monthlyNet * 100) / 100;
+    if (amount <= 0) return;
+    const source = "Salary (take-home)";
+    updateCurrentMonth((month) => {
+      const existing = month.incomes.find((income) => income.source.trim().toLowerCase() === source.toLowerCase());
+      if (existing) {
+        return { ...month, incomes: month.incomes.map((income) => (income.id === existing.id ? { ...income, amount, recurring: true } : income)) };
+      }
+      return {
+        ...month,
+        incomes: [
+          ...month.incomes,
+          {
+            id: createId("income"),
+            source,
+            amount,
+            color: colors[month.incomes.length % colors.length],
+            recurring: true,
+            date: newEntryDate(),
+            accountId: guessAccountId(ledger, "income", source),
+          },
+        ],
+      };
+    });
+    setToast(`${moneyFormatter.format(amount)} a month added as take-home income`);
+  }
+
+  const insightWidgetActions: WidgetActions = {
+    patchInsights,
+    markRecurring: (candidate) => {
+      updateLedger((current) => applyRecurringFlag(current, candidate));
+      setToast(`${candidate.label} marked recurring — it now feeds the forecast`);
+      track("recurring_marked", { cadence: candidate.cadence });
+    },
+    navigate: (view) => setActiveView(view),
+    setSavingsTarget: (value) => updateLedger((current) => ({ ...current, savingsTarget: value })),
+    toast: setToast,
+  };
+
+  // Every widget on the Dashboard. The money-flow family draws through InsightWidgetCard; the
+  // rest are rendered here.
+  const renderDashboardWidget: WidgetRenderer = (id, size) => {
+    const spec = INSIGHT_WIDGET_SPECS[id];
+    if (spec && insightsModel) {
+      return (
+        <InsightWidgetCard
+          id={id}
+          title={t(widgetDefinition("dashboard", id)?.title[region] ?? id)}
+          spec={spec}
+          model={insightsModel}
+          insights={insightsState}
+          actions={insightWidgetActions}
+          formatter={moneyFormatter}
+          privacy={ledger.privacyMode}
+          animations={animationsEnabled}
+          editing={layoutEditing === "dashboard"}
+          onVariant={(variant) => patchInsights((current) => setWidgetVariant(current, id, spec.type, variant))}
+        />
+      );
+    }
+    switch (id) {
+      case "snapshot":
+        return (
+          <section className="summaryStrip" aria-label="Monthly snapshot">
+            <MetricCard label="Income" value={projection.monthlyIncome} tone="green" privacy={ledger.privacyMode} formatter={moneyFormatter} />
+            <MetricCard label="Spending" value={projection.monthlyExpenses} tone="red" privacy={ledger.privacyMode} formatter={moneyFormatter} />
+            <MetricCard label="Surplus" value={projection.monthlySurplus} tone={projection.monthlySurplus >= 0 ? "green" : "red"} privacy={ledger.privacyMode} formatter={moneyFormatter} />
+            <MetricCard label="Savings rate" value={projection.savingsRate} suffix="%" tone={projection.savingsRate >= ledger.savingsTarget ? "green" : "amber"} />
+          </section>
+        );
+      case "net-worth":
+        return (
+          <article className="miniPanel flowPanel">
+            <PanelTitle
+              title="Net worth outlook"
+              icon={<LineChart size={16} />}
+              action={<NetWorthHorizonTabs horizon={netWorthHorizon} onChange={setNetWorthHorizon} compact />}
+            />
+            <p className="panelSubcopy">Projects your recurring monthly surplus, debt payments, and interest after any 0% period ends. One-off items are not extrapolated.</p>
+            <NetWorthChart points={netWorthOutlook} formatter={moneyFormatter} privacy={ledger.privacyMode} compact />
+          </article>
+        );
+      case "retirement":
+        return (
+          <RetirementWidget
+            accounts={effectiveAccounts}
+            region={region}
+            taxProfile={ledger.taxProfile}
+            formatter={moneyFormatter}
+            privacy={ledger.privacyMode}
+            onOpenAccounts={() => setActiveView("accounts")}
+            onOpenEstimator={openEstimator}
+          />
+        );
+      case "take-home":
+        return <TakeHomeWidget region={region} taxProfile={ledger.taxProfile} accounts={ledger.accounts} formatter={moneyFormatter} privacy={ledger.privacyMode} onOpen={openEstimator} />;
+      case "medical":
+        return (
+          <MedicalWidget
+            months={ledger.months}
+            healthPlan={ledger.healthPlan}
+            accounts={effectiveAccounts}
+            formatter={moneyFormatter}
+            symbol={currencySymbol}
+            privacy={ledger.privacyMode}
+            onChange={(patch) => updateLedger((current) => ({ ...current, healthPlan: { ...current.healthPlan, ...patch } }))}
+            onOpenAccounts={() => setActiveView("accounts")}
+          />
+        );
+      case "loans":
+        return <LoansWidget accounts={effectiveAccounts} region={region} taxProfile={ledger.taxProfile} formatter={moneyFormatter} privacy={ledger.privacyMode} onOpenAccounts={() => setActiveView("accounts")} />;
+      case "housing":
+        return <HousingWidget month={currentMonth} income={projection.monthlyIncome} region={region} formatter={moneyFormatter} privacy={ledger.privacyMode} onOpenLedger={() => setActiveView("ledger")} />;
+      case "credit":
+        return <CreditScoreWidget estimate={healthScore.estimatedCreditScore} noData={healthScore.noData} region={region} privacy={ledger.privacyMode} />;
+      case "goals":
+        return <GoalsWidget goals={ledger.goals} goalSequence={goalSequence} formatter={moneyFormatter} privacy={ledger.privacyMode} onOpenGoals={() => setActiveView("goals")} />;
+      case "payoff":
+        // Narrow it is the chosen plan at a glance; given the width it compares every strategy.
+        return (
+          <PayoffWidget
+            comparison={allocationPlan}
+            settings={ledger.allocation}
+            formatter={moneyFormatter}
+            privacy={ledger.privacyMode}
+            t={t}
+            compare={size === "l" || size === "xl"}
+            onOpen={() => setActiveView("allocate")}
+            onOpenAccounts={() => setActiveView("accounts")}
+          />
+        );
+      case "subscriptions":
+        return <SubscriptionsWidget report={subscriptionReport} formatter={moneyFormatter} preciseFormatter={preciseFormatter} privacy={ledger.privacyMode} t={t} onOpen={() => setActiveView("subscriptions")} />;
+      case "health":
+        return (
+          <article className={`miniPanel healthPanel ${healthScore.noData ? "" : healthTone(healthScore.score)}`}>
+            <PanelTitle title="Health score" icon={<Gauge size={16} />} action={<InfoHint label="How health score is calculated" text={t(healthScore.detail)} />} />
+            <div className="scoreHeadline">
+              <div className="scoreNumber">
+                {healthScore.noData ? "N/A" : formatDecimal(healthScore.score)}
+                {!healthScore.noData && <small>/10</small>}
+              </div>
+              {!healthScore.noData && <span className="scoreBadge">{healthScore.summary}</span>}
+            </div>
+            {healthScore.noData && <span className="scoreCaption">Add data to generate a score</span>}
+            {!healthScore.noData && (
+              <>
+                <div className="creditEstimate">
+                  <span>Estimated credit score</span>
+                  <strong>
+                    {creditReading.primary.score}
+                    <small>
+                      {" "}
+                      {creditReading.primary.scale} · {creditReading.primary.band.label}
+                    </small>
+                  </strong>
+                </div>
+                <div className="ruleList">
+                  <ProgressRule label="Cash flow" value={healthScore.cashFlowScore} target={75} />
+                  <ProgressRule label="Debt load" value={healthScore.debtLoadScore} target={75} />
+                  <ProgressRule label="Payments" value={healthScore.paymentPressureScore} target={75} />
+                  <ProgressRule label="Card headroom" value={healthScore.utilizationScore} target={75} />
+                  <ProgressRule label="Savings" value={healthScore.savingsScore} target={75} />
+                </div>
+              </>
+            )}
+          </article>
+        );
+      case "chart":
+        return (
+          <article className="miniPanel chartPanel">
+            <PanelTitle
+              title={insightChartTitle}
+              icon={insightChartView === "cash-flow" ? <BarChart3 size={16} /> : <LineChart size={16} />}
+              action={<InsightChartToggle value={insightChartView} onChange={setInsightChartView} />}
+            />
+            {insightChartView === "inflow-outflow" && <InflowOutflowChart points={monthlyFlowPoints} privacy={ledger.privacyMode} formatter={moneyFormatter} />}
+            {insightChartView === "cash-flow" && <BarChart bars={monthlyBars} privacy={ledger.privacyMode} formatter={moneyFormatter} />}
+            {insightChartView === "net-worth" && (
+              <>
+                <div className="chartUtilityRow">
+                  <NetWorthHorizonTabs horizon={netWorthHorizon} onChange={setNetWorthHorizon} compact />
+                </div>
+                <NetWorthChart points={netWorthOutlook} formatter={moneyFormatter} privacy={ledger.privacyMode} compact />
+              </>
+            )}
+          </article>
+        );
+      case "categories":
+        return (
+          <article className="miniPanel categoryPanel">
+            <PanelTitle title="Top categories" icon={<Database size={16} />} />
+            <div className="categoryList">
+              {categoryRows.length ? (
+                categoryRows.slice(0, 5).map((row) => (
+                  <div className="categoryRow" key={row.name}>
+                    <span className="swatch small" style={{ background: row.color }} />
+                    <span>{row.name}</span>
+                    <strong className={ledger.privacyMode ? "masked" : ""}>{moneyFormatter.format(row.annual / 12)}</strong>
+                    <em>{formatDecimal(row.share)}%</em>
+                  </div>
+                ))
+              ) : (
+                <EmptyState icon={<FolderPlus size={18} />} title="No categories yet" text="Drag related expenses together in Ledger to build this view." />
+              )}
+            </div>
+          </article>
+        );
+      case "anomalies": {
+        const { shown, hiddenCount } = visibleSignals(anomalySignals, insightsState.hiddenWarnings);
+        return (
+          <article className="miniPanel anomalyPanel">
+            <PanelTitle
+              title="Detected anomalies"
+              icon={
+                <InfoHint
+                  label="About detected anomalies"
+                  text={t("Flags are generated only from local income, outflow, debt, card limit, APR, payment, and categorisation data. They are not financial advice, but they point to pressure worth checking.")}
+                />
+              }
+            />
+            <div className="anomalyList">
+              {shown.map((signal) => (
+                <FinancialSignalCard
+                  key={signal.id}
+                  signal={signal}
+                  t={t}
+                  onDismiss={
+                    signal.id === "no-urgent-signals"
+                      ? undefined
+                      : () => patchInsights((current) => ({ ...current, hiddenWarnings: [...current.hiddenWarnings, signal.id] }))
+                  }
+                />
+              ))}
+              {!shown.length && <p className="panelHint">{t("Everything here has been dismissed.")}</p>}
+            </div>
+            {hiddenCount > 0 && (
+              <button className="linkButton" type="button" onClick={() => patchInsights((current) => ({ ...current, hiddenWarnings: [] }))}>
+                {t(`Show ${hiddenCount} dismissed ${hiddenCount === 1 ? "flag" : "flags"}`)}
+              </button>
+            )}
+          </article>
+        );
+      }
+      case "paycheck":
+        return <PaycheckBreakdownWidget region={region} taxProfile={ledger.taxProfile} accounts={ledger.accounts} formatter={moneyFormatter} privacy={ledger.privacyMode} onOpenPay={openEstimator} />;
+      case "annual":
+        return (
+          <section className="projectionPanel" aria-label="Annual calculation">
+            <div className="sectionHeading">
+              <div>
+                <h2>Annual projection</h2>
+                <p>Automatic from the selected monthly plan</p>
+              </div>
+              <div className="tabs" role="tablist" aria-label="Projection view">
+                <button className={projectionView === "overview" ? "selected" : ""} type="button" onClick={() => setProjectionView("overview")}>
+                  Overview
+                </button>
+                <button className={projectionView === "category" ? "selected" : ""} type="button" onClick={() => setProjectionView("category")}>
+                  By category
+                </button>
+                <button className={projectionView === "month" ? "selected" : ""} type="button" onClick={() => setProjectionView("month")}>
+                  By month
+                </button>
+              </div>
+            </div>
+            <div className="annualGrid">
+              <AnnualSnapshot projection={projection} privacy={ledger.privacyMode} formatter={moneyFormatter} />
+              <SavingsGauge projection={projection} target={ledger.savingsTarget} onTargetChange={(value) => updateLedger((current) => ({ ...current, savingsTarget: value }))} />
+              <ProjectionDetail view={projectionView} projection={projection} categoryRows={categoryRows} monthlyBars={monthlyBars} privacy={ledger.privacyMode} formatter={moneyFormatter} />
+            </div>
+          </section>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const payPageTitle = region === "US" ? "Paycheck & tax" : "Pay & tax";
+  const coreNavItems: Array<{ id: AppView; label: string; icon: ReactNode }> = [
     { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard size={20} /> },
     { id: "ledger", label: "Ledger", icon: <ReceiptText size={20} /> },
     { id: "accounts", label: "Accounts", icon: <CreditCard size={20} /> },
-    { id: "goals", label: "Goals", icon: <Target size={20} /> },
-    { id: "insights", label: "Insights", icon: <LineChart size={20} /> },
-    { id: "settings", label: "Settings", icon: <SettingsIcon size={20} /> },
+    { id: "subscriptions", label: "Subscriptions", icon: <Repeat size={20} /> },
   ];
-  const activeTitle =
-    activeView === "dashboard"
-      ? "Dashboard"
-      : activeView === "ledger"
-        ? "Ledger"
-        : activeView === "accounts"
-          ? "Accounts"
-          : activeView === "goals"
-            ? "Goals"
-            : activeView === "insights"
-              ? "Insights"
-              : "Settings";
+  const toolNavItems: Record<ToolView, { id: ToolView; label: string; icon: ReactNode; blurb: string }> = {
+    pay: {
+      id: "pay",
+      label: payPageTitle,
+      icon: <Calculator size={20} />,
+      blurb: region === "US" ? "Gross salary to take-home after federal, state and FICA" : "Gross salary to take-home after tax, NI and student loan",
+    },
+    allocate: { id: "allocate", label: "Allocate", icon: <Coins size={20} />, blurb: "Plan the fastest way to pay off debt and where spare money goes" },
+    goals: { id: "goals", label: "Goals", icon: <Target size={20} />, blurb: "Save towards things you want and see when you'll get there" },
+  };
+  // A tool opened from a widget or link shows in the sidebar while it is the page being viewed.
+  const visibleTools = TOOL_VIEWS.filter((tool) => toolPrefs.pinned.includes(tool) || activeView === tool);
+  const navItems = [...coreNavItems, ...visibleTools.map((tool) => toolNavItems[tool])];
+  const unpinnedTools = TOOL_VIEWS.filter((tool) => !toolPrefs.pinned.includes(tool));
+  const toolBadge = unseenSuggestionCount(toolPrefs, suggestedTools);
+  const unpinnedActiveTool = isToolView(activeView) && !toolPrefs.pinned.includes(activeView) ? activeView : null;
   const insightChartTitle =
     insightChartView === "cash-flow"
       ? "Cash flow volatility"
@@ -2540,10 +3438,11 @@ function App() {
         ref={csvInputRef}
         className="hiddenFile"
         type="file"
-        accept="text/csv,.csv,.ofx,.qif,.txt"
+        accept="text/csv,.csv,.ofx,.qif,.txt,application/pdf,.pdf"
+        aria-label="Import a bank statement file"
         onChange={(event) => {
           const file = event.currentTarget.files?.[0];
-          if (file) void importCsv(file);
+          if (file) void importStatementFile(file);
         }}
       />
 
@@ -2561,7 +3460,7 @@ function App() {
           {navItems.map((item) => (
             <button
               key={item.id}
-              className={activeView === item.id ? "navItem active" : "navItem"}
+              className={`navItem${activeView === item.id ? " active" : ""}${item.id === unpinnedActiveTool ? " preview" : ""}`}
               type="button"
               onClick={() => setActiveView(item.id)}
               aria-pressed={activeView === item.id}
@@ -2570,7 +3469,68 @@ function App() {
               {item.label}
             </button>
           ))}
+          <button
+            key="settings"
+            className={activeView === "settings" ? "navItem active" : "navItem"}
+            type="button"
+            onClick={() => setActiveView("settings")}
+            aria-pressed={activeView === "settings"}
+          >
+            <SettingsIcon size={20} />
+            Settings
+          </button>
         </nav>
+
+        {unpinnedTools.length > 0 && (
+          <div className="navTools">
+            <button
+              className={toolsTrayOpen ? "navToolsToggle open" : "navToolsToggle"}
+              type="button"
+              onClick={toggleToolsTray}
+              aria-expanded={toolsTrayOpen}
+              aria-controls="navToolsTray"
+            >
+              <Plus size={16} />
+              More tools
+              {toolBadge > 0 && (
+                <span className="navToolsBadge" aria-label={`${toolBadge} suggested for you`}>
+                  {toolBadge}
+                </span>
+              )}
+              <ChevronDown size={15} className="navToolsChevron" aria-hidden="true" />
+            </button>
+            {toolsTrayOpen && (
+              <ul className="navToolsTray" id="navToolsTray" aria-label="Tools you can add to the sidebar">
+                {unpinnedTools.map((tool) => {
+                  const item = toolNavItems[tool];
+                  const reason = suggestedTools[tool];
+                  return (
+                    <li key={tool} className={reason ? "navToolRow suggested" : "navToolRow"}>
+                      <button
+                        className="navToolOpen"
+                        type="button"
+                        onClick={() => {
+                          setActiveView(tool);
+                          setToolsTrayOpen(false);
+                        }}
+                      >
+                        <span className="navToolIcon" aria-hidden="true">{item.icon}</span>
+                        <span className="navToolText">
+                          <strong>{item.label}</strong>
+                          {reason && <em>{reason}</em>}
+                          <small>{item.blurb}</small>
+                        </span>
+                      </button>
+                      <button className="navToolAdd" type="button" onClick={() => setToolPinned(tool, true)} aria-label={`Add ${item.label} to sidebar`} data-tip="Add to sidebar">
+                        <Plus size={15} />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        )}
 
         <div className={`saveStatusChip ${saveState}`} role="status" aria-live="off">
           <span className="saveDot" aria-hidden="true" />
@@ -2591,7 +3551,7 @@ function App() {
           className="sideTutorialBtn"
           type="button"
           onClick={() => setTutorialView(activeView)}
-          data-tip={`Replay the ${TUTORIALS[activeView].badge} tutorial`}
+          data-tip={`Replay the ${tutorialsFor(region)[activeView].badge} tutorial`}
         >
           <GraduationCap size={16} />
           Tutorial
@@ -2625,8 +3585,10 @@ function App() {
 
       <div className="workspace">
         <header className="appBar">
+          {/* The page names itself in its own header below, so the bar only carries controls:
+              the month switcher on the Ledger, and the country, theme and privacy toggles. */}
           <div className="appBarTitle">
-            {activeView === "ledger" ? (
+            {activeView === "ledger" && (
               <div className="monthSwitch" aria-label="Selected month">
                 <button className="iconButton" type="button" onClick={() => changeMonth(-1)} aria-label="Previous month" aria-keyshortcuts="Alt+ArrowLeft">
                   <ChevronLeft size={19} />
@@ -2638,8 +3600,6 @@ function App() {
                   <ChevronRight size={19} />
                 </button>
               </div>
-            ) : (
-              <h2>{activeTitle}</h2>
             )}
           </div>
 
@@ -2658,10 +3618,10 @@ function App() {
           )}
 
           <div className="topActions">
-            <label className="currencyControl">
+            <label className="currencyControl countryControl">
               <span>{currencySymbol}</span>
-              <select value={ledger.currency} onChange={(event) => changeCurrency(event.target.value as CurrencyCode)} aria-label="Currency">
-                {currencyOptions.map((option) => (
+              <select value={ledger.country} onChange={(event) => changeCountry(event.target.value as CountryCode)} aria-label="Country">
+                {countryOptions.map((option) => (
                   <option value={option.code} key={option.code}>
                     {option.label}
                   </option>
@@ -2690,18 +3650,37 @@ function App() {
         </header>
 
         <main className="contentCanvas">
+          {unpinnedActiveTool && (
+            <div className="toolPinBanner" role="note">
+              <span>
+                <strong>{toolNavItems[unpinnedActiveTool].label}</strong> isn't in your sidebar yet.
+              </span>
+              <button className="linkButton" type="button" onClick={() => setToolPinned(unpinnedActiveTool, true)}>
+                <Plus size={14} />
+                Add to sidebar
+              </button>
+            </div>
+          )}
+
           {activeView === "dashboard" && (
             <section className="viewStack" aria-label="Dashboard">
               <div className="pageHeader compactHeader">
                 <div>
-                  <h2>Dashboard</h2>
+                  {/* Customise sits with the page title, apart from the month's figure on the right:
+                      one changes the page, the other is what the page tells you. */}
+                  <div className="pageTitleRow">
+                    <h2>Dashboard</h2>
+                    <LayoutEditButton page="dashboard" editing={layoutEditing === "dashboard"} onToggle={() => setLayoutEditing((current) => (current === "dashboard" ? null : "dashboard"))} t={t} />
+                  </div>
                   <p>Your money at a glance — this month and where it&rsquo;s heading.</p>
                 </div>
-                <div className="netBlock">
-                  <span>Left this month</span>
-                  <strong className={projection.monthlySurplus >= 0 ? "positiveText sensitive" : "negativeText sensitive"}>
-                    <AnimatedCurrency value={projection.monthlySurplus} formatter={moneyFormatter} />
-                  </strong>
+                <div className="pageHeaderSide">
+                  <div className="netBlock">
+                    <span>Left this month</span>
+                    <strong className={projection.monthlySurplus >= 0 ? "positiveText sensitive" : "negativeText sensitive"}>
+                      <AnimatedCurrency value={projection.monthlySurplus} formatter={moneyFormatter} />
+                    </strong>
+                  </div>
                 </div>
               </div>
 
@@ -2770,7 +3749,8 @@ function App() {
                 />
               )}
 
-              {!checklistDismissed && (
+              {/* Out of the way while the layout is being customised; back once it is done. */}
+              {!checklistDismissed && layoutEditing !== "dashboard" && (
                 <GettingStartedCard
                   items={[
                     {
@@ -2801,6 +3781,13 @@ function App() {
                       action: () => setActiveView("accounts"),
                     },
                     {
+                      id: "pay",
+                      label: region === "US" ? "Estimate your paycheck" : "Estimate your take-home pay",
+                      hint: region === "US" ? "Gross salary → net after federal, state and FICA" : "Gross salary → net after tax, NI and student loan",
+                      done: setupProgress.pay,
+                      action: () => setActiveView("pay"),
+                    },
+                    {
                       id: "goal",
                       label: "Set a savings goal",
                       hint: "See when you'll reach it",
@@ -2810,7 +3797,7 @@ function App() {
                     {
                       id: "import",
                       label: "Import a bank statement",
-                      hint: "Fill a whole month from a CSV in seconds",
+                      hint: "Fill a whole month from a CSV or PDF in seconds",
                       done: setupProgress.imported,
                       action: () => csvInputRef.current?.click(),
                     },
@@ -2823,59 +3810,21 @@ function App() {
                 />
               )}
 
-              <section className="summaryStrip" aria-label="Monthly snapshot">
-                <MetricCard label="Income" value={projection.monthlyIncome} tone="green" privacy={ledger.privacyMode} formatter={moneyFormatter} />
-                <MetricCard label="Spending" value={projection.monthlyExpenses} tone="red" privacy={ledger.privacyMode} formatter={moneyFormatter} />
-                <MetricCard label="Surplus" value={projection.monthlySurplus} tone={projection.monthlySurplus >= 0 ? "green" : "red"} privacy={ledger.privacyMode} formatter={moneyFormatter} />
-                <MetricCard label="Savings rate" value={projection.savingsRate} suffix="%" tone={projection.savingsRate >= ledger.savingsTarget ? "green" : "amber"} />
-              </section>
-
-              <section className="dashboardGrid">
-                <article className="miniPanel flowPanel">
-                  <PanelTitle
-                    title="Net worth outlook"
-                    icon={<LineChart size={16} />}
-                    action={<NetWorthHorizonTabs horizon={netWorthHorizon} onChange={setNetWorthHorizon} compact />}
-                  />
-                  <p className="panelSubcopy">Projects your recurring monthly surplus, debt payments, and interest after any 0% period ends. One-off items are not extrapolated.</p>
-                  <NetWorthChart points={netWorthOutlook} formatter={moneyFormatter} privacy={ledger.privacyMode} compact />
-                </article>
-                <article className="miniPanel debtPanel">
-                  <PanelTitle title="Accounts and imports" icon={<CreditCard size={16} />} />
-                  <div className="debtMiniGrid">
-                    <div>
-                      <span>Total debt</span>
-                      <strong className={ledger.privacyMode ? "masked" : ""}>{moneyFormatter.format(debtSummary.totalDebt)}</strong>
-                    </div>
-                    <div>
-                      <span>Monthly payments</span>
-                      <strong className={ledger.privacyMode ? "masked" : ""}>{moneyFormatter.format(debtSummary.monthlyMinimums)}</strong>
-                    </div>
-                    <div>
-                      <span>Card utilization</span>
-                      <strong>{formatDecimal(debtSummary.utilization)}%</strong>
-                    </div>
-                    <div>
-                      <span>Last import</span>
-                      <strong>{ledger.importBatches[0]?.importedRows ?? 0} rows</strong>
-                    </div>
-                  </div>
-                  <div className="buttonRow dashboardActions">
-                    <button className="commandButton" type="button" onClick={() => setActiveView("accounts")}>
-                      <CreditCard size={16} />
-                      Manage accounts
-                    </button>
-                    <button className="commandButton" type="button" onClick={() => csvInputRef.current?.click()}>
-                      <FileSpreadsheet size={16} />
-                      Import file
-                    </button>
-                    <button className="commandButton" type="button" onClick={() => void importFromClipboard()}>
-                      <ClipboardPaste size={16} />
-                      Paste transactions
-                    </button>
-                  </div>
-                </article>
-              </section>
+              <WidgetGrid
+                page="dashboard"
+                region={region}
+                layout={dashboardLayout}
+                editing={layoutEditing === "dashboard"}
+                hidden={hiddenWidgets(dashboardLayout, "dashboard", region)}
+                render={renderDashboardWidget}
+                onMove={(id, delta) => changeLayout("dashboard", "move", (layout) => moveWidget(layout, id, delta))}
+                onDrop={(id, targetId, edge) => changeLayout("dashboard", "move", (layout) => moveWidgetBefore(layout, id, targetId, edge))}
+                onResize={(id, direction) => changeLayout("dashboard", "resize", (layout) => cycleWidgetSize(layout, "dashboard", id, direction))}
+                onSetSize={(id, size) => changeLayout("dashboard", "resize", (layout) => resizeWidget(layout, "dashboard", id, size))}
+                onRemove={(id) => changeLayout("dashboard", "remove", (layout) => removeWidget(layout, id))}
+                onAdd={(id) => changeLayout("dashboard", "add", (layout) => addWidget(layout, "dashboard", region, id))}
+                onReset={() => changeLayout("dashboard", "reset", () => defaultLayout("dashboard", region))}
+              />
             </section>
           )}
 
@@ -2928,7 +3877,11 @@ function App() {
                 <Sparkles size={16} aria-hidden="true" />
                 <input
                   value={quickAddInput}
-                  placeholder="Quick add — try “costa 4.35”, “salary 2400 recurring”, or “tesco 42.61 yesterday”"
+                  placeholder={
+                    region === "US"
+                      ? "Quick add — try “starbucks 4.35”, “salary 3400 recurring”, or “target 42.61 yesterday”"
+                      : "Quick add — try “costa 4.35”, “salary 2400 recurring”, or “tesco 42.61 yesterday”"
+                  }
                   aria-label="Quick add transaction"
                   onChange={(event) => setQuickAddInput(event.target.value)}
                   onKeyDown={(event) => {
@@ -3109,6 +4062,11 @@ function App() {
                                 >
                                   {categoryCollapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
                                 </button>
+                                {categoryEmoji(group.category) && (
+                                  <span className="categoryEmoji" aria-hidden="true">
+                                    {categoryEmoji(group.category)}
+                                  </span>
+                                )}
                                 <input
                                   className="categoryNameInput"
                                   aria-label="Category name"
@@ -3236,6 +4194,7 @@ function App() {
                   month={currentMonth}
                   formatter={moneyFormatter}
                   privacy={ledger.privacyMode}
+                  t={t}
                   onDefaultChange={(accountId) => updateLedger((current) => ({ ...current, defaultAccountId: accountId }))}
                   onGoToAccounts={() => setActiveView("accounts")}
                   onNoteChange={(note) => updateCurrentMonth((month) => ({ ...month, note }))}
@@ -3244,9 +4203,9 @@ function App() {
               </section>
 
               <div className="annualInsightsCta">
-                <button className="commandButton" type="button" onClick={() => setActiveView("insights")}>
+                <button className="commandButton" type="button" onClick={openAnnualView}>
                   <LineChart size={16} />
-                  See annual insights
+                  See the year on the Dashboard
                 </button>
               </div>
             </section>
@@ -3257,7 +4216,7 @@ function App() {
               <div className="pageHeader compactHeader">
                 <div>
                   <h2>Accounts</h2>
-                  <p>Savings, current accounts, and investments alongside debt — together they make your net worth.</p>
+                  <p>{t("Savings, current accounts, and investments alongside debt — together they make your net worth.")}</p>
                 </div>
                 <div className="netBlock">
                   <span>Net Worth</span>
@@ -3276,7 +4235,7 @@ function App() {
 
               <section className="accountsGrid">
                 <article className="miniPanel accountsPanel">
-                  <PanelTitle title="Savings, cash & investments" icon={<PiggyBank size={16} />} />
+                  <PanelTitle title={region === "US" ? "Savings, cash, investments & retirement" : "Savings, cash & investments"} icon={<PiggyBank size={16} />} />
                   <div className="debtAccountList">
                     {effectiveAccounts.filter((a) => a.accountClass !== "debt").length ? (
                       effectiveAccounts
@@ -3286,6 +4245,8 @@ function App() {
                             key={account.id}
                             account={account}
                             otherColors={ledger.accounts.filter((other) => other.id !== account.id).map((other) => other.color)}
+                            region={region}
+                            taxProfile={ledger.taxProfile}
                             symbol={currencySymbol}
                             formatter={moneyFormatter}
                             privacy={ledger.privacyMode}
@@ -3294,7 +4255,15 @@ function App() {
                           />
                         ))
                     ) : (
-                      <EmptyState icon={<PiggyBank size={18} />} title="No asset accounts" text="Add a savings, current, or investment account below to start tracking net worth." />
+                      <EmptyState
+                        icon={<PiggyBank size={18} />}
+                        title="No asset accounts"
+                        text={
+                          region === "US"
+                            ? "Add a checking, savings, brokerage or retirement account (401(k), IRA, HSA) below to start tracking net worth."
+                            : "Add a savings, current, or investment account below to start tracking net worth."
+                        }
+                      />
                     )}
                   </div>
                 </article>
@@ -3310,6 +4279,8 @@ function App() {
                             key={account.id}
                             account={account}
                             otherColors={ledger.accounts.filter((other) => other.id !== account.id).map((other) => other.color)}
+                            region={region}
+                            taxProfile={ledger.taxProfile}
                             symbol={currencySymbol}
                             formatter={moneyFormatter}
                             privacy={ledger.privacyMode}
@@ -3319,7 +4290,11 @@ function App() {
                           />
                         ))
                     ) : (
-                      <EmptyState icon={<CreditCard size={18} />} title="No debt accounts" text="Add a credit card, loan, overdraft, or other balance to track it here." />
+                      <EmptyState
+                        icon={<CreditCard size={18} />}
+                        title="No debt accounts"
+                        text={region === "US" ? "Add a credit card, mortgage, auto loan, student loan or other balance to track it here." : "Add a credit card, loan, mortgage, student loan, overdraft, or other balance to track it here."}
+                      />
                     )}
                   </div>
                 </article>
@@ -3343,6 +4318,7 @@ function App() {
                 <AccountEditor
                   draft={accountDraft}
                   setDraft={setAccountDraft}
+                  region={region}
                   symbol={currencySymbol}
                   assumedReturn={ledger.assumedInvestmentReturn}
                   onAdd={addAccount}
@@ -3370,6 +4346,104 @@ function App() {
             </section>
           )}
 
+          {activeView === "pay" && (
+            <section className="viewStack" aria-label={payPageTitle}>
+              <div className="pageHeader compactHeader">
+                <div>
+                  <h2>{payPageTitle}</h2>
+                  <p>
+                    {region === "US"
+                      ? "What your gross salary becomes after federal and state tax, Social Security, Medicare and paycheck deductions — and one click to use it as income."
+                      : "What your gross salary becomes after income tax, National Insurance, student loan and pension — and one click to use it as income."}
+                  </p>
+                </div>
+                <div className="netBlock">
+                  <span>Take-home per month</span>
+                  <strong className={`positiveText ${ledger.privacyMode ? "masked" : ""}`}>
+                    <AnimatedCurrency value={takeHome.netMonthly} formatter={moneyFormatter} />
+                  </strong>
+                </div>
+              </div>
+
+              <TakeHomeEstimator
+                region={region}
+                taxProfile={ledger.taxProfile}
+                accounts={ledger.accounts}
+                formatter={moneyFormatter}
+                symbol={currencySymbol}
+                privacy={ledger.privacyMode}
+                onChange={(patch) => updateLedger((current) => ({ ...current, taxProfile: { ...current.taxProfile, ...patch } }))}
+                onUseAsIncome={applyTakeHomeIncome}
+              />
+
+              <section className="payGrid">
+                <article className="miniPanel payrollPanel">
+                  <PanelTitle title={region === "US" ? "Paycheck deductions from your accounts" : "Deductions from pay on your accounts"} icon={<Landmark size={16} />} />
+                  {payrollAccounts.length ? (
+                    <>
+                      <p className="panelSubcopy">
+                        {region === "US"
+                          ? "Accounts set to contribute from your paycheck. Pre-tax money lowers the income tax above; Roth money comes out after tax."
+                          : "Accounts set to contribute from your pay before tax. They lower the income tax above (net-pay arrangement)."}
+                      </p>
+                      <div className="retirementAccounts">
+                        {payrollAccounts.map((account) => (
+                          <div className="retirementAccount" key={account.id}>
+                            <span className="swatch small" style={{ background: account.color }} />
+                            <div className="subscriptionName">
+                              <strong>{account.name}</strong>
+                              <em>{accountTypeOption(region, account.accountClass, account.type).label}{account.taxTreatment === "roth" ? " · after tax" : " · before tax"}</em>
+                            </div>
+                            <strong className={ledger.privacyMode ? "masked" : ""}>{moneyFormatter.format(account.monthlyContribution)}/mo</strong>
+                            <em className={ledger.privacyMode ? "masked" : ""}>{account.employerMonthlyContribution ? `+${moneyFormatter.format(account.employerMonthlyContribution)} employer` : ""}</em>
+                          </div>
+                        ))}
+                      </div>
+                      <button className="linkButton" type="button" onClick={() => setActiveView("accounts")}>
+                        Change contributions on Accounts →
+                      </button>
+                    </>
+                  ) : (
+                    <EmptyState
+                      icon={<Landmark size={18} />}
+                      title={region === "US" ? "No paycheck deductions yet" : "No deductions from pay yet"}
+                      text={
+                        region === "US"
+                          ? "Add a 401(k), 403(b), HSA or FSA on Accounts and set its contributions to come from your paycheck; they are taken off here automatically."
+                          : "Add a workplace pension on Accounts and set its contributions to come from your pay; they are taken off here automatically."
+                      }
+                      onAction={() => setActiveView("accounts")}
+                    />
+                  )}
+                </article>
+
+                <article className="miniPanel payNotesPanel">
+                  <PanelTitle title="What this covers" icon={<InfoHint label="About the estimate" text={region === "US" ? "Federal brackets and the standard deduction for your filing status, Social Security up to the wage base, Medicare including the additional 0.9%, and one flat state rate. Credits, itemized deductions, local taxes, bonuses and multiple jobs are not modeled." : "Income tax at the England, Wales and Northern Ireland rates with the standard personal allowance and its taper, employee Class 1 National Insurance, student-loan deductions by plan and net-pay pension contributions. Scottish rates, benefits in kind, other tax codes and the High Income Child Benefit Charge are not modelled."} />} />
+                  <ul className="payNotes">
+                    {region === "US" ? (
+                      <>
+                        <li>Federal income tax from the {takeHome.yearLabel} brackets and standard deduction.</li>
+                        <li>Social Security (6.2%, up to the wage base) and Medicare (1.45%, plus 0.9% on high earners).</li>
+                        <li>State income tax as a single rate — flat-tax states exactly, others roughly. Override it if you know yours.</li>
+                        <li>401(k)/403(b), HSA and FSA contributions and pre-tax health premiums from your own figures.</li>
+                        <li>Not included: credits, itemized deductions, local taxes, bonuses, a second job or a spouse's income.</li>
+                      </>
+                    ) : (
+                      <>
+                        <li>Income tax for {takeHome.yearLabel} at the England, Wales and Northern Ireland rates, with the personal allowance tapering above £100,000.</li>
+                        <li>Employee National Insurance at 8% between the thresholds and 2% above the upper limit.</li>
+                        <li>Student loan by plan — 9% of pay above the threshold, 6% for a postgraduate loan.</li>
+                        <li>Pension contributions taken before tax from the accounts you set up.</li>
+                        <li>Not included: Scottish rates, other tax codes, benefits in kind, bonuses or the High Income Child Benefit Charge.</li>
+                      </>
+                    )}
+                  </ul>
+                  <p className="panelSubcopy">An estimate for planning, not tax advice. Your payslip is the real figure.</p>
+                </article>
+              </section>
+            </section>
+          )}
+
           {activeView === "goals" && (
             <GoalsView
               goals={ledger.goals}
@@ -3384,6 +4458,7 @@ function App() {
               symbol={currencySymbol}
               formatter={moneyFormatter}
               privacy={ledger.privacyMode}
+              t={t}
               onAddGoal={addGoal}
               onUpdateGoal={updateGoal}
               onRemoveGoal={removeGoal}
@@ -3393,203 +4468,60 @@ function App() {
             />
           )}
 
-          {activeView === "insights" && (
-            <section className="viewStack" aria-label="Insights">
-              <div className="pageHeader compactHeader">
-                <div>
-                  <h2>Insights</h2>
-                  <p>Cash flow, top categories, and trends for {formatMonth(ledger.selectedMonth)}.</p>
-                </div>
-              </div>
+          {activeView === "allocate" && (
+            <AllocateView
+              comparison={allocationPlan}
+              settings={ledger.allocation}
+              ledgerSurplus={ledgerSpare}
+              monthlyExpenses={projection.recurringMonthlyExpenses}
+              assumedInvestmentReturn={ledger.assumedInvestmentReturn}
+              region={region}
+              country={ledger.country}
+              taxProfile={ledger.taxProfile}
+              symbol={currencySymbol}
+              formatter={moneyFormatter}
+              privacy={ledger.privacyMode}
+              t={t}
+              onChange={updateAllocation}
+              onOpenAccounts={() => setActiveView("accounts")}
+              onOpenGoals={() => setActiveView("goals")}
+            />
+          )}
 
-              <section className="statCardRow" aria-label="Month summary">
-                <MetricCard label="Total income" value={projection.monthlyIncome} tone="green" privacy={ledger.privacyMode} formatter={moneyFormatter} />
-                <MetricCard label="Total expenses" value={projection.monthlyExpenses} tone="red" privacy={ledger.privacyMode} formatter={moneyFormatter} />
-                <MetricCard label="Net income" value={projection.monthlySurplus} tone={projection.monthlySurplus >= 0 ? "green" : "red"} privacy={ledger.privacyMode} formatter={moneyFormatter} />
-                <MetricCard label="Savings rate" value={projection.savingsRate} suffix="%" tone="amber" privacy={ledger.privacyMode} formatter={moneyFormatter} />
-              </section>
-
-              <section className="miniPanel cashFlowPanel" aria-label="Cash flow">
-                <PanelTitle
-                  title="Cash flow"
-                  icon={<TrendingUp size={16} />}
-                  action={<span className="panelWhen">{formatMonth(ledger.selectedMonth)}</span>}
-                />
-                <CashFlowSankey month={currentMonth} surplus={projection.monthlySurplus} privacy={ledger.privacyMode} formatter={moneyFormatter} />
-              </section>
-
-              <section className="insightsGrid">
-                <article className={`miniPanel healthPanel ${healthScore.noData ? "" : healthTone(healthScore.score)}`}>
-                  <PanelTitle
-                    title="Health score"
-                    icon={<Gauge size={16} />}
-                    action={<InfoHint label="How health score is calculated" text={healthScore.detail} />}
-                  />
-                  <div className="scoreHeadline">
-                    <div className="scoreNumber">
-                      {healthScore.noData ? "N/A" : formatDecimal(healthScore.score)}
-                      {!healthScore.noData && <small>/10</small>}
-                    </div>
-                    {!healthScore.noData && <span className="scoreBadge">{healthScore.summary}</span>}
-                  </div>
-                  {healthScore.noData && <span className="scoreCaption">Add data to generate a score</span>}
-                  {!healthScore.noData && (
-                    <>
-                      <div className="creditEstimate">
-                        <span>Estimated credit score</span>
-                        <strong>{healthScore.estimatedCreditScore}</strong>
-                      </div>
-                      <div className="ruleList">
-                        <ProgressRule label="Cash flow" value={healthScore.cashFlowScore} target={75} />
-                        <ProgressRule label="Debt load" value={healthScore.debtLoadScore} target={75} />
-                        <ProgressRule label="Payments" value={healthScore.paymentPressureScore} target={75} />
-                        <ProgressRule label="Card headroom" value={healthScore.utilizationScore} target={75} />
-                        <ProgressRule label="Savings" value={healthScore.savingsScore} target={75} />
-                      </div>
-                    </>
-                  )}
-                </article>
-                <article className="miniPanel chartPanel">
-                  <PanelTitle
-                    title={insightChartTitle}
-                    icon={insightChartView === "cash-flow" ? <BarChart3 size={16} /> : <LineChart size={16} />}
-                    action={<InsightChartToggle value={insightChartView} onChange={setInsightChartView} />}
-                  />
-                  {insightChartView === "inflow-outflow" && (
-                    <InflowOutflowChart points={monthlyFlowPoints} privacy={ledger.privacyMode} formatter={moneyFormatter} />
-                  )}
-                  {insightChartView === "cash-flow" && <BarChart bars={monthlyBars} privacy={ledger.privacyMode} formatter={moneyFormatter} />}
-                  {insightChartView === "net-worth" && (
-                    <>
-                      <div className="chartUtilityRow">
-                        <NetWorthHorizonTabs horizon={netWorthHorizon} onChange={setNetWorthHorizon} compact />
-                      </div>
-                      <NetWorthChart points={netWorthOutlook} formatter={moneyFormatter} privacy={ledger.privacyMode} compact />
-                    </>
-                  )}
-                </article>
-                <article className="miniPanel categoryPanel">
-                  <PanelTitle title="Top categories" icon={<Database size={16} />} />
-                  <div className="categoryList">
-                    {categoryRows.length ? (
-                      categoryRows.slice(0, 5).map((row) => (
-                        <div className="categoryRow" key={row.name}>
-                          <span className="swatch small" style={{ background: row.color }} />
-                          <span>{row.name}</span>
-                          <strong className={ledger.privacyMode ? "masked" : ""}>{moneyFormatter.format(row.annual / 12)}</strong>
-                          <em>{formatDecimal(row.share)}%</em>
-                        </div>
-                      ))
-                    ) : (
-                      <EmptyState icon={<FolderPlus size={18} />} title="No categories yet" text="Drag related expenses together in Ledger to build this view." />
-                    )}
-                  </div>
-                </article>
-                <article className="miniPanel anomalyPanel">
-                  <PanelTitle
-                    title="Detected anomalies"
-                    icon={<InfoHint label="About detected anomalies" text="Flags are generated only from local income, outflow, debt, card limit, APR, payment, and categorisation data. They are not financial advice, but they point to pressure worth checking." />}
-                  />
-                  <div className="anomalyList">
-                    {financialSignals.map((signal) => (
-                      <FinancialSignalCard key={signal.id} signal={signal} />
-                    ))}
-                  </div>
-                </article>
-              </section>
-
-              <section className="miniPanel subscriptionsPanel" aria-label="Recurring payments">
-                <PanelTitle
-                  title="Recurring payments detected"
-                  icon={<Repeat size={16} />}
-                  action={
-                    <InfoHint
-                      label="How recurring payments are detected"
-                      text="Detected locally from your own ledger: the same merchant on a steady cadence with a steady amount. Nothing leaves this device."
-                    />
-                  }
-                />
-                {detectedSubscriptions.length ? (
-                  <>
-                    <div className="subscriptionSummary">
-                      <span>
-                        {detectedSubscriptions.length} recurring {detectedSubscriptions.length === 1 ? "payment" : "payments"} ·{" "}
-                        <strong className={ledger.privacyMode ? "masked" : ""}>
-                          {moneyFormatter.format(detectedSubscriptions.reduce((sum, candidate) => sum + candidate.monthlyEquivalent, 0))}
-                        </strong>{" "}
-                        / month
-                      </span>
-                    </div>
-                    <div className="subscriptionList">
-                      {detectedSubscriptions.slice(0, 8).map((candidate) => (
-                        <div className="subscriptionRow" key={`${candidate.kind}:${candidate.key}`}>
-                          <span className="swatch small" style={{ background: candidate.color }} />
-                          <div className="subscriptionName">
-                            <strong>{candidate.label}</strong>
-                            <em>
-                              {candidate.cadence} · seen {candidate.occurrences}×{candidate.category ? ` · ${candidate.category}` : ""}
-                            </em>
-                          </div>
-                          <strong className={ledger.privacyMode ? "masked" : ""}>{moneyFormatter.format(candidate.typicalAmount)}</strong>
-                          {!candidate.alreadyRecurring && (
-                            <button className="commandButton" type="button" onClick={() => markCandidateRecurring(candidate)}>
-                              <Repeat size={13} />
-                              Mark recurring
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <EmptyState
-                    icon={<Repeat size={18} />}
-                    title="No repeating payments detected yet"
-                    text="Import a few months of transactions and repeating merchants show up here automatically."
-                  />
-                )}
-                {missedRecurring.length > 0 && (
-                  <div className="missedRecurring" role="status">
-                    {missedRecurring.map((candidate) => (
-                      <p key={`missed-${candidate.kind}:${candidate.key}`}>
-                        <AlertCircle size={13} />
-                        {candidate.label} usually lands around {formatShortDate(candidate.nextExpected ?? candidate.lastSeen)} — not seen yet this cycle.
-                      </p>
-                    ))}
-                  </div>
-                )}
-                {recurringSuggestions.length > 0 && detectedSubscriptions.length === 0 && (
-                  <p className="panelSubcopy">
-                    {recurringSuggestions.length} repeating {recurringSuggestions.length === 1 ? "pattern" : "patterns"} found — mark them recurring above to feed the forecast.
-                  </p>
-                )}
-              </section>
-
-              <section className="projectionPanel" aria-label="Annual calculation">
-                <div className="sectionHeading">
-                  <div>
-                    <h2>Annual projection</h2>
-                    <p>Automatic from the selected monthly plan</p>
-                  </div>
-                  <div className="tabs" role="tablist" aria-label="Projection view">
-                    <button className={projectionView === "overview" ? "selected" : ""} type="button" onClick={() => setProjectionView("overview")}>
-                      Overview
-                    </button>
-                    <button className={projectionView === "category" ? "selected" : ""} type="button" onClick={() => setProjectionView("category")}>
-                      By category
-                    </button>
-                    <button className={projectionView === "month" ? "selected" : ""} type="button" onClick={() => setProjectionView("month")}>
-                      By month
-                    </button>
-                  </div>
-                </div>
-                <div className="annualGrid">
-                  <AnnualSnapshot projection={projection} privacy={ledger.privacyMode} formatter={moneyFormatter} />
-                  <SavingsGauge projection={projection} target={ledger.savingsTarget} onTargetChange={(value) => updateLedger((current) => ({ ...current, savingsTarget: value }))} />
-                  <ProjectionDetail view={projectionView} projection={projection} categoryRows={categoryRows} monthlyBars={monthlyBars} privacy={ledger.privacyMode} formatter={moneyFormatter} />
-                </div>
-              </section>
-            </section>
+          {activeView === "subscriptions" && (
+            <SubscriptionsView
+              report={subscriptionReport}
+              formatter={moneyFormatter}
+              preciseFormatter={preciseFormatter}
+              privacy={ledger.privacyMode}
+              t={t}
+              onCancel={cancelSubscription}
+              onReactivate={(subscription) => {
+                updateLedger((current) => reactivateSubscription(current, subscription));
+                setToast(t(`${subscription.label} is active again`));
+              }}
+              onDelete={(subscription) => {
+                updateLedger((current) => deleteSubscription(current, subscription));
+                setToast(t(`${subscription.label} removed from Subscriptions`));
+                track("subscription_deleted", { status: subscription.status });
+              }}
+              onRestoreDeleted={() => {
+                updateLedger((current) => restoreDeletedSubscriptions(current));
+                setToast("Removed subscriptions restored");
+              }}
+              onSetKind={(subscription, kind) => updateLedger((current) => setSubscriptionKind(current, subscription, kind))}
+              onSetTolerance={(subscription, days) => updateLedger((current) => setSubscriptionTolerance(current, subscription, days))}
+              onMarkRecurring={(subscription) => {
+                updateLedger((current) => setSubscriptionRecurring(current, subscription, true));
+                setToast(`${subscription.label} marked recurring — it now feeds the forecast`);
+                track("recurring_marked", { cadence: subscription.cadence });
+              }}
+              onOpenLedger={(monthKey) => {
+                updateLedger((current) => (current.months[monthKey] ? { ...current, selectedMonth: monthKey } : current));
+                setActiveView("ledger");
+              }}
+              onImport={() => csvInputRef.current?.click()}
+            />
           )}
 
           {activeView === "settings" && (
@@ -3642,11 +4574,11 @@ function App() {
                     <div className="dataAction">
                       <Upload size={20} />
                       <h3>Import data</h3>
-                      <p>Review bank transactions or restore a previous JSON backup.</p>
+                      <p>Review bank transactions from a CSV, OFX, QIF or PDF statement, or restore a previous JSON backup.</p>
                       <div className="buttonRow">
                         <button className="commandButton" type="button" onClick={() => csvInputRef.current?.click()}>
                           <FileSpreadsheet size={16} />
-                          Import CSV / OFX / QIF
+                          Import CSV / OFX / QIF / PDF
                         </button>
                         <button className="commandButton" type="button" onClick={() => void importFromClipboard()}>
                           <ClipboardPaste size={16} />
@@ -3683,7 +4615,21 @@ function App() {
 
                 <aside className="settingsSide">
                   <article className="settingsPanel compactSetting">
-                    <PanelTitle title="Currency" icon={<WalletCards size={17} />} />
+                    <PanelTitle title="Country & currency" icon={<WalletCards size={17} />} />
+                    <p>
+                      {region === "US"
+                        ? "US accounts, tax tools and spelling are on. Currency only changes the symbol."
+                        : "Country picks the account types, tools and spelling; the United States has its own experience. Currency only changes the symbol."}
+                    </p>
+                    <label className="selectField">
+                      <select value={ledger.country} onChange={(event) => changeCountry(event.target.value as CountryCode)} aria-label="Settings country">
+                        {countryOptions.map((option) => (
+                          <option value={option.code} key={option.code}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                     <label className="selectField">
                       <select value={ledger.currency} onChange={(event) => changeCurrency(event.target.value as CurrencyCode)} aria-label="Settings currency">
                         {currencyOptions.map((option) => (
@@ -3693,19 +4639,6 @@ function App() {
                         ))}
                       </select>
                     </label>
-                  </article>
-
-                  <article className="settingsPanel compactSetting">
-                    <PanelTitle title="Animations" icon={<LineChart size={17} />} />
-                    <p>Enable interface motion and animated totals.</p>
-                    <button
-                      className={animationsEnabled ? "switch on" : "switch"}
-                      type="button"
-                      aria-label="Toggle animations"
-                      onClick={() => setAnimationsEnabled((enabled) => !enabled)}
-                    >
-                      <span />
-                    </button>
                   </article>
 
                   <MonthlyReminderPanel
@@ -3941,6 +4874,31 @@ function App() {
                   Clear selected month
                 </button>
               </article>
+
+              <article className="dangerPanel">
+                <div>
+                  <h3>Clear all data</h3>
+                  <p>
+                    {confirmClearAll
+                      ? `This permanently deletes every month, account, goal, rule and import${user ? ", here and in the cloud" : ""}. It can't be undone — export a backup first if you might want it.`
+                      : "Delete everything and start again as a new user. Your sign-in, country and theme stay."}
+                  </p>
+                </div>
+                {confirmClearAll ? (
+                  <div className="dangerConfirm">
+                    <button className="commandButton" type="button" onClick={() => setConfirmClearAll(false)}>
+                      Cancel
+                    </button>
+                    <button className="dangerButton" type="button" onClick={() => void clearAllData()}>
+                      Yes, delete everything
+                    </button>
+                  </div>
+                ) : (
+                  <button className="dangerButton" type="button" onClick={() => setConfirmClearAll(true)}>
+                    Clear all data
+                  </button>
+                )}
+              </article>
             </section>
           )}
         </main>
@@ -3978,9 +4936,9 @@ function App() {
           </div>
         )}
 
-        {onboardingOpen && <Onboarding initialCurrency={ledger.currency} onFinish={finishOnboarding} />}
+        {onboardingOpen && <Onboarding initialCountry={ledger.country} initialCurrency={ledger.currency} onFinish={finishOnboarding} />}
 
-        {tutorialView && <TutorialOverlay tutorial={TUTORIALS[tutorialView]} onClose={closeTutorial} />}
+        {tutorialView && <TutorialOverlay tutorial={tutorialsFor(region)[tutorialView]} t={t} onClose={closeTutorial} />}
 
         {toastVisible && (
           <div className="statusToast" role="status" aria-live="polite">
@@ -4082,6 +5040,10 @@ function App() {
           userId={user?.id}
           onDismiss={() => setShowFeedbackModal(false)}
         />
+      )}
+
+      {showPdfNotice && !onboardingOpen && !importReview && (
+        <PdfImportNotice onImport={() => dismissPdfNotice("import")} onDismiss={() => dismissPdfNotice("dismiss")} />
       )}
       <Analytics />
     </div>
@@ -4466,6 +5428,65 @@ function FeedbackModal({
   );
 }
 
+// "What's new" card for people who used the app before PDF import existed. The
+// X, the backdrop and Escape all dismiss it; it is shown once per device.
+function PdfImportNotice({ onImport, onDismiss }: { onImport: () => void; onDismiss: () => void }) {
+  // Layout effect: the Escape handler is live the moment the card is on screen.
+  useLayoutEffect(() => {
+    const onKey = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") onDismiss();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onDismiss]);
+
+  return (
+    <div
+      className="modalBackdrop noticeBackdrop"
+      role="presentation"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onDismiss();
+      }}
+    >
+      <div className="noticeModal" role="dialog" aria-modal="true" aria-labelledby="pdf-notice-title">
+        <button className="iconButton noticeClose" type="button" onClick={onDismiss} aria-label="Close" autoFocus>
+          <X size={18} />
+        </button>
+        <div className="noticeIcon" aria-hidden="true">
+          <FileText size={24} />
+        </div>
+        <div>
+          <span className="eyebrow">New</span>
+          <h2 id="pdf-notice-title">PDF statements now import directly</h2>
+        </div>
+        <p>
+          Upload the PDF statement your bank gives you and review the transactions exactly as you would a CSV: categories suggested, duplicates
+          flagged, transfers skipped. No more copying rows out by hand.
+        </p>
+        <ul className="noticeBanks" aria-label="Supported banks">
+          {PDF_SUPPORTED_BANKS.slice(0, 12).map((bank) => (
+            <li key={bank}>{bank}</li>
+          ))}
+          <li>and more</li>
+        </ul>
+        <p className="noticeFootnote">
+          <ShieldCheck size={14} aria-hidden="true" />
+          The PDF is read on this device and never uploaded.
+        </p>
+        <div className="buttonRow noticeActions">
+          <button className="navCta inlineCta" type="button" onClick={onImport}>
+            <FileText size={16} />
+            Import a PDF
+          </button>
+          <button className="commandButton" type="button" onClick={onDismiss}>
+            Got it
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SyncNudge({
   onSignIn,
   onDismiss,
@@ -4624,7 +5645,7 @@ function ImportReviewModal({
       <section className="importModal" role="dialog" aria-modal="true" aria-labelledby="import-review-title">
         <header className="importModalHeader">
           <div>
-            <span className="eyebrow">CSV Review</span>
+            <span className="eyebrow">{review.format === "pdf" ? `PDF statement review${review.bank ? ` · ${review.bank}` : ""}` : "CSV Review"}</span>
             <h2 id="import-review-title">{review.fileName}</h2>
           </div>
           <button className="iconButton" type="button" onClick={onClose} aria-label="Close CSV review">
@@ -4946,36 +5967,6 @@ function importKindPatch(kind: TransactionKind, row: CsvImportRow): Partial<CsvI
   };
 }
 
-function formatShortDate(date: string): string {
-  const [year, month, day] = date.split("-").map(Number);
-  return new Intl.DateTimeFormat("en", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(year, month - 1, day));
-}
-
-function MetricCard({
-  label,
-  value,
-  suffix,
-  tone,
-  privacy,
-  formatter,
-}: {
-  label: string;
-  value: number;
-  suffix?: string;
-  tone: "green" | "red" | "amber";
-  privacy?: boolean;
-  formatter?: Intl.NumberFormat;
-}) {
-  return (
-    <article className={`metricCard ${tone}`}>
-      <span>{label}</span>
-      <strong className={privacy && !suffix ? "masked" : ""}>
-        {suffix ? `${formatDecimal(value)}${suffix}` : <AnimatedCurrency value={value} formatter={formatter ?? getCurrencyFormatter("GBP")} />}
-      </strong>
-    </article>
-  );
-}
-
 type GettingStartedItem = {
   id: string;
   label: string;
@@ -5039,23 +6030,6 @@ function GettingStartedCard({
         ))}
       </div>
     </article>
-  );
-}
-
-function EmptyState({ icon, title, text, onAction }: { icon: ReactNode; title: string; text: string; onAction?: () => void }) {
-  return (
-    <div
-      className={`emptyState${onAction ? " emptyState--clickable" : ""}`}
-      onClick={onAction}
-      role={onAction ? "button" : undefined}
-      tabIndex={onAction ? 0 : undefined}
-      onKeyDown={onAction ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onAction(); } } : undefined}
-    >
-      <div className="emptyIcon">{icon}</div>
-      <strong>{title}</strong>
-      <p>{text}</p>
-      {onAction && <span className="emptyStateHint">Click to start adding</span>}
-    </div>
   );
 }
 
@@ -5386,11 +6360,15 @@ function RenameAllModal({
   onRenameAll: () => void;
   onJustThisOne: () => void;
 }) {
-  const renameAllRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const dismissRef = useRef(onJustThisOne);
   dismissRef.current = onJustThisOne;
   useEffect(() => {
-    renameAllRef.current?.focus();
+    // Focus the dialog itself, not a button. The prompt opens on the keydown of the Enter that
+    // committed the rename; Chromium delivers that keystroke's keypress to whatever is focused by
+    // then and treats Enter on a button as a click — so focusing "Rename all" here would confirm
+    // the prompt before anyone saw it. Tab reaches the buttons; Escape dismisses.
+    dialogRef.current?.focus();
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") dismissRef.current();
     };
@@ -5408,7 +6386,7 @@ function RenameAllModal({
         if (event.target === event.currentTarget) onJustThisOne();
       }}
     >
-      <div className="mergeModal" role="dialog" aria-modal="true" aria-labelledby="rename-all-title">
+      <div className="mergeModal" role="dialog" aria-modal="true" aria-labelledby="rename-all-title" ref={dialogRef} tabIndex={-1}>
         <div className="mergeModalIcon">
           <PenLine size={24} />
         </div>
@@ -5419,7 +6397,7 @@ function RenameAllModal({
             : `New imports are named “${from}” because of an earlier rename.`}
         </p>
         <div className="mergeOptions">
-          <button ref={renameAllRef} className="mergeOption" type="button" onClick={onRenameAll}>
+          <button className="mergeOption" type="button" onClick={onRenameAll}>
             <strong>{others ? `Rename all to “${to}”` : `Use “${to}” from now on`}</strong>
             <span>{others ? `${others + 1} transactions` : "Future imports"}</span>
             <small>Future imports with this name will be called “{to}” too.</small>
@@ -5612,6 +6590,8 @@ function ExpenseRow({
 function AccountRow({
   account,
   otherColors,
+  region,
+  taxProfile,
   symbol,
   formatter,
   privacy,
@@ -5622,6 +6602,8 @@ function AccountRow({
   account: Account;
   // Colours the other accounts use, so the swatch only offers ones that keep dots distinct.
   otherColors: string[];
+  region: RegionKey;
+  taxProfile: LedgerState["taxProfile"];
   symbol: string;
   formatter: Intl.NumberFormat;
   privacy: boolean;
@@ -5630,13 +6612,30 @@ function AccountRow({
   onRemove: () => void;
 }) {
   const isDebt = account.accountClass === "debt";
-  const hasLimit = isDebt && account.type !== "loan";
+  const hasLimit = isDebt && !isLoanType(account.type);
   const utilization = hasLimit && account.creditLimit > 0 ? clampPercent((account.balance / account.creditLimit) * 100) : 0;
-  const typeOptions = ACCOUNT_TYPE_OPTIONS[account.accountClass];
+  const typeOptions = accountTypeOptionsFor(region, account.accountClass, account.type);
+  const typeInfo = accountTypeOption(region, account.accountClass, account.type);
   const payoff = isDebt ? estimateDebtPayoff(account) : null;
+  const hasDetails = isDebt ? isLoanType(account.type) : supportsPlanDetails(account.accountClass, account.type);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const payroll = !isDebt && account.contributionSource === "payroll";
+
+  // A new type brings its own tax treatment and contribution source; the user can still change them.
+  function changeType(type: AccountType) {
+    onChange({
+      type,
+      ...(isDebt
+        ? {}
+        : {
+            taxTreatment: defaultTaxTreatment(region, account.accountClass, type),
+            contributionSource: defaultContributionSource(region, account.accountClass, type),
+          }),
+    });
+  }
 
   return (
-    <div className={`debtAccountRow ${isDebt ? "isDebt" : "isAsset"}`} style={{ "--account-color": account.color } as CSSProperties}>
+    <div className={`debtAccountRow ${isDebt ? "isDebt" : "isAsset"} ${detailsOpen ? "detailsOpen" : ""}`} style={{ "--account-color": account.color } as CSSProperties}>
       <button
         className="swatchButton"
         type="button"
@@ -5646,17 +6645,16 @@ function AccountRow({
       />
       <div className="debtAccountMain">
         <input value={account.name} onChange={(event) => onChange({ name: capitalizeFirst(event.target.value) })} aria-label="Account name" />
-        <select
-          value={account.type}
-          onChange={(event) => onChange({ type: event.target.value as AccountType })}
-          aria-label={`Type for ${account.name}`}
-        >
-          {typeOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+        <div className="typeSelectWrap">
+          <select value={account.type} onChange={(event) => changeType(event.target.value as AccountType)} aria-label={`Type for ${account.name}`}>
+            {typeOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          {typeInfo.info && <InfoHint label={`What is a ${typeInfo.label}?`} text={typeInfo.info} />}
+        </div>
       </div>
       <div className="debtField balanceField">
         <span>Balance</span>
@@ -5689,37 +6687,41 @@ function AccountRow({
         </div>
       ) : (
         <div className="debtField limitField">
-          <span>Monthly in</span>
+          <span>{payroll ? "Monthly in (you)" : "Monthly in"}</span>
           <MoneyInput
             ariaLabel={`Monthly contribution for ${account.name}`}
             value={String(account.monthlyContribution)}
             symbol={symbol}
             privacy={privacy}
             placeholder="Monthly contribution"
+            readOnly={Number(account.contributionPercent) > 0 && Number(taxProfile.grossAnnualSalary) > 0}
             onChange={(value) => onChange({ monthlyContribution: Math.max(0, Number(value) || 0) })}
           />
         </div>
       )}
 
       <label className="numberField compact hintField aprField">
-        <span className="fieldLabel">{rateLabel(account.accountClass)}</span>
-        <input
-          value={String(account.rate)}
-          inputMode="decimal"
-          placeholder={rateLabel(account.accountClass)}
-          onChange={(event) => onChange({ rate: Math.max(-50, Number(event.target.value) || 0) })}
-          aria-label={`${rateLabel(account.accountClass)} for ${account.name}`}
+        <span className="fieldLabel">{rateLabel(account.accountClass, region)}</span>
+        <NumberInput
+          value={account.rate}
+          min={-50}
+          max={1000}
+          placeholder={rateLabel(account.accountClass, region)}
+          onCommit={(value) => onChange({ rate: value })}
+          ariaLabel={`${rateLabel(account.accountClass, region)} for ${account.name}`}
         />
-        <InfoHint label={`Rate help for ${account.name}`} text={rateHelp(account.accountClass)} />
+        <InfoHint label={`Rate help for ${account.name}`} text={rateHelp(account.accountClass, region)} />
       </label>
       <label className="numberField compact hintField interestFreeField">
         <span className="fieldLabel">{isDebt ? "Promo months" : "Intro months"}</span>
-        <input
-          value={String(account.promoMonths)}
-          inputMode="numeric"
+        <NumberInput
+          value={account.promoMonths}
+          min={0}
+          max={120}
+          integer
           placeholder={isDebt ? "Promo months left" : "Intro months left"}
-          onChange={(event) => onChange({ promoMonths: clampWholeNumber(Number(event.target.value) || 0, 120) })}
-          aria-label={`Promo months for ${account.name}`}
+          onCommit={(value) => onChange({ promoMonths: clampWholeNumber(value, 120) })}
+          ariaLabel={`Promo months for ${account.name}`}
         />
         <InfoHint
           label={`Promo period help for ${account.name}`}
@@ -5746,13 +6748,7 @@ function AccountRow({
           </div>
           <label className="numberField compact hintField debtPromoRateField">
             <span className="fieldLabel">Promo rate %</span>
-            <input
-              value={String(account.promoRate)}
-              inputMode="decimal"
-              placeholder="Promo rate %"
-              onChange={(event) => onChange({ promoRate: Math.max(0, Number(event.target.value) || 0) })}
-              aria-label={`Promo rate for ${account.name}`}
-            />
+            <NumberInput value={account.promoRate} min={0} max={1000} placeholder="Promo rate %" onCommit={(value) => onChange({ promoRate: value })} ariaLabel={`Promo rate for ${account.name}`} />
             <InfoHint
               label={`Promo rate help for ${account.name}`}
               text="The rate during the promo months: 0 for an interest-free card, or the deal rate for a balance transfer (e.g. 2.9)."
@@ -5760,32 +6756,49 @@ function AccountRow({
           </label>
           <label className="numberField compact hintField dueField">
             <span className="fieldLabel">Due day</span>
-            <input value={String(account.dueDay)} inputMode="numeric" placeholder="Due day (1-31)" onChange={(event) => onChange({ dueDay: clampDueDay(Number(event.target.value) || 1) })} aria-label={`Due day for ${account.name}`} />
+            <NumberInput value={account.dueDay} min={1} max={31} integer placeholder="Due day (1-31)" onCommit={(value) => onChange({ dueDay: clampDueDay(value) })} ariaLabel={`Due day for ${account.name}`} />
             <InfoHint label={`Payment date help for ${account.name}`} text="Day of the month this account payment is due." />
           </label>
         </>
       ) : (
         <label className="numberField compact hintField introRateField">
           <span className="fieldLabel">Intro rate %</span>
-          <input
-            value={String(account.promoRate)}
-            inputMode="decimal"
-            placeholder="Intro rate %"
-            onChange={(event) => onChange({ promoRate: Math.max(0, Number(event.target.value) || 0) })}
-            aria-label={`Intro rate for ${account.name}`}
-          />
+          <NumberInput value={account.promoRate} min={0} max={1000} placeholder="Intro rate %" onCommit={(value) => onChange({ promoRate: value })} ariaLabel={`Intro rate for ${account.name}`} />
           <InfoHint label={`Intro rate help for ${account.name}`} text="The rate that applies during the intro months above, before the standard rate takes over." />
         </label>
       )}
 
       <div className="debtAccountMeta">
-        <span>{accountTypeLabel(account)}</span>
+        <span>{typeInfo.label}</span>
         <strong className={privacy ? "masked" : ""}>{formatter.format(account.balance)}</strong>
-        <em>{[accountMetaCaption(account, utilization, payoff, hasLimit, formatter, privacy), autoNote].filter(Boolean).join(" · ")}</em>
+        <em>{[accountMetaCaption(account, utilization, payoff, hasLimit, formatter, privacy, region), autoNote].filter(Boolean).join(" · ")}</em>
+        {hasDetails && (
+          <button
+            className={`detailsToggle ${detailsOpen ? "open" : ""}`}
+            type="button"
+            onClick={() => setDetailsOpen((open) => !open)}
+            aria-expanded={detailsOpen}
+            aria-label={`${detailsOpen ? "Hide" : "Show"} ${isDebt ? "loan" : "plan"} details for ${account.name}`}
+          >
+            {detailsOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            {isDebt ? "Loan details" : "Plan details"}
+            {!detailsOpen && !isDebt && (account.employerMonthlyContribution || account.contributionPercent) ? " · set" : ""}
+          </button>
+        )}
       </div>
       <button className="iconButton rowAction" type="button" onClick={onRemove} aria-label={`Remove ${account.name}`}>
         <Trash2 size={17} />
       </button>
+
+      {hasDetails && detailsOpen && (
+        <div className="accountDetails">
+          {isDebt ? (
+            <LoanDetails account={account} region={region} taxProfile={taxProfile} formatter={formatter} privacy={privacy} onChange={onChange} />
+          ) : (
+            <AccountPlanDetails account={account} region={region} taxProfile={taxProfile} formatter={formatter} symbol={symbol} privacy={privacy} onChange={onChange} />
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -5793,85 +6806,106 @@ function AccountRow({
 function AccountEditor({
   draft,
   setDraft,
+  region,
   symbol,
   assumedReturn,
   onAdd,
 }: {
   draft: AccountDraft;
   setDraft: Dispatch<SetStateAction<AccountDraft>>;
+  region: RegionKey;
   symbol: string;
   assumedReturn: number;
   onAdd: () => void;
 }) {
   const isDebt = draft.accountClass === "debt";
+  const isLoan = isDebt && isLoanType(draft.type);
+  const typeInfo = accountTypeOption(region, draft.accountClass, draft.type);
+  const payroll = !isDebt && typeInfo.payroll;
 
   function changeClass(accountClass: AccountClass) {
-    setDraft((current) => ({ ...current, accountClass, type: DEFAULT_TYPE_BY_CLASS[accountClass] }));
+    setDraft((current) => ({ ...current, accountClass, type: defaultTypeForClass(accountClass) }));
   }
 
+  // Every field sits in the same two-column cell (control + hint slot), so the controls line up
+  // whether or not they carry an "i" icon.
   return (
     <article className="miniPanel accountEditorPanel">
-      <PanelTitle title="Add account" icon={<Plus size={16} />} />
+      <PanelTitle title="Add account" icon={<Landmark size={16} />} />
       <div className="debtDraftGrid">
-        <select
-          className="accountClassSelect"
-          value={draft.accountClass}
-          onChange={(event) => changeClass(event.target.value as AccountClass)}
-          aria-label="Account kind"
-        >
-          <option value="savings">Savings account</option>
-          <option value="cash">Current account</option>
-          <option value="investment">Investment / stocks</option>
-          <option value="debt">Debt account</option>
-        </select>
-        <select
-          value={draft.type}
-          onChange={(event) => setDraft((current) => ({ ...current, type: event.target.value as AccountType }))}
-          aria-label="Account type"
-        >
-          {ACCOUNT_TYPE_OPTIONS[draft.accountClass].map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <input
-          value={draft.name}
-          placeholder="Account name"
-          onChange={(event) => setDraft((current) => ({ ...current, name: capitalizeFirst(event.target.value) }))}
-          onKeyDown={(event) => handleDraftEnter(event, onAdd)}
-          aria-label="Account name"
-        />
-        <MoneyInput
-          ariaLabel="Current balance"
-          value={draft.balance}
-          symbol={symbol}
-          placeholder={isDebt ? "Current balance owed" : "Current balance"}
-          onChange={(value) => setDraft((current) => ({ ...current, balance: value }))}
-        />
+        <div className="draftField">
+          <select className="accountClassSelect" value={draft.accountClass} onChange={(event) => changeClass(event.target.value as AccountClass)} aria-label="Account kind">
+            {accountClassOptions(region).map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <span className="hintSlot" />
+        </div>
+        <div className="draftField">
+          <select value={draft.type} onChange={(event) => setDraft((current) => ({ ...current, type: event.target.value as AccountType }))} aria-label="Account type">
+            {accountTypeOptions(region, draft.accountClass).map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          {typeInfo.info ? <InfoHint label={`What is a ${typeInfo.label}?`} text={typeInfo.info} /> : <span className="hintSlot" />}
+        </div>
+        <div className="draftField">
+          <input
+            value={draft.name}
+            placeholder="Account name"
+            onChange={(event) => setDraft((current) => ({ ...current, name: capitalizeFirst(event.target.value) }))}
+            onKeyDown={(event) => handleDraftEnter(event, onAdd)}
+            aria-label="Account name"
+          />
+          <span className="hintSlot" />
+        </div>
+        <div className="draftField">
+          <MoneyInput
+            ariaLabel="Current balance"
+            value={draft.balance}
+            symbol={symbol}
+            placeholder={isDebt ? "Current balance owed" : "Current balance"}
+            onChange={(value) => setDraft((current) => ({ ...current, balance: value }))}
+          />
+          <span className="hintSlot" />
+        </div>
 
         {!isDebt && (
-          <MoneyInput
-            ariaLabel="Monthly contribution"
-            value={draft.monthlyContribution}
-            symbol={symbol}
-            placeholder="Monthly contribution"
-            onChange={(value) => setDraft((current) => ({ ...current, monthlyContribution: value }))}
-          />
+          <div className="draftField">
+            <MoneyInput
+              ariaLabel="Monthly contribution"
+              value={draft.monthlyContribution}
+              symbol={symbol}
+              placeholder={payroll ? (region === "US" ? "Your monthly contribution from your paycheck" : "Your monthly contribution from your pay") : "Monthly contribution"}
+              onChange={(value) => setDraft((current) => ({ ...current, monthlyContribution: value }))}
+            />
+            {payroll ? (
+              <InfoHint
+                label="Contribution help"
+                text="Taken from pay before take-home, so it is not subtracted from your surplus. Employer matches, % of pay and limits can be set in the account's plan details once added."
+              />
+            ) : (
+              <span className="hintSlot" />
+            )}
+          </div>
         )}
 
-        <label className="numberField hintField">
+        <div className="draftField">
           <input
             value={draft.rate}
             inputMode="decimal"
-            placeholder={draft.accountClass === "investment" ? `Expected return % (default ${assumedReturn})` : rateLabel(draft.accountClass)}
+            placeholder={draft.accountClass === "investment" ? `Expected return % (default ${assumedReturn})` : rateLabel(draft.accountClass, region)}
             onChange={(event) => setDraft((current) => ({ ...current, rate: event.target.value }))}
-            aria-label={rateLabel(draft.accountClass)}
+            aria-label={rateLabel(draft.accountClass, region)}
           />
-          <InfoHint label="Rate help" text={rateHelp(draft.accountClass)} />
-        </label>
+          <InfoHint label="Rate help" text={rateHelp(draft.accountClass, region)} />
+        </div>
 
-        <label className="numberField hintField">
+        <div className="draftField">
           <input
             value={draft.promoMonths}
             inputMode="numeric"
@@ -5887,11 +6921,11 @@ function AccountEditor({
                 : "If this account has an intro rate, how many months it lasts before the standard rate takes over."
             }
           />
-        </label>
+        </div>
 
         {isDebt ? (
           <>
-            <label className="numberField hintField">
+            <div className="draftField">
               <input
                 value={draft.promoRate}
                 inputMode="decimal"
@@ -5900,24 +6934,30 @@ function AccountEditor({
                 aria-label="Promo rate"
               />
               <InfoHint label="Promo rate help" text="The rate during the promo months: 0 for an interest-free card, or the deal rate for a balance transfer (e.g. 2.9)." />
-            </label>
-            {draft.type !== "loan" && (
-              <MoneyInput
-                ariaLabel="Credit limit"
-                value={draft.creditLimit}
-                symbol={symbol}
-                placeholder={draft.type === "overdraft" ? "Overdraft limit" : "Credit limit"}
-                onChange={(value) => setDraft((current) => ({ ...current, creditLimit: value }))}
-              />
+            </div>
+            {!isLoan && (
+              <div className="draftField">
+                <MoneyInput
+                  ariaLabel="Credit limit"
+                  value={draft.creditLimit}
+                  symbol={symbol}
+                  placeholder={draft.type === "overdraft" ? (region === "US" ? "Credit line limit" : "Overdraft limit") : "Credit limit"}
+                  onChange={(value) => setDraft((current) => ({ ...current, creditLimit: value }))}
+                />
+                <span className="hintSlot" />
+              </div>
             )}
-            <MoneyInput
-              ariaLabel="Monthly payment"
-              value={draft.minimumPayment}
-              symbol={symbol}
-              placeholder="Monthly payment"
-              onChange={(value) => setDraft((current) => ({ ...current, minimumPayment: value }))}
-            />
-            <label className="numberField hintField">
+            <div className="draftField">
+              <MoneyInput
+                ariaLabel="Monthly payment"
+                value={draft.minimumPayment}
+                symbol={symbol}
+                placeholder="Monthly payment"
+                onChange={(value) => setDraft((current) => ({ ...current, minimumPayment: value }))}
+              />
+              {isLoan ? <InfoHint label="Loan payment help" text="The regular monthly payment. Term, repayment plan and a suggested payment can be set in the loan details once added." /> : <span className="hintSlot" />}
+            </div>
+            <div className="draftField">
               <input
                 value={draft.dueDay}
                 inputMode="numeric"
@@ -5927,10 +6967,10 @@ function AccountEditor({
                 aria-label="Payment due day"
               />
               <InfoHint label="Payment date help" text="Day of the month the payment is due." />
-            </label>
+            </div>
           </>
         ) : (
-          <label className="numberField hintField">
+          <div className="draftField">
             <input
               value={draft.promoRate}
               inputMode="decimal"
@@ -5940,10 +6980,11 @@ function AccountEditor({
               aria-label="Intro rate"
             />
             <InfoHint label="Intro rate help" text="If the account has a promotional intro rate, enter it here. It applies for the intro months above." />
-          </label>
+          </div>
         )}
 
         <button className="navCta inlineCta" type="button" onClick={onAdd}>
+          <Plus size={16} />
           Add account
         </button>
       </div>
@@ -5951,22 +6992,21 @@ function AccountEditor({
   );
 }
 
-function rateLabel(accountClass: AccountClass): string {
-  if (accountClass === "debt") return "Interest rate (APR) %";
-  if (accountClass === "investment") return "Expected return %";
-  return "Interest rate (AER) %";
+function savingsRateName(region: RegionKey): string {
+  return region === "US" ? "APY" : "AER";
 }
 
-function rateHelp(accountClass: AccountClass): string {
+function rateLabel(accountClass: AccountClass, region: RegionKey): string {
+  if (accountClass === "debt") return "Interest rate (APR) %";
+  if (accountClass === "investment") return "Expected return %";
+  return `Interest rate (${savingsRateName(region)}) %`;
+}
+
+function rateHelp(accountClass: AccountClass, region: RegionKey): string {
   if (accountClass === "debt") return "Annual percentage rate charged after any interest-free period ends. Use 0 if the account has no interest.";
   if (accountClass === "investment")
     return "Assumed average annual return — an estimate, not a guarantee. A conservative long-run figure is around 6%. Markets can fall as well as rise.";
-  return "The annual interest rate (AER) the account earns after any intro period ends.";
-}
-
-function accountTypeLabel(account: Account): string {
-  const option = ACCOUNT_TYPE_OPTIONS[account.accountClass].find((o) => o.value === account.type);
-  return option?.label ?? "Account";
+  return `The annual interest rate (${savingsRateName(region)}) the account earns after any intro period ends.`;
 }
 
 // Caption for a debt account whose displayed balance was rolled forward past its snapshot —
@@ -5991,6 +7031,7 @@ function accountMetaCaption(
   hasLimit: boolean,
   formatter: Intl.NumberFormat,
   privacy: boolean,
+  region: RegionKey,
 ): string {
   if (account.accountClass === "debt") {
     const parts: string[] = [];
@@ -6012,50 +7053,13 @@ function accountMetaCaption(
     }
     return parts.join(" · ");
   }
-  const rateNote = `${formatDecimal(account.rate)}% ${account.accountClass === "investment" ? "est." : "AER"}`;
-  const contributionNote = account.monthlyContribution > 0 ? ` · +${Math.round(account.monthlyContribution)}/mo` : "";
+  const rateNote = `${formatDecimal(account.rate)}% ${account.accountClass === "investment" ? "est." : savingsRateName(region)}`;
+  const employer = Math.max(0, Number(account.employerMonthlyContribution) || 0);
+  const contributionNote =
+    account.monthlyContribution > 0 || employer > 0
+      ? ` · +${Math.round(account.monthlyContribution)}${employer > 0 ? ` +${Math.round(employer)} employer` : ""}/mo${account.contributionSource === "payroll" ? " from pay" : ""}`
+      : "";
   return `${rateNote}${contributionNote}`;
-}
-
-function MoneyInput({
-  ariaLabel,
-  inputRef,
-  value,
-  symbol,
-  placeholder,
-  privacy,
-  onEnter,
-  onChange,
-}: {
-  ariaLabel: string;
-  inputRef?: Ref<HTMLInputElement>;
-  value: string;
-  symbol: string;
-  placeholder?: string;
-  privacy?: boolean;
-  onEnter?: (event: KeyboardEvent<HTMLInputElement>) => void;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className={privacy ? "moneyInput maskedInput" : "moneyInput"}>
-      <span>{symbol}</span>
-      <input
-        ref={inputRef}
-        type="text"
-        inputMode="decimal"
-        value={value}
-        placeholder={placeholder}
-        onChange={(event) => onChange(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            onEnter?.(event);
-          }
-        }}
-        aria-label={ariaLabel}
-      />
-    </label>
-  );
 }
 
 function AnnualSnapshot({ projection, privacy, formatter }: { projection: Projection; privacy: boolean; formatter: Intl.NumberFormat }) {
@@ -6192,6 +7196,7 @@ function LedgerAccountsPanel({
   month,
   formatter,
   privacy,
+  t,
   onDefaultChange,
   onGoToAccounts,
   onNoteChange,
@@ -6202,6 +7207,7 @@ function LedgerAccountsPanel({
   month: MonthBudget;
   formatter: Intl.NumberFormat;
   privacy: boolean;
+  t: (text: string) => string;
   onDefaultChange: (accountId: string) => void;
   onGoToAccounts: () => void;
   onNoteChange: (note: string) => void;
@@ -6216,7 +7222,7 @@ function LedgerAccountsPanel({
           title="Accounts"
           icon={
             <InfoHint
-              label="What do the coloured dots mean?"
+              label={t("What do the coloured dots mean?")}
               text="Each transaction's dot shows the account its money moved through. Click a dot to move it to another account; that account's balance moves with it. Change balances themselves on the Accounts page."
             />
           }
@@ -6271,7 +7277,7 @@ function LedgerAccountsPanel({
               <PiggyBank size={15} />
               Add an account
             </button>
-            <p>Add your current account, savings and cards to see transactions move their balances.</p>
+            <p>{t("Add your current account, savings and cards to see transactions move their balances.")}</p>
           </div>
         )}
       </div>
@@ -6297,19 +7303,7 @@ function LedgerAccountsPanel({
   );
 }
 
-function PanelTitle({ title, icon, action }: { title: string; icon?: ReactNode; action?: ReactNode }) {
-  return (
-    <div className="panelTitle">
-      <h3>{title}</h3>
-      <div className="panelTitleActions">
-        {action}
-        {icon ?? <Info size={16} />}
-      </div>
-    </div>
-  );
-}
-
-function TutorialOverlay({ tutorial, onClose }: { tutorial: PageTutorial; onClose: () => void }) {
+function TutorialOverlay({ tutorial, t, onClose }: { tutorial: PageTutorial; t: (text: string) => string; onClose: () => void }) {
   const [step, setStep] = useState(0);
   const total = tutorial.steps.length;
   const current = tutorial.steps[Math.min(step, total - 1)];
@@ -6330,11 +7324,11 @@ function TutorialOverlay({ tutorial, onClose }: { tutorial: PageTutorial; onClos
           <GraduationCap size={13} />
           {tutorial.badge} · 60-second tour
         </span>
-        <h2 className="tutorialTitle">{tutorial.title}</h2>
-        {current.heading ? <h3 className="tutorialStepHeading">{current.heading}</h3> : null}
+        <h2 className="tutorialTitle">{t(tutorial.title)}</h2>
+        {current.heading ? <h3 className="tutorialStepHeading">{t(current.heading)}</h3> : null}
         <ul className="tutorialBullets">
           {current.bullets.map((bullet, index) => (
-            <li key={index}>{bullet}</li>
+            <li key={index}>{t(bullet)}</li>
           ))}
         </ul>
 
@@ -6370,253 +7364,7 @@ function TutorialOverlay({ tutorial, onClose }: { tutorial: PageTutorial; onClos
   );
 }
 
-function InfoHint({ text, label = "More information" }: { text: string; label?: string }) {
-  return (
-    <span className="infoHint" tabIndex={0} role="button" aria-label={label}>
-      <Info size={15} aria-hidden="true" />
-      <span role="tooltip">{text}</span>
-    </span>
-  );
-}
-
-function NetWorthHorizonTabs({
-  horizon,
-  onChange,
-  compact,
-}: {
-  horizon: NetWorthHorizon;
-  onChange: (horizon: NetWorthHorizon) => void;
-  compact?: boolean;
-}) {
-  return (
-    <div className={compact ? "tabs compactTabs" : "tabs"} role="tablist" aria-label="Net worth horizon">
-      <button className={horizon === 12 ? "selected" : ""} type="button" onClick={() => onChange(12)}>
-        1 year
-      </button>
-      <button className={horizon === 24 ? "selected" : ""} type="button" onClick={() => onChange(24)}>
-        2 years
-      </button>
-      <button className={horizon === 60 ? "selected" : ""} type="button" onClick={() => onChange(60)}>
-        5 years
-      </button>
-    </div>
-  );
-}
-
-// ─── Cash flow Sankey ────────────────────────────────────────────────────────
-
-type SankeyEndpoint = { id: string; label: string; value: number; color: string };
 type ChartTip = { x: number; y: number; title: string; lines: string[] } | null;
-
-// Left column: income sources aggregated by name (top 5 + "Other income").
-// Right column: Savings first (when the month is in surplus), then expense
-// categories (top 7 + "Other"). A deficit month gets a red "Shortfall" source
-// so both sides of the diagram still conserve flow.
-function buildSankeyEndpoints(month: MonthBudget, surplus: number): { sources: SankeyEndpoint[]; targets: SankeyEndpoint[] } {
-  const bySource = new Map<string, SankeyEndpoint>();
-  month.incomes.forEach((entry, index) => {
-    const label = entry.source.trim() || "Income";
-    const key = label.toLowerCase();
-    const existing = bySource.get(key);
-    if (existing) {
-      existing.value += entry.amount;
-    } else {
-      bySource.set(key, { id: `src-${key}`, label, value: entry.amount, color: entry.color || colors[index % colors.length] });
-    }
-  });
-  let sources = [...bySource.values()].filter((node) => node.value > 0).sort((a, b) => b.value - a.value);
-  if (sources.length > 6) {
-    const rest = sources.slice(5);
-    sources = [
-      ...sources.slice(0, 5),
-      { id: "src-other", label: "Other income", value: rest.reduce((sum, node) => sum + node.value, 0), color: "var(--faint)" },
-    ];
-  }
-  if (surplus < 0) {
-    sources.push({ id: "src-shortfall", label: "Shortfall", value: -surplus, color: "var(--red)" });
-  }
-
-  let targets: SankeyEndpoint[] = buildExpenseGroups(month.expenses)
-    .map((group) => ({
-      id: `cat-${group.id}`,
-      label: group.category || group.items[0]?.name || "Outflow",
-      value: group.total,
-      color: group.color,
-    }))
-    .filter((node) => node.value > 0)
-    .sort((a, b) => b.value - a.value);
-  if (targets.length > 8) {
-    const rest = targets.slice(7);
-    targets = [
-      ...targets.slice(0, 7),
-      { id: "cat-other", label: "Other", value: rest.reduce((sum, node) => sum + node.value, 0), color: "var(--faint)" },
-    ];
-  }
-  if (surplus > 0) {
-    targets.unshift({ id: "cat-savings", label: "Savings", value: surplus, color: "var(--mint)" });
-  }
-
-  return { sources, targets };
-}
-
-function CashFlowSankey({
-  month,
-  surplus,
-  privacy,
-  formatter,
-}: {
-  month: MonthBudget;
-  surplus: number;
-  privacy: boolean;
-  formatter: Intl.NumberFormat;
-}) {
-  const shellRef = useRef<HTMLDivElement | null>(null);
-  const [tip, setTip] = useState<ChartTip>(null);
-  const { sources, targets } = useMemo(() => buildSankeyEndpoints(month, surplus), [month, surplus]);
-
-  // Both sides sum to the same figure by construction: income + shortfall on
-  // the left, expenses + savings on the right.
-  const totalFlow = targets.reduce((sum, node) => sum + node.value, 0);
-
-  if (totalFlow <= 0) {
-    return <EmptyState icon={<TrendingUp size={18} />} title="No cash flow yet" text="Add income and outflows in Ledger, or import a bank CSV, to draw this diagram." />;
-  }
-
-  const width = 1060;
-  const nodeW = 12;
-  const gap = 14;
-  const padY = 10;
-  const xLeft = 236;
-  const xRight = 812;
-  const xHub = (xLeft + xRight) / 2;
-  const rows = Math.max(sources.length, targets.length, 1);
-  const height = Math.max(320, Math.min(560, rows * 62));
-
-  const usable = (count: number) => height - padY * 2 - (count - 1) * gap;
-  const scale = Math.min(usable(sources.length), usable(targets.length), usable(1)) / totalFlow;
-
-  type PlacedNode = SankeyEndpoint & { y0: number; y1: number };
-  const place = (nodes: SankeyEndpoint[]): PlacedNode[] => {
-    const contentHeight = nodes.reduce((sum, node) => sum + node.value * scale, 0) + (nodes.length - 1) * gap;
-    let y = (height - contentHeight) / 2;
-    return nodes.map((node) => {
-      const nodeHeight = Math.max(node.value * scale, 3);
-      const placed = { ...node, y0: y, y1: y + nodeHeight };
-      y += nodeHeight + gap;
-      return placed;
-    });
-  };
-
-  const leftNodes = place(sources);
-  const rightNodes = place(targets);
-  const hubHeight = totalFlow * scale;
-  const hubY0 = (height - hubHeight) / 2;
-
-  const money = (value: number) => (privacy ? "•••" : formatter.format(value));
-  const percent = (value: number) => `${((value / totalFlow) * 100).toFixed(1)}%`;
-
-  // Ribbons: each left node flows into the hub; the hub fans out to each right
-  // node. Offsets accumulate down the hub in node order on both faces.
-  const ribbon = (x0: number, sy0: number, sy1: number, x1: number, ty0: number, ty1: number) => {
-    const mx = (x0 + x1) / 2;
-    return `M ${x0} ${sy0} C ${mx} ${sy0}, ${mx} ${ty0}, ${x1} ${ty0} L ${x1} ${ty1} C ${mx} ${ty1}, ${mx} ${sy1}, ${x0} ${sy1} Z`;
-  };
-
-  let inOffset = hubY0;
-  const inLinks = leftNodes.map((node) => {
-    const linkHeight = node.value * scale;
-    const link = { node, path: ribbon(xLeft + nodeW, node.y0, node.y1, xHub, inOffset, inOffset + linkHeight) };
-    inOffset += linkHeight;
-    return link;
-  });
-  let outOffset = hubY0;
-  const outLinks = rightNodes.map((node) => {
-    const linkHeight = node.value * scale;
-    const link = { node, path: ribbon(xHub + nodeW, outOffset, outOffset + linkHeight, xRight, node.y0, node.y1) };
-    outOffset += linkHeight;
-    return link;
-  });
-
-  const showTip = (event: ReactMouseEvent, title: string, lines: string[]) => {
-    const rect = shellRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    setTip({ x: event.clientX - rect.left, y: event.clientY - rect.top, title, lines });
-  };
-
-  const labelFor = (node: SankeyEndpoint) => `${money(node.value)} (${percent(node.value)})`;
-
-  return (
-    <div className="sankeyShell" ref={shellRef} onMouseLeave={() => setTip(null)}>
-      <svg className="sankeySvg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Cash flow from income sources to savings and spending categories">
-        <defs>
-          {[...inLinks.map((link, index) => ({ link, id: `sankey-in-${index}`, from: link.node.color, to: "var(--blue)" })), ...outLinks.map((link, index) => ({ link, id: `sankey-out-${index}`, from: "var(--blue)", to: link.node.color }))].map(({ id, from, to }) => (
-            <linearGradient id={id} key={id} x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0" style={{ stopColor: from }} />
-              <stop offset="1" style={{ stopColor: to }} />
-            </linearGradient>
-          ))}
-        </defs>
-        {inLinks.map((link, index) => (
-          <path
-            className="sankeyLink"
-            key={link.node.id}
-            d={link.path}
-            fill={`url(#sankey-in-${index})`}
-            onMouseMove={(event) => showTip(event, `${link.node.label} → Income`, [`${money(link.node.value)} · ${percent(link.node.value)} of flow`])}
-          />
-        ))}
-        {outLinks.map((link, index) => (
-          <path
-            className="sankeyLink"
-            key={link.node.id}
-            d={link.path}
-            fill={`url(#sankey-out-${index})`}
-            onMouseMove={(event) => showTip(event, `Income → ${link.node.label}`, [`${money(link.node.value)} · ${percent(link.node.value)} of flow`])}
-          />
-        ))}
-        {leftNodes.map((node) => (
-          <g key={node.id}>
-            <rect className="sankeyNode" x={xLeft} y={node.y0} width={nodeW} height={node.y1 - node.y0} rx={3} fill={node.color} />
-            <text className="sankeyLabel" x={xLeft - 12} y={(node.y0 + node.y1) / 2} textAnchor="end" dominantBaseline="middle">
-              <tspan className="name">{node.label}</tspan>
-              <tspan className={privacy ? "amt masked" : "amt"} dx="7">
-                {labelFor(node)}
-              </tspan>
-            </text>
-          </g>
-        ))}
-        <g>
-          <rect className="sankeyNode" x={xHub} y={hubY0} width={nodeW} height={hubHeight} rx={3} fill="var(--blue)" />
-          <text className="sankeyLabel hub" x={xHub + nodeW / 2} y={hubY0 - 10} textAnchor="middle">
-            <tspan className="name">Income</tspan>
-            <tspan className={privacy ? "amt masked" : "amt"} dx="7">
-              {money(totalFlow)}
-            </tspan>
-          </text>
-        </g>
-        {rightNodes.map((node) => (
-          <g key={node.id}>
-            <rect className="sankeyNode" x={xRight} y={node.y0} width={nodeW} height={node.y1 - node.y0} rx={3} fill={node.color} />
-            <text className="sankeyLabel" x={xRight + nodeW + 12} y={(node.y0 + node.y1) / 2} dominantBaseline="middle">
-              <tspan className="name">{node.label}</tspan>
-              <tspan className={privacy ? "amt masked" : "amt"} dx="7">
-                {labelFor(node)}
-              </tspan>
-            </text>
-          </g>
-        ))}
-      </svg>
-      {tip && (
-        <div className="chartTip" style={{ left: tip.x + 14, top: tip.y + 14 }}>
-          <strong>{tip.title}</strong>
-          {tip.lines.map((line) => (
-            <span key={line}>{line}</span>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 function InsightChartToggle({ value, onChange }: { value: InsightChartView; onChange: (value: InsightChartView) => void }) {
   const options: Array<{ value: InsightChartView; label: string; icon: ReactNode }> = [
@@ -6644,15 +7392,40 @@ function InsightChartToggle({ value, onChange }: { value: InsightChartView; onCh
   );
 }
 
-function FinancialSignalCard({ signal }: { signal: FinancialSignal }) {
+function FinancialSignalCard({ signal, t, onDismiss }: { signal: FinancialSignal; t: (text: string) => string; onDismiss?: () => void }) {
+  const title = t(signal.title);
   return (
     <div className={`signalCard ${signal.tone}`}>
       <div className="signalTitle">
-        <strong>{signal.title}</strong>
-        <InfoHint label={`${signal.title} context`} text={signal.detail} />
+        <strong>{title}</strong>
+        {onDismiss ? (
+          <span className="signalActions">
+            <InfoHint label={`${title} context`} text={t(signal.detail)} />
+            <button className="iconButton small signalDismiss" type="button" aria-label={`Dismiss ${title}`} onClick={onDismiss}>
+              <X size={14} />
+            </button>
+          </span>
+        ) : (
+          <InfoHint label={`${title} context`} text={t(signal.detail)} />
+        )}
       </div>
-      <span>{signal.summary}</span>
+      <span>{t(signal.summary)}</span>
     </div>
+  );
+}
+
+function LayoutEditButton({ page, editing, onToggle, t }: { page: LayoutPage; editing: boolean; onToggle: () => void; t: (text: string) => string }) {
+  return (
+    <button
+      className={editing ? "commandButton layoutEditButton active" : "commandButton layoutEditButton"}
+      type="button"
+      onClick={onToggle}
+      aria-pressed={editing}
+      aria-label={editing ? t(`Finish customising the ${page}`) : t(`Customise the ${page} layout`)}
+    >
+      {editing ? <Check size={15} /> : <SlidersHorizontal size={15} />}
+      {editing ? "Done" : t("Customise")}
+    </button>
   );
 }
 
@@ -6823,150 +7596,6 @@ function InflowOutflowChart({
   );
 }
 
-function NetWorthChart({
-  points,
-  formatter,
-  privacy,
-  compact = false,
-}: {
-  points: NetWorthPoint[];
-  formatter: Intl.NumberFormat;
-  privacy: boolean;
-  compact?: boolean;
-}) {
-  const width = 720;
-  const height = 260;
-  const padding = 28;
-  const plotTop = padding;
-  const plotBottom = height - padding;
-  const plotHeight = plotBottom - plotTop;
-  const values = points.map((point) => point.netWorth);
-  // Scale to the actual data so small movements stay visible even deep in the
-  // red — never anchor the domain to zero (that flattens all-negative data
-  // into a line pinned at the bottom of the plot).
-  const rawMin = Math.min(...values);
-  const rawMax = Math.max(...values);
-  const spread = Math.max(rawMax - rawMin, Math.max(Math.abs(rawMax), Math.abs(rawMin)) * 0.02, 1);
-  const domainPad = spread * 0.12;
-  const minValue = rawMin - domainPad;
-  const maxValue = rawMax + domainPad;
-  const range = maxValue - minValue;
-  const yFor = (value: number) => plotTop + ((maxValue - value) / range) * plotHeight;
-  const zeroY = yFor(0);
-  const zeroVisible = zeroY >= plotTop && zeroY <= plotBottom;
-  // Fraction of the plot height where the zero line sits — the stroke/fill
-  // gradients flip from green to red at this offset.
-  const zeroOffset = Math.min(1, Math.max(0, (zeroY - plotTop) / plotHeight));
-  const areaBaselineY = Math.min(plotBottom, Math.max(plotTop, zeroY));
-  const lastPoint = points[points.length - 1] ?? points[0];
-  const totalInterest = points.reduce((sum, point) => sum + point.interestCharged, 0);
-  const totalGrowth = points.reduce((sum, point) => sum + point.growthEarned, 0);
-  const xFor = (index: number) => padding + (index / Math.max(points.length - 1, 1)) * (width - padding * 2);
-  const path = points
-    .map((point, index) => `${index === 0 ? "M" : "L"} ${xFor(index).toFixed(1)} ${yFor(point.netWorth).toFixed(1)}`)
-    .join(" ");
-  // Shade between the line and the zero axis (or the nearest plot edge when
-  // zero is out of frame) so negative territory reads as a red region.
-  const areaPath = `${path} L ${width - padding} ${areaBaselineY.toFixed(1)} L ${padding} ${areaBaselineY.toFixed(1)} Z`;
-  const markerPoints = points.filter((point) => point.monthIndex % 12 === 0 || point.monthIndex === points.length - 1);
-  const mint = "#00dfc1";
-  const red = "#ff8a7a";
-
-  return (
-    <div className={compact ? "netWorthChart compact" : "netWorthChart"}>
-      <div className="netWorthStats">
-        <div>
-          <span>Ending net worth</span>
-          <strong className={`${(lastPoint?.netWorth ?? 0) >= 0 ? "positiveText" : "negativeText"} ${privacy ? "masked" : ""}`}>
-            {formatter.format(lastPoint?.netWorth ?? 0)}
-          </strong>
-        </div>
-        <div>
-          <span>Ending assets</span>
-          <strong className={privacy ? "masked" : ""}>{formatter.format(lastPoint?.assetBalance ?? 0)}</strong>
-        </div>
-        <div>
-          <span>Growth earned</span>
-          <strong className={`positiveText ${privacy ? "masked" : ""}`}>{formatter.format(totalGrowth)}</strong>
-        </div>
-        <div>
-          <span>Interest paid</span>
-          <strong className={`${totalInterest > 0 ? "negativeText" : ""} ${privacy ? "masked" : ""}`}>{formatter.format(totalInterest)}</strong>
-        </div>
-      </div>
-      <div className="netWorthSvgWrap">
-        <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Projected net worth over selected horizon">
-          <defs>
-            <linearGradient id="netWorthStroke" gradientUnits="userSpaceOnUse" x1="0" y1={plotTop} x2="0" y2={plotBottom}>
-              <stop offset="0" stopColor={mint} />
-              <stop offset={zeroOffset} stopColor={mint} />
-              <stop offset={zeroOffset} stopColor={red} />
-              <stop offset="1" stopColor={red} />
-            </linearGradient>
-            <linearGradient id="netWorthFill" gradientUnits="userSpaceOnUse" x1="0" y1={plotTop} x2="0" y2={plotBottom}>
-              <stop offset="0" stopColor="rgba(0, 223, 193, 0.22)" />
-              <stop offset={zeroOffset} stopColor="rgba(0, 223, 193, 0.03)" />
-              <stop offset={zeroOffset} stopColor="rgba(255, 138, 122, 0.05)" />
-              <stop offset="1" stopColor="rgba(255, 138, 122, 0.24)" />
-            </linearGradient>
-          </defs>
-          <line className="netWorthAxis" x1={padding} x2={width - padding} y1={plotBottom} y2={plotBottom} />
-          {zeroVisible && (
-            <>
-              <line className="netWorthZeroAxis" x1={padding} x2={width - padding} y1={zeroY} y2={zeroY} />
-              <text className="netWorthZeroLabel" x={width - padding} y={zeroY - 6} textAnchor="end">
-                {formatter.format(0)}
-              </text>
-            </>
-          )}
-          <path d={areaPath} fill="url(#netWorthFill)" />
-          <path className="netWorthLine" d={path} style={{ stroke: "url(#netWorthStroke)" }} />
-          {markerPoints.map((point) => (
-            <circle
-              key={point.monthIndex}
-              className="netWorthDot"
-              cx={xFor(point.monthIndex)}
-              cy={yFor(point.netWorth)}
-              r="4"
-              style={{ stroke: point.netWorth >= 0 ? mint : red }}
-            />
-          ))}
-        </svg>
-        <div className="netWorthLabels">
-          {markerPoints.map((point) => (
-            <span key={point.monthIndex}>{point.label}</span>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Same bands as the score summary in calculateHealthScore (Strong/Stable,
-// Tight, At risk) so the card's accent matches the word it shows.
-function healthTone(score: number): "good" | "warn" | "bad" {
-  return score >= 5.8 ? "good" : score >= 3.8 ? "warn" : "bad";
-}
-
-function ProgressRule({ label, value, target }: { label: string; value: number; target: number }) {
-  const width = clampPercent(value);
-  const targetPosition = clampPercent(target);
-  const tone = value >= target ? "good" : value >= 40 ? "warn" : "bad";
-
-  return (
-    <div className={`progressRule ${tone}`}>
-      <div>
-        <span>{label}</span>
-        <b>{formatDecimal(value)}%</b>
-      </div>
-      <div className="ruleTrack">
-        <strong style={{ width: `${width}%` }} />
-        <i style={{ left: `${targetPosition}%` }} />
-      </div>
-    </div>
-  );
-}
-
 function LineGraph({ projection }: { projection: Projection }) {
   const income = Math.max(projection.monthlyIncome, 1);
   const expenseRatio = clampPercent((projection.monthlyExpenses / income) * 100);
@@ -6993,72 +7622,20 @@ function LineGraph({ projection }: { projection: Projection }) {
   );
 }
 
-function handleDraftEnter(event: KeyboardEvent<HTMLInputElement>, action: () => void) {
-  if (event.key !== "Enter") return;
-  event.preventDefault();
-  action();
-}
-
-function blurOnEnter(event: KeyboardEvent<HTMLInputElement>) {
-  if (event.key !== "Enter") return;
-  event.preventDefault();
-  event.currentTarget.blur();
-}
-
 function isEditableTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
   const tagName = target.tagName.toLowerCase();
   return target.isContentEditable || tagName === "input" || tagName === "textarea" || tagName === "select";
 }
 
-function focusNextFrame(ref: { current: HTMLInputElement | null }) {
-  window.requestAnimationFrame(() => {
-    ref.current?.focus();
-    ref.current?.select();
-  });
-}
-
-function AnimatedCurrency({ value, formatter }: { value: number; formatter: Intl.NumberFormat }) {
-  const displayValue = useAnimatedNumber(value);
-  return <>{formatter.format(displayValue)}</>;
-}
-
-function useAnimatedNumber(value: number) {
-  const [display, setDisplay] = useState(value);
-  const fromRef = useRef(value);
-
-  useEffect(() => {
-    const from = fromRef.current;
-    const difference = value - from;
-    const start = performance.now();
-    const duration = 420;
-    let frame = 0;
-
-    function tick(now: number) {
-      const progress = clampPercent(((now - start) / duration) * 100) / 100;
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setDisplay(from + difference * eased);
-      if (progress < 1) {
-        frame = requestAnimationFrame(tick);
-      } else {
-        fromRef.current = value;
-      }
-    }
-
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [value]);
-
-  return display;
-}
-
 // Analytics label for an import inlet, derived from the review's source name.
-function importSourceOf(fileName: string): string {
+function importSourceOf(fileName: string): ImportFormat {
   if (fileName === BANK_FEED_SOURCE_NAME) return "feed";
   if (fileName === "Pasted transactions") return "paste";
   const lower = fileName.toLowerCase();
   if (lower.endsWith(".ofx")) return "ofx";
   if (lower.endsWith(".qif")) return "qif";
+  if (lower.endsWith(".pdf")) return "pdf";
   return "csv";
 }
 
@@ -7239,84 +7816,6 @@ function removeImportBatchFromState(state: LedgerState, batchId: string): Ledger
   };
 }
 
-function buildCategoryRows(month: MonthBudget, projection: Projection) {
-  const total = Math.max(projection.monthlyExpenses, 1);
-  return buildExpenseGroups(month.expenses)
-    .filter((group) => group.category)
-    .map((group) => ({
-      name: group.category,
-      annual: group.total * 12,
-      share: (group.total / total) * 100,
-      color: group.color,
-    }))
-    .sort((a, b) => b.annual - a.annual);
-}
-
-function buildExpenseGroups(expenses: ExpenseEntry[]) {
-  type ExpenseGroup = { id: string; category: string; color: string; total: number; items: ExpenseEntry[]; order: number };
-  const positions = new Map(expenses.map((expense, index) => [expense.id, index]));
-  const groups = new Map<string, ExpenseGroup>();
-  const ungrouped: ExpenseGroup[] = [];
-
-  expenses.forEach((expense, index) => {
-    const category = expense.category.trim();
-    if (!category) {
-      ungrouped.push({
-        id: `expense-${expense.id}`,
-        category: "",
-        color: expense.color,
-        total: expense.amount,
-        items: [expense],
-        order: index,
-      });
-      return;
-    }
-
-    const existing = groups.get(category);
-    if (existing) {
-      existing.items.push(expense);
-      existing.total += expense.amount;
-    } else {
-      const group = {
-        id: `category-${category}`,
-        category,
-        color: expense.color || categoryColor(category, index),
-        total: expense.amount,
-        items: [expense],
-        order: index,
-      };
-      groups.set(category, group);
-    }
-  });
-
-  const categoryGroups = Array.from(groups.values())
-    .map((group) => ({
-      ...group,
-      items: [...group.items].sort((a, b) => b.amount - a.amount || (positions.get(a.id) ?? 0) - (positions.get(b.id) ?? 0)),
-    }))
-    .sort((a, b) => b.total - a.total || a.order - b.order);
-
-  return [...categoryGroups, ...ungrouped].map(({ order, ...group }) => group);
-}
-
-function buildMonthlyBars(ledger: LedgerState, _fallbackMonth: MonthBudget) {
-  const [year] = ledger.selectedMonth.split("-").map(Number);
-  const values = Array.from({ length: 12 }, (_, index) => {
-    const key = `${year}-${String(index + 1).padStart(2, "0")}`;
-    const month = ledger.months[key] ?? { incomes: [], expenses: [], note: "" };
-    const projection = calculateProjection(month);
-    return {
-      label: new Date(year, index, 1).toLocaleString("en", { month: "short" }),
-      value: projection.monthlySurplus,
-    };
-  });
-  const max = Math.max(...values.map((item) => Math.abs(item.value)), 1);
-  return values.map((item) => ({
-    ...item,
-    height: (Math.abs(item.value) / max) * 100,
-  }));
-}
-
 function downloadFile(name: string, content: string, type: string) {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
@@ -7345,22 +7844,11 @@ function randomCategoryColor(expenses: ExpenseEntry[]) {
   return palette[Math.floor(Math.random() * palette.length)];
 }
 
-function categoryColor(category: string, fallbackIndex: number) {
-  const normalized = category.trim().toLowerCase();
-  const defaultCategories = ["home", "food", "bills", "travel", "health", "personal", "work", "subscriptions", "savings", "other"];
-  const knownIndex = defaultCategories.findIndex((item) => item === normalized);
-  return colors[(knownIndex >= 0 ? knownIndex : fallbackIndex + 2) % colors.length];
-}
-
 function findLastExpenseIndex(expenses: ExpenseEntry[], predicate: (expense: ExpenseEntry) => boolean) {
   for (let index = expenses.length - 1; index >= 0; index -= 1) {
     if (predicate(expenses[index])) return index;
   }
   return -1;
-}
-
-function formatDecimal(value: number) {
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 }).format(value);
 }
 
 export default App;

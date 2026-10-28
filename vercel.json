@@ -80,6 +80,12 @@
       ]
     }
   ],
+  "rewrites": [
+    {
+      "source": "/:view(dashboard|ledger|accounts|pay|goals|subscriptions|allocate|insights|settings)",
+      "destination": "/index.html"
+    }
+  ],
   "redirects": [
     {
       "source": "/index.html",

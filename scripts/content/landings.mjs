@@ -190,7 +190,7 @@ export const LANDINGS = [
     why: [
       "Free, with no account, no subscription and no trial clock.",
       "Planned against real transactions, so the numbers are honest.",
-      "Every UK bank via CSV, or paste a PDF statement.",
+      "Every UK bank via CSV or PDF statement.",
       "Categories that remember each merchant, so month two takes minutes.",
       "Your data stays in your browser. No bank login, no open banking.",
     ],
@@ -230,7 +230,7 @@ export const LANDINGS = [
       "Import your bank CSV and every expense lands in a monthly list, ready to sort into categories with a drag. Totals per category, recurring payments flagged, transfers between your own accounts skipped. Free, private, works with every UK bank, and nothing connects to your account.",
     why: [
       "Free, with no account and no subscription.",
-      "Reads CSV, OFX and QIF from every UK bank, or pasted PDF text.",
+      "Reads CSV, OFX, QIF and PDF statements from every UK bank, or pasted text.",
       "Categories that stick: sort a merchant once and it is remembered.",
       "Recurring bills and subscriptions detected automatically.",
       "Local-first: your spending never leaves your browser.",

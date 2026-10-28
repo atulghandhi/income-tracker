@@ -8,7 +8,7 @@
 const US_ROWS_COMMON = {
   price: ["Price", "Free. No tiers, no trial clock.", null],
   bank: ["Bank connection", "None needed. Import a CSV you download yourself; open banking is opt-in and off by default.", null],
-  csv: ["Manual entry and CSV import", "Yes, free. CSV, OFX, QIF and pasted text.", null],
+  csv: ["Manual entry and CSV import", "Yes, free. CSV, OFX, QIF, PDF and pasted text.", null],
   data: ["Where your data lives", "In your browser on your device. Optional sign-in to sync.", null],
   platforms: ["Platforms", "Web, installable on phone and desktop. iOS app in development.", null],
 };
@@ -84,7 +84,7 @@ export const COMPARISONS = [
     ],
     faqs: [
       { q: "Is there a free alternative to Emma that does not need open banking?", a: "Yes. The Income Tracker is free and works from a CSV you download from your bank, with no account connection. Emma's core product depends on open banking." },
-      { q: "Can I import CSV files into Emma?", a: "Only on the Pro (£9.99 a month) and Ultimate tiers. The Income Tracker imports CSV, OFX, QIF and pasted text for free." },
+      { q: "Can I import CSV files into Emma?", a: "Only on the Pro (£9.99 a month) and Ultimate tiers. The Income Tracker imports CSV, OFX, QIF, PDF statements and pasted text for free." },
       { q: "Is Emma free?", a: "Emma has a free tier limited to two bank connections, with paid tiers from £4.99 to £14.99 a month." },
     ],
     related: ["best-free-budgeting-apps-uk", "budget-app-without-open-banking", "import", "snoop-alternative"],
@@ -489,7 +489,7 @@ export const ROUNDUP = {
       us: true,
       free: "Everything free",
       openBanking: "No (opt-in only)",
-      manual: "Yes: CSV, OFX, QIF, paste, manual",
+      manual: "Yes: CSV, OFX, QIF, PDF, paste, manual",
       bestFor: "Private, no-login budgeting from bank CSVs",
       summary:
         "A month-by-month ledger fed by the CSV you download from your bank. Categories with merchant memory, recurring items, goals, an annual view, and data kept in your browser. Free with no tiers.",

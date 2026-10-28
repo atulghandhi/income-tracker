@@ -2,7 +2,9 @@ import { applyAccountFlows, isoToday } from "./accountFlow";
 import type {
   Account,
   AccountClass,
+  AllocationSettings,
   AssetSummary,
+  CountryCode,
   CurrencyCode,
   DebtAccount,
   DebtSummary,
@@ -12,6 +14,7 @@ import type {
   GoalOutcome,
   GoalSequenceResult,
   GoalStatus,
+  HealthPlan,
   HealthScoreBreakdown,
   IncomeEntry,
   LedgerState,
@@ -21,11 +24,56 @@ import type {
   NetWorthSummary,
   Projection,
   SavingsGoal,
+  TaxProfile,
 } from "./types";
 
-export const CURRENT_SCHEMA_VERSION = 8;
+// v9 adds the country, tax profile, health plan and optional plan details on accounts.
+// v10 adds the allocation plan (Allocate page).
+export const CURRENT_SCHEMA_VERSION = 10;
+
+export const DEFAULT_TAX_PROFILE: TaxProfile = {
+  grossAnnualSalary: 0,
+  payFrequency: "monthly",
+  filingStatus: "single",
+  state: "",
+  stateRateOverride: null,
+  studentLoanPlan: "none",
+  postgradLoan: false,
+  preTaxHealthPremiumMonthly: 0,
+  pensionMonthly: 0,
+  pensionMethod: "sacrifice",
+  bonusAmount: 0,
+  bonusOneOff: true,
+};
+
+export const DEFAULT_HEALTH_PLAN: HealthPlan = {
+  planType: "",
+  coverage: "self",
+  premiumMonthly: 0,
+  deductible: 0,
+  outOfPocketMax: 0,
+  planYearStartMonth: 1,
+};
 
 export const DEFAULT_INVESTMENT_RETURN = 6;
+
+export const DEFAULT_ALLOCATION_SETTINGS: AllocationSettings = {
+  priority: "interest",
+  savingsPriority: "safe-rate",
+  lumpSum: 0,
+  monthlyExtraOverride: null,
+  bufferMonths: 3,
+  taxReserve: 0,
+  taxDueInMonths: 6,
+  horizonMonths: 36,
+  promoGuard: true,
+  rollover: true,
+  safeSavingsRate: 4,
+  customShares: { debts: 60, buffer: 20, savings: 20 },
+  customMethod: "avalanche",
+  debtIncluded: {},
+  lumpSumTax: { taxable: false, source: "self-employed", monthlySalary: null, priorThisYear: 0, studentLoan: null },
+};
 
 export const ASSET_CLASSES: AccountClass[] = ["cash", "savings", "investment"];
 
@@ -69,6 +117,17 @@ export function getCurrencyFormatter(currency: CurrencyCode): Intl.NumberFormat 
   });
 }
 
+// Same currency with its minor units: subscription prices are £10.99, not £11.
+export function getPreciseCurrencyFormatter(currency: CurrencyCode): Intl.NumberFormat {
+  const option = currencyOptions.find((item) => item.code === currency) ?? currencyOptions[0];
+  return new Intl.NumberFormat(option.locale, {
+    style: "currency",
+    currency: option.code,
+    minimumFractionDigits: option.code === "JPY" ? 0 : 2,
+    maximumFractionDigits: option.code === "JPY" ? 0 : 2,
+  });
+}
+
 export function getCurrencySymbol(currency: CurrencyCode): string {
   const formatter = getCurrencyFormatter(currency);
   return formatter.formatToParts(0).find((part) => part.type === "currency")?.value ?? currency;
@@ -98,12 +157,15 @@ export const emptyBudget: MonthBudget = {
   note: "",
 };
 
-export function createInitialState(): LedgerState {
+export function createInitialState(country: CountryCode = "GB", currency: CurrencyCode = country === "US" ? "USD" : "GBP"): LedgerState {
   const selectedMonth = getMonthKey();
 
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
-    currency: "GBP",
+    currency,
+    country,
+    taxProfile: { ...DEFAULT_TAX_PROFILE },
+    healthPlan: { ...DEFAULT_HEALTH_PLAN },
     selectedMonth,
     months: {
       [selectedMonth]: emptyBudget,
@@ -118,7 +180,9 @@ export function createInitialState(): LedgerState {
     categoryRules: [],
     nameRules: [],
     importBatches: [],
+    subscriptionPrefs: [],
     privacyMode: false,
+    allocation: { ...DEFAULT_ALLOCATION_SETTINGS, customShares: { ...DEFAULT_ALLOCATION_SETTINGS.customShares }, debtIncluded: {}, lumpSumTax: { ...DEFAULT_ALLOCATION_SETTINGS.lumpSumTax } },
     lastSavedAt: new Date().toISOString(),
   };
 }
@@ -286,13 +350,18 @@ export function calculateAssetSummary(accounts: Account[]): AssetSummary {
   const totalSavings = byClass("savings");
   const totalInvestments = byClass("investment");
   const totalAssets = totalCash + totalSavings + totalInvestments;
-  const monthlyContributions = assets.reduce((sum, a) => sum + Math.max(0, Number(a.monthlyContribution || 0)), 0);
+  // Everything that reaches the accounts each month, however it gets there.
+  const employeeContributions = assets.reduce((sum, a) => sum + Math.max(0, Number(a.monthlyContribution || 0)), 0);
+  const employerContributions = assets.reduce((sum, a) => sum + employerContribution(a), 0);
+  const payrollContributions = assets.filter(isPayrollContribution).reduce((sum, a) => sum + Math.max(0, Number(a.monthlyContribution || 0)), 0);
+  const cashContributions = employeeContributions - payrollContributions;
+  const monthlyContributions = employeeContributions + employerContributions;
   const weightedAssetRate =
     totalAssets > 0
       ? assets.reduce((sum, a) => sum + Math.max(0, Number(a.rate || 0)) * Math.max(0, Number(a.balance || 0)), 0) / totalAssets
       : 0;
 
-  return { totalAssets, totalCash, totalSavings, totalInvestments, monthlyContributions, weightedAssetRate };
+  return { totalAssets, totalCash, totalSavings, totalInvestments, monthlyContributions, cashContributions, payrollContributions, employerContributions, weightedAssetRate };
 }
 
 export function calculateNetWorthSummary(accounts: Account[]): NetWorthSummary {
@@ -493,11 +562,37 @@ export function recurringAccountTransfersByAccount(month: MonthBudget): Record<s
   return byAccount;
 }
 
-// What each asset account actually receives a month: the linked ledger transfer when there is one
+// What the user puts into an asset account a month: the linked ledger transfer when there is one
 // (that is what the user really moves), otherwise the contribution set on the account.
 export function effectiveContribution(account: Account, linkedTransfers: Record<string, number>): number {
   if (account.accountClass === "debt") return 0;
   return account.id in linkedTransfers ? Math.max(0, linkedTransfers[account.id]) : Math.max(0, Number(account.monthlyContribution) || 0);
+}
+
+// Money an employer adds on top (a 401(k) match, the employer's pension contribution). It never
+// passes through the user's budget, so it only ever adds to the account.
+export function employerContribution(account: Account): number {
+  if (account.accountClass === "debt") return 0;
+  return Math.max(0, Number(account.employerMonthlyContribution) || 0);
+}
+
+// Payroll contributions come out of gross pay before take-home, and the ledger's income is
+// take-home — so they are already "gone" from the surplus and must not be taken out of cash again.
+export function isPayrollContribution(account: Account): boolean {
+  return account.accountClass !== "debt" && account.contributionSource === "payroll";
+}
+
+// What actually leaves the budget for this account each month. A linked ledger row is real money
+// moving, whatever the account's contribution source says.
+export function cashContribution(account: Account, linkedTransfers: Record<string, number>): number {
+  if (account.accountClass === "debt") return 0;
+  if (account.id in linkedTransfers) return Math.max(0, linkedTransfers[account.id]);
+  return isPayrollContribution(account) ? 0 : effectiveContribution(account, linkedTransfers);
+}
+
+// Everything that lands in the account each month: the user's contribution plus the employer's.
+export function accountInflow(account: Account, linkedTransfers: Record<string, number>): number {
+  return effectiveContribution(account, linkedTransfers) + employerContribution(account);
 }
 
 export function buildNetWorthOutlook({
@@ -526,7 +621,9 @@ export function buildNetWorthOutlook({
     rate: Number(account.rate || 0),
     promoRate: Number(account.promoRate || 0),
     promoMonths: Math.max(0, Math.round(Number(account.promoMonths || 0))),
-    contribution: effectiveContribution(account, linkedTransfers),
+    // Inflow lands in the account; only the cash part is taken out of the budget's surplus.
+    contribution: accountInflow(account, linkedTransfers),
+    fromCash: cashContribution(account, linkedTransfers),
     payment:
       account.accountClass === "debt" && account.id in linkedTransfers
         ? Math.max(0, linkedTransfers[account.id])
@@ -547,11 +644,12 @@ export function buildNetWorthOutlook({
       //    expense or windfall this month should not be extrapolated across the whole forecast.
       unallocatedCash += projection.recurringMonthlySurplus + linkedBack;
 
-      // 2. Route contributions into asset accounts (transfer out of cash — net worth unchanged).
+      // 2. Route contributions into asset accounts. The user's own money is a transfer out of cash
+      //    (net worth unchanged); payroll and employer money arrives from outside the budget.
       working.forEach((account) => {
         if (account.accountClass === "debt" || account.contribution <= 0) return;
         account.balance += account.contribution;
-        unallocatedCash -= account.contribution;
+        unallocatedCash -= account.fromCash;
       });
 
       // 3. Pay debts (transfer out of cash) and apply debt interest.
@@ -818,7 +916,7 @@ export function buildFinancialSignals({
       signals.push({
         id: `promo-ending-${debt.id}`,
         title: "Interest-free period ending soon",
-        summary: `${debt.name} has ${debt.promoMonths} 0% ${debt.promoMonths === 1 ? "month" : "months"} left.`,
+        summary: `${debt.name} has ${debt.promoMonths} interest-free ${debt.promoMonths === 1 ? "month" : "months"} left.`,
         detail: "The net-worth forecast starts applying APR after the 0% period. Plan payments before that date if the balance is still material.",
         tone: "warning",
       });
@@ -874,8 +972,9 @@ export function buildFinancialSignals({
     }
   }
 
-  // Over-allocation: routing more into accounts each month than the surplus can fund.
-  if (assetSummary.monthlyContributions > 0 && projection.monthlySurplus >= 0 && assetSummary.monthlyContributions > projection.monthlySurplus + 1) {
+  // Over-allocation: routing more into accounts each month than the surplus can fund. Only money
+  // that leaves the budget counts — payroll and employer contributions never touch the surplus.
+  if (assetSummary.cashContributions > 0 && projection.monthlySurplus >= 0 && assetSummary.cashContributions > projection.monthlySurplus + 1) {
     signals.push({
       id: "contribution-over-allocation",
       title: "Contributions exceed surplus",
@@ -1058,6 +1157,7 @@ export function runGoalSequence({
   horizonMonths,
   startDate = new Date(),
   dedicatedMonthly = {},
+  analyzeGaps = true,
 }: {
   goals: SavingsGoal[];
   monthlySurplus: number;
@@ -1066,6 +1166,9 @@ export function runGoalSequence({
   // Money that can only go to one goal, keyed by goal id: a linked account's monthly
   // contribution. Paid in before the shared surplus is split, and never shared with other goals.
   dedicatedMonthly?: Record<string, number>;
+  // The gap solvers below re-run the simulation many times; those inner runs must not solve gaps
+  // of their own or the recursion explodes (every at-risk deadline spawned 32 nested solves).
+  analyzeGaps?: boolean;
 }): GoalSequenceResult {
   const hasDedicated = goals.some((goal) => (dedicatedMonthly[goal.id] ?? 0) > 0);
   if (!goals.length || (monthlySurplus <= 0 && !hasDedicated)) {
@@ -1230,10 +1333,16 @@ export function runGoalSequence({
         status = monthsToSpare <= 2 ? "tight" : "on-track";
       } else {
         status = "at-risk";
-        // Solve: how much extra monthly surplus is needed?
-        extraMonthlyNeeded = solveExtraMonthly(g, sorted, monthlySurplus, g.deadlineMonths, startDate, dedicatedMonthly);
-        // Solve: how many extra months are needed at current surplus?
-        extraMonthsNeeded = solveExtraMonths(g, sorted, monthlySurplus, horizonMonths, startDate, dedicatedMonthly);
+        if (analyzeGaps) {
+          // Solve: how much extra monthly surplus is needed?
+          extraMonthlyNeeded = solveExtraMonthly(g, sorted, monthlySurplus, g.deadlineMonths, startDate, dedicatedMonthly);
+          // How many months past the deadline it lands: known when it completes inside the
+          // horizon, otherwise searched for beyond it.
+          extraMonthsNeeded =
+            completionMonth !== null
+              ? Math.max(0, completionMonth - g.deadlineMonths)
+              : Math.max(0, solveExtraMonths(g, sorted, monthlySurplus, horizonMonths, startDate, dedicatedMonthly) + horizonMonths - g.deadlineMonths);
+        }
       }
     } else {
       status = completionMonth !== null ? "no-deadline" : "no-deadline";
@@ -1271,7 +1380,7 @@ function solveExtraMonthly(
   let hi = target.target; // worst-case upper bound
   for (let iter = 0; iter < 32; iter++) {
     const mid = (lo + hi) / 2;
-    const result = runGoalSequence({ goals: allGoals, monthlySurplus: baseSurplus + mid, horizonMonths: deadlineMonths, startDate, dedicatedMonthly });
+    const result = runGoalSequence({ goals: allGoals, monthlySurplus: baseSurplus + mid, horizonMonths: deadlineMonths, startDate, dedicatedMonthly, analyzeGaps: false });
     const outcome = result.goals.find((g) => g.goalId === target.id);
     const hits = outcome?.completionMonth !== null && outcome!.completionMonth! <= deadlineMonths;
     if (hits) hi = mid; else lo = mid;
@@ -1280,7 +1389,7 @@ function solveExtraMonthly(
   return Math.ceil(hi);
 }
 
-/** Binary-search for how many extra months are needed at the current surplus. */
+/** How far past its deadline the goal lands at the current surplus: one longer simulation tells. */
 function solveExtraMonths(
   target: SavingsGoal,
   allGoals: SavingsGoal[],
@@ -1293,7 +1402,7 @@ function solveExtraMonths(
   let hi = baseHorizon + 120;
   for (let iter = 0; iter < 32; iter++) {
     const mid = Math.ceil((lo + hi) / 2);
-    const result = runGoalSequence({ goals: allGoals, monthlySurplus: surplus, horizonMonths: mid, startDate, dedicatedMonthly });
+    const result = runGoalSequence({ goals: allGoals, monthlySurplus: surplus, horizonMonths: mid, startDate, dedicatedMonthly, analyzeGaps: false });
     const outcome = result.goals.find((g) => g.goalId === target.id);
     const hits = outcome?.completionMonth !== null;
     if (hits) hi = mid; else lo = mid;

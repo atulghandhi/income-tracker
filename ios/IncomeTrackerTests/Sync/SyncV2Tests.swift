@@ -188,7 +188,7 @@ private func expense(_ id: String, amount: Double = 10) -> ExpenseEntry {
     ExpenseEntry(id: id, name: id, category: "Food", amount: amount, color: "#2f7fdd", recurring: false)
 }
 
-private func add(_ entry: ExpenseEntry) -> (inout LedgerState) -> Void {
+private func adding(_ entry: ExpenseEntry) -> (inout LedgerState) -> Void {
     { state in state.months[state.selectedMonth, default: .empty].expenses.append(entry) }
 }
 
@@ -203,7 +203,7 @@ final class SyncEngineTests: XCTestCase {
     func testEmptyAccountTakesThisDevicesData() async {
         let server = FakeServer()
         var initial = LedgerState.initial
-        add(expense("coffee"))(&initial)
+        adding(expense("coffee"))(&initial)
         let device = FakeDevice("a", server: server, state: initial)
         let outcome = await device.engine.start(userId: "u")
         await settle()
@@ -224,7 +224,7 @@ final class SyncEngineTests: XCTestCase {
         await android.engine.start(userId: "u")
         await settle()
 
-        iphone.edit(add(expense("from-iphone")))
+        iphone.edit(adding(expense("from-iphone")))
         await settle()
         for device in [web, iphone, android] {
             XCTAssertEqual(device.expenseIds, ["from-iphone"])
@@ -241,8 +241,8 @@ final class SyncEngineTests: XCTestCase {
         await settle()
 
         server.online = false
-        a.edit(add(expense("a-offline")))
-        b.edit(add(expense("b-offline")))
+        a.edit(adding(expense("a-offline")))
+        b.edit(adding(expense("b-offline")))
         await settle()
         XCTAssertEqual(a.statuses.last, .offline)
 
@@ -267,7 +267,7 @@ final class SyncEngineTests: XCTestCase {
         let device = FakeDevice("a", server: server)
         let outcome = await device.engine.start(userId: "u")
         XCTAssertEqual(outcome, .updateRequired)
-        device.edit(add(expense("blocked")))
+        device.edit(adding(expense("blocked")))
         await settle()
         XCTAssertEqual(server.pushes, 0)
         XCTAssertEqual(device.statuses.last, .updateRequired)
@@ -276,13 +276,13 @@ final class SyncEngineTests: XCTestCase {
     func testFirstSignInWithSeparateDataAsksAndCombineKeepsBoth() async {
         let server = FakeServer()
         var webState = LedgerState.initial
-        add(expense("from-web"))(&webState)
+        adding(expense("from-web"))(&webState)
         let web = FakeDevice("web", server: server, state: webState)
         await web.engine.start(userId: "u")
         await settle()
 
         var phoneState = LedgerState.initial
-        add(expense("from-phone"))(&phoneState)
+        adding(expense("from-phone"))(&phoneState)
         let phone = FakeDevice("phone", server: server, state: phoneState)
         let outcome = await phone.engine.start(userId: "u")
         XCTAssertEqual(outcome, .choose)
@@ -312,7 +312,7 @@ final class SyncEngineTests: XCTestCase {
         await settle()
         XCTAssertEqual(server.pushes, before, "pulling a differently formatted ledger must not push")
 
-        phone.edit(add(expense("after")))
+        phone.edit(adding(expense("after")))
         await settle()
         XCTAssertEqual(server.row?.state["webOnlyField"], .string("keep me"), "a push keeps fields iOS does not know")
     }

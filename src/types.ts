@@ -133,10 +133,68 @@ export type NameRule = {
   updatedAt: string;
 };
 
-export type DebtAccountType ="credit-card" | "loan" | "overdraft" | "other";
+// What the user has decided about a detected subscription (see subscriptions.ts). Keyed by the
+// subscription's id (merchant + cadence, plus a price discriminator when one payee has several).
+// Detection itself is never stored — it is recomputed from the ledger — only these decisions are.
+export type SubscriptionPreference = {
+  id: string;
+  // "cancelled" moves it to the cancelled list; "deleted" removes it from the page altogether.
+  status?: "cancelled" | "deleted";
+  cancelledAt?: string; // ISO date
+  // Overrides the detected classification (a gym the app called a bill, say).
+  kind?: "subscription" | "bill";
+  // How many days early or late a payment may land and still count as on time.
+  toleranceDays?: number;
+  // A snapshot of what was cancelled, so the cancelled list can still show it if the ledger rows
+  // behind it are later deleted.
+  label?: string;
+  cadence?: "weekly" | "fortnightly" | "4-weekly" | "monthly" | "quarterly" | "half-yearly" | "annual";
+  price?: number;
+  updatedAt: string;
+};
 
-// Asset sub-types (for the savings/debit/investment side)
-export type AssetAccountType = "current" | "savings" | "isa" | "investment" | "pension" | "other-asset";
+// Debt sub-types. "loan" is the generic personal loan; mortgages, car finance and student loans
+// are their own types so the app can offer the right fields (amortisation term, repayment plan).
+export type DebtAccountType = "credit-card" | "loan" | "mortgage" | "auto-loan" | "student-loan" | "overdraft" | "other";
+
+// Asset sub-types (for the savings/debit/investment side). Which of these a user is offered depends
+// on their country (see region.ts): "isa"/"lisa"/"pension"/"sipp" are UK instruments, "hysa"/"cd"/
+// "money-market"/"hsa"/"fsa"/"401k"/"403b"/"traditional-ira"/"roth-ira"/"529" are US ones. Every
+// type stays valid whatever the country, so switching country never rewrites an account.
+export type AssetAccountType =
+  | "current"
+  | "savings"
+  | "isa"
+  | "lisa"
+  | "hysa"
+  | "cd"
+  | "money-market"
+  | "hsa"
+  | "fsa"
+  | "investment"
+  | "pension"
+  | "sipp"
+  | "401k"
+  | "403b"
+  | "traditional-ira"
+  | "roth-ira"
+  | "529"
+  | "other-asset";
+
+// How contributions and growth are taxed. Defaults per type live in region.ts; a 401(k) can be
+// switched to "roth" by the user.
+export type TaxTreatment = "pre-tax" | "roth" | "taxable" | "tax-free" | "triple";
+
+// Where a contribution comes from. "payroll" money never reaches the user's bank account (it is
+// taken from gross pay before take-home), so it must not be subtracted from the ledger surplus,
+// which is built from take-home income. "personal" money moves out of the budget as before.
+export type ContributionSource = "personal" | "payroll";
+
+// US federal student-loan repayment plans (simplified).
+export type RepaymentPlan = "standard" | "graduated" | "extended" | "income-driven";
+
+// UK student-loan plans: repayments are a percentage of pay above the plan's threshold.
+export type UkStudentLoanPlan = "plan1" | "plan2" | "plan4" | "plan5" | "postgrad";
 
 // The high-level class decides whether the balance adds to or subtracts from net worth,
 // and which fields are meaningful.
@@ -186,14 +244,159 @@ export type Account = {
   includeInNetWorth: boolean;
   color: string;
   note: string;
+
+  // ── Optional plan details ─────────────────────────────────────────────────
+  // Everything below is optional and only offered for the account types it applies to. An account
+  // with none of it set behaves exactly as before. See retirement.ts and loans.ts.
+
+  // Retirement, pension and tax-advantaged accounts.
+  taxTreatment?: TaxTreatment;
+  contributionSource?: ContributionSource;
+  // Employee contribution as a % of gross pay. When set and a gross salary is known (taxProfile),
+  // `monthlyContribution` is kept in step with it by syncPlanContributions.
+  contributionPercent?: number;
+  // Employer money: a match on what the employee pays in ("100% of the first 4%") and/or a fixed
+  // % of pay regardless (UK auto-enrolment minimum 3%, US non-elective contributions). Resolved to
+  // `employerMonthlyContribution` when a salary is known; typed directly when it is not.
+  employerMatchPercent?: number;
+  employerMatchCapPercent?: number;
+  employerContributionPercent?: number;
+  employerMonthlyContribution?: number;
+  // Contribution limits: the statutory annual limit is looked up by type and year; these adjust it.
+  annualLimitOverride?: number;
+  catchUpEligible?: boolean;
+  coverage?: "self" | "family";
+
+  // Fixed terms: a CD's term, or a loan's remaining amortisation term in months.
+  termMonths?: number;
+
+  // Student loans.
+  studentLoanType?: "federal" | "private";
+  repaymentPlan?: RepaymentPlan;
+  studentLoanPlan?: UkStudentLoanPlan;
+  familySize?: number;
 };
 
 // Back-compat alias for code/signatures still referring to a debt account shape.
 export type DebtAccount = Account;
 
+// Gross-to-net inputs shared by the US and UK estimators, and by workplace-plan contributions that
+// are expressed as a % of pay. Every figure is optional; the estimators say so loudly.
+export type TaxProfile = {
+  grossAnnualSalary: number;
+  payFrequency: PayFrequency;
+  // US
+  filingStatus: FilingStatus;
+  state: string;
+  stateRateOverride: number | null;
+  // UK
+  studentLoanPlan: UkStudentLoanPlan | "none";
+  postgradLoan: boolean;
+  // Estimated monthly health-insurance premium taken before tax (US). Kept here rather than on the
+  // health plan so the estimator works without one.
+  preTaxHealthPremiumMonthly: number;
+  // Pension paid from pay each month, on top of any set up on accounts. UK: salary sacrifice
+  // (lowers tax, NI and student loan) or a net-pay contribution (lowers tax only). US: pre-tax 401(k).
+  pensionMonthly: number;
+  pensionMethod: "sacrifice" | "net-pay";
+  // Bonus or commission. One-off: a single yearly payment shown separately, so monthly take-home
+  // stays salary-based. Otherwise it is paid every month and folded into regular pay.
+  bonusAmount: number;
+  bonusOneOff: boolean;
+};
+
+export type PayFrequency = "monthly" | "semimonthly" | "biweekly" | "weekly";
+export type FilingStatus = "single" | "married-joint" | "married-separate" | "head";
+
+// US health cover: what the plan costs and where the deductible / out-of-pocket maximum sit, so
+// medical spending in the ledger can be measured against them.
+export type HealthPlan = {
+  planType: "" | "hdhp" | "ppo" | "hmo" | "epo" | "other";
+  coverage: "self" | "family";
+  premiumMonthly: number;
+  deductible: number;
+  outOfPocketMax: number;
+  // 1 = January. Most plans run on the calendar year.
+  planYearStartMonth: number;
+};
+
+// ─── Allocation planner ──────────────────────────────────────────────────────
+// How spare money and lump sums are split between debts, a buffer, a tax reserve and savings,
+// and the order debts are attacked in. See allocate.ts.
+
+export type PayoffMethod = "avalanche" | "snowball" | "cashflow" | "utilisation";
+
+export type PlanPriority =
+  | "interest" // minimise total interest paid
+  | "payments" // free up monthly cash flow as fast as possible
+  | "quick-wins" // clear the most accounts soonest (snowball)
+  | "credit-score" // bring card utilisation down first
+  | "cash-buffer" // build an emergency buffer before overpaying
+  | "tax-buffer" // set aside a tax bill first
+  | "balanced" // starter buffer, then only overpay debts that cost more than savings earn
+  | "custom"; // fixed percentage split chosen by the user
+
+export type SavingsPriority =
+  | "safe-rate" // highest rate on cash-style savings
+  | "growth" // highest expected return, investments included (capital at risk)
+  | "tax-efficient" // tax-advantaged wrappers first
+  | "goals-first"; // fund the Goals page's goals in priority order
+
+export type CustomShares = { debts: number; buffer: number; savings: number };
+
+// UK only: whether the lump sum on the Allocate page is untaxed income or a gain, and what is
+// needed to size the tax to set aside from it. See lumpSumTax.ts.
+export type LumpSumSource = "self-employed" | "other-income" | "rental" | "savings-interest" | "dividends" | "capital-gain";
+
+export type UndergradLoanPlan = Exclude<UkStudentLoanPlan, "postgrad">;
+
+// Student loan repayments collected through Self Assessment on untaxed income. null = follow the
+// tax profile (the Pay & tax page).
+export type LumpSumStudentLoan = { repaying: boolean; plan: UndergradLoanPlan | null; postgrad: boolean };
+
+export type LumpSumTaxSettings = {
+  taxable: boolean;
+  source: LumpSumSource;
+  // Gross monthly salary already taxed through PAYE. null = follow the tax profile's salary.
+  monthlySalary: number | null;
+  // Already received this tax year from the same kind of source, before tax.
+  priorThisYear: number;
+  studentLoan: LumpSumStudentLoan | null;
+};
+
+export type AllocationSettings = {
+  priority: PlanPriority;
+  savingsPriority: SavingsPriority;
+  lumpSum: number;
+  // null = follow the ledger's spare-per-month figure.
+  monthlyExtraOverride: number | null;
+  // Emergency buffer target, in months of recurring expenses.
+  bufferMonths: number;
+  // A tax bill to set aside for (0 = none) and how many months until it is due.
+  taxReserve: number;
+  taxDueInMonths: number;
+  horizonMonths: number;
+  // Clear a 0% balance before its promo ends, whatever the ordering says.
+  promoGuard: boolean;
+  // Roll a cleared debt's payment into the next one (the "snowball" effect, used by every method).
+  rollover: boolean;
+  // Assumed rate for a new easy-access savings account when the user has none to compare with.
+  safeSavingsRate: number;
+  customShares: CustomShares;
+  customMethod: PayoffMethod;
+  // Per-debt overrides of whether it is in the plan, by account id. Absent = the default for its
+  // type (mortgages and UK student loans start left out; see allocate.ts).
+  debtIncluded: Record<string, boolean>;
+  lumpSumTax: LumpSumTaxSettings;
+};
+
 export type LedgerState = {
   schemaVersion: number;
   currency: CurrencyCode;
+  // Decides labels, account types and which region-specific tools show. See region.ts.
+  country: CountryCode;
+  taxProfile: TaxProfile;
+  healthPlan: HealthPlan;
   selectedMonth: string;
   months: Record<string, MonthBudget>;
   /** Multi-goal list, ordered by priority ascending. Replaces the old single `goal`. */
@@ -212,11 +415,59 @@ export type LedgerState = {
   categoryRules: CategoryRule[];
   nameRules: NameRule[];
   importBatches: ImportBatch[];
+  // The user's decisions on the subscriptions page: cancelled, removed, reclassified, tolerance.
+  subscriptionPrefs: SubscriptionPreference[];
   privacyMode: boolean;
   // Stage C opt-in: allow sending transaction descriptions (never amounts or
   // identity) to the categorize-batch edge function for AI suggestions.
   aiCategorizationEnabled?: boolean;
+  // The Allocate page's plan: priority, lump sum, buffer and tax targets. See allocate.ts.
+  allocation: AllocationSettings;
+  // The Insights widgets' own data: the look each one uses, dismissed warnings, notes and to-dos.
+  // Lives in the ledger so it persists and syncs exactly like transactions do.
+  insights?: InsightsState;
   lastSavedAt: string;
+};
+
+// ─── Insights dashboard ──────────────────────────────────────────────────────
+
+export type InsightWidgetType =
+  | "summary"
+  | "moneyFlow"
+  | "health"
+  | "monthlyCashFlow"
+  | "warnings"
+  | "topCategories"
+  | "recurring"
+  | "annualSnapshot"
+  | "savingsRate"
+  | "spendingPace"
+  | "netWorth"
+  | "debt"
+  | "goals"
+  | "monthCompare"
+  | "upcoming"
+  | "calendar"
+  | "accounts"
+  | "todo"
+  | "notes";
+
+export type InsightWidgetInstance = {
+  id: string;
+  type: InsightWidgetType;
+  // Which look the widget uses ("waterfall" vs "particles" for the money flow, and so on).
+  variant?: string;
+};
+
+export type InsightTodoItem = { id: string; text: string; done: boolean; createdAt: string };
+
+export type InsightsState = {
+  version: 1;
+  // One entry per widget that has a non-default look; the id is the widget's id on the page.
+  widgets: InsightWidgetInstance[];
+  hiddenWarnings: string[];
+  notes: Record<string, string>;
+  todos: Record<string, InsightTodoItem[]>;
 };
 
 export type Projection = {
@@ -254,7 +505,12 @@ export type AssetSummary = {
   totalCash: number;
   totalSavings: number;
   totalInvestments: number;
+  // Everything going into asset accounts each month: the user's contributions plus employer money.
   monthlyContributions: number;
+  // The part that leaves the budget (personal contributions, not payroll or employer ones).
+  cashContributions: number;
+  payrollContributions: number;
+  employerContributions: number;
   weightedAssetRate: number;
 };
 
@@ -346,3 +602,7 @@ export type GoalSequenceResult = {
 };
 
 export type CurrencyCode = "GBP" | "USD" | "EUR" | "CAD" | "AUD" | "INR" | "JPY";
+
+// Countries the app can be set to. "US" and "GB" have their own experience; the rest use the
+// GB-geared app with their own currency.
+export type CountryCode = "US" | "GB" | "IE" | "CA" | "AU" | "IN" | "JP" | "OTHER";

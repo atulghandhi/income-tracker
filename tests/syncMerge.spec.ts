@@ -311,3 +311,49 @@ test.describe("three devices converge", () => {
     });
   }
 });
+
+test.describe("Newer ledger fields merge one level down", () => {
+  const base = () => normalizeState({ ...createInitialState("GB"), lastSavedAt: NOW });
+
+  test("two devices changing different tax-profile fields both keep their change", () => {
+    const start = base();
+    const local = { ...start, taxProfile: { ...start.taxProfile, grossAnnualSalary: 45_000 } };
+    const remote = { ...start, taxProfile: { ...start.taxProfile, pensionMonthly: 200 } };
+    const merged = mergeLedgerStates(start, local, remote, NOW);
+    expect(merged.taxProfile.grossAnnualSalary).toBe(45_000);
+    expect(merged.taxProfile.pensionMonthly).toBe(200);
+  });
+
+  test("subscription decisions merge per subscription", () => {
+    const start = { ...base(), subscriptionPrefs: [{ id: "netflix", status: "cancelled" as const, updatedAt: NOW }] };
+    const local = { ...start, subscriptionPrefs: [...start.subscriptionPrefs, { id: "gym", kind: "bill" as const, updatedAt: NOW }] };
+    const remote = { ...start, subscriptionPrefs: [...start.subscriptionPrefs, { id: "spotify", status: "deleted" as const, updatedAt: NOW }] };
+    const merged = mergeLedgerStates(start, local, remote, NOW);
+    expect(merged.subscriptionPrefs.map((pref) => pref.id).sort()).toEqual(["gym", "netflix", "spotify"]);
+  });
+
+  test("Insights to-dos added on two devices are both kept; a dismissed warning stays dismissed", () => {
+    const start = base();
+    const insights = start.insights!;
+    const todo = (id: string) => ({ id, text: id, done: false, createdAt: NOW });
+    const local = { ...start, insights: { ...insights, todos: { todo: [todo("a")] }, hiddenWarnings: ["w-local"] } };
+    const remote = { ...start, insights: { ...insights, todos: { todo: [todo("b")] } } };
+    const merged = mergeLedgerStates(start, local, remote, NOW);
+    expect(merged.insights?.todos.todo.map((item) => item.id).sort()).toEqual(["a", "b"]);
+    expect(merged.insights?.hiddenWarnings).toEqual(["w-local"]);
+  });
+
+  test("normalizeState keeps the newer fields and anything it does not recognise", () => {
+    const loaded = normalizeState({
+      ...createInitialState("US"),
+      taxProfile: { ...createInitialState("US").taxProfile, bonusAmount: 5_000, futureTaxField: "kept" } as never,
+      futureRootField: { from: "a newer client" },
+    } as never);
+    expect(loaded.country).toBe("US");
+    expect(loaded.taxProfile.bonusAmount).toBe(5_000);
+    expect((loaded.taxProfile as unknown as Record<string, unknown>).futureTaxField).toBe("kept");
+    expect((loaded as unknown as Record<string, unknown>).futureRootField).toEqual({ from: "a newer client" });
+    expect(loaded.allocation).toBeDefined();
+    expect(loaded.insights).toBeDefined();
+  });
+});

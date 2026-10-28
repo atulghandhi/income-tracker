@@ -97,6 +97,13 @@ export function mergeLedgerStates(
     selectedMonth: (_b, l) => l,
     schemaVersion: (_b, l, r) => Math.max(Number(l) || 0, Number(r) || 0),
     lastSavedAt: () => now,
+    // Settings forms: two devices changing different fields both keep their change.
+    taxProfile: mergeObjectFields,
+    healthPlan: mergeObjectFields,
+    allocation: mergeObjectFields,
+    // One decision per subscription, by id.
+    subscriptionPrefs: mergeIdList,
+    insights: mergeInsights,
   });
 
   return {
@@ -170,6 +177,45 @@ function mergeFields(
   }
 
   return out;
+}
+
+// The default for a single value: the side that changed it, local when both did.
+function pickWhole(base: unknown, local: unknown, remote: unknown): unknown {
+  if (local === undefined && remote === undefined) return undefined;
+  return valuesEqual(local, base) ? remote : local;
+}
+
+function isRec(value: unknown): value is Rec {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+// An object merged one level down, field by field.
+function mergeObjectFields(base: unknown, local: unknown, remote: unknown): unknown {
+  if (!isRec(local) || !isRec(remote)) return pickWhole(base, local, remote);
+  return mergeFields(isRec(base) ? base : undefined, local, remote);
+}
+
+// A list of objects with ids, merged per item like the root collections.
+function mergeIdList(base: unknown, local: unknown, remote: unknown): unknown {
+  if (!Array.isArray(local) || !Array.isArray(remote)) return pickWhole(base, local, remote);
+  return mergeCollection(Array.isArray(base) ? base : undefined, local, remote, (b, l, r) => mergeFields(b, l, r));
+}
+
+// The Insights widgets' data: looks per widget, dismissed warnings as a set, a note per widget,
+// and each widget's to-do items merged by id.
+function mergeInsights(base: unknown, local: unknown, remote: unknown): unknown {
+  if (!isRec(local) || !isRec(remote)) return pickWhole(base, local, remote);
+  return mergeFields(isRec(base) ? base : undefined, local, remote, [], {
+    version: (_b, l, r) => Math.max(Number(l) || 0, Number(r) || 0),
+    widgets: mergeIdList,
+    hiddenWarnings: mergeSet,
+    notes: mergeObjectFields,
+    todos: (b, l, r) => {
+      if (!isRec(l) || !isRec(r)) return pickWhole(b, l, r);
+      const keys = [...new Set([...Object.keys(isRec(b) ? b : {}), ...Object.keys(l), ...Object.keys(r)])];
+      return mergeFields(isRec(b) ? b : undefined, l, r, [], Object.fromEntries(keys.map((key) => [key, mergeIdList])));
+    },
+  });
 }
 
 // Set-valued fields: union of both sides minus anything either side removed.

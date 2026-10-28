@@ -84,6 +84,13 @@ public enum LedgerMerge {
             "selectedMonth": { _, l, _ in l },
             "schemaVersion": { _, l, r in .number(max(number(l) ?? 0, number(r) ?? 0)) },
             "lastSavedAt": { _, _, _ in .string(now) },
+            // Settings forms: two devices changing different fields both keep their change.
+            "taxProfile": mergeObjectFields,
+            "healthPlan": mergeObjectFields,
+            "allocation": mergeObjectFields,
+            // One decision per subscription, by id.
+            "subscriptionPrefs": mergeIdList,
+            "insights": mergeInsights,
         ])
         root["months"] = .object(months)
         root["goals"] = .array(goals.map(JSONValue.object))
@@ -156,6 +163,44 @@ public enum LedgerMerge {
             }
         }
         return out
+    }
+
+    /// The default for a single value: the side that changed it, local when both did.
+    private static func pickWhole(_ base: JSONValue?, _ local: JSONValue?, _ remote: JSONValue?) -> JSONValue? {
+        if local == nil && remote == nil { return nil }
+        return equal(local ?? .null, base ?? .null) ? remote : local
+    }
+
+    /// An object merged one level down, field by field.
+    private static func mergeObjectFields(_ base: JSONValue?, _ local: JSONValue?, _ remote: JSONValue?) -> JSONValue? {
+        guard let l = local?.objectValue, let r = remote?.objectValue else { return pickWhole(base, local, remote) }
+        return .object(mergeFields(base?.objectValue, l, r))
+    }
+
+    /// A list of objects with ids, merged per item like the root collections.
+    private static func mergeIdList(_ base: JSONValue?, _ local: JSONValue?, _ remote: JSONValue?) -> JSONValue? {
+        guard local?.arrayValue != nil, remote?.arrayValue != nil else { return pickWhole(base, local, remote) }
+        let baseList: JSONValue? = base?.arrayValue != nil ? base : nil
+        return .array(mergeCollection(baseList, local, remote) { b, l, r in mergeFields(b, l, r) }.map(JSONValue.object))
+    }
+
+    /// The Insights widgets' data: looks per widget, dismissed warnings as a set, a note per
+    /// widget, and each widget's to-do items merged by id.
+    private static func mergeInsights(_ base: JSONValue?, _ local: JSONValue?, _ remote: JSONValue?) -> JSONValue? {
+        guard let l = local?.objectValue, let r = remote?.objectValue else { return pickWhole(base, local, remote) }
+        return .object(mergeFields(base?.objectValue, l, r, special: [
+            "version": { _, l, r in .number(max(number(l) ?? 0, number(r) ?? 0)) },
+            "widgets": mergeIdList,
+            "hiddenWarnings": mergeSet,
+            "notes": mergeObjectFields,
+            "todos": { b, l, r in
+                guard let lt = l?.objectValue, let rt = r?.objectValue else { return pickWhole(b, l, r) }
+                let bt = b?.objectValue
+                var special: [String: Special] = [:]
+                for key in Set((bt ?? [:]).keys).union(lt.keys).union(rt.keys) { special[key] = mergeIdList }
+                return .object(mergeFields(bt, lt, rt, special: special))
+            },
+        ]))
     }
 
     /// Set-valued fields: union of both sides minus anything either side removed.

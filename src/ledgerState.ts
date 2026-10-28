@@ -8,6 +8,7 @@
 
 import { syncLinkedGoals, linkSavingsTransfers } from "./accountLinks";
 import { assignMissingAccounts, distinctAccountColors, isoToday } from "./accountFlow";
+import { normalizeAllocationSettings } from "./allocate";
 import { syncScheduledDebtPayments } from "./debtSync";
 import {
   CURRENT_SCHEMA_VERSION,
@@ -22,48 +23,21 @@ import {
   seedMonthFromPrevious,
 } from "./finance";
 import { tidyImportedNames } from "./importer";
+import { normalizeInsightsState } from "./insightsState";
 import { normalizeNameRules } from "./nameRules";
+import { allAccountTypesForClass, countryFromCurrency, defaultTypeForClass, isCountryCode } from "./region";
+import { syncPlanContributions } from "./retirement";
+import { normalizeSubscriptionPrefs } from "./subscriptions";
 import type {
   Account,
   AccountClass,
   AccountType,
   CategoryRule,
+  CurrencyCode,
   ImportBatch,
   LedgerState,
   SavingsGoal,
 } from "./types";
-
-// Default sub-type for each account class, so switching the class picks a sensible type.
-export const DEFAULT_TYPE_BY_CLASS: Record<AccountClass, AccountType> = {
-  debt: "credit-card",
-  cash: "current",
-  savings: "savings",
-  investment: "investment",
-};
-
-export const ACCOUNT_TYPE_OPTIONS: Record<AccountClass, Array<{ value: AccountType; label: string }>> = {
-  debt: [
-    { value: "credit-card", label: "Credit card" },
-    { value: "loan", label: "Loan" },
-    { value: "overdraft", label: "Overdraft" },
-    { value: "other", label: "Other" },
-  ],
-  cash: [
-    { value: "current", label: "Current" },
-    { value: "other-asset", label: "Other cash" },
-  ],
-  savings: [
-    { value: "savings", label: "Savings" },
-    { value: "isa", label: "Cash ISA" },
-    { value: "other-asset", label: "Other" },
-  ],
-  investment: [
-    { value: "investment", label: "Investment / stocks" },
-    { value: "isa", label: "Stocks & shares ISA" },
-    { value: "pension", label: "Pension" },
-    { value: "other-asset", label: "Other" },
-  ],
-};
 
 // Keys older schemas used that normalisation migrates away; never carried forward.
 const LEGACY_ROOT_KEYS = ["goal", "debts"];
@@ -97,7 +71,7 @@ export function normalizeState(rawState: Partial<LedgerState>): LedgerState {
 // payments in the ledger, every transaction on an account, and linked goals following their
 // account's live balance (last, so it sees the balances the steps before settled).
 export function syncLedgerLinks(state: LedgerState): LedgerState {
-  return syncLinkedGoals(assignMissingAccounts(syncScheduledDebtPayments(linkSavingsTransfers(state))));
+  return syncLinkedGoals(assignMissingAccounts(syncScheduledDebtPayments(linkSavingsTransfers(syncPlanContributions(state)))));
 }
 
 export function normalizeStateFields(rawState: Partial<LedgerState>): LedgerState {
@@ -143,11 +117,18 @@ export function normalizeStateFields(rawState: Partial<LedgerState>): LedgerStat
         }),
       };
 
+  const currency: CurrencyCode = currencyOptions.some((option) => option.code === state.currency) ? state.currency : fallback.currency;
+
   return keepExtras(
     rawState,
     {
       schemaVersion: CURRENT_SCHEMA_VERSION,
-      currency: currencyOptions.some((option) => option.code === state.currency) ? state.currency! : fallback.currency,
+      currency,
+      // v8 → v9: ledgers saved before the country existed take it from their currency, so a USD
+      // ledger opens on the US experience and everything else keeps the UK-geared app.
+      country: isCountryCode(state.country) ? state.country : countryFromCurrency(currency),
+      taxProfile: normalizeTaxProfile(state.taxProfile),
+      healthPlan: normalizeHealthPlan(state.healthPlan),
       selectedMonth,
       months: normalizedMonths,
       goals: normalizeGoals(state.goals),
@@ -164,8 +145,13 @@ export function normalizeStateFields(rawState: Partial<LedgerState>): LedgerStat
       categoryRules: normalizeCategoryRules(state.categoryRules),
       nameRules: normalizeNameRules(state.nameRules),
       importBatches: normalizeImportBatches(state.importBatches),
+      subscriptionPrefs: normalizeSubscriptionPrefs(state.subscriptionPrefs),
       privacyMode: Boolean(state.privacyMode),
       aiCategorizationEnabled: Boolean(state.aiCategorizationEnabled),
+      // v9 → v10: ledgers saved before the Allocate page existed start on the default plan.
+      allocation: keepExtras(state.allocation, normalizeAllocationSettings(state.allocation)),
+      // The Insights widgets' own data (looks, dismissed warnings, notes, to-dos).
+      insights: keepExtras(state.insights, normalizeInsightsState(state.insights)),
       lastSavedAt: state.lastSavedAt ?? new Date().toISOString(),
     },
     LEGACY_ROOT_KEYS,
@@ -248,8 +234,8 @@ function normalizeAccounts(state: Partial<LedgerState>): Account[] {
       : "debt";
     const isDebt = accountClass === "debt";
 
-    const validTypes = ACCOUNT_TYPE_OPTIONS[accountClass].map((option) => option.value) as string[];
-    const type: AccountType = validTypes.includes(item?.type) ? item.type : DEFAULT_TYPE_BY_CLASS[accountClass];
+    const validTypes = allAccountTypesForClass(accountClass) as string[];
+    const type: AccountType = validTypes.includes(item?.type) ? item.type : defaultTypeForClass(accountClass);
 
     return keepExtras(
       item,
@@ -281,9 +267,80 @@ function normalizeAccounts(state: Partial<LedgerState>): Account[] {
         includeInNetWorth: item?.includeInNetWorth !== false,
         color: item?.color || colors[index % colors.length],
         note: item?.note ?? "",
+        ...normalizePlanDetails(item, isDebt),
       },
       LEGACY_ACCOUNT_KEYS,
     );
+  });
+}
+
+// Optional plan fields: only what is present and valid is kept, so accounts from before v9 stay
+// exactly as they were.
+function normalizePlanDetails(item: Record<string, unknown>, isDebt: boolean): Partial<Account> {
+  const details: Partial<Account> = {};
+  const optionalNumber = (key: keyof Account, max = 1_000_000_000) => {
+    const value = Number(item?.[key]);
+    if (Number.isFinite(value) && value >= 0) (details as Record<string, unknown>)[key] = Math.min(max, value);
+  };
+  if (!isDebt) {
+    if (["pre-tax", "roth", "taxable", "tax-free", "triple"].includes(item?.taxTreatment as string)) details.taxTreatment = item.taxTreatment as Account["taxTreatment"];
+    if (item?.contributionSource === "payroll" || item?.contributionSource === "personal") details.contributionSource = item.contributionSource;
+    optionalNumber("contributionPercent", 100);
+    optionalNumber("employerMatchPercent", 1000);
+    optionalNumber("employerMatchCapPercent", 100);
+    optionalNumber("employerContributionPercent", 100);
+    optionalNumber("employerMonthlyContribution");
+    optionalNumber("annualLimitOverride");
+    if (typeof item?.catchUpEligible === "boolean") details.catchUpEligible = item.catchUpEligible;
+    if (item?.coverage === "self" || item?.coverage === "family") details.coverage = item.coverage;
+  } else {
+    if (item?.studentLoanType === "federal" || item?.studentLoanType === "private") details.studentLoanType = item.studentLoanType;
+    if (["standard", "graduated", "extended", "income-driven"].includes(item?.repaymentPlan as string)) details.repaymentPlan = item.repaymentPlan as Account["repaymentPlan"];
+    if (["plan1", "plan2", "plan4", "plan5", "postgrad"].includes(item?.studentLoanPlan as string)) details.studentLoanPlan = item.studentLoanPlan as Account["studentLoanPlan"];
+    optionalNumber("familySize", 20);
+  }
+  optionalNumber("termMonths", 1200);
+  return details;
+}
+
+function normalizeTaxProfile(raw: unknown): LedgerState["taxProfile"] {
+  const fallback = createInitialState().taxProfile;
+  const item = (raw ?? {}) as Record<string, unknown>;
+  const number = (value: unknown, defaultValue: number, max = 1_000_000_000) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? Math.min(max, parsed) : defaultValue;
+  };
+  return keepExtras(raw, {
+    grossAnnualSalary: number(item.grossAnnualSalary, fallback.grossAnnualSalary),
+    payFrequency: ["monthly", "semimonthly", "biweekly", "weekly"].includes(item.payFrequency as string) ? (item.payFrequency as LedgerState["taxProfile"]["payFrequency"]) : fallback.payFrequency,
+    filingStatus: ["single", "married-joint", "married-separate", "head"].includes(item.filingStatus as string) ? (item.filingStatus as LedgerState["taxProfile"]["filingStatus"]) : fallback.filingStatus,
+    state: typeof item.state === "string" ? item.state.slice(0, 2).toUpperCase() : fallback.state,
+    stateRateOverride: Number.isFinite(Number(item.stateRateOverride)) && item.stateRateOverride !== null && item.stateRateOverride !== "" ? Math.max(0, Math.min(30, Number(item.stateRateOverride))) : null,
+    studentLoanPlan: ["none", "plan1", "plan2", "plan4", "plan5", "postgrad"].includes(item.studentLoanPlan as string) ? (item.studentLoanPlan as LedgerState["taxProfile"]["studentLoanPlan"]) : fallback.studentLoanPlan,
+    postgradLoan: Boolean(item.postgradLoan),
+    preTaxHealthPremiumMonthly: number(item.preTaxHealthPremiumMonthly, fallback.preTaxHealthPremiumMonthly),
+    pensionMonthly: number(item.pensionMonthly, fallback.pensionMonthly),
+    pensionMethod: item.pensionMethod === "net-pay" ? "net-pay" : fallback.pensionMethod,
+    bonusAmount: number(item.bonusAmount, fallback.bonusAmount),
+    bonusOneOff: typeof item.bonusOneOff === "boolean" ? item.bonusOneOff : fallback.bonusOneOff,
+  });
+}
+
+function normalizeHealthPlan(raw: unknown): LedgerState["healthPlan"] {
+  const fallback = createInitialState().healthPlan;
+  const item = (raw ?? {}) as Record<string, unknown>;
+  const number = (value: unknown, defaultValue: number) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? Math.min(1_000_000_000, parsed) : defaultValue;
+  };
+  const startMonth = Math.round(Number(item.planYearStartMonth));
+  return keepExtras(raw, {
+    planType: ["", "hdhp", "ppo", "hmo", "epo", "other"].includes(item.planType as string) ? (item.planType as LedgerState["healthPlan"]["planType"]) : fallback.planType,
+    coverage: item.coverage === "family" ? "family" : "self",
+    premiumMonthly: number(item.premiumMonthly, fallback.premiumMonthly),
+    deductible: number(item.deductible, fallback.deductible),
+    outOfPocketMax: number(item.outOfPocketMax, fallback.outOfPocketMax),
+    planYearStartMonth: Number.isFinite(startMonth) && startMonth >= 1 && startMonth <= 12 ? startMonth : fallback.planYearStartMonth,
   });
 }
 

@@ -1,7 +1,7 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 // Core ledger behaviour in the app shell: keyboard-first entry, quick add,
-// grouping, CSV review, accounts and insights. Skips the marketing landing and
+// grouping, CSV review, accounts and the dashboard's insight widgets. Skips the marketing landing and
 // the first-run wizard so each test starts on an empty dashboard.
 
 test.beforeEach(async ({ page }) => {
@@ -20,8 +20,31 @@ async function inputValues(page: Page, selector: string) {
   return page.locator(selector).evaluateAll((inputs) => inputs.map((input) => (input as HTMLInputElement).value));
 }
 
-async function openView(page: Page, name: "Dashboard" | "Ledger" | "Accounts" | "Goals" | "Insights" | "Settings") {
-  await page.locator(".sideNav").getByRole("button", { name, exact: true }).click();
+// Phones pin the quick-add bar to the bottom and the annual rail below it, so Playwright's
+// own "scroll into view if needed" can leave a target underneath them. Centre it, then click.
+async function tap(locator: Locator) {
+  await locator.waitFor();
+  await locator.evaluate((element) => element.scrollIntoView({ block: "center", inline: "nearest" }));
+  let box = await locator.boundingBox();
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    await locator.page().waitForTimeout(120);
+    const next = await locator.boundingBox();
+    if (box && next && Math.abs(box.x - next.x) < 0.5 && Math.abs(box.y - next.y) < 0.5) break;
+    box = next;
+  }
+  await locator.page().mouse.click(box!.x + box!.width / 2, box!.y + box!.height / 2);
+}
+
+async function openView(page: Page, name: "Dashboard" | "Ledger" | "Accounts" | "Goals" | "Settings") {
+  const nav = page.locator(".sideNav");
+  const item = nav.getByRole("button", { name, exact: true });
+  // A new user's sidebar leaves Goals under More tools until it is added.
+  await expect(nav.getByRole("button", { name: "Dashboard", exact: true })).toBeVisible();
+  if (name === "Goals" && !(await item.isVisible())) {
+    await nav.getByRole("button", { name: /^More tools/ }).click();
+    await nav.getByRole("button", { name: `Add ${name} to sidebar` }).click();
+  }
+  await item.click();
 }
 
 async function openLedger(page: Page) {
@@ -35,6 +58,9 @@ async function addIncome(page: Page, source: string, amount: number) {
   await page.locator(INCOME_AMOUNT).fill(String(amount));
   await page.locator(INCOME_AMOUNT).press("Enter");
   await expect.poll(() => inputValues(page, "input[aria-label='Income source']")).toContain(source);
+  // The app hands focus back to the add row on the next frame; wait for that so the
+  // next action cannot be redirected into the add row.
+  await expect(page.locator(INCOME_SOURCE)).toBeFocused();
 }
 
 async function addExpense(page: Page, name: string, amount: number) {
@@ -42,6 +68,9 @@ async function addExpense(page: Page, name: string, amount: number) {
   await page.locator(EXPENSE_AMOUNT).fill(String(amount));
   await page.locator(EXPENSE_AMOUNT).press("Enter");
   await expect.poll(() => inputValues(page, "input[aria-label='Expense name']")).toContain(name);
+  // The app hands focus back to the add row on the next frame; wait for that so a
+  // fill into another field straight afterwards cannot be redirected into the add row.
+  await expect(page.locator(EXPENSE_NAME)).toBeFocused();
 }
 
 async function groupExpenses(page: Page, first: string, second: string, category: string) {
@@ -54,7 +83,7 @@ async function groupExpenses(page: Page, first: string, second: string, category
 }
 
 async function uploadCsv(page: Page, csv: string) {
-  await page.locator('input[accept="text/csv,.csv,.ofx,.qif,.txt"]').setInputFiles({
+  await page.getByLabel("Import a bank statement file").setInputFiles({
     name: "bank.csv",
     mimeType: "text/csv",
     buffer: Buffer.from(csv),
@@ -156,7 +185,8 @@ test.describe("Ledger", () => {
     await expect(page.locator(".panel.income .panelHeader")).toContainText("$0");
   });
 
-  test("groups expenses into a category, collapses it, moves rows in, and deletes it", async ({ page }) => {
+  test("groups expenses into a category, collapses it, moves rows in, and deletes it", async ({ page, isMobile }) => {
+    test.skip(Boolean(isMobile), "Moving a row between categories uses a right-click menu, which needs a mouse.");
     await openLedger(page);
     await addExpense(page, "QA coffee", 45);
     await addExpense(page, "QA lunch", 18);
@@ -184,7 +214,8 @@ test.describe("Ledger", () => {
     );
   });
 
-  test("reorders income by drag, keyboard and the automatic orders", async ({ page }) => {
+  test("reorders income by drag, keyboard and the automatic orders", async ({ page, isMobile }) => {
+    test.skip(Boolean(isMobile), "HTML5 drag and drop is a pointer feature; touch devices reorder with the keyboard handles.");
     await openLedger(page);
     await addIncome(page, "Amazon refund", 12);
     await addIncome(page, "Salary", 2400);
@@ -192,9 +223,31 @@ test.describe("Ledger", () => {
     await addIncome(page, "Side gig", 50);
     const sources = () => inputValues(page, "input[aria-label='Income source']");
     const amounts = () => inputValues(page, ".incomeRow input[aria-label='Income amount']");
+    // A drag needs both rows on screen: the browser abandons the gesture if the page scrolls mid-drag.
+    // Starting a native drag is also timing-sensitive under load, so the gesture is repeated until
+    // the order actually changes.
+    const showRows = (index: number) => page.locator(".incomeRow").nth(index).evaluate((row) => row.scrollIntoView({ block: "center" }));
+    async function dragRow(from: number, to: number, edge: "before" | "after", expected: string[]) {
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        await showRows(Math.min(from, to) + 1);
+        // Let row and toast animations settle. allSettled: an animation that is cancelled
+        // mid-flight (a toast replaced, a row re-rendered) rejects its `finished` promise.
+        await page.evaluate(() => Promise.allSettled(document.getAnimations().map((animation) => animation.finished)));
+        const target = page.locator(".incomeRow").nth(to);
+        const box = await target.boundingBox();
+        const y = edge === "before" ? 4 : (box?.height ?? 40) - 4;
+        await page.locator(".incomeRow").nth(from).locator(".dragHandle").dragTo(target, { targetPosition: { x: 200, y } });
+        try {
+          await expect.poll(sources, { timeout: 1500 }).toEqual(expected);
+          return;
+        } catch {
+          // The gesture didn't take; try again.
+        }
+      }
+      await expect.poll(sources).toEqual(expected);
+    }
 
-    await page.locator(".incomeRow").nth(1).locator(".dragHandle").dragTo(page.locator(".incomeRow").nth(0), { targetPosition: { x: 200, y: 4 } });
-    await expect.poll(sources).toEqual(["Salary", "Amazon refund", "Amazon refund", "Side gig"]);
+    await dragRow(1, 0, "before", ["Salary", "Amazon refund", "Amazon refund", "Side gig"]);
 
     await page.locator(".incomeRow").nth(3).locator(".dragHandle").focus();
     await page.keyboard.press("ArrowUp");
@@ -208,12 +261,7 @@ test.describe("Ledger", () => {
     await expect.poll(sources).toEqual(["Salary", "Side gig", "Amazon refund", "Amazon refund"]);
 
     // Dragging from an automatic order keeps what was on screen, applies the move, and switches to custom.
-    // Moved rows replay their entry animation; let them settle before dragging.
-    await page.evaluate(() => Promise.all(document.getAnimations().map((animation) => animation.finished)));
-    const lastRow = page.locator(".incomeRow").nth(3);
-    const lastBox = await lastRow.boundingBox();
-    await page.locator(".incomeRow").nth(1).locator(".dragHandle").dragTo(lastRow, { targetPosition: { x: 200, y: (lastBox?.height ?? 40) - 4 } });
-    await expect.poll(sources).toEqual(["Salary", "Amazon refund", "Amazon refund", "Side gig"]);
+    await dragRow(1, 3, "after", ["Salary", "Amazon refund", "Amazon refund", "Side gig"]);
     await expect(order).toHaveValue("custom");
   });
 
@@ -250,7 +298,43 @@ test.describe("Ledger", () => {
     await expect(page.getByRole("button", { name: "Remove rename rule Costa" })).toBeVisible();
   });
 
-  test("sorts category sections by total and category items by amount", async ({ page }) => {
+  test("the rename-all prompt cannot be confirmed by the Enter keystroke that opened it", async ({ page }) => {
+    // Regression: the prompt used to focus its "Rename all" button the instant it mounted — during
+    // the keydown of the Enter that committed the rename. Chromium then delivered that same
+    // keystroke's keypress to the button and clicked it, so every "Coffee" was renamed before
+    // anyone saw the prompt. The dialog itself must hold focus, and Enter on it must do nothing.
+    await openLedger(page);
+    await addExpense(page, "Coffee", 3);
+    await addExpense(page, "Coffee", 4);
+    const expenseNames = () => inputValues(page, "input[aria-label='Expense name']");
+
+    const first = page.locator("input[aria-label='Expense name']").first();
+    await first.fill("Costa");
+    await first.press("Enter");
+    const prompt = page.getByRole("dialog", { name: "Rename every “Coffee”?" });
+    await expect(prompt).toBeVisible();
+    // Focus sits on the dialog, never on one of its buttons.
+    await expect(prompt).toBeFocused();
+    await expect(prompt.getByRole("button", { name: /Rename all/ })).not.toBeFocused();
+
+    // A further Enter — the tail of the same keystroke, or a nervous extra press — changes nothing:
+    // the prompt stays open and the other Coffee is untouched.
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(300);
+    await expect(prompt).toBeVisible();
+    expect(await expenseNames()).toEqual(expect.arrayContaining(["Costa", "Coffee"]));
+    expect((await expenseNames()).filter((name) => name === "Coffee")).toHaveLength(1);
+
+    // The buttons are still reachable by keyboard, and Escape still dismisses.
+    await page.keyboard.press("Tab");
+    await expect(prompt.getByRole("button", { name: /Rename all/ })).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(prompt).toHaveCount(0);
+    expect((await expenseNames()).filter((name) => name === "Coffee")).toHaveLength(1);
+  });
+
+  test("sorts category sections by total and category items by amount", async ({ page, isMobile }) => {
+    test.skip(Boolean(isMobile), "Uses the right-click category menu, which needs a mouse.");
     await openLedger(page);
     await addExpense(page, "Food low", 10);
     await addExpense(page, "Food high", 90);
@@ -321,7 +405,7 @@ test.describe("Ledger", () => {
     );
     await expect.poll(() => inputValues(page, "input[aria-label='Category name']")).toEqual(expect.arrayContaining(["Food", "Work lunch"]));
 
-    await page.getByRole("button", { name: "Undo import" }).click();
+    await tap(page.getByRole("button", { name: "Undo import" }));
     await expect.poll(() => inputValues(page, "input[aria-label='Income source']")).not.toContain("ACME Payroll");
     await expect.poll(() => inputValues(page, "input[aria-label='Expense name']")).not.toContain("Tesco Express");
   });
@@ -338,15 +422,16 @@ test.describe("Ledger", () => {
     await expect(page.getByText("Start with income")).toBeVisible();
 
     await openView(page, "Dashboard");
-    const outlook = page.locator(".flowPanel");
+    const outlook = page.locator('[data-widget-id="net-worth"]');
     await expect(outlook.getByRole("heading", { name: "Net worth outlook" })).toBeVisible();
     const horizon = outlook.getByRole("tablist", { name: "Net worth horizon" });
     await horizon.getByRole("button", { name: "5 years" }).click();
     await expect(horizon.getByRole("button", { name: "5 years" })).toHaveClass(/selected/);
     await horizon.getByRole("button", { name: "2 years" }).click();
     await expect(horizon.getByRole("button", { name: "2 years" })).toHaveClass(/selected/);
-    await expect(page.getByRole("heading", { name: "Accounts and imports" })).toBeVisible();
-    await expect(page.getByText("£1,200").first()).toBeVisible();
+    // The card's balance shows in Credit & debt; the old "Accounts and imports" card is gone.
+    await expect(page.locator('[data-widget-id="accounts-imports"]')).toHaveCount(0);
+    await expect(page.locator('[data-widget-id="debt-overview"]').getByText("£1,200").first()).toBeVisible();
   });
 
   test("loans stay out of card utilization and 0% months count down as time passes", async ({ page }) => {
@@ -521,7 +606,7 @@ test.describe("Ledger", () => {
     await expect(panel.getByRole("button", { name: /^Monzo/ })).toContainText("£960");
 
     // Clicking the dot moves it (and its money) to the card, with a short toast naming the account.
-    await page.getByRole("button", { name: "Tesco is in Monzo. Move to the next account" }).click();
+    await tap(page.getByRole("button", { name: "Tesco is in Monzo. Move to the next account" }));
     await expect(page.locator(".accountToast")).toHaveText("Amex");
     await expect(page.locator(".accountToast")).toHaveCount(0, { timeout: 3000 });
     await expect(panel.getByRole("button", { name: /^Monzo/ })).toContainText("£1,000");
@@ -545,14 +630,15 @@ test.describe("Ledger", () => {
     await expect(page.getByLabel("Balance for Amex")).toHaveValue("50");
   });
 
-  test("explains health score, flags financial anomalies, and switches insight charts", async ({ page }) => {
+  test("explains health score, flags and dismisses anomalies, and switches insight charts", async ({ page }) => {
+    test.slow();
     await openLedger(page);
     await addIncome(page, "Salary", 2000);
     await addExpense(page, "Rent", 1700);
     await addExpense(page, "Food", 600);
     await addDebtAccount(page, { name: "Everyday Visa", balance: 2850, limit: 3000, apr: 24.9, promoMonths: 0, payment: 50, dueDay: 18 });
 
-    await openView(page, "Insights");
+    await openView(page, "Dashboard");
     await expect(page.getByRole("heading", { name: "Health score" })).toBeVisible();
     await expect(page.getByText("Estimated credit score")).toBeVisible();
     await page.getByLabel("How health score is calculated").hover();
@@ -563,16 +649,33 @@ test.describe("Ledger", () => {
     await expect(charts.getByRole("button", { name: "Cash flow volatility" })).toHaveAttribute("aria-pressed", "true");
     await charts.getByRole("button", { name: "Net worth outlook" }).click();
     await expect(charts.getByRole("button", { name: "Net worth outlook" })).toHaveAttribute("aria-pressed", "true");
-    const horizon = page.getByRole("tablist", { name: "Net worth horizon" });
+    const horizon = page.locator('[data-widget-id="chart"]').getByRole("tablist", { name: "Net worth horizon" });
     await horizon.getByRole("button", { name: "5 years" }).click();
     await expect(horizon.getByRole("button", { name: "5 years" })).toHaveClass(/selected/);
     await charts.getByRole("button", { name: "Monthly cash flow" }).click();
     await expect(charts.getByRole("button", { name: "Monthly cash flow" })).toHaveAttribute("aria-pressed", "true");
 
-    await expect(page.getByText("Outflow is higher than income")).toBeVisible();
-    await expect(page.getByText("Card utilisation over 90%")).toBeVisible();
-    await expect(page.getByText("Overall credit utilisation over 80%")).toBeVisible();
-    await page.getByLabel("Card utilisation over 90% context").hover();
+    // The money flow has two looks; the choice is kept with the ledger.
+    const flow = page.locator('[data-widget-id="cash-flow"]');
+    const looks = flow.getByRole("radiogroup", { name: "Money flow look" });
+    await expect(looks.getByRole("radio", { name: "Waterfall" })).toHaveAttribute("aria-checked", "true");
+    await looks.getByRole("radio", { name: "Particle stream" }).click();
+    await expect(looks.getByRole("radio", { name: "Particle stream" })).toHaveAttribute("aria-checked", "true");
+    await openView(page, "Ledger");
+    await openView(page, "Dashboard");
+    await expect(looks.getByRole("radio", { name: "Particle stream" })).toHaveAttribute("aria-checked", "true");
+
+    const anomalies = page.locator('[data-widget-id="anomalies"]');
+    await expect(anomalies.getByText("Outflow is higher than income")).toBeVisible();
+    await expect(anomalies.getByText("Card utilisation over 90%")).toBeVisible();
+    await expect(anomalies.getByText("Overall credit utilisation over 80%")).toBeVisible();
+    await anomalies.getByLabel("Card utilisation over 90% context").hover();
     await expect(page.getByText("Very high utilisation can drag down")).toBeVisible();
+
+    // A flag can be dismissed, and brought back.
+    await anomalies.getByRole("button", { name: "Dismiss Card utilisation over 90%" }).click();
+    await expect(anomalies.getByText("Card utilisation over 90%")).toHaveCount(0);
+    await anomalies.getByRole("button", { name: "Show 1 dismissed flag" }).click();
+    await expect(anomalies.getByText("Card utilisation over 90%")).toBeVisible();
   });
 });
