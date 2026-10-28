@@ -295,6 +295,14 @@ export type TaxProfile = {
   // Estimated monthly health-insurance premium taken before tax (US). Kept here rather than on the
   // health plan so the estimator works without one.
   preTaxHealthPremiumMonthly: number;
+  // Pension paid from pay each month, on top of any set up on accounts. UK: salary sacrifice
+  // (lowers tax, NI and student loan) or a net-pay contribution (lowers tax only). US: pre-tax 401(k).
+  pensionMonthly: number;
+  pensionMethod: "sacrifice" | "net-pay";
+  // Bonus or commission. One-off: a single yearly payment shown separately, so monthly take-home
+  // stays salary-based. Otherwise it is paid every month and folded into regular pay.
+  bonusAmount: number;
+  bonusOneOff: boolean;
 };
 
 export type PayFrequency = "monthly" | "semimonthly" | "biweekly" | "weekly";

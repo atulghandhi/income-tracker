@@ -40,6 +40,10 @@ export const DEFAULT_TAX_PROFILE: TaxProfile = {
   studentLoanPlan: "none",
   postgradLoan: false,
   preTaxHealthPremiumMonthly: 0,
+  pensionMonthly: 0,
+  pensionMethod: "sacrifice",
+  bonusAmount: 0,
+  bonusOneOff: true,
 };
 
 export const DEFAULT_HEALTH_PLAN: HealthPlan = {

@@ -58,18 +58,36 @@ export type TakeHomeSummary = {
   us?: UsTaxResult;
   uk?: UkTaxResult;
   payroll: PayrollDeductions;
+  // A one-off bonus, kept out of the regular figures above: what it adds to the year after tax.
+  oneOffBonus?: { gross: number; net: number };
 };
 
+// Regular pay is the salary plus any bonus paid every month; a one-off bonus is valued separately as
+// the extra take-home it adds to the year, so the monthly figure the budget uses stays steady.
 export function computeTakeHome(region: RegionKey, profile: TaxProfile, accounts: Account[], today = new Date()): TakeHomeSummary {
+  const salary = positive(profile.grossAnnualSalary);
+  const bonus = positive(profile.bonusAmount);
+  const oneOff = profile.bonusOneOff !== false;
+  const regularGross = salary + (oneOff ? 0 : bonus * 12);
+  const regular = estimate(region, profile, accounts, regularGross, today);
+  if (!oneOff && bonus > 0) regular.lines[0] = { ...regular.lines[0], label: "Gross pay (incl. bonus/commission)" };
+  if (oneOff && bonus > 0 && salary > 0) {
+    const withBonus = estimate(region, profile, accounts, regularGross + bonus, today);
+    regular.oneOffBonus = { gross: bonus, net: Math.round((withBonus.net - regular.net) * 100) / 100 };
+  }
+  return regular;
+}
+
+function estimate(region: RegionKey, profile: TaxProfile, accounts: Account[], gross: number, today: Date): TakeHomeSummary {
   const payroll = payrollDeductionsFromAccounts(accounts, region);
-  const gross = positive(profile.grossAnnualSalary);
+  const pensionAnnual = positive(profile.pensionMonthly) * 12;
   if (region === "US") {
     const us = estimateUsTakeHome({
       grossAnnualSalary: gross,
       filingStatus: profile.filingStatus,
       state: profile.state,
       stateRateOverride: profile.stateRateOverride,
-      preTaxRetirementAnnual: payroll.preTaxRetirementAnnual,
+      preTaxRetirementAnnual: payroll.preTaxRetirementAnnual + pensionAnnual,
       preTaxHsaAnnual: payroll.preTaxHealthAccountsAnnual,
       preTaxHealthPremiumAnnual: positive(profile.preTaxHealthPremiumMonthly) * 12,
       afterTaxPayrollAnnual: payroll.afterTaxAnnual,
@@ -93,9 +111,11 @@ export function computeTakeHome(region: RegionKey, profile: TaxProfile, accounts
       payroll,
     };
   }
+  const sacrifice = profile.pensionMethod !== "net-pay";
   const uk = estimateUkTakeHome({
     grossAnnualSalary: gross,
-    pensionAnnual: payroll.preTaxRetirementAnnual,
+    salarySacrificeAnnual: sacrifice ? pensionAnnual : 0,
+    pensionAnnual: payroll.preTaxRetirementAnnual + (sacrifice ? 0 : pensionAnnual),
     studentLoanPlan: profile.studentLoanPlan,
     postgradLoan: profile.postgradLoan,
     payFrequency: profile.payFrequency,

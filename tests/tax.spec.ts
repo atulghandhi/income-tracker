@@ -213,3 +213,43 @@ test.describe("take-home from the ledger's own accounts", () => {
     expect(computeTakeHome("GB", createInitialState("GB").taxProfile, []).hasSalary).toBe(false);
   });
 });
+
+test.describe("Pension and bonus on the take-home estimate", () => {
+  const today = new Date(2026, 9, 28); // UK tax year 2026/27
+  const profile = (patch: Partial<ReturnType<typeof createInitialState>["taxProfile"]>) => ({ ...createInitialState("GB").taxProfile, grossAnnualSalary: 40_000, ...patch });
+
+  test("UK salary sacrifice lowers tax and NI; a net-pay contribution lowers tax only", () => {
+    // £200 a month = £2,400. Sacrifice: pay £37,600 → tax 25,030 × 20% = 5,006; NI 25,030 × 8% = 2,002.40.
+    const sacrifice = computeTakeHome("GB", profile({ pensionMonthly: 200, pensionMethod: "sacrifice" }), [], today);
+    expect(sacrifice.uk?.salarySacrifice).toBe(2_400);
+    expect(sacrifice.uk?.incomeTax).toBe(5_006);
+    expect(sacrifice.uk?.nationalInsurance).toBe(2_002.4);
+    expect(sacrifice.net).toBe(30_591.6);
+    expect(sacrifice.lines.map((line) => line.label)).toContain("Pension (salary sacrifice)");
+    // Net pay: same tax, but NI on the full £40,000 (27,430 × 8% = 2,194.40) — £192 a year less.
+    const netPay = computeTakeHome("GB", profile({ pensionMonthly: 200, pensionMethod: "net-pay" }), [], today);
+    expect(netPay.uk?.incomeTax).toBe(5_006);
+    expect(netPay.uk?.nationalInsurance).toBe(2_194.4);
+    expect(netPay.net).toBe(30_399.6);
+  });
+
+  test("a one-off bonus is valued on its own and leaves the monthly take-home alone", () => {
+    const base = computeTakeHome("GB", profile({}), [], today);
+    const withBonus = computeTakeHome("GB", profile({ bonusAmount: 5_000, bonusOneOff: true }), [], today);
+    expect(withBonus.netMonthly).toBe(base.netMonthly);
+    // £45,000 for the year: tax 32,430 × 20% = 6,486; NI 32,430 × 8% = 2,594.40 → £3,600 of the £5,000 kept.
+    expect(withBonus.oneOffBonus).toEqual({ gross: 5_000, net: 3_600 });
+  });
+
+  test("a bonus paid every month is folded into regular pay", () => {
+    const monthly = computeTakeHome("GB", profile({ bonusAmount: 500, bonusOneOff: false }), [], today);
+    expect(monthly.gross).toBe(46_000);
+    expect(monthly.oneOffBonus).toBeUndefined();
+    expect(monthly.lines[0].label).toBe("Gross pay (incl. bonus/commission)");
+  });
+
+  test("US: the pension is a pre-tax 401(k) on top of any set on accounts", () => {
+    const us = computeTakeHome("US", { ...profile({ pensionMonthly: 500 }), state: "TX" }, [], today);
+    expect(us.us?.lines.find((line) => line.label.startsWith("Pre-tax retirement"))?.amount).toBe(-6_000);
+  });
+});

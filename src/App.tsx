@@ -7823,6 +7823,10 @@ function normalizeTaxProfile(raw: unknown): LedgerState["taxProfile"] {
     studentLoanPlan: ["none", "plan1", "plan2", "plan4", "plan5", "postgrad"].includes(item.studentLoanPlan as string) ? (item.studentLoanPlan as LedgerState["taxProfile"]["studentLoanPlan"]) : fallback.studentLoanPlan,
     postgradLoan: Boolean(item.postgradLoan),
     preTaxHealthPremiumMonthly: number(item.preTaxHealthPremiumMonthly, fallback.preTaxHealthPremiumMonthly),
+    pensionMonthly: number(item.pensionMonthly, fallback.pensionMonthly),
+    pensionMethod: item.pensionMethod === "net-pay" ? "net-pay" : fallback.pensionMethod,
+    bonusAmount: number(item.bonusAmount, fallback.bonusAmount),
+    bonusOneOff: typeof item.bonusOneOff === "boolean" ? item.bonusOneOff : fallback.bonusOneOff,
   };
 }
 

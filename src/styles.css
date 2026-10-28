@@ -7430,6 +7430,11 @@ hr {
   font-size: 13px;
 }
 
+.planCheckNote {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .planCheck input {
   width: 16px;
   height: 16px;
@@ -7746,6 +7751,21 @@ hr {
   margin-top: 14px;
   color: var(--muted);
   font-size: 12.5px;
+}
+
+.bonusResult {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-high);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.bonusResult b {
+  color: var(--ink);
 }
 
 .estimatorFacts b {

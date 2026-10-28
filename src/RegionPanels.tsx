@@ -669,6 +669,31 @@ export function TakeHomeEstimator({
               </label>
             </>
           )}
+          <PlanField
+            label={region === "US" ? "401(k) per month (optional)" : "Pension per month (optional)"}
+            hint={
+              region === "US"
+                ? "Pre-tax retirement contributions from each paycheck. Skips income tax, not Social Security or Medicare."
+                : "Salary sacrifice lowers income tax, National Insurance and student-loan repayments. A contribution from pay before tax (net pay) lowers income tax only."
+            }
+          >
+            <MoneyInput ariaLabel="Pension per month" value={String(positive(taxProfile.pensionMonthly))} symbol={symbol} privacy={privacy} onChange={(value) => onChange({ pensionMonthly: positive(Number(value)) })} />
+          </PlanField>
+          {region !== "US" && positive(taxProfile.pensionMonthly) > 0 && (
+            <PlanField label="Paid by">
+              <select value={taxProfile.pensionMethod} onChange={(event) => onChange({ pensionMethod: event.target.value as TaxProfile["pensionMethod"] })} aria-label="Pension method">
+                <option value="sacrifice">Salary sacrifice</option>
+                <option value="net-pay">From pay before tax (net pay)</option>
+              </select>
+            </PlanField>
+          )}
+          <PlanField label="Bonus / commission (optional)" hint="A one-off payment is shown on its own, so your monthly take-home stays salary-based. Untick it for commission paid every month.">
+            <MoneyInput ariaLabel="Bonus or commission" value={String(positive(taxProfile.bonusAmount))} symbol={symbol} privacy={privacy} onChange={(value) => onChange({ bonusAmount: positive(Number(value)) })} />
+          </PlanField>
+          <label className="planCheck">
+            <input type="checkbox" checked={taxProfile.bonusOneOff !== false} onChange={(event) => onChange({ bonusOneOff: event.target.checked })} aria-label="Bonus is one-off" />
+            <span>One-off{taxProfile.bonusOneOff === false && <small className="planCheckNote"> · counted as paid every month</small>}</span>
+          </label>
           <p className="planHint">
             <Briefcase size={13} />
             {payroll.preTaxRetirementAnnual + payroll.preTaxHealthAccountsAnnual + payroll.afterTaxAnnual > 0
@@ -730,6 +755,13 @@ export function TakeHomeEstimator({
                   </span>
                 )}
               </div>
+              {summary.oneOffBonus && (
+                <p className="bonusResult">
+                  One-off bonus of <b className={privacy ? "masked" : ""}>{formatter.format(summary.oneOffBonus.gross)}</b> comes to about{" "}
+                  <b className={privacy ? "masked" : ""}>{formatter.format(summary.oneOffBonus.net)}</b> after {region === "US" ? "tax" : "tax and NI"} — you keep{" "}
+                  {formatDecimal(summary.oneOffBonus.gross > 0 ? (summary.oneOffBonus.net / summary.oneOffBonus.gross) * 100 : 0)}%.
+                </p>
+              )}
               <div className="buttonRow">
                 <button className="commandButton" type="button" onClick={() => onUseAsIncome(summary.netMonthly)}>
                   <Check size={14} />

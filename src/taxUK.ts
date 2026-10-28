@@ -69,6 +69,9 @@ export function ukTaxYearFor(date = new Date()): number {
 
 export type UkTaxInput = {
   grossAnnualSalary: number;
+  // Pension by salary sacrifice: pay given up before anything is worked out, so it lowers income
+  // tax, National Insurance and student-loan repayments alike.
+  salarySacrificeAnnual?: number;
   // Employee pension contributions taken from pay before tax (net-pay arrangement). They reduce
   // income tax but not National Insurance.
   pensionAnnual?: number;
@@ -82,6 +85,7 @@ export type UkTaxResult = {
   year: number;
   yearLabel: string;
   gross: number;
+  salarySacrifice: number;
   pension: number;
   personalAllowance: number;
   taxableIncome: number;
@@ -148,23 +152,27 @@ export function estimateUkTakeHome(input: UkTaxInput): UkTaxResult {
   const year = ukTableYear(input.year ?? ukTaxYearFor());
   const table = UK_TAX_TABLES[year];
   const gross = positive(input.grossAnnualSalary);
-  const pension = Math.min(gross, positive(input.pensionAnnual));
-  const incomeTax = ukIncomeTax(gross - pension, year);
-  const nationalInsurance = ukNationalInsurance(gross, year);
+  const salarySacrifice = Math.min(gross, positive(input.salarySacrificeAnnual));
+  // Pay after sacrifice: what tax, NI and student loans are all worked out on.
+  const pay = gross - salarySacrifice;
+  const pension = Math.min(pay, positive(input.pensionAnnual));
+  const incomeTax = ukIncomeTax(pay - pension, year);
+  const nationalInsurance = ukNationalInsurance(pay, year);
   const plan = input.studentLoanPlan && input.studentLoanPlan !== "none" ? input.studentLoanPlan : null;
-  const studentLoan = plan ? ukStudentLoanRepayment({ grossAnnualSalary: gross, plan, year }).annual : 0;
-  const postgradLoan = input.postgradLoan ? ukStudentLoanRepayment({ grossAnnualSalary: gross, plan: "postgrad", year }).annual : 0;
+  const studentLoan = plan ? ukStudentLoanRepayment({ grossAnnualSalary: pay, plan, year }).annual : 0;
+  const postgradLoan = input.postgradLoan ? ukStudentLoanRepayment({ grossAnnualSalary: pay, plan: "postgrad", year }).annual : 0;
   const totalDeductions = round2(incomeTax.tax + nationalInsurance + studentLoan + postgradLoan);
-  const net = round2(gross - pension - totalDeductions);
+  const net = round2(pay - pension - totalDeductions);
   const payPeriods = payPeriodsPerYear(input.payFrequency ?? "monthly");
 
-  const niMarginal = gross > table.niUpperLimit ? table.niUpperRate : gross > table.niPrimaryThreshold ? table.niMainRate : 0;
+  const niMarginal = pay > table.niUpperLimit ? table.niUpperRate : pay > table.niPrimaryThreshold ? table.niMainRate : 0;
   const loanMarginal = (studentLoan > 0 ? 9 : 0) + (postgradLoan > 0 ? 6 : 0);
   // Between £100k and £125,140 every £2 also loses £1 of allowance, an effective 60% band.
-  const taperMarginal = gross - pension > table.allowanceTaperStart && gross - pension <= table.higherRateLimit ? table.higherRate / 2 : 0;
+  const taperMarginal = pay - pension > table.allowanceTaperStart && pay - pension <= table.higherRateLimit ? table.higherRate / 2 : 0;
 
   const lines: UkTaxResult["lines"] = [
     { label: "Gross pay", amount: gross },
+    ...(salarySacrifice > 0 ? [{ label: "Pension (salary sacrifice)", amount: -salarySacrifice }] : []),
     ...(pension > 0 ? [{ label: "Pension contributions (before tax)", amount: -pension }] : []),
     { label: "Income tax", amount: -incomeTax.tax, rate: incomeTax.marginalRate },
     { label: "National Insurance", amount: -nationalInsurance, rate: niMarginal },
@@ -177,6 +185,7 @@ export function estimateUkTakeHome(input: UkTaxInput): UkTaxResult {
     year,
     yearLabel: `${year}/${String(year + 1).slice(-2)}`,
     gross,
+    salarySacrifice,
     pension,
     personalAllowance: incomeTax.personalAllowance,
     taxableIncome: round2(incomeTax.taxableIncome),
