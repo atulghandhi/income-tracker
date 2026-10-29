@@ -1,11 +1,11 @@
 <template>
   <style>
     #root { position: absolute; inset: 0; background: var(--ground); font-family: Inter, sans-serif; }
-    .lockup { position: absolute; left: 0; right: 0; top: 640px; display: flex; flex-direction: column; align-items: center; }
-    #endcard-icon { width: 240px; height: 240px; border-radius: 54px; box-shadow: 0 24px 60px rgba(5, 20, 36, 0.22); }
-    .name { margin: 64px 0 0; font-size: 76px; font-weight: 700; letter-spacing: -0.03em; color: var(--ink); }
-    .line { margin: 22px 0 0; font-size: 44px; font-weight: 700; letter-spacing: -0.02em; color: var(--muted); }
-    .mask { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: 0.08em; margin-bottom: -0.08em; }
+    .lockup { position: absolute; left: 0; right: 0; top: 620px; display: flex; flex-direction: column; align-items: center; }
+    #endcard-icon { width: 260px; height: 260px; border-radius: 58px; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.16), 0 30px 70px rgba(0, 0, 0, 0.45); }
+    .name { margin: 72px 0 0; font-size: 84px; font-weight: 700; letter-spacing: -0.03em; color: var(--title); }
+    .line { margin: 24px 0 0; font-size: 46px; font-weight: 700; letter-spacing: -0.02em; color: var(--muted); }
+    .mask { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: 0.1em; margin-bottom: -0.1em; }
     .w { display: inline-block; }
     .accent { color: var(--mint); }
   </style>
@@ -21,7 +21,7 @@
     tl.fromTo("#endcard-icon", { scale: 0.82, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "expo.out" }, 0);
     tl.fromTo("#endcard-name .w", { yPercent: 110 }, { yPercent: 0, duration: 0.42, ease: "power3.out", stagger: 0.06 }, 0.18);
     tl.fromTo("#endcard-line .w", { yPercent: 110 }, { yPercent: 0, duration: 0.42, ease: "power3.out", stagger: 0.05 }, 0.45);
-    tl.set({}, {}, 3.5850000000000004);
+    tl.set({}, {}, 3.585);
     window.__timelines["endcard"] = tl;
   </script>
 </template>

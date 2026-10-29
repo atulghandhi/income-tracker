@@ -26,9 +26,13 @@ Files in each folder: 01-dashboard, 02-ledger, 03-accounts, 04-credit-cards, 05-
 | Audio | AAC-LC 256 kbps, 48 kHz, stereo; −14.5 LUFS, peak −3.2 dBFS | Stereo AAC 256 kbps, 44.1/48 kHz |
 | Size | 35 MB | under 500 MB |
 
-All app footage is real iOS Simulator recordings (iPhone 17 Pro Max) of the demo ledger. Six shots, each two bars long, are hard-cut on the music's downbeats (134 BPM). Their titles use the app's own colour tokens. The film ends on a card with the real app icon. Apple's default poster frame (5 s) falls on the quick-log shot. If you upload the 886×1920 file in the 6.9" slot, App Store Connect also uses it for 6.5". There is no preview for the 6.1"/6.3" slot; that slot is optional for previews.
+All app footage is real iOS Simulator recordings (iPhone 17 Pro Max) of the demo ledger. Six shots, each two bars long, are hard-cut on the music's downbeats (134 BPM). Their titles are in white with mint on the key phrase, on the app icon's navy, so they read clearly against the light app screen. The film ends on a card with the real app icon.
 
-Shots: dashboard chart scrub → quick-log ("Pret coffee 3.20" → Logged) → paste import review → accounts net worth → Debt filter → insights → goals → end card.
+Every tap is shown on screen. A finger dot presses the control, a mint ripple goes out, and a mint highlight frames the tapped button, chip or field. Swipes and the chart scrub get a moving dot. Each page change is a visible tap on the tab bar just before the cut.
+
+Apple's default poster frame (5 s) falls on the Accounts shot. If you upload the 886×1920 file in the 6.9" slot, App Store Connect also uses it for 6.5". There is no preview for the 6.1"/6.3" slot; that slot is optional for previews.
+
+Shots: dashboard chart scrub → Accounts (Debt filter) → Insights → Goals → quick-log ("Pret coffee 3.20" → Logged) → paste import review → end card.
 
 ### Music
 

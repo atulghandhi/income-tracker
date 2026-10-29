@@ -1,30 +1,27 @@
 <template>
   <style>
     #root { position: absolute; inset: 0; background: var(--ground); font-family: Inter, sans-serif; }
-    .title { position: absolute; left: 93px; top: 118px; width: 700px; margin: 0;
-             font-size: 64px; line-height: 1.08; font-weight: 700; letter-spacing: -0.025em; color: var(--ink); }
-    .mask { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: 0.08em; margin-bottom: -0.08em; }
+    .title { position: absolute; left: 93px; top: 96px; width: 700px; margin: 0;
+             font-size: 80px; line-height: 1.04; font-weight: 700; letter-spacing: -0.03em; color: var(--title); }
+    .mask { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: 0.1em; margin-bottom: -0.1em; }
     .w { display: inline-block; }
     .accent { color: var(--mint); }
-    .panel { position: absolute; left: 93px; top: 352px; width: 700px; height: 1521px; border-radius: 56px; overflow: hidden;
-             background: #fff; box-shadow: 0 24px 64px rgba(11, 28, 46, 0.12), 0 2px 6px rgba(11, 28, 46, 0.06); }
+    .punct { color: var(--title); }
+    .panel { position: absolute; left: 93px; top: 352px; width: 700px; height: 1521px; border-radius: 60px; overflow: hidden;
+             background: #fff; box-shadow: 0 0 0 10px #16283B, 0 30px 80px rgba(0, 0, 0, 0.45); }
     .panel video { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; }
   </style>
   <div id="root" data-composition-id="accounts" data-width="886" data-height="1920">
-    <h1 id="accounts-title" class="title"><span class="mask"><span class="w">Every</span></span> <span class="mask"><span class="w">account.</span></span> <span class="mask"><span class="w accent">One</span></span> <span class="mask"><span class="w accent">net</span></span> <span class="mask"><span class="w accent">worth.</span></span></h1>
+    <h1 id="accounts-title" class="title"><span class="mask"><span class="w">Every</span></span> <span class="mask"><span class="w">account,</span></span> <span class="mask"><span class="w accent">one</span></span> <span class="mask"><span class="w accent">net</span></span> <span class="mask"><span class="w accent">worth.</span></span></h1>
     <div id="accounts-panel" class="panel">
-      <video id="accounts-v0" class="clip" src="assets/clips/accounts.mp4" data-start="0" data-duration="1.79" data-media-start="4.2" muted playsinline></video>
-      <video id="accounts-v1" class="clip" src="assets/clips/accounts.mp4" data-start="1.79" data-duration="1.79" data-media-start="9.85" muted playsinline></video>
+      <video id="accounts-v0" class="clip" src="assets/clips/accounts.mp4" data-start="0.0" data-duration="1.79" data-media-start="4.55" muted playsinline></video>
+      <video id="accounts-v1" class="clip" src="assets/clips/accounts.mp4" data-start="1.79" data-duration="1.79" data-media-start="9.79" muted playsinline></video>
     </div>
   </div>
   <script>
     const tl = gsap.timeline({ paused: true });
-    if (1) {
-      tl.fromTo("#accounts-title .w", { yPercent: 110 }, { yPercent: 0, duration: 0.42, ease: "power3.out", stagger: 0.045 }, 0);
-    } else {
-      tl.set("#accounts-title .w", { yPercent: 0 }, 0);
-    }
-    tl.set({}, {}, 3.5700000000000003);
+    tl.fromTo("#accounts-title .w", { yPercent: 110 }, { yPercent: 0, duration: 0.42, ease: "power3.out", stagger: 0.045 }, 0);
+    tl.set({}, {}, 3.57);
     window.__timelines["accounts"] = tl;
   </script>
 </template>

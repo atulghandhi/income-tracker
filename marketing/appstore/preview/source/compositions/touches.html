@@ -1,0 +1,120 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; pointer-events: none; }
+    .layer { position: absolute; left: 93px; top: 352px; width: 700px; height: 1521px; border-radius: 60px; overflow: hidden; }
+    .dot { position: absolute; width: 76px; height: 76px; margin: -38px 0 0 -38px; border-radius: 50%; opacity: 0;
+            background: rgba(11, 28, 46, 0.30); border: 4px solid #fff; box-shadow: 0 6px 18px rgba(11, 28, 46, 0.35); }
+    .ripple { position: absolute; width: 76px; height: 76px; margin: -38px 0 0 -38px; border-radius: 50%; opacity: 0;
+               border: 6px solid var(--mint-ui); }
+    .hl { position: absolute; opacity: 0; border: 5px solid var(--mint-ui); background: rgba(0, 184, 158, 0.14); }
+  </style>
+  <div id="root" data-composition-id="touches" data-width="886" data-height="1920" data-layout-ignore>
+    <div class="layer" data-layout-allow-overflow>
+      <div id="hl0" class="hl" style="left:283.5px; top:1387.6px; width:132.9px; height:104.3px; border-radius:52.1px;"></div>
+      <div id="rp0" class="ripple" style="left:350.0px; top:1439.8px;"></div>
+      <div id="tp0" class="dot" style="left:350.0px; top:1439.8px;"></div>
+      <div id="hl1" class="hl" style="left:536.5px; top:749.7px; width:107.5px; height:59.7px; border-radius:29.9px;"></div>
+      <div id="rp1" class="ripple" style="left:590.2px; top:779.5px;"></div>
+      <div id="tp1" class="dot" style="left:590.2px; top:779.5px;"></div>
+      <div id="hl2" class="hl" style="left:523.8px; top:1387.6px; width:132.9px; height:104.3px; border-radius:52.1px;"></div>
+      <div id="rp2" class="ripple" style="left:590.2px; top:1439.8px;"></div>
+      <div id="tp2" class="dot" style="left:590.2px; top:1439.8px;"></div>
+      <div id="hl3" class="hl" style="left:402.9px; top:1387.6px; width:132.9px; height:104.3px; border-radius:52.1px;"></div>
+      <div id="rp3" class="ripple" style="left:469.3px; top:1439.8px;"></div>
+      <div id="tp3" class="dot" style="left:469.3px; top:1439.8px;"></div>
+      <div id="hl4" class="hl" style="left:41.7px; top:1387.6px; width:132.9px; height:104.3px; border-radius:52.1px;"></div>
+      <div id="rp4" class="ripple" style="left:108.2px; top:1439.8px;"></div>
+      <div id="tp4" class="dot" style="left:108.2px; top:1439.8px;"></div>
+      <div id="hl5" class="hl" style="left:21.0px; top:1301.7px; width:578.4px; height:78.8px; border-radius:39.4px;"></div>
+      <div id="rp5" class="ripple" style="left:310.2px; top:1341.1px;"></div>
+      <div id="tp5" class="dot" style="left:310.2px; top:1341.1px;"></div>
+      <div id="hl6" class="hl" style="left:598.5px; top:883.3px; width:82.0px; height:82.0px; border-radius:41.0px;"></div>
+      <div id="rp6" class="ripple" style="left:639.5px; top:924.3px;"></div>
+      <div id="tp6" class="dot" style="left:639.5px; top:924.3px;"></div>
+      <div id="hl7" class="hl" style="left:590.6px; top:91.0px; width:85.2px; height:85.2px; border-radius:42.6px;"></div>
+      <div id="rp7" class="ripple" style="left:633.2px; top:133.6px;"></div>
+      <div id="tp7" class="dot" style="left:633.2px; top:133.6px;"></div>
+      <div id="hl8" class="hl" style="left:266.0px; top:380.6px; width:406.5px; height:75.6px; border-radius:25.1px;"></div>
+      <div id="rp8" class="ripple" style="left:469.3px; top:418.4px;"></div>
+      <div id="tp8" class="dot" style="left:469.3px; top:418.4px;"></div>
+      <div id="dg0" class="dot" style="left:95.5px; top:906.8px;"></div>
+      <div id="dg1" class="dot" style="left:350.0px; top:1240.9px;"></div>
+      <div id="dg2" class="dot" style="left:350.0px; top:1240.9px;"></div>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#tp0", { opacity: 0, scale: 1.25 }, { opacity: 1, scale: 1, duration: 0.16, ease: "power2.out", immediateRender: false }, 3.285);
+    tl.to("#tp0", { scale: 0.82, duration: 0.08, ease: "power2.in" }, 3.445);
+    tl.to("#tp0", { scale: 1, opacity: 0, duration: 0.3, ease: "power2.out" }, 3.605);
+    tl.fromTo("#rp0", { opacity: 0.9, scale: 0.4 }, { opacity: 0, scale: 2.2, duration: 0.55, ease: "power2.out", immediateRender: false }, 3.485);
+    tl.fromTo("#hl0", { opacity: 0, scale: 1.08 }, { opacity: 1, scale: 1, duration: 0.14, ease: "power2.out", immediateRender: false }, 3.425);
+    tl.to("#hl0", { opacity: 0, duration: 0.3, ease: "power1.in" }, 3.985);
+    tl.fromTo("#tp1", { opacity: 0, scale: 1.25 }, { opacity: 1, scale: 1, duration: 0.16, ease: "power2.out", immediateRender: false }, 5.715);
+    tl.to("#tp1", { scale: 0.82, duration: 0.08, ease: "power2.in" }, 5.875);
+    tl.to("#tp1", { scale: 1, opacity: 0, duration: 0.3, ease: "power2.out" }, 6.035);
+    tl.fromTo("#rp1", { opacity: 0.9, scale: 0.4 }, { opacity: 0, scale: 2.2, duration: 0.55, ease: "power2.out", immediateRender: false }, 5.915);
+    tl.fromTo("#hl1", { opacity: 0, scale: 1.08 }, { opacity: 1, scale: 1, duration: 0.14, ease: "power2.out", immediateRender: false }, 5.855);
+    tl.to("#hl1", { opacity: 0, duration: 0.3, ease: "power1.in" }, 6.415);
+    tl.fromTo("#tp2", { opacity: 0, scale: 1.25 }, { opacity: 1, scale: 1, duration: 0.16, ease: "power2.out", immediateRender: false }, 6.865);
+    tl.to("#tp2", { scale: 0.82, duration: 0.08, ease: "power2.in" }, 7.025);
+    tl.to("#tp2", { scale: 1, opacity: 0, duration: 0.3, ease: "power2.out" }, 7.185);
+    tl.fromTo("#rp2", { opacity: 0.9, scale: 0.4 }, { opacity: 0, scale: 2.2, duration: 0.55, ease: "power2.out", immediateRender: false }, 7.065);
+    tl.fromTo("#hl2", { opacity: 0, scale: 1.08 }, { opacity: 1, scale: 1, duration: 0.14, ease: "power2.out", immediateRender: false }, 7.005);
+    tl.to("#hl2", { opacity: 0, duration: 0.3, ease: "power1.in" }, 7.565);
+    tl.fromTo("#tp3", { opacity: 0, scale: 1.25 }, { opacity: 1, scale: 1, duration: 0.16, ease: "power2.out", immediateRender: false }, 10.445);
+    tl.to("#tp3", { scale: 0.82, duration: 0.08, ease: "power2.in" }, 10.605);
+    tl.to("#tp3", { scale: 1, opacity: 0, duration: 0.3, ease: "power2.out" }, 10.765);
+    tl.fromTo("#rp3", { opacity: 0.9, scale: 0.4 }, { opacity: 0, scale: 2.2, duration: 0.55, ease: "power2.out", immediateRender: false }, 10.645);
+    tl.fromTo("#hl3", { opacity: 0, scale: 1.08 }, { opacity: 1, scale: 1, duration: 0.14, ease: "power2.out", immediateRender: false }, 10.585);
+    tl.to("#hl3", { opacity: 0, duration: 0.3, ease: "power1.in" }, 11.145);
+    tl.fromTo("#tp4", { opacity: 0, scale: 1.25 }, { opacity: 1, scale: 1, duration: 0.16, ease: "power2.out", immediateRender: false }, 14.025);
+    tl.to("#tp4", { scale: 0.82, duration: 0.08, ease: "power2.in" }, 14.185);
+    tl.to("#tp4", { scale: 1, opacity: 0, duration: 0.3, ease: "power2.out" }, 14.345);
+    tl.fromTo("#rp4", { opacity: 0.9, scale: 0.4 }, { opacity: 0, scale: 2.2, duration: 0.55, ease: "power2.out", immediateRender: false }, 14.225);
+    tl.fromTo("#hl4", { opacity: 0, scale: 1.08 }, { opacity: 1, scale: 1, duration: 0.14, ease: "power2.out", immediateRender: false }, 14.165);
+    tl.to("#hl4", { opacity: 0, duration: 0.3, ease: "power1.in" }, 14.725);
+    tl.fromTo("#tp5", { opacity: 0, scale: 1.25 }, { opacity: 1, scale: 1, duration: 0.16, ease: "power2.out", immediateRender: false }, 14.295);
+    tl.to("#tp5", { scale: 0.82, duration: 0.08, ease: "power2.in" }, 14.455);
+    tl.to("#tp5", { scale: 1, opacity: 0, duration: 0.3, ease: "power2.out" }, 14.615);
+    tl.fromTo("#rp5", { opacity: 0.9, scale: 0.4 }, { opacity: 0, scale: 2.2, duration: 0.55, ease: "power2.out", immediateRender: false }, 14.495);
+    tl.fromTo("#hl5", { opacity: 0, scale: 1.08 }, { opacity: 1, scale: 1, duration: 0.14, ease: "power2.out", immediateRender: false }, 14.435);
+    tl.to("#hl5", { opacity: 0, duration: 0.3, ease: "power1.in" }, 14.995);
+    tl.fromTo("#tp6", { opacity: 0, scale: 1.25 }, { opacity: 1, scale: 1, duration: 0.16, ease: "power2.out", immediateRender: false }, 16.055);
+    tl.to("#tp6", { scale: 0.82, duration: 0.08, ease: "power2.in" }, 16.215);
+    tl.to("#tp6", { scale: 1, opacity: 0, duration: 0.3, ease: "power2.out" }, 16.375);
+    tl.fromTo("#rp6", { opacity: 0.9, scale: 0.4 }, { opacity: 0, scale: 2.2, duration: 0.55, ease: "power2.out", immediateRender: false }, 16.255);
+    tl.fromTo("#hl6", { opacity: 0, scale: 1.08 }, { opacity: 1, scale: 1, duration: 0.14, ease: "power2.out", immediateRender: false }, 16.195);
+    tl.to("#hl6", { opacity: 0, duration: 0.3, ease: "power1.in" }, 16.755);
+    tl.fromTo("#tp7", { opacity: 0, scale: 1.25 }, { opacity: 1, scale: 1, duration: 0.16, ease: "power2.out", immediateRender: false }, 18.015);
+    tl.to("#tp7", { scale: 0.82, duration: 0.08, ease: "power2.in" }, 18.175);
+    tl.to("#tp7", { scale: 1, opacity: 0, duration: 0.3, ease: "power2.out" }, 18.335);
+    tl.fromTo("#rp7", { opacity: 0.9, scale: 0.4 }, { opacity: 0, scale: 2.2, duration: 0.55, ease: "power2.out", immediateRender: false }, 18.215);
+    tl.fromTo("#hl7", { opacity: 0, scale: 1.08 }, { opacity: 1, scale: 1, duration: 0.14, ease: "power2.out", immediateRender: false }, 18.155);
+    tl.to("#hl7", { opacity: 0, duration: 0.3, ease: "power1.in" }, 18.715);
+    tl.fromTo("#tp8", { opacity: 0, scale: 1.25 }, { opacity: 1, scale: 1, duration: 0.16, ease: "power2.out", immediateRender: false }, 19.795);
+    tl.to("#tp8", { scale: 0.82, duration: 0.08, ease: "power2.in" }, 19.955);
+    tl.to("#tp8", { scale: 1, opacity: 0, duration: 0.3, ease: "power2.out" }, 20.115);
+    tl.fromTo("#rp8", { opacity: 0.9, scale: 0.4 }, { opacity: 0, scale: 2.2, duration: 0.15, ease: "power2.out", immediateRender: false }, 19.995);
+    tl.fromTo("#hl8", { opacity: 0, scale: 1.08 }, { opacity: 1, scale: 1, duration: 0.14, ease: "power2.out", immediateRender: false }, 19.935);
+    tl.to("#hl8", { opacity: 0, duration: 0.01, ease: "power1.in" }, 20.145);
+    tl.fromTo("#dg0", { opacity: 0, scale: 1.25, x: 0, y: 0 }, { opacity: 1, scale: 0.9, duration: 0.16, ease: "power2.out", immediateRender: false }, 1.125);
+    tl.to("#dg0", { x: 3.2, y: 0.0, duration: 0.21, ease: "none" }, 1.285);
+    tl.to("#dg0", { x: 79.5, y: 0.0, duration: 0.21, ease: "none" }, 1.495);
+    tl.to("#dg0", { x: 159.1, y: 0.0, duration: 0.21, ease: "none" }, 1.705);
+    tl.to("#dg0", { x: 238.6, y: 0.0, duration: 0.21, ease: "none" }, 1.915);
+    tl.to("#dg0", { x: 318.2, y: 0.0, duration: 0.21, ease: "none" }, 2.125);
+    tl.to("#dg0", { x: 397.7, y: 0.0, duration: 0.21, ease: "none" }, 2.335);
+    tl.to("#dg0", { x: 477.3, y: 0.0, duration: 0.21, ease: "none" }, 2.545);
+    tl.to("#dg0", { x: 540.9, y: 0.0, duration: 0.21, ease: "none" }, 2.755);
+    tl.to("#dg0", { opacity: 0, scale: 1.2, duration: 0.2, ease: "power2.out" }, 3.485);
+    tl.fromTo("#dg1", { opacity: 0, scale: 1.25, x: 0, y: 0 }, { opacity: 1, scale: 0.9, duration: 0.16, ease: "power2.out", immediateRender: false }, 8.845);
+    tl.to("#dg1", { x: 0.0, y: -604.5, duration: 1.3, ease: "none" }, 9.005);
+    tl.to("#dg1", { opacity: 0, scale: 1.2, duration: 0.2, ease: "power2.out" }, 10.305);
+    tl.fromTo("#dg2", { opacity: 0, scale: 1.25, x: 0, y: 0 }, { opacity: 1, scale: 0.9, duration: 0.16, ease: "power2.out", immediateRender: false }, 12.455);
+    tl.to("#dg2", { x: 0.0, y: -540.9, duration: 1.3, ease: "none" }, 12.615);
+    tl.to("#dg2", { opacity: 0, scale: 1.2, duration: 0.2, ease: "power2.out" }, 13.915);
+    tl.set({}, {}, 21.475);
+    window.__timelines["touches"] = tl;
+  </script>
+</template>
