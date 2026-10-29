@@ -12,6 +12,7 @@ import {
   setSubscriptionKind,
   setSubscriptionTolerance,
   shiftIsoDate,
+  confirmSubscription,
   type Subscription,
 } from "../src/subscriptions";
 import type { ExpenseEntry, IncomeEntry, LedgerState } from "../src/types";
@@ -958,5 +959,93 @@ test.describe("undated manual entries", () => {
     expect(gym.cadence).toBe("monthly");
     expect(gym.yearlyCost).toBe(384);
     expect(gym.status).toBe("active");
+  });
+});
+
+// Reported 2026-10-29: two £1 Tesco shops, two £1 M&S shops and two £6 pharmacy payments came up
+// as yearly and half-yearly subscriptions. Two payments always fit a long cadence somewhere inside
+// its window, so a twice-seen stream needs better evidence — and when that is all there is, the
+// user is asked rather than told.
+test.describe("twice-seen streams", () => {
+  const shops = (name: string, category = "Food"): Row[] =>
+    // A busy payee: plenty of other baskets at other amounts.
+    [12.4, 33.1, 8.75, 21.6, 15.2].map((amount, index) => ({ name, amount, date: shiftIsoDate("2025-09-01", index * 30), category }));
+  const ids = (list: Subscription[]) => list.map((subscription) => subscription.key);
+
+  test("a repeated £1 basket at a supermarket a year apart is not a subscription", () => {
+    const report = detectSubscriptions(
+      ledgerWith([
+        { name: "Tesco Stores", amount: 1, date: "2025-05-06", category: "Food" },
+        { name: "Tesco Stores", amount: 1, date: "2026-05-19", category: "Food" },
+        { name: "M&S Simply Food", amount: 1, date: "2025-05-19", category: "Food" },
+        { name: "M&S Simply Food", amount: 1, date: "2026-05-19", category: "Food" },
+        ...shops("Tesco Stores"),
+        ...shops("M&S Simply Food"),
+      ]),
+      { today: TODAY },
+    );
+    expect(report.subscriptions).toEqual([]);
+    expect(report.bills).toEqual([]);
+    expect(report.possible).toEqual([]);
+  });
+
+  test("two payments that drift off the date they predict are not a yearly or half-yearly plan", () => {
+    const report = detectSubscriptions(
+      ledgerWith([
+        { name: "Lloyds Pharmacy", amount: 6, date: "2025-11-08", category: "Health" },
+        { name: "Lloyds Pharmacy", amount: 6, date: "2026-05-20", category: "Health" },
+      ]),
+      { today: TODAY },
+    );
+    expect([...report.subscriptions, ...report.bills, ...report.possible]).toEqual([]);
+  });
+
+  test("two on-date payments at an unknown payee are asked about, and stay out of the totals", () => {
+    const state = ledgerWith([
+      { name: "Lloyds Pharmacy", amount: 6, date: "2025-11-20", category: "Health" },
+      { name: "Lloyds Pharmacy", amount: 6, date: "2026-05-20", category: "Health" },
+    ]);
+    const report = detectSubscriptions(state, { today: TODAY });
+    expect(ids(report.possible)).toEqual(["lloyds pharmacy"]);
+    expect(report.possible[0].cadence).toBe("half-yearly");
+    expect([...report.subscriptions, ...report.bills]).toEqual([]);
+    expect(report.totals.yearly).toBe(0);
+    expect(report.totals.activeCount).toBe(0);
+
+    // "Yes, track it" makes it an ordinary subscription.
+    const confirmed = detectSubscriptions(confirmSubscription(state, report.possible[0]), { today: TODAY });
+    expect(confirmed.possible).toEqual([]);
+    expect(ids([...confirmed.subscriptions, ...confirmed.bills])).toEqual(["lloyds pharmacy"]);
+    expect(confirmed.totals.yearly).toBe(12);
+
+    // "No" removes it.
+    const declined = detectSubscriptions(deleteSubscription(state, report.possible[0]), { today: TODAY });
+    expect([...declined.possible, ...declined.subscriptions, ...declined.bills]).toEqual([]);
+  });
+
+  test("a genuine yearly subscription is still found from two payments", () => {
+    const report = detectSubscriptions(
+      ledgerWith([
+        { name: "Disney Plus", amount: 79.9, date: "2025-06-01", category: "Entertainment" },
+        { name: "Disney Plus", amount: 79.9, date: "2026-06-02", category: "Entertainment" },
+      ]),
+      { today: TODAY },
+    );
+    expect(ids(report.subscriptions)).toEqual(["disney plus"]);
+    expect(report.possible).toEqual([]);
+  });
+
+  test("a third payment is full evidence again, with the normal on-time window", () => {
+    // Six days late on the middle payment: too far for two payments, fine for three.
+    const report = detectSubscriptions(
+      ledgerWith([
+        { name: "Window Cleaning Co", amount: 40, date: "2025-06-05" },
+        { name: "Window Cleaning Co", amount: 40, date: "2025-12-11" },
+        { name: "Window Cleaning Co", amount: 40, date: "2026-06-05" },
+      ]),
+      { today: TODAY },
+    );
+    expect(ids([...report.subscriptions, ...report.bills])).toEqual(["window cleaning co"]);
+    expect(report.possible).toEqual([]);
   });
 });

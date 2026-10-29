@@ -150,6 +150,8 @@ export type SubscriptionPreference = {
   label?: string;
   cadence?: "weekly" | "fortnightly" | "4-weekly" | "monthly" | "quarterly" | "half-yearly" | "annual";
   price?: number;
+  // The user said yes to a "possible subscription" (one only seen twice), so it is tracked.
+  confirmed?: boolean;
   updatedAt: string;
 };
 

@@ -114,6 +114,7 @@ import {
   markSubscriptionCancelled,
   reactivateSubscription,
   restoreDeletedSubscriptions,
+  confirmSubscription,
   setSubscriptionKind,
   setSubscriptionRecurring,
   setSubscriptionTolerance,
@@ -4649,6 +4650,10 @@ function App() {
                 updateLedger((current) => deleteSubscription(current, subscription));
                 setToast(t(`${subscription.label} removed from Subscriptions`));
                 track("subscription_deleted", { status: subscription.status });
+              }}
+              onConfirm={(subscription) => {
+                updateLedger((current) => confirmSubscription(current, subscription));
+                setToast(t(`${subscription.label} is now tracked`));
               }}
               onRestoreDeleted={() => {
                 updateLedger((current) => restoreDeletedSubscriptions(current));

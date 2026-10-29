@@ -5,6 +5,7 @@ import {
   ArrowUpRight,
   Ban,
   CalendarClock,
+  Check,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
@@ -43,6 +44,8 @@ export interface SubscriptionsViewProps {
   onCancel: (subscription: Subscription, cancelledAt: string) => void;
   onReactivate: (subscription: Subscription) => void;
   onDelete: (subscription: Subscription) => void;
+  // "Yes, track it" on a possible subscription (one only seen twice).
+  onConfirm: (subscription: Subscription) => void;
   onRestoreDeleted: () => void;
   onSetKind: (subscription: Subscription, kind: SubscriptionKind | null) => void;
   onSetTolerance: (subscription: Subscription, days: number | null) => void;
@@ -60,6 +63,7 @@ export function SubscriptionsView({
   onCancel,
   onReactivate,
   onDelete,
+  onConfirm,
   onRestoreDeleted,
   onSetKind,
   onSetTolerance,
@@ -190,6 +194,35 @@ export function SubscriptionsView({
                   </div>
                 ))}
               </div>
+            </article>
+          )}
+
+          {report.possible.length > 0 && (
+            <article className="miniPanel subsPossible" aria-label="Possible subscriptions">
+              <div className="subsPossibleHead">
+                <h3>{t("Possibly subscriptions?")}</h3>
+                <p>{t("Each has only been paid twice, so it could be a coincidence. They are not in your totals until you say yes.")}</p>
+              </div>
+              <ul>
+                {report.possible.map((subscription) => (
+                  <li key={subscription.id}>
+                    <div className="subsPossibleText">
+                      <strong>{subscription.label}</strong>
+                      <small>
+                        {CADENCE_LABEL[subscription.cadence]} · <span className={masked}>{preciseFormatter.format(subscription.currentPrice)}</span> · {t("paid")}{" "}
+                        {subscription.payments.map((payment) => formatShortDate(payment.date)).join(t(" and "))}
+                      </small>
+                    </div>
+                    <button className="commandButton subsPossibleYes" type="button" onClick={() => onConfirm(subscription)} aria-label={`${subscription.label} is a subscription — track it`}>
+                      <Check size={14} />
+                      {t("Yes, track it")}
+                    </button>
+                    <button className="commandButton" type="button" onClick={() => onDelete(subscription)} aria-label={`${subscription.label} is not a subscription`}>
+                      {t("No")}
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </article>
           )}
 

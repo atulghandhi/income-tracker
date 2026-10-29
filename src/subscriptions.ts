@@ -106,6 +106,10 @@ export type Subscription = {
   siblings: number;
   // Text for the reason a stream was classified as it was; surfaced in the row detail.
   notes: string[];
+  // Only seen twice at a payee that is not an obvious subscription seller, and not yet confirmed:
+  // shown as a question ("Possibly a subscription?") and left out of every total.
+  possible: boolean;
+  confirmedByUser: boolean;
 };
 
 export type SubscriptionReport = {
@@ -116,6 +120,8 @@ export type SubscriptionReport = {
   subscriptions: Subscription[]; // active + due, by yearly cost desc
   bills: Subscription[]; // active + due bills, by yearly cost desc
   cancelled: Subscription[]; // stopped (detected) + cancelled (user); never deleted
+  // Twice-seen streams waiting for a yes or no; not counted anywhere else.
+  possible: Subscription[];
   deletedCount: number;
   totals: {
     subscriptionsYearly: number;
@@ -284,7 +290,13 @@ export function detectSubscriptions(state: LedgerState, options: DetectOptions =
     subscriptions.push(orphanCancelled(pref));
   }
 
-  const visible = subscriptions.filter((subscription) => subscription.status !== "deleted");
+  const notDeleted = subscriptions.filter((subscription) => subscription.status !== "deleted");
+  // A possible subscription that is still going is asked about; one that already stopped was never
+  // evidenced enough to report as a cancellation, so it is not shown at all.
+  const possible = notDeleted
+    .filter((subscription) => subscription.possible && (subscription.status === "active" || subscription.status === "due"))
+    .sort((a, b) => b.yearlyCost - a.yearlyCost || a.label.localeCompare(b.label));
+  const visible = notDeleted.filter((subscription) => !subscription.possible);
   const live = visible.filter((subscription) => subscription.status === "active" || subscription.status === "due");
   const byCost = (a: Subscription, b: Subscription) => b.yearlyCost - a.yearlyCost || a.label.localeCompare(b.label);
   const activeSubscriptions = live.filter((subscription) => subscription.kind === "subscription").sort(byCost);
@@ -305,7 +317,8 @@ export function detectSubscriptions(state: LedgerState, options: DetectOptions =
     subscriptions: activeSubscriptions,
     bills: activeBills,
     cancelled,
-    deletedCount: subscriptions.length - visible.length,
+    possible,
+    deletedCount: subscriptions.length - notDeleted.length,
     totals: {
       subscriptionsYearly,
       billsYearly,
@@ -331,9 +344,13 @@ export function detectSubscriptions(state: LedgerState, options: DetectOptions =
 // vouch for, so it is not reported as a cancellation either. A decision the user made (status
 // "cancelled") is always kept.
 function weaklyEvidenced(subscription: Subscription, oneOffs: { count: number; largest: number } | undefined, othersAtPayee: number): boolean {
-  if (subscription.status === "cancelled" || subscription.status === "deleted") return false;
+  if (subscription.status === "cancelled" || subscription.status === "deleted" || subscription.confirmedByUser) return false;
   const ambiguous = isAmbiguousSubscriptionMerchant(subscription.key);
   const offs = oneOffs ?? { count: 0, largest: 0 };
+  // Twice-seen at a busy payee — a supermarket, a pharmacy, anywhere three or more other amounts
+  // are paid — is far more likely a repeated basket than a plan. A known subscription seller (a
+  // subscriptions category, "membership", "prime", "plus") is exempt.
+  if (subscription.occurrences <= 2 && !ambiguous && offs.count >= 3 && !looksLikeSubscription(subscription.key, subscription.category)) return true;
   if (subscription.occurrences <= 2 && ambiguous) {
     // Twice-seen, priced among the payee's one-off purchases: just another purchase.
     if (offs.count >= 1 && offs.largest >= subscription.currentPrice / 2) return true;
@@ -363,7 +380,7 @@ export function upsertSubscriptionPreference(state: LedgerState, subscription: P
     updatedAt: now,
   };
   // Dropping the last override removes the preference altogether.
-  const meaningful = next.status || next.kind || typeof next.toleranceDays === "number";
+  const meaningful = next.status || next.kind || typeof next.toleranceDays === "number" || next.confirmed;
   const others = prefs.filter((pref) => pref.id !== subscription.id);
   return { ...state, subscriptionPrefs: meaningful ? [...others, next] : others };
 }
@@ -389,6 +406,11 @@ export function deleteSubscription(state: LedgerState, subscription: Subscriptio
 export function restoreDeletedSubscriptions(state: LedgerState): LedgerState {
   const prefs = (state.subscriptionPrefs ?? []).filter((pref) => pref.status !== "deleted");
   return { ...state, subscriptionPrefs: prefs };
+}
+
+// "Yes, track it" on a possible subscription.
+export function confirmSubscription(state: LedgerState, subscription: Subscription): LedgerState {
+  return upsertSubscriptionPreference(state, subscription, { confirmed: true });
 }
 
 export function setSubscriptionKind(state: LedgerState, subscription: Subscription, kind: SubscriptionKind | null): LedgerState {
@@ -427,7 +449,8 @@ export function normalizeSubscriptionPrefs(raw: unknown): SubscriptionPreference
     const status = item.status === "cancelled" || item.status === "deleted" ? item.status : undefined;
     const kind = item.kind === "subscription" || item.kind === "bill" ? item.kind : undefined;
     const toleranceDays = typeof item.toleranceDays === "number" && Number.isFinite(item.toleranceDays) ? Math.max(0, Math.min(14, Math.round(item.toleranceDays))) : undefined;
-    if (!status && !kind && toleranceDays === undefined) continue;
+    const confirmed = item.confirmed === true ? true : undefined;
+    if (!status && !kind && toleranceDays === undefined && !confirmed) continue;
     prefs.push({
       id: item.id,
       status,
@@ -437,6 +460,7 @@ export function normalizeSubscriptionPrefs(raw: unknown): SubscriptionPreference
       label: typeof item.label === "string" ? item.label : undefined,
       cadence: typeof item.cadence === "string" && item.cadence in CYCLES_PER_YEAR ? (item.cadence as SubscriptionCadence) : undefined,
       price: typeof item.price === "number" && Number.isFinite(item.price) ? item.price : undefined,
+      confirmed,
       updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : new Date().toISOString(),
     });
   }
@@ -519,6 +543,8 @@ function orphanCancelled(pref: SubscriptionPreference): Subscription {
     entryRefs: [],
     siblings: 0,
     notes: ["No longer found in the ledger — kept from when it was cancelled."],
+    possible: false,
+    confirmedByUser: true,
   };
 }
 
@@ -630,7 +656,7 @@ function detectStreamsForMerchant(merchantKey: string, payments: RawPayment[], u
   const fitted: Array<{ payments: RawPayment[]; fit: CadenceFit }> = [];
   const tryPiece = (piece: RawPayment[], splitsLeft: number) => {
     const fit = bestCadence(piece, userTolerance);
-    if (fit && acceptStream(piece, fit, retail, merchantKey)) {
+    if (fit && acceptStream(piece, fit, retail, merchantKey, false, userTolerance)) {
       fitted.push({ payments: piece, fit });
       return;
     }
@@ -661,7 +687,7 @@ function detectStreamsForMerchant(merchantKey: string, payments: RawPayment[], u
       const members = new Set(cluster);
       const others = again.filter((payment) => !members.has(payment));
       const complete = fit ? !others.some((payment) => payment.date > cluster[0].date && payment.date < cluster[cluster.length - 1].date && onSchedule(fit, cluster, payment, userTolerance)) : false;
-      if (fit && complete && pattern !== "variable" && acceptStream(cluster, fit, retail, merchantKey, true)) fitted.push({ payments: cluster, fit });
+      if (fit && complete && pattern !== "variable" && acceptStream(cluster, fit, retail, merchantKey, true, userTolerance)) fitted.push({ payments: cluster, fit });
       else leftovers.push(...cluster);
     }
   }
@@ -936,7 +962,25 @@ function minimumOccurrences(cadence: SubscriptionCadence, exact: boolean, unambi
   return exact && unambiguousSubscription ? 2 : 3;
 }
 
-function acceptStream(payments: RawPayment[], fit: CadenceFit, retail: boolean, merchantKey: string, loose = false): boolean {
+// Two payments always fit a yearly or half-yearly schedule somewhere inside its ±10 or ±7 day
+// window; real renewals bill on almost the same date, give or take a weekend. With only two to go
+// on, the second must land within a few days of the date the first predicts (or within the window
+// the user set for this payee). A third payment brings back the normal window.
+const TWO_PAYMENT_WINDOW_DAYS = 4;
+
+function twoPaymentsOnDate(payments: RawPayment[], fit: CadenceFit, userTolerance: number | null): boolean {
+  if (payments.length !== 2 || (fit.cadence !== "annual" && fit.cadence !== "half-yearly")) return true;
+  const months = fit.cadence === "annual" ? 12 : 6;
+  const [first, second] = payments;
+  const [year, month, day] = first.date.split("-").map(Number);
+  const target = new Date(Date.UTC(year, month - 1 + months, 1));
+  const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+  target.setUTCDate(Math.min(day, lastDay));
+  const expected = target.toISOString().slice(0, 10);
+  return Math.abs(dayDiff(expected, second.date)) <= (userTolerance ?? TWO_PAYMENT_WINDOW_DAYS);
+}
+
+function acceptStream(payments: RawPayment[], fit: CadenceFit, retail: boolean, merchantKey: string, loose = false, userTolerance: number | null = null): boolean {
   const amounts = payments.map((payment) => payment.amount);
   const exact = amountPatternOf(amounts) === "fixed";
   const category = latestCategory(payments);
@@ -950,6 +994,7 @@ function acceptStream(payments: RawPayment[], fit: CadenceFit, retail: boolean, 
   // cadence itself is long: two annual renewals at different prices are the whole point.
   if (loose && fit.cadence !== "annual" && fit.cadence !== "half-yearly") minimum = Math.max(minimum, 3);
   if (payments.length < minimum) return false;
+  if (!twoPaymentsOnDate(payments, fit, userTolerance)) return false;
   // At a storefront, a history still under six payments cannot have skipped a cycle: three
   // rentals that happen to land on similar days are not a plan with a month off.
   if (ambiguous && payments.length < 6 && fit.missedCycles > 0) return false;
@@ -1355,6 +1400,8 @@ function finalizeStream(
   const category = latestCategory(stream.payments);
   const autoKind = classifyKind(stream.merchantKey, category, currentPrice, currency, stream.payments.some((payment) => payment.debtLinked), stream.amountPattern);
   const kind = pref?.kind ?? autoKind;
+  // Saying yes to a possible subscription, or setting its kind or on-time window, means it is one.
+  const confirmedByUser = Boolean(pref?.confirmed || pref?.kind || typeof pref?.toleranceDays === "number");
 
   const nextExpected = predictNext(stream.fit, last.date, cadence);
   const daysUntilNext = nextExpected ? dayDiff(today, nextExpected) : null;
@@ -1438,6 +1485,10 @@ function finalizeStream(
     entryRefs: payments.map((payment) => ({ monthKey: payment.monthKey, entryId: payment.entryId, kind: "expense" as const })),
     siblings,
     notes,
+    // A name or category that already says subscription ("prime", "membership") or bill
+    // ("insurance", a Bills category) is not in doubt.
+    possible: payments.length <= 2 && !confirmedByUser && pref?.status !== "cancelled" && !looksLikeSubscription(stream.merchantKey, category) && !looksLikeBill(stream.merchantKey, category),
+    confirmedByUser,
   };
 }
 

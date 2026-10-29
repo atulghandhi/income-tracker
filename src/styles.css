@@ -9334,6 +9334,71 @@ select:not([multiple]):disabled {
   font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 11px; font-weight: 760;
 }
 .subsListHeading .tabs button.selected b { background: rgba(var(--accent-rgb), 0.12); color: var(--accent); }
+/* Twice-seen streams asked about, kept out of the totals until confirmed. */
+.subsPossible {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-height: 0;
+  padding: 16px 18px;
+}
+
+.subsPossibleHead h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 680;
+}
+
+.subsPossibleHead p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.subsPossible ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.subsPossible li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-high);
+}
+
+.subsPossibleText {
+  display: grid;
+  flex: 1 1 220px;
+  gap: 2px;
+  min-width: 0;
+}
+
+.subsPossibleText strong {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.subsPossibleText small {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.subsPossibleYes {
+  border: 1px solid rgba(var(--accent-rgb), 0.55);
+  background: rgba(var(--accent-rgb), 0.12);
+  color: var(--accent-strong);
+}
+
 .subsListTotal { margin: 0; color: var(--muted); font-size: 13px; }
 .subsListTotal strong { color: var(--ink); font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
