@@ -1,0 +1,29 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; background: var(--ground); font-family: Inter, sans-serif; }
+    .title { position: absolute; left: 93px; top: 118px; width: 700px; margin: 0;
+             font-size: 64px; line-height: 1.08; font-weight: 700; letter-spacing: -0.025em; color: var(--ink); }
+    .mask { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: 0.08em; margin-bottom: -0.08em; }
+    .w { display: inline-block; }
+    .accent { color: var(--mint); }
+    .panel { position: absolute; left: 93px; top: 352px; width: 700px; height: 1521px; border-radius: 56px; overflow: hidden;
+             background: #fff; box-shadow: 0 24px 64px rgba(11, 28, 46, 0.12), 0 2px 6px rgba(11, 28, 46, 0.06); }
+    .panel video { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; }
+  </style>
+  <div id="root" data-composition-id="dash" data-width="886" data-height="1920">
+    <h1 id="dash-title" class="title"><span class="mask"><span class="w">Know</span></span> <span class="mask"><span class="w">what’s</span></span> <span class="mask"><span class="w accent">left</span></span> <span class="mask"><span class="w">this</span></span> <span class="mask"><span class="w">month.</span></span></h1>
+    <div id="dash-panel" class="panel">
+      <video id="dash-v0" class="clip" src="assets/clips/dashboard.mp4" data-start="0" data-duration="3.585" data-media-start="1.2" muted playsinline></video>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    if (0) {
+      tl.fromTo("#dash-title .w", { yPercent: 110 }, { yPercent: 0, duration: 0.42, ease: "power3.out", stagger: 0.045 }, 0);
+    } else {
+      tl.set("#dash-title .w", { yPercent: 0 }, 0);
+    }
+    tl.set({}, {}, 3.575);
+    window.__timelines["dash"] = tl;
+  </script>
+</template>

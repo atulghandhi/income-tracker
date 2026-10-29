@@ -1,0 +1,27 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; background: var(--ground); font-family: Inter, sans-serif; }
+    .lockup { position: absolute; left: 0; right: 0; top: 640px; display: flex; flex-direction: column; align-items: center; }
+    #endcard-icon { width: 240px; height: 240px; border-radius: 54px; box-shadow: 0 24px 60px rgba(5, 20, 36, 0.22); }
+    .name { margin: 64px 0 0; font-size: 76px; font-weight: 700; letter-spacing: -0.03em; color: var(--ink); }
+    .line { margin: 22px 0 0; font-size: 44px; font-weight: 700; letter-spacing: -0.02em; color: var(--muted); }
+    .mask { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: 0.08em; margin-bottom: -0.08em; }
+    .w { display: inline-block; }
+    .accent { color: var(--mint); }
+  </style>
+  <div id="root" data-composition-id="endcard" data-width="886" data-height="1920">
+    <div class="lockup">
+      <img id="endcard-icon" src="assets/brand/app-icon.png" alt="Income Tracker app icon" />
+      <h1 id="endcard-name" class="name"><span class="mask"><span class="w">Income</span></span> <span class="mask"><span class="w">Tracker</span></span></h1>
+      <p id="endcard-line" class="line"><span class="mask"><span class="w">Every</span></span> <span class="mask"><span class="w">pound,</span></span> <span class="mask"><span class="w accent">accounted</span></span> <span class="mask"><span class="w accent">for.</span></span></p>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#endcard-icon", { scale: 0.82, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "expo.out" }, 0);
+    tl.fromTo("#endcard-name .w", { yPercent: 110 }, { yPercent: 0, duration: 0.42, ease: "power3.out", stagger: 0.06 }, 0.18);
+    tl.fromTo("#endcard-line .w", { yPercent: 110 }, { yPercent: 0, duration: 0.42, ease: "power3.out", stagger: 0.05 }, 0.45);
+    tl.set({}, {}, 3.5850000000000004);
+    window.__timelines["endcard"] = tl;
+  </script>
+</template>

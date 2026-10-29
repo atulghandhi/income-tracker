@@ -1,61 +1,36 @@
 <!doctype html>
-<html lang="en" data-resolution="portrait">
+<html lang="en-GB" data-resolution="custom">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=1080, height=1920" />
+    <meta name="viewport" content="width=886, height=1920" />
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
     <style>
-      /* Placeholders: replace all three with the film's own palette and display face. */
+      /* Income Tracker design tokens (ios/IncomeTracker/DesignSystem/Colors.swift, light). */
       :root {
-        --ground: #000;
-        --ink: #ffffff;
-        --font-display: sans-serif;
+        --ground: #F4F7FB;
+        --ink: #0B1C2E;
+        --muted: #5A6B7E;
+        --mint: #00A18A;
       }
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
-      html,
-      body {
-        margin: 0;
-        width: 1080px;
-        height: 1920px;
-        overflow: hidden;
-        background: var(--ground);
-      }
-      #root {
-        width: 100%;
-        height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-family: var(--font-display);
-      }
-      #title {
-        color: var(--ink);
-        font-size: 72px;
-        font-weight: 600;
-        letter-spacing: -0.03em;
-      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { margin: 0; width: 886px; height: 1920px; overflow: hidden; background: var(--ground); }
+      #root { width: 100%; height: 100%; }
     </style>
   </head>
   <body>
-    <div
-      id="root"
-      data-composition-id="main"
-      data-start="0"
-      data-duration="10"
-      data-width="1080"
-      data-height="1920"
-    >
-      <audio id="music" data-timeline-role="music" class="clip" src="assets/audio/bed.wav" data-start="0" data-duration="28.5" data-track-index="9" data-volume="1"></audio>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="25.08" data-width="886" data-height="1920">
+      <div id="dash" data-composition-id="dash" data-composition-src="compositions/dash.html" data-start="0" data-duration="3.585" data-track-index="1" data-track-kind="graphics" data-width="886" data-height="1920"></div>
+      <div id="quicklog" data-composition-id="quicklog" data-composition-src="compositions/quicklog.html" data-start="3.585" data-duration="3.58" data-track-index="1" data-track-kind="graphics" data-width="886" data-height="1920"></div>
+      <div id="import" data-composition-id="import" data-composition-src="compositions/import.html" data-start="7.165" data-duration="3.58" data-track-index="1" data-track-kind="graphics" data-width="886" data-height="1920"></div>
+      <div id="accounts" data-composition-id="accounts" data-composition-src="compositions/accounts.html" data-start="10.745" data-duration="3.58" data-track-index="1" data-track-kind="graphics" data-width="886" data-height="1920"></div>
+      <div id="insights" data-composition-id="insights" data-composition-src="compositions/insights.html" data-start="14.325" data-duration="3.59" data-track-index="1" data-track-kind="graphics" data-width="886" data-height="1920"></div>
+      <div id="goals" data-composition-id="goals" data-composition-src="compositions/goals.html" data-start="17.915" data-duration="3.57" data-track-index="1" data-track-kind="graphics" data-width="886" data-height="1920"></div>
+      <div id="endcard" data-composition-id="endcard" data-composition-src="compositions/endcard.html" data-start="21.485" data-duration="3.595" data-track-index="1" data-track-kind="graphics" data-width="886" data-height="1920"></div>
+      <audio id="music" data-timeline-role="music" class="clip" src="assets/audio/bed.wav" data-start="0" data-duration="25.08" data-track-index="9" data-volume="1" data-fade-out="1.2"></audio>
     </div>
     <script>
-      const tl = gsap.timeline({ paused: true });
-      // Example: tl.fromTo("#title", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.18, ease: "power4.out" }, 0);
-      window.__timelines["main"] = tl;
-      tl.seek(0);
+      window.__timelines = window.__timelines || {};
+      window.__timelines["main"] = gsap.timeline({ paused: true });
     </script>
   </body>
 </html>
