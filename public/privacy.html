@@ -4,13 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Privacy Policy · The Income Tracker</title>
-    <meta name="description" content="How The Income Tracker handles your data: everything stays in your browser unless you sign in to sync, no bank credentials, no data sales. Plain-English privacy policy." />
+    <meta name="description" content="How The Income Tracker handles your data: everything stays on your device unless you sign in to sync, no bank credentials, no data sales. Plain-English privacy policy." />
     <meta name="robots" content="index, follow" />
     <link rel="canonical" href="https://www.theincometracker.com/privacy.html" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png" />
     <meta property="og:title" content="Privacy Policy · The Income Tracker" />
-    <meta property="og:description" content="How The Income Tracker handles your data: everything stays in your browser unless you sign in to sync, no bank credentials, no data sales. Plain-English privacy policy." />
+    <meta property="og:description" content="How The Income Tracker handles your data: everything stays on your device unless you sign in to sync, no bank credentials, no data sales. Plain-English privacy policy." />
     <meta property="og:url" content="https://www.theincometracker.com/privacy.html" />
     <meta property="og:image" content="https://www.theincometracker.com/og-image.png" />
     <style>
@@ -43,47 +43,55 @@
       <nav><a href="/">&larr; Back to The Income Tracker</a></nav>
 
       <h1>Privacy Policy</h1>
-      <p class="meta">Effective date: June 1, 2025 &nbsp;·&nbsp; Last updated: June 12, 2026</p>
+      <p class="meta">Effective date: June 1, 2025 &nbsp;·&nbsp; Last updated: October 29, 2026</p>
 
-      <p>The Income Tracker ("we", "our", or "us") is committed to protecting your privacy. This policy explains what information we collect, how we use it, and your rights.</p>
+      <p>The Income Tracker ("we", "our", or "us") is committed to protecting your privacy. This policy covers the website and web app at theincometracker.com and the Income Tracker iPhone app. It explains what information we collect, how we use it, and your rights.</p>
 
       <h2>1. Information We Collect</h2>
       <p>We collect only what is necessary to operate the service:</p>
       <ul>
-        <li><strong>Account data</strong> — when you sign in with Google we receive your name, email address, and profile picture from Google.</li>
-        <li><strong>Financial ledger data</strong> — the income, expense, debt, and savings entries you create in the app. This data is stored locally in your browser and, if you are signed in, synced to our cloud database (Supabase) so you can access it across devices.</li>
-        <li><strong>Usage data</strong> — standard server logs including IP address, browser type, and page requests. We do not use third-party analytics trackers.</li>
+        <li><strong>Account data</strong> — signing in is optional. If you sign in with Apple, Google or email, we receive your email address (and, from Google, your name and profile picture). If you use Sign in with Apple's "Hide My Email", we receive only Apple's private relay address.</li>
+        <li><strong>Financial ledger data</strong> — the income, expense, account, debt and savings entries you create or import. This data is stored on your device (in your browser on the web, or in the app's storage on iPhone) and, if you are signed in, synced to our cloud database (Supabase) so you can access it across devices.</li>
+        <li><strong>Usage data</strong> — standard server logs including IP address, browser type and page requests. The web app may send anonymous usage events (for example "an entry was added") to PostHog to help us improve the product; these never include amounts, merchants, categories or balances, and are not sent if your browser has Do Not Track turned on. The iPhone app does not include any analytics.</li>
       </ul>
 
       <h2>2. How We Use Your Information</h2>
       <ul>
         <li>To provide and operate The Income Tracker service.</li>
-        <li>To sync your ledger across devices when you are signed in.</li>
+        <li>To sync your ledger across your devices when you are signed in.</li>
         <li>To respond to support requests.</li>
-        <li>We do <strong>not</strong> sell, rent, or share your personal data with third parties for marketing purposes.</li>
+        <li>We do <strong>not</strong> sell, rent, or share your personal data with third parties for marketing purposes, and we do not track you across other apps or websites.</li>
       </ul>
 
       <h2>3. Data Storage</h2>
-      <p>Ledger data for signed-in users is stored in a Supabase (PostgreSQL) database hosted in the United States. Data is protected by row-level security policies so only you can access your records. Local-only users' data stays entirely in their browser's <code>localStorage</code> and never leaves their device.</p>
+      <p>Ledger data for signed-in users is stored in a Supabase (PostgreSQL) database hosted in the United States. Data is protected by row-level security policies so only you can access your records. If you do not sign in, your data stays entirely on your device — in your browser's <code>localStorage</code> on the web, or in the app's on-device storage on iPhone — and never leaves it.</p>
+      <p>On iPhone, Face ID is used only by iOS to unlock the app; we never receive your face data. The Home Screen widgets read a summary of your ledger from storage shared on your device with the app.</p>
 
       <h2>4. Third-Party Services</h2>
       <ul>
-        <li><strong>Google OAuth</strong> — used for sign-in only. We do not access your Google Drive, Gmail, or any other Google data.</li>
+        <li><strong>Sign in with Apple and Google sign-in</strong> — used for sign-in only. We do not access your iCloud, Google Drive, Gmail or any other Apple or Google data.</li>
         <li><strong>Supabase</strong> — our backend database and authentication provider.</li>
-        <li><strong>Vercel</strong> — our hosting platform.</li>
+        <li><strong>Vercel</strong> — our website hosting platform.</li>
+        <li><strong>PostHog</strong> — anonymous product usage events from the web app, as described above.</li>
+        <li><strong>Anthropic</strong> — if you ask the web app to suggest categories for imported transactions, the bank descriptions of those rows (not amounts, dates or balances) are sent to Anthropic's Claude model to suggest a category.</li>
       </ul>
 
       <h2>5. Cookies and Local Storage</h2>
-      <p>We use browser <code>localStorage</code> to store your ledger state locally and an authentication session cookie set by Supabase when you sign in. We do not use advertising cookies or cross-site tracking.</p>
+      <p>On the web we use browser <code>localStorage</code> to store your ledger locally and an authentication session set by Supabase when you sign in. On iPhone, your sign-in session is kept in the iOS Keychain. We do not use advertising cookies or cross-site tracking.</p>
 
-      <h2>6. Data Retention</h2>
-      <p>Your data is retained for as long as your account exists. You may delete your account and all associated data at any time by contacting us at the address below. We will process deletion requests within 30 days.</p>
+      <h2>6. Data Retention and Deleting Your Account</h2>
+      <p>Your cloud data is kept for as long as your account exists. You can delete your account and all of its cloud data at any time:</p>
+      <ul>
+        <li><strong>In the iPhone app</strong> — open Settings, then tap <em>Delete account</em>. Your account, cloud ledger and any connected bank-feed records are deleted immediately.</li>
+        <li><strong>By email</strong> — write to us at the address below and we will delete your account within 30 days.</li>
+      </ul>
+      <p>Data stored only on your device is removed when you clear it in the app, clear your browser data, or delete the iPhone app. Feedback you have sent us is kept but is no longer linked to your account.</p>
 
       <h2>7. Children's Privacy</h2>
       <p>The Income Tracker is not directed at children under 13. We do not knowingly collect personal information from children under 13. If you believe a child has provided us with personal information, please contact us and we will delete it promptly.</p>
 
       <h2>8. Your Rights</h2>
-      <p>Depending on your jurisdiction you may have rights to access, correct, export, or delete your personal data. To exercise any of these rights, contact us at the address below.</p>
+      <p>Depending on your jurisdiction (including under UK and EU GDPR) you may have rights to access, correct, export, or delete your personal data. You can export your ledger at any time from Settings, and delete your account as described above. To exercise any other right, contact us at the address below.</p>
 
       <h2>9. Changes to This Policy</h2>
       <p>We may update this policy from time to time. When we do we will update the "last updated" date above. Continued use of the service after changes constitutes acceptance of the updated policy.</p>

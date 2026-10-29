@@ -22,6 +22,9 @@ struct SettingsSheet: View {
     @State private var passwordField = ""
     @State private var emailAuthNotice: String? = nil
     @State private var showSignOutConfirm = false
+    @State private var showDeleteAccountConfirm = false
+    @State private var isDeletingAccount = false
+    @State private var deleteAccountError: String? = nil
 
     // Cloud vault
     @State private var isSyncing = false
@@ -134,6 +137,22 @@ struct SettingsSheet: View {
             } message: {
                 Text("Your ledger stays in your cloud vault and comes back when you sign in again. This device returns to an empty ledger.")
             }
+            .alert("Delete your account?", isPresented: $showDeleteAccountConfirm) {
+                Button("Delete account", role: .destructive) {
+                    Task { await deleteAccount() }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This permanently deletes your account and everything in your cloud vault, and this iPhone returns to an empty ledger. It can't be undone. Export a backup first if you might want your data.")
+            }
+            .alert("Couldn't delete your account", isPresented: Binding(
+                get: { deleteAccountError != nil },
+                set: { if !$0 { deleteAccountError = nil } }
+            )) {
+                Button("OK") { deleteAccountError = nil }
+            } message: {
+                Text(deleteAccountError ?? "")
+            }
             .task {
                 notificationsDenied = await !NotificationScheduler.isAuthorized()
                     && (billsEnabled || dailyLogEnabled || monthlyImportEnabled)
@@ -174,6 +193,19 @@ struct SettingsSheet: View {
                 } label: {
                     Text("Sign out")
                 }
+
+                Button(role: .destructive) {
+                    showDeleteAccountConfirm = true
+                } label: {
+                    HStack {
+                        Text("Delete account")
+                        if isDeletingAccount {
+                            Spacer()
+                            ProgressView()
+                        }
+                    }
+                }
+                .disabled(isDeletingAccount)
             } else {
                 Button {
                     isSigningIn = true
@@ -685,16 +717,30 @@ struct SettingsSheet: View {
         }
     }
 
+    private func deleteAccount() async {
+        isDeletingAccount = true
+        defer { isDeletingAccount = false }
+        do {
+            try await sync.deleteAccount()
+            sync.mergeConflict = nil
+            store.resetAfterSignOut()
+            Haptics.destructiveAction()
+            notice = "Your account and cloud data have been deleted."
+        } catch {
+            deleteAccountError = "Check your connection and try again. If it keeps failing, email hello@theincometracker.com and we'll delete it for you."
+        }
+    }
+
     // MARK: - About section
 
     @ViewBuilder
     private var aboutSection: some View {
         Section {
             LabeledContent("Version", value: appVersion)
-            Link(destination: URL(string: "https://ledgerlite.co.uk/privacy.html")!) {
+            Link(destination: URL(string: "https://www.theincometracker.com/privacy.html")!) {
                 Label("Privacy policy", systemImage: "hand.raised")
             }
-            Link(destination: URL(string: "https://ledgerlite.co.uk/guides/")!) {
+            Link(destination: URL(string: "https://www.theincometracker.com/guides/")!) {
                 Label("Guides and bank CSV help", systemImage: "book")
             }
         } header: {

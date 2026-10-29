@@ -312,6 +312,14 @@ final class SyncCoordinator: LedgerSyncTransport {
         await signOutLocally()
     }
 
+    /// Permanently deletes the signed-in account and everything stored for it in the
+    /// cloud (App Store guideline 5.1.1(v)). The delete_my_account RPC removes the
+    /// auth user; the ledger, profile and bank-feed rows go with it by cascade.
+    func deleteAccount() async throws {
+        _ = try await authorizedRequest(path: "/rest/v1/rpc/delete_my_account", method: "POST", body: Data("{}".utf8))
+        await signOutLocally()
+    }
+
     private func signOutLocally() async {
         stopRealtime()
         realtime = nil
