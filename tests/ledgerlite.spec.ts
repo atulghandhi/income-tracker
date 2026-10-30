@@ -203,6 +203,20 @@ test.describe("Ledger", () => {
     await expect(nav.getByRole("button", { name: "Dashboard", exact: true })).toHaveCount(0);
   });
 
+  test("right-click Hide on the page being viewed leaves one link to it, under More tools", async ({ page }) => {
+    await page.goto("/");
+    const nav = page.locator(".sideNav");
+    await openView(page, "Accounts");
+    await nav.getByRole("button", { name: "Accounts", exact: true }).click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Hide from sidebar" }).click();
+    await expect(nav.locator(".navStack").getByRole("button", { name: "Accounts", exact: true })).toHaveCount(0);
+    await nav.getByRole("button", { name: /^More tools/ }).click();
+    await expect(nav.getByRole("button", { name: "Add Accounts to sidebar" })).toBeVisible();
+    // Still on the page, with the way back into the sidebar on show.
+    await expect(page).toHaveURL(/\/accounts$/);
+  });
+
+
   test("changes currency from settings and reflects it in the ledger totals", async ({ page }) => {
     await openLedger(page);
     await expect(page.locator(".panel.income .panelHeader")).toContainText("£0");

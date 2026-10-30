@@ -3479,10 +3479,9 @@ function App() {
   const hiddenViews = toolPrefs.hidden ?? [];
   const inSidebar = (view: AppView) => (isToolView(view) ? toolPrefs.pinned.includes(view) : !(isHideableView(view) && hiddenViews.includes(view)));
   const navEntry = (view: AppView): NavEntry => (isToolView(view) ? toolNavItems[view] : coreNavItems.find((item) => item.id === view)!);
-  // A page out of the sidebar still shows there while it is the page being viewed (opened from a
-  // widget or link), marked as a preview.
-  const navItems = [...coreNavItems.map((item) => item.id), ...TOOL_VIEWS].filter((view) => inSidebar(view) || activeView === view).map(navEntry);
+  const navItems = [...coreNavItems.map((item) => item.id), ...TOOL_VIEWS].filter(inSidebar).map(navEntry);
   // Everything out of the sidebar, listed under More tools: hidden everyday pages first, then tools.
+  // Viewing one (from there, a widget or a link) doesn't add it back; the page's banner offers that.
   const offSidebar: AppView[] = [...HIDEABLE_VIEWS.filter((view) => hiddenViews.includes(view)), ...TOOL_VIEWS.filter((tool) => !toolPrefs.pinned.includes(tool))];
   const toolBadge = unseenSuggestionCount(toolPrefs, suggestedTools);
   const offSidebarActive = canHide(activeView) && !inSidebar(activeView) ? activeView : null;
@@ -3557,11 +3556,11 @@ function App() {
           {navItems.map((item) => (
             <button
               key={item.id}
-              className={`navItem${activeView === item.id ? " active" : ""}${item.id === offSidebarActive ? " preview" : ""}`}
+              className={activeView === item.id ? "navItem active" : "navItem"}
               type="button"
               onClick={() => setActiveView(item.id)}
               onContextMenu={(event) => {
-                if (!canHide(item.id) || item.id === offSidebarActive) return;
+                if (!canHide(item.id)) return;
                 event.preventDefault();
                 setNavMenu({ view: item.id, x: event.clientX, y: event.clientY });
               }}

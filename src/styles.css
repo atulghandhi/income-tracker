@@ -484,11 +484,6 @@ textarea {
 }
 
 /* ─── Sidebar tools: optional pages added from "More tools" ─────────────────── */
-.navItem.preview {
-  outline: 1px dashed rgba(var(--accent-rgb), 0.45);
-  outline-offset: -1px;
-}
-
 .navTools {
   margin-top: 6px;
 }
