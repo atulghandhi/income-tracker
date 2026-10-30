@@ -229,6 +229,30 @@ test.describe("Ledger", () => {
     await expect(note).toHaveCount(0);
   });
 
+  test("long rule lists show three until asked, and a new rule is never tucked away", async ({ page }) => {
+    await page.goto("/");
+    await openView(page, "Settings");
+    const input = page.getByLabel("Add a transfer payee");
+    const rows = page.locator(".transferRulesPanel .transferRuleList li");
+    const addRule = async (payee: string) => {
+      await input.fill(payee);
+      await input.press("Enter");
+    };
+    for (const payee of ["Payee One", "Payee Two", "Payee Three"]) await addRule(payee);
+    await expect(rows).toHaveCount(3);
+    await expect(page.locator(".transferRulesPanel").getByRole("button", { name: /^Show / })).toHaveCount(0);
+
+    await addRule("Payee Four");
+    await expect(rows).toHaveCount(3);
+    await expect(rows.first()).toContainText(/payee four/i);
+
+    const panel = page.locator(".transferRulesPanel");
+    await panel.getByRole("button", { name: "Show all 4" }).click();
+    await expect(rows).toHaveCount(4);
+    await panel.getByRole("button", { name: "Show less" }).click();
+    await expect(rows).toHaveCount(3);
+  });
+
   test("changes currency from settings and reflects it in the ledger totals", async ({ page }) => {
     await openLedger(page);
     await expect(page.locator(".panel.income .panelHeader")).toContainText("£0");

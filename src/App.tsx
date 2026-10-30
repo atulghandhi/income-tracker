@@ -233,6 +233,7 @@ import {
   NetWorthHorizonTabs,
   NumberInput,
   PanelTitle,
+  ShowMoreList,
   ProgressRule,
   blurOnEnter,
   focusNextFrame,
@@ -4955,8 +4956,9 @@ function App() {
                   </button>
                 </div>
                 {transferRules.length ? (
-                  <ul className="transferRuleList">
-                    {transferRules.map((rule) => (
+                  <ShowMoreList
+                    items={[...transferRules].sort((a, b) => b.createdAt.localeCompare(a.createdAt))}
+                    renderItem={(rule) => (
                       <li key={rule.id}>
                         <span>{rule.pattern}</span>
                         <button
@@ -4968,8 +4970,8 @@ function App() {
                           <Trash2 size={15} />
                         </button>
                       </li>
-                    ))}
-                  </ul>
+                    )}
+                  />
                 ) : (
                   <p className="transferRuleEmpty">
                     No transfer rules yet. Set a transaction’s type to “Transfer” during import, or add a payee above.
@@ -4984,8 +4986,9 @@ function App() {
                   category instantly. Delete any rule that misfires; the next correction re-learns it.
                 </p>
                 {learnedRules.length ? (
-                  <ul className="transferRuleList">
-                    {learnedRules.map(({ rule, matches }) => (
+                  <ShowMoreList
+                    items={learnedRules}
+                    renderItem={({ rule, matches }) => (
                       <li key={rule.id}>
                         <code>{rule.pattern}</code>
                         <span className="learnedRuleTarget">
@@ -5004,8 +5007,8 @@ function App() {
                           <Trash2 size={15} />
                         </button>
                       </li>
-                    ))}
-                  </ul>
+                    )}
+                  />
                 ) : (
                   <p className="transferRuleEmpty">No learned rules yet — correct a category on an imported transaction to create one.</p>
                 )}
@@ -5018,8 +5021,9 @@ function App() {
                   name instead. Renaming again updates the rule.
                 </p>
                 {ledger.nameRules.length ? (
-                  <ul className="transferRuleList">
-                    {ledger.nameRules.map((rule) => (
+                  <ShowMoreList
+                    items={ledger.nameRules}
+                    renderItem={(rule) => (
                       <li key={rule.id}>
                         <code>{rule.from}</code>
                         <span className="learnedRuleTarget">
@@ -5035,8 +5039,8 @@ function App() {
                           <Trash2 size={15} />
                         </button>
                       </li>
-                    ))}
-                  </ul>
+                    )}
+                  />
                 ) : (
                   <p className="transferRuleEmpty">No rename rules yet — rename a transaction that shares its name with others to create one.</p>
                 )}

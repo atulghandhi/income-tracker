@@ -62,6 +62,24 @@ export function PanelTitle({ title, icon, action }: { title: string; icon?: Reac
   );
 }
 
+// A list that can grow long: the first few rows, and a button for the rest.
+const SHOW_MORE_PREVIEW = 3;
+
+export function ShowMoreList<T>({ items, renderItem }: { items: T[]; renderItem: (item: T) => ReactNode }) {
+  const [expanded, setExpanded] = useState(false);
+  const overflow = items.length > SHOW_MORE_PREVIEW;
+  return (
+    <>
+      <ul className="transferRuleList">{(expanded || !overflow ? items : items.slice(0, SHOW_MORE_PREVIEW)).map(renderItem)}</ul>
+      {overflow && (
+        <button className="linkButton" type="button" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
+          {expanded ? "Show less" : `Show all ${items.length}`}
+        </button>
+      )}
+    </>
+  );
+}
+
 // The "i" that hides explanatory copy. On a desktop it opens on hover and closes when the pointer
 // leaves the icon; on a touch screen a tap opens it and a tap anywhere else (or Escape) closes it.
 // The bubble is rendered at the document root with fixed coordinates, so it is never clipped by a
