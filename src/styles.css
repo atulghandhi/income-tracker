@@ -3786,6 +3786,22 @@ hr {
   color: var(--mint);
 }
 
+.architectureNote > svg,
+.architectureNoteDismiss {
+  flex-shrink: 0;
+}
+
+.architectureNoteDismiss {
+  height: 38px;
+}
+
+.settingsHeaderActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 .architectureNote h3,
 .architectureNote p {
   margin: 0;

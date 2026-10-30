@@ -217,6 +217,18 @@ test.describe("Ledger", () => {
   });
 
 
+  test("the Where your data lives note stays dismissed, and quick setup stays reachable", async ({ page }) => {
+    await page.goto("/");
+    await openView(page, "Settings");
+    const note = page.getByRole("heading", { name: "Where your data lives" });
+    await expect(note).toBeVisible();
+    await page.getByRole("button", { name: "Dismiss where your data lives" }).click();
+    await expect(note).toHaveCount(0);
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("button", { name: "Run quick setup" })).toBeVisible();
+    await expect(note).toHaveCount(0);
+  });
+
   test("changes currency from settings and reflects it in the ledger totals", async ({ page }) => {
     await openLedger(page);
     await expect(page.locator(".panel.income .panelHeader")).toContainText("£0");

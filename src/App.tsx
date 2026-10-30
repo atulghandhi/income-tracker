@@ -629,6 +629,7 @@ const DEV_AUTO_SAMPLE = import.meta.env.DEV && import.meta.env.VITE_DEV_SAMPLE !
 const TUTORIAL_SEEN_KEY = "tutorialSeenPages";
 const ONBOARDING_KEY = "onboardingComplete";
 const GETTING_STARTED_KEY = "gettingStartedDismissed";
+const DATA_NOTE_DISMISSED_KEY = "dataNoteDismissed";
 // One-off announcement of PDF statement imports for people who were already using the app.
 const PDF_NOTICE_KEY = "it_pdf_import_notice";
 
@@ -781,6 +782,7 @@ function App() {
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [confirmClearAll, setConfirmClearAll] = useState(false);
   const [checklistDismissed, setChecklistDismissed] = useState(() => readFlag(GETTING_STARTED_KEY));
+  const [dataNoteDismissed, setDataNoteDismissed] = useState(() => readFlag(DATA_NOTE_DISMISSED_KEY));
   const [showPdfNotice, setShowPdfNotice] = useState(false);
   // Whether hydration found a saved ledger — the difference between a returning user and a new one.
   const storedLedgerRef = useRef(false);
@@ -4699,26 +4701,49 @@ function App() {
                   <h2>Settings</h2>
                   <p>Your data, imports, rules, and preferences.</p>
                 </div>
-                <button className="privacyBadge" type="button" onClick={() => setShowFeedbackModal(true)}>
-                  <CircleHelp size={15} />
-                  Submit feedback
-                </button>
+                <div className="settingsHeaderActions">
+                  {/* Quick setup lives in the note below, so it moves up here once the note is gone. */}
+                  {dataNoteDismissed && (
+                    <button className="privacyBadge" type="button" onClick={() => setOnboardingOpen(true)}>
+                      <Sparkles size={15} />
+                      Run quick setup
+                    </button>
+                  )}
+                  <button className="privacyBadge" type="button" onClick={() => setShowFeedbackModal(true)}>
+                    <CircleHelp size={15} />
+                    Submit feedback
+                  </button>
+                </div>
               </div>
 
-              <article className="architectureNote">
-                <Cloud size={21} />
-                <div>
-                  <h3>Where your data lives</h3>
-                  <p>
-                    Everything is saved in this browser. Sign in and it also backs up privately to the cloud, so you can pick up on
-                    another device. Export a full copy below any time.
-                  </p>
-                </div>
-                <button className="commandButton" type="button" onClick={() => setOnboardingOpen(true)}>
-                  <Sparkles size={15} />
-                  Run quick setup
-                </button>
-              </article>
+              {!dataNoteDismissed && (
+                <article className="architectureNote">
+                  <Cloud size={21} />
+                  <div>
+                    <h3>Where your data lives</h3>
+                    <p>
+                      Everything is saved in this browser. Sign in and it also backs up privately to the cloud, so you can pick up on
+                      another device. Export a full copy below any time.
+                    </p>
+                  </div>
+                  <button className="commandButton" type="button" onClick={() => setOnboardingOpen(true)}>
+                    <Sparkles size={15} />
+                    Run quick setup
+                  </button>
+                  <button
+                    className="iconButton architectureNoteDismiss"
+                    type="button"
+                    aria-label="Dismiss where your data lives"
+                    data-tip="Dismiss"
+                    onClick={() => {
+                      writeFlag(DATA_NOTE_DISMISSED_KEY);
+                      setDataNoteDismissed(true);
+                    }}
+                  >
+                    <X size={16} />
+                  </button>
+                </article>
+              )}
 
               <section className="settingsGrid">
                 <article className="settingsPanel dataPanel">
