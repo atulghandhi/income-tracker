@@ -4,9 +4,9 @@ import type { AppView } from "./routes";
 // Goals) are "tools": a new user adds them from the sidebar's "More tools" list, which flags the
 // ones their own data says they need (debts → Allocate, money left over → Goals). A tool not in
 // the sidebar still opens from a widget, link or the checklist, and offers to add itself. The
-// everyday pages can be hidden too (right-click → Hide), except the few the app can't do without.
-// All of this is a per-device view preference, like the theme and dashboard layout, so it lives
-// in localStorage.
+// everyday pages can be hidden too (Settings, or right-click → Hide), except the two the app can't
+// do without. What's in the sidebar is saved in the ledger, so it syncs with the account, and in
+// localStorage; which suggestions have been seen stays per-device.
 
 export type ToolView = Extract<AppView, "pay" | "allocate" | "goals">;
 
@@ -16,11 +16,11 @@ export function isToolView(view: AppView): view is ToolView {
   return (TOOL_VIEWS as AppView[]).includes(view);
 }
 
-// Everyday pages someone can hide. Dashboard, Ledger and Settings always stay: without them there
-// is nowhere to land, nothing to record money in, and no way back to these preferences.
-export type HideableView = Extract<AppView, "accounts" | "subscriptions">;
+// Everyday pages someone can hide. Ledger and Settings always stay: without them there is nothing
+// to record money in and no way back to these preferences.
+export type HideableView = Extract<AppView, "dashboard" | "accounts" | "subscriptions">;
 
-export const HIDEABLE_VIEWS: HideableView[] = ["accounts", "subscriptions"];
+export const HIDEABLE_VIEWS: HideableView[] = ["dashboard", "accounts", "subscriptions"];
 
 export function isHideableView(view: AppView): view is HideableView {
   return (HIDEABLE_VIEWS as AppView[]).includes(view);
@@ -41,6 +41,9 @@ export type NavToolsPrefs = {
   seen: ToolView[];
 };
 
+// The part of the preferences saved in the ledger.
+export type SidebarChoice = { pinned: ToolView[]; hidden: HideableView[] };
+
 const NAV_TOOLS_KEY = "it_nav_tools";
 
 function cleanTools(value: unknown): ToolView[] {
@@ -51,6 +54,11 @@ function cleanTools(value: unknown): ToolView[] {
 function cleanHidden(value: unknown): HideableView[] {
   if (!Array.isArray(value)) return [];
   return HIDEABLE_VIEWS.filter((view) => value.includes(view));
+}
+
+export function normalizeSidebarChoice(value: unknown): SidebarChoice {
+  const raw = (value ?? {}) as Partial<SidebarChoice>;
+  return { pinned: cleanTools(raw.pinned), hidden: cleanHidden(raw.hidden) };
 }
 
 // null = never decided on this device; the caller picks a starting set (see initialPinned).

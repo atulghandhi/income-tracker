@@ -2,7 +2,7 @@ import { supabase } from "./supabase";
 import type { CsvImportRow } from "./importer";
 
 // Stage C: AI categorization backstop. Only rows the local pipeline scored below
-// AI_UPGRADE_THRESHOLD are sent, and only when the user opted in and is signed in.
+// AI_UPGRADE_THRESHOLD are sent, and only when the user is signed in.
 // Privacy contract (enforced here, not just promised): descriptions + sign only —
 // no amounts, no dates, no balances, no identity beyond the auth token.
 // AI output is capped at 0.8 confidence so a user's own rules (0.96/0.85) always win.
@@ -19,29 +19,8 @@ export type AiSuggestion = {
   cleanedMerchant?: string;
 };
 
-export function isAiCategorizationAvailable(signedIn: boolean, optedIn: boolean): boolean {
-  return Boolean(supabase && signedIn && optedIn);
-}
-
-export type AiConnectionStatus = "ok" | "not-deployed" | "no-api-key" | "unauthenticated" | "unreachable";
-
-// Fired when the user switches the toggle on, so a broken backend is reported
-// immediately instead of failing silently at the next import. An empty batch
-// exercises the whole chain (function exists -> key configured -> auth valid)
-// without spending a model call.
-export async function testAiConnection(): Promise<AiConnectionStatus> {
-  if (!supabase) return "unreachable";
-  try {
-    const { error } = await supabase.functions.invoke("categorize-batch", { body: { rows: [], categories: [] } });
-    if (!error) return "ok";
-    const status = (error as { context?: { status?: number } }).context?.status;
-    if (status === 503) return "no-api-key";
-    if (status === 401) return "unauthenticated";
-    if (status === 404) return "not-deployed";
-    return "unreachable";
-  } catch {
-    return "unreachable";
-  }
+export function isAiCategorizationAvailable(signedIn: boolean): boolean {
+  return Boolean(supabase && signedIn);
 }
 
 export async function aiCategorizeRows(rows: CsvImportRow[], userCategories: string[]): Promise<AiSuggestion[]> {

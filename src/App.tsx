@@ -120,7 +120,7 @@ import {
   setSubscriptionTolerance,
   type Subscription,
 } from "./subscriptions";
-import { aiCategorizeRows, applyAiSuggestions, isAiCategorizationAvailable, testAiConnection } from "./aiCategorize";
+import { aiCategorizeRows, applyAiSuggestions, isAiCategorizationAvailable } from "./aiCategorize";
 import { bucketCount, identifyAnalytics, track } from "./analytics";
 import { DebtRemindersPanel, InstallBanner, MonthlyReminderPanel, NewMonthNudge } from "./RetentionPanels";
 import {
@@ -1158,7 +1158,21 @@ function App() {
     setNavTools(initial);
     writeNavTools(initial);
   }, [hydrated, navTools, setupProgress]);
-  const toolPrefs: NavToolsPrefs = navTools ?? { pinned: [...TOOL_VIEWS], seen: [] };
+  // The choice saved in the ledger (so it follows the account) wins over this device's copy.
+  const toolPrefs: NavToolsPrefs = { ...(navTools ?? { pinned: [...TOOL_VIEWS], seen: [] }), ...ledger.sidebar };
+  // A choice made before it was saved in the ledger moves there, so other devices get it too.
+  useEffect(() => {
+    if (!hydrated || ledger.sidebar || !navTools?.hidden?.length) return;
+    updateLedger((current) => ({ ...current, sidebar: { pinned: navTools.pinned, hidden: navTools.hidden ?? [] } }));
+  }, [hydrated, ledger.sidebar, navTools]);
+  // Opening the app with no page in the address starts on the Dashboard, or the Ledger once the
+  // Dashboard is hidden. A link to /dashboard still opens it.
+  const openedWithoutPage = useRef(viewFromPath(window.location.pathname) === null);
+  useEffect(() => {
+    if (!hydrated || !openedWithoutPage.current) return;
+    openedWithoutPage.current = false;
+    if (toolPrefs.hidden?.includes("dashboard")) setActiveViewState("ledger");
+  }, [hydrated]);
   const suggestedTools = useMemo(
     () =>
       toolSuggestions({
@@ -1178,7 +1192,9 @@ function App() {
   // Puts a page in the sidebar or takes it out: a tool is pinned or unpinned, an everyday page
   // hidden or shown. Either way a page out of the sidebar waits under More tools.
   function setSidebarItem(view: AppView, shown: boolean) {
-    updateNavTools((prefs) => withSidebarItem(prefs, view, shown));
+    const next = withSidebarItem(toolPrefs, view, shown);
+    updateNavTools(() => next);
+    updateLedger((current) => ({ ...current, sidebar: { pinned: next.pinned, hidden: next.hidden ?? [] } }));
     track("nav_tool", { tool: view, action: shown ? "add" : "remove" });
   }
   // Right-click (or long-press) on a sidebar page: a one-item menu to hide it.
@@ -2707,7 +2723,7 @@ function App() {
       });
     }
 
-    if (result.rows.length && isAiCategorizationAvailable(Boolean(user), Boolean(ledger.aiCategorizationEnabled))) {
+    if (result.rows.length && isAiCategorizationAvailable(Boolean(user))) {
       const categories = Array.from(
         new Set([
           ...(region === "US" ? ["Housing", "Food", "Utilities", "Transportation", "Subscriptions", "Medical", "Personal", "Work"] : ["Home", "Food", "Bills", "Travel", "Subscriptions", "Health", "Personal", "Work"]),
@@ -3103,13 +3119,16 @@ function App() {
         return;
       }
 
-      if (!isEditable && event.key === "/") {
+      // Single-key shortcuts only fire with no modifier, so Cmd+C, Cmd+/ and the like stay the browser's.
+      const isPlainKey = !isEditable && !isCommand && !event.altKey;
+
+      if (isPlainKey && event.key === "/") {
         event.preventDefault();
         focusSearch();
         return;
       }
 
-      if ((isCommand && key === "n") || (!isEditable && (key === "n" || key === "c"))) {
+      if ((isCommand && key === "n") || (isPlainKey && (key === "n" || key === "c"))) {
         event.preventDefault();
         openNewTransaction();
         return;
@@ -3442,7 +3461,7 @@ function App() {
   const payPageTitle = region === "US" ? "Paycheck & tax" : "Pay & tax";
   type NavEntry = { id: AppView; label: string; icon: ReactNode; blurb: string };
   const coreNavItems: NavEntry[] = [
-    { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard size={20} />, blurb: "" },
+    { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard size={20} />, blurb: "Your month at a glance, with widgets you choose" },
     { id: "ledger", label: "Ledger", icon: <ReceiptText size={20} />, blurb: "" },
     { id: "accounts", label: "Accounts", icon: <CreditCard size={20} />, blurb: "Balances, cards and loans that make up your net worth" },
     { id: "subscriptions", label: "Subscriptions", icon: <Repeat size={20} />, blurb: "Every recurring payment in one place, with price rises flagged" },
@@ -4801,47 +4820,31 @@ function App() {
                     onReminderAdded={(method) => track("reminder_added", { method })}
                   />
 
-                  {isSupabaseConfigured() && (
-                    <article className="settingsPanel compactSetting">
-                      <PanelTitle title="AI categorisation" icon={<Sparkles size={17} />} />
-                      <p>
-                        Let AI suggest categories for import rows nothing else matched. Only transaction descriptions leave this
-                        device — never amounts, dates, or balances. Your own rules always win.
-                        {!user && " Sign in to enable."}
-                      </p>
-                      <button
-                        className={ledger.aiCategorizationEnabled && user ? "switch on" : "switch"}
-                        type="button"
-                        aria-label="Toggle AI categorisation"
-                        disabled={!user}
-                        onClick={() => {
-                          const turningOn = !ledger.aiCategorizationEnabled;
-                          updateLedger((current) => ({ ...current, aiCategorizationEnabled: !current.aiCategorizationEnabled }));
-                          if (!turningOn) {
-                            setToast("AI categorisation off");
-                            return;
-                          }
-                          // Verify the whole chain now, not silently at the next import.
-                          setToast("AI categorisation on — checking the connection…");
-                          void testAiConnection().then((status) => {
-                            setToast(
-                              status === "ok"
-                                ? "AI connected ✓ — low-confidence import rows will get suggestions"
-                                : status === "no-api-key"
-                                  ? "AI backend reachable but ANTHROPIC_API_KEY isn’t set in Supabase secrets"
-                                  : status === "not-deployed"
-                                    ? "The categorize-batch function isn’t deployed to Supabase yet"
-                                    : status === "unauthenticated"
-                                      ? "Sign in again — the AI backend rejected the session"
-                                      : "Couldn’t reach the AI backend — check the Supabase function logs",
-                            );
-                          });
-                        }}
-                      >
-                        <span />
-                      </button>
-                    </article>
-                  )}
+                  <article className="settingsPanel compactSetting">
+                    <PanelTitle title="Sidebar" icon={<SlidersHorizontal size={17} />} />
+                    <p>Choose the pages you use. Hidden ones wait under More tools. Ledger and Settings always stay.</p>
+                    <ul className="sidebarToolsList">
+                      {[...coreNavItems.map((item) => item.id).filter(canHide), ...TOOL_VIEWS].map((view) => {
+                        const shown = inSidebar(view);
+                        const { label } = navEntry(view);
+                        return (
+                          <li key={view}>
+                            <span>{label}</span>
+                            <button
+                              className={shown ? "switch on" : "switch"}
+                              type="button"
+                              role="switch"
+                              aria-checked={shown}
+                              aria-label={`Show ${label} in sidebar`}
+                              onClick={() => setSidebarItem(view, !shown)}
+                            >
+                              <span />
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </article>
                 </aside>
               </section>
 

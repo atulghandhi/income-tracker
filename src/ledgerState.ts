@@ -25,6 +25,7 @@ import {
 import { tidyImportedNames } from "./importer";
 import { normalizeInsightsState } from "./insightsState";
 import { normalizeNameRules } from "./nameRules";
+import { normalizeSidebarChoice } from "./navTools";
 import { allAccountTypesForClass, countryFromCurrency, defaultTypeForClass, isCountryCode } from "./region";
 import { syncPlanContributions } from "./retirement";
 import { normalizeSubscriptionPrefs } from "./subscriptions";
@@ -148,6 +149,7 @@ export function normalizeStateFields(rawState: Partial<LedgerState>): LedgerStat
       subscriptionPrefs: normalizeSubscriptionPrefs(state.subscriptionPrefs),
       privacyMode: Boolean(state.privacyMode),
       aiCategorizationEnabled: Boolean(state.aiCategorizationEnabled),
+      ...(state.sidebar ? { sidebar: normalizeSidebarChoice(state.sidebar) } : {}),
       // v9 → v10: ledgers saved before the Allocate page existed start on the default plan.
       allocation: keepExtras(state.allocation, normalizeAllocationSettings(state.allocation)),
       // The Insights widgets' own data (looks, dismissed warnings, notes, to-dos).

@@ -172,6 +172,37 @@ test.describe("Ledger", () => {
     await expect(page.getByRole("button", { name: "Show amounts" })).toBeVisible();
   });
 
+  test("Cmd+C and Ctrl+C copy instead of opening the ledger; plain c still does", async ({ page }) => {
+    await page.goto("/");
+    await openView(page, "Settings");
+    await page.locator("body").press("Meta+c");
+    await page.locator("body").press("Control+c");
+    await expect(page).toHaveURL(/\/settings$/);
+    await page.locator("body").press("c");
+    await expect(page).toHaveURL(/\/ledger$/);
+  });
+
+  test("hiding the Dashboard moves it to More tools, saves it in the ledger, and opens on the Ledger", async ({ page }) => {
+    await page.goto("/");
+    await openView(page, "Settings");
+    const nav = page.locator(".sideNav");
+    await page.getByRole("switch", { name: "Show Dashboard in sidebar" }).click();
+    await expect(nav.getByRole("button", { name: "Dashboard", exact: true })).toHaveCount(0);
+    // Ledger and Settings can't be hidden.
+    await expect(page.getByRole("switch", { name: "Show Ledger in sidebar" })).toHaveCount(0);
+    await expect(page.getByRole("switch", { name: "Show Settings in sidebar" })).toHaveCount(0);
+    await nav.getByRole("button", { name: /^More tools/ }).click();
+    await expect(nav.getByRole("button", { name: "Add Dashboard to sidebar" })).toBeVisible();
+
+    // The ledger alone remembers it (and so does the cloud, which syncs the ledger): this device's
+    // copy can go.
+    await page.waitForTimeout(700);
+    await page.evaluate(() => localStorage.removeItem("it_nav_tools"));
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await expect(page).toHaveURL(/\/ledger$/);
+    await expect(nav.getByRole("button", { name: "Dashboard", exact: true })).toHaveCount(0);
+  });
+
   test("changes currency from settings and reflects it in the ledger totals", async ({ page }) => {
     await openLedger(page);
     await expect(page.locator(".panel.income .panelHeader")).toContainText("£0");

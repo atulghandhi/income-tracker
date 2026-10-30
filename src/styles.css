@@ -697,6 +697,13 @@ textarea {
   font-size: 14px;
 }
 
+.sidebarToolsList .switch {
+  position: relative;
+  top: auto;
+  right: auto;
+  flex-shrink: 0;
+}
+
 .localIdentity {
   gap: 12px;
   margin-top: auto;

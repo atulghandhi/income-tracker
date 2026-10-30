@@ -1,3 +1,5 @@
+import type { SidebarChoice } from "./navTools";
+
 // Which layer decided an entry's category. "user" is sacred — no automation
 // (rules, AI, feeds) may ever overwrite a category the user set by hand.
 export type CategorySource = "user" | "rule" | "system" | "bank" | "ai" | "heuristic";
@@ -420,9 +422,11 @@ export type LedgerState = {
   // The user's decisions on the subscriptions page: cancelled, removed, reclassified, tolerance.
   subscriptionPrefs: SubscriptionPreference[];
   privacyMode: boolean;
-  // Stage C opt-in: allow sending transaction descriptions (never amounts or
-  // identity) to the categorize-batch edge function for AI suggestions.
+  // No longer read: AI suggestions are on for everyone signed in. Kept because the iOS app and
+  // older clients still write it.
   aiCategorizationEnabled?: boolean;
+  // Which pages sit in the sidebar. Absent until someone changes it. See navTools.ts.
+  sidebar?: SidebarChoice;
   // The Allocate page's plan: priority, lump sum, buffer and tax targets. See allocate.ts.
   allocation: AllocationSettings;
   // The Insights widgets' own data: the look each one uses, dismissed warnings, notes and to-dos.
