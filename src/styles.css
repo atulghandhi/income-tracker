@@ -6143,6 +6143,27 @@ hr {
 }
 .motion-off .statusToast { animation: none; }
 
+/* An action toast: like the status toast, but it takes clicks (Undo after deleting a to-do). */
+.undoToast {
+  position: fixed; bottom: 76px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 14px;
+  background: var(--ink); color: var(--on-ink);
+  border-radius: 999px; box-shadow: var(--shadow-md);
+  font-size: 12.5px; padding: 6px 6px 6px 18px; z-index: 310;
+  max-width: min(560px, calc(100vw - 32px));
+  animation: toastIn 160ms ease-out;
+}
+.undoToast span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.undoToastAction {
+  display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
+  border: 0; border-radius: 999px; padding: 6px 12px;
+  background: rgba(var(--on-ink-rgb), 0.14); color: var(--on-ink);
+  font: inherit; font-weight: 650; cursor: pointer;
+}
+.undoToastAction:hover { background: rgba(var(--on-ink-rgb), 0.24); }
+.undoToastAction:focus-visible { outline: 2px solid var(--on-ink); outline-offset: 2px; }
+.motion-off .undoToast { animation: none; }
+
 .learnedRulesPanel code {
   background: var(--well); border-radius: 6px; padding: 2px 7px;
   font-size: 12px;

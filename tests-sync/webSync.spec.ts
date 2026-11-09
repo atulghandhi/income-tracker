@@ -52,6 +52,10 @@ class FakeSupabase {
       .flatMap((month) => month.expenses.map((expense) => expense.name))
       .sort();
   }
+
+  todos(): string[] {
+    return ((this.row?.state.insights?.todos?.todo ?? []) as Array<{ text: string }>).map((item) => item.text);
+  }
 }
 
 function base64url(value: object) {
@@ -186,4 +190,51 @@ test("a cloud saved by a newer app version is never overwritten", async ({ brows
   await page.waitForTimeout(1500);
   expect(server.pushes).toBe(0);
   expect(server.row.revision).toBe(7);
+});
+
+test("deleting a to-do offers Undo for a few seconds, and both the delete and the undo reach the cloud", async ({ browser }) => {
+  const server = new FakeSupabase();
+  const context = await browser.newContext();
+  await server.attach(context);
+  // Put the To-do widget on the dashboard (layouts are kept per device).
+  await context.addInitScript(() => {
+    const layout = JSON.stringify({ version: 2, widgets: [{ id: "todo", size: "s" }] });
+    localStorage.setItem("it_layout_dashboard_gb", layout);
+    localStorage.setItem("it_layout_dashboard_us", layout);
+  });
+  const page = await openDevice(context);
+  await expect.poll(() => server.row?.revision ?? 0).toBe(1);
+
+  const input = page.getByRole("textbox", { name: "New to-do" });
+  for (const text of ["Call the bank", "Cancel the gym", "Move savings"]) {
+    await input.fill(text);
+    await input.press("Enter");
+  }
+  await expect.poll(() => server.todos()).toEqual(["Call the bank", "Cancel the gym", "Move savings"]);
+
+  // Delete the middle one: it leaves the list and the cloud at once, and the popup offers Undo.
+  const toast = page.locator(".undoToast");
+  await page.getByRole("button", { name: "Delete Cancel the gym" }).click();
+  await expect(toast).toContainText("Cancel the gym");
+  await expect(page.locator(".todoList li span")).toHaveText(["Call the bank", "Move savings"]);
+  await expect.poll(() => server.todos()).toEqual(["Call the bank", "Move savings"]);
+
+  // Undo puts it back where it was, locally and in the cloud.
+  await toast.getByRole("button", { name: "Undo" }).click();
+  await expect(toast).toBeHidden();
+  await expect(page.locator(".todoList li span")).toHaveText(["Call the bank", "Cancel the gym", "Move savings"]);
+  await expect.poll(() => server.todos()).toEqual(["Call the bank", "Cancel the gym", "Move savings"]);
+
+  // Left alone, the popup goes away by itself and the delete stands.
+  await page.getByRole("button", { name: "Delete Call the bank" }).click();
+  await expect(toast).toBeVisible();
+  await page.mouse.move(0, 0);
+  await expect(toast).toBeHidden({ timeout: 8_000 });
+  await expect.poll(() => server.todos()).toEqual(["Cancel the gym", "Move savings"]);
+
+  // And it is still gone after a reload, which reads the cloud back.
+  await page.reload();
+  await expect(page.locator(".todoList li span")).toHaveText(["Cancel the gym", "Move savings"]);
+  expect(server.todos()).toEqual(["Cancel the gym", "Move savings"]);
+  await expect(page.locator(".saveStatusChip")).toHaveText(/Synced to cloud/);
 });

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { AlertCircle, ArrowDownRight, ArrowUpRight, Check, Clock3, Eye, EyeOff, Minus, Plus, Repeat, RotateCcw, Trash2, X } from "lucide-react";
 import { clampPercent } from "./finance";
 import type { InsightsModel } from "./insightsData";
@@ -1153,14 +1154,46 @@ export function AccountsWidget({ model, size, formatter, privacy }: WidgetContex
 
 // ─── To-do list ──────────────────────────────────────────────────────────────
 
+// How long the "Undo" popup stays up after a to-do is deleted (paused while hovered or focused).
+export const TODO_UNDO_MS = 5000;
+
 export function TodoWidget({ widget, insights, actions, editing, size }: WidgetContext) {
   const [draft, setDraft] = useState("");
+  // The last deleted item and where it sat, kept only while its Undo popup is showing.
+  const [removed, setRemoved] = useState<{ item: InsightTodoItem; index: number; stamp: number } | null>(null);
+  const [undoPaused, setUndoPaused] = useState(false);
   const items = insights.todos[widget.id] ?? [];
   const open = items.filter((item) => !item.done).length;
 
   const update = (next: InsightTodoItem[]) => {
     actions.patchInsights((current) => ({ ...current, todos: { ...current.todos, [widget.id]: next } }));
   };
+  // The delete saves straight away, so it syncs like any other edit; Undo puts the same item
+  // (same id) back where it was, which the sync merge treats as an ordinary add.
+  const remove = (item: InsightTodoItem) => {
+    const index = items.findIndex((candidate) => candidate.id === item.id);
+    update(items.filter((candidate) => candidate.id !== item.id));
+    setUndoPaused(false);
+    setRemoved({ item, index, stamp: Date.now() });
+  };
+  const undo = () => {
+    if (!removed) return;
+    const { item, index } = removed;
+    actions.patchInsights((current) => {
+      const list = current.todos[widget.id] ?? [];
+      if (list.some((candidate) => candidate.id === item.id)) return current;
+      const next = [...list];
+      next.splice(Math.min(Math.max(index, 0), next.length), 0, item);
+      return { ...current, todos: { ...current.todos, [widget.id]: next } };
+    });
+    setRemoved(null);
+  };
+
+  useEffect(() => {
+    if (!removed || undoPaused) return;
+    const timer = window.setTimeout(() => setRemoved(null), TODO_UNDO_MS);
+    return () => window.clearTimeout(timer);
+  }, [removed, undoPaused]);
   const add = () => {
     const text = draft.trim();
     if (!text) return;
@@ -1190,7 +1223,7 @@ export function TodoWidget({ widget, insights, actions, editing, size }: WidgetC
               {item.done && <Check size={12} />}
             </button>
             <span>{item.text}</span>
-            <button className="iconButton small" type="button" aria-label={`Delete ${item.text}`} disabled={editing} onClick={() => update(items.filter((candidate) => candidate.id !== item.id))}>
+            <button className="iconButton small" type="button" aria-label={`Delete ${item.text}`} disabled={editing} onClick={() => remove(item)}>
               <Trash2 size={13} />
             </button>
           </li>
@@ -1201,6 +1234,27 @@ export function TodoWidget({ widget, insights, actions, editing, size }: WidgetC
           {open === 0 ? "All done" : `${open} to do`} · {items.length - open} done
         </div>
       )}
+      {removed &&
+        createPortal(
+          <div
+            key={removed.stamp}
+            className="undoToast"
+            role="status"
+            aria-live="polite"
+            onMouseEnter={() => setUndoPaused(true)}
+            onMouseLeave={() => setUndoPaused(false)}
+            onFocus={() => setUndoPaused(true)}
+            onBlur={() => setUndoPaused(false)}
+          >
+            <span>
+              Deleted “{removed.item.text}”
+            </span>
+            <button className="undoToastAction" type="button" onClick={undo}>
+              <RotateCcw size={13} /> Undo
+            </button>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
