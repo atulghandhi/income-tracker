@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { useFullDashboard } from "./helpers/dashboard";
+import { primaryNav } from "./helpers/shell";
 
 // The US experience end to end: country switch, American account types with plan details,
 // employer match and contribution limits, the gross-to-net estimate, loans and medical tracking —
@@ -14,7 +15,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function openView(page: Page, name: "Dashboard" | "Ledger" | "Accounts" | "Pay & tax" | "Paycheck & tax" | "Goals" | "Settings") {
-  const nav = page.locator(".sideNav");
+  const nav = await primaryNav(page);
   const item = nav.getByRole("button", { name, exact: true });
   // A new user's sidebar leaves the pay page and Goals under More tools until they are added.
   await expect(nav.getByRole("button", { name: "Dashboard", exact: true })).toBeVisible();
@@ -322,19 +323,19 @@ test.describe("sample data and tutorials", () => {
   test("the tutorial speaks to the country: US pages explain 401(k)s and FICO, UK pages stay as they were", async ({ page }) => {
     await switchToUs(page);
     await openView(page, "Accounts");
-    await page.locator(".sideNav").getByRole("button", { name: /Tutorial/ }).click();
+    await (await primaryNav(page)).getByRole("button", { name: /Tutorial/ }).click();
     const tutorial = page.getByRole("dialog", { name: /tutorial/ });
     await expect(tutorial).toContainText("401(k), Roth IRA, HSA, 529");
     await expect(tutorial).toContainText("Plan details");
     await tutorial.getByRole("button", { name: "Skip tutorial" }).click();
     await openView(page, "Dashboard");
-    await page.locator(".sideNav").getByRole("button", { name: /Tutorial/ }).click();
+    await (await primaryNav(page)).getByRole("button", { name: /Tutorial/ }).click();
     await expect(tutorial).toContainText("FICO and VantageScore");
     await tutorial.getByRole("button", { name: "Skip tutorial" }).click();
 
     await page.getByLabel("Country", { exact: true }).selectOption("GB");
     await openView(page, "Accounts");
-    await page.locator(".sideNav").getByRole("button", { name: /Tutorial/ }).click();
+    await (await primaryNav(page)).getByRole("button", { name: /Tutorial/ }).click();
     await expect(tutorial).toContainText("Add savings, current and investment accounts as assets.");
     await expect(tutorial).not.toContainText("401(k)");
   });

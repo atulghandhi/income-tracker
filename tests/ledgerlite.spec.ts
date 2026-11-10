@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { useFullDashboard } from "./helpers/dashboard";
+import { primaryNav } from "./helpers/shell";
 
 // Core ledger behaviour in the app shell: keyboard-first entry, quick add,
 // grouping, CSV review, accounts and the dashboard's insight widgets. Skips the marketing landing and
@@ -37,7 +38,7 @@ async function tap(locator: Locator) {
 }
 
 async function openView(page: Page, name: "Dashboard" | "Ledger" | "Accounts" | "Goals" | "Settings") {
-  const nav = page.locator(".sideNav");
+  const nav = await primaryNav(page);
   const item = nav.getByRole("button", { name, exact: true });
   // A new user's sidebar leaves Goals under More tools until it is added.
   await expect(nav.getByRole("button", { name: "Dashboard", exact: true })).toBeVisible();
@@ -188,6 +189,7 @@ test.describe("Ledger", () => {
     const nav = page.locator(".sideNav");
     await page.getByRole("switch", { name: "Show Dashboard in sidebar" }).click();
     await expect(nav.getByRole("button", { name: "Dashboard", exact: true })).toHaveCount(0);
+    await primaryNav(page);
     // Ledger and Settings can't be hidden.
     await expect(page.getByRole("switch", { name: "Show Ledger in sidebar" })).toHaveCount(0);
     await expect(page.getByRole("switch", { name: "Show Settings in sidebar" })).toHaveCount(0);
@@ -207,6 +209,7 @@ test.describe("Ledger", () => {
     await page.goto("/");
     const nav = page.locator(".sideNav");
     await openView(page, "Accounts");
+    await primaryNav(page);
     await nav.getByRole("button", { name: "Accounts", exact: true }).click({ button: "right" });
     await page.getByRole("menuitem", { name: "Hide from sidebar" }).click();
     await expect(nav.locator(".navStack").getByRole("button", { name: "Accounts", exact: true })).toHaveCount(0);

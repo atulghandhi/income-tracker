@@ -3839,7 +3839,7 @@ hr {
 
 .dataActionGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
   gap: 18px;
   margin-top: 24px;
 }
@@ -5821,7 +5821,7 @@ hr {
 
 /* Goal cards */
 .goalsCardGrid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 16px;
 }
 .goalCard {
   border: 1px solid var(--line); border-radius: var(--radius-lg);
@@ -6673,7 +6673,7 @@ hr {
 
 .gettingStartedItems {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
   gap: 8px;
 }
 
@@ -7185,7 +7185,7 @@ hr {
 
 .widgetRecs ul {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
   gap: 8px;
   margin: 0;
   padding: 0;
@@ -7508,7 +7508,7 @@ hr {
 
 .widgetTrayList {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
   gap: 12px;
   margin-top: 18px;
 }
@@ -7574,7 +7574,7 @@ hr {
 
 .planGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
   gap: 12px 16px;
   align-items: start;
 }
@@ -8651,7 +8651,7 @@ select:not([multiple]):disabled {
 
 .splitBarLegend {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
   gap: 6px 18px;
   margin: 10px 0 0;
   padding: 0;
@@ -8913,7 +8913,7 @@ select:not([multiple]):disabled {
 /* Strategy bars */
 .strategyCharts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
   gap: 18px 28px;
   margin-top: 20px;
 }
@@ -9225,7 +9225,7 @@ select:not([multiple]):disabled {
   }
 
   .allocateInputs {
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
   }
 }
 
@@ -12059,4 +12059,1255 @@ select:not([multiple]):disabled {
 
 .signalTitle .signalDismiss:hover {
   color: var(--ink);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOBILE APP SHELL
+   Phones, folded foldables (down to 280px wide) and unfolded foldables / small
+   tablets (600–900px). The sidebar becomes a sheet that slides up from a tab
+   bar; the tab bar turns into a side rail once there is width to spare. This
+   block sits last so it wins over the per-feature breakpoints above.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.tabBar,
+.navSheetHeader,
+.navSheetBackdrop,
+.appBarBrand,
+.appBarPage,
+.countryChevron {
+  display: none;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Touch screens: no grey flash on tap, no double-tap zoom delay, and controls big enough for a
+   thumb. 16px form text stops iOS zooming the page whenever a field takes focus. */
+@media (pointer: coarse) {
+  a,
+  button,
+  summary,
+  label,
+  select,
+  [role="button"],
+  [role="switch"],
+  [role="tab"] {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  .iconButton {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 900px) {
+  :root {
+    --tabbar-h: 60px;
+    --rail-w: 0px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+  }
+
+  html,
+  body {
+    min-width: 0;
+  }
+
+  html {
+    scroll-padding-top: calc(124px + var(--safe-top));
+    scroll-padding-bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 24px);
+  }
+
+  html.navSheetOpen,
+  html.navSheetOpen body {
+    overflow: hidden;
+  }
+
+  .appShell,
+  .workspace {
+    min-height: 100dvh;
+  }
+
+  .workspace {
+    margin-left: 0;
+    padding-bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 20px);
+  }
+
+  /* ── Tab bar ─────────────────────────────────────────────────────────── */
+  .tabBar {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 60;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    height: calc(var(--tabbar-h) + var(--safe-bottom));
+    padding: 0 max(4px, var(--safe-right)) var(--safe-bottom) max(4px, var(--safe-left));
+    border-top: 1px solid var(--line);
+    background: rgba(var(--nav-rgb), 0.94);
+    backdrop-filter: blur(20px) saturate(1.4);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .tabBarItem {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-width: 0;
+    padding: 6px 2px 4px;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font-size: 10.5px;
+    font-weight: 600;
+    line-height: 1.15;
+    transition: color 150ms ease;
+  }
+
+  .tabBarItem > svg {
+    flex: 0 0 auto;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  /* The active tab gets a soft pill behind its icon, like a native bottom bar. */
+  .tabBarItem::before {
+    content: "";
+    position: absolute;
+    top: 5px;
+    left: 50%;
+    width: 52px;
+    max-width: calc(100% - 6px);
+    height: 28px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    opacity: 0;
+    transform: translateX(-50%) scaleX(0.6);
+    transition:
+      opacity 160ms ease,
+      transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .tabBarItem > span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .tabBarItem > svg,
+  .tabBarItem > span {
+    position: relative;
+  }
+
+  .tabBarItem > svg {
+    margin-top: 2px;
+    margin-bottom: 2px;
+  }
+
+  .tabBarItem.active {
+    color: var(--accent-strong);
+  }
+
+  .tabBarItem.active::before {
+    opacity: 1;
+    transform: translateX(-50%);
+  }
+
+  .tabBarItem:active > svg {
+    transform: scale(0.88);
+  }
+
+  .tabBarItem.wideOnly {
+    display: none;
+  }
+
+  /* On a phone the fifth and sixth sidebar pages live under More, so More lights up for them. */
+  .tabBarMore.activeNarrow {
+    color: var(--accent-strong);
+  }
+
+  .tabBarMore.activeNarrow::before {
+    opacity: 1;
+    transform: translateX(-50%);
+  }
+
+  .tabBarBadge {
+    position: absolute;
+    top: 6px;
+    left: calc(50% + 8px);
+    width: 8px;
+    height: 8px;
+    border: 2px solid var(--nav);
+    border-radius: 50%;
+    background: var(--red);
+    box-sizing: content-box;
+  }
+
+  /* ── The sidebar, as a sheet ─────────────────────────────────────────── */
+  .navSheetBackdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 125;
+    display: block;
+    background: rgba(var(--bg-deep-rgb), 0.5);
+    animation: sheetFade 200ms ease both;
+  }
+
+  .sideNav {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 130;
+    width: auto;
+    max-width: 560px;
+    max-height: min(86dvh, 720px);
+    min-height: 0;
+    margin: 0 auto;
+    gap: 12px;
+    padding: 0 max(14px, var(--safe-right)) calc(16px + var(--safe-bottom)) max(14px, var(--safe-left));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 0;
+    border-radius: 22px 22px 0 0;
+    background: var(--nav);
+    box-shadow: 0 -12px 48px rgba(0, 0, 0, 0.28);
+    visibility: hidden;
+    transform: translateY(105%);
+    transition:
+      transform 300ms cubic-bezier(0.32, 0.72, 0, 1),
+      visibility 0s linear 300ms;
+  }
+
+  .sideNav.open {
+    visibility: visible;
+    transform: none;
+    transition:
+      transform 300ms cubic-bezier(0.32, 0.72, 0, 1),
+      visibility 0s;
+  }
+
+  .motion-off .sideNav,
+  .motion-off .navSheetBackdrop {
+    transition: none;
+    animation: none;
+  }
+
+  .navSheetHeader {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0 -4px;
+    padding: 18px 4px 6px 8px;
+    background: var(--nav);
+  }
+
+  .navSheetHeader strong {
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .navSheetGrip {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    width: 38px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--line-strong);
+    transform: translateX(-50%);
+  }
+
+  .sideNav .brandCluster {
+    display: none;
+  }
+
+  .sideNav .navStack {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 0;
+  }
+
+  .sideNav .navItem {
+    justify-content: flex-start;
+    min-height: 50px;
+    padding: 0 12px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    font-size: 14.5px;
+    font-weight: 600;
+  }
+
+  .sideNav .navItem.active {
+    border-color: rgba(var(--accent-rgb), 0.4);
+    background: var(--accent-soft);
+  }
+
+  .sideNav .navItem.active::after {
+    display: none;
+  }
+
+  .sideNav .navTools {
+    margin-top: 0;
+  }
+
+  .sideNav .saveStatusChip {
+    margin-top: 0;
+  }
+
+  .sideNav .sideTutorialBtn,
+  .sideNav .sideSignInBtn {
+    min-height: 48px;
+  }
+
+  /* ── Top bar ─────────────────────────────────────────────────────────── */
+  .appBar {
+    position: sticky;
+    top: 0;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    min-height: calc(54px + var(--safe-top));
+    padding: calc(6px + var(--safe-top)) max(12px, var(--safe-right)) 6px max(12px, var(--safe-left));
+    background: rgba(var(--bg-rgb), 0.86);
+    -webkit-backdrop-filter: blur(24px);
+  }
+
+  [data-theme="dark"] .appBar {
+    background: rgba(5, 20, 36, 0.86);
+  }
+
+  .appBarTitle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .appBarBrand {
+    display: block;
+    flex: 0 0 auto;
+    border-radius: 8px;
+  }
+
+  .appBarPage {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--ink);
+    font-size: 17px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    opacity: 0;
+    transform: translateY(6px);
+    transition:
+      opacity 180ms ease,
+      transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .appBar.scrolled .appBarPage {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* At the top of a page the bar blends into it; it only draws its edge once content slides under. */
+  .appBar:not(.scrolled) {
+    border-bottom-color: transparent;
+    background: var(--bg);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .appBar .monthSwitch {
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 0;
+  }
+
+  .appBar .monthSwitch .iconButton {
+    flex: 0 0 auto;
+    width: 40px;
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  .appBar .monthLabel {
+    flex: 0 1 auto;
+    min-width: 0;
+    padding: 0 2px;
+  }
+
+  .appBar .monthLabel strong {
+    overflow: hidden;
+    font-size: 16px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ── Ledger: adding a line ───────────────────────────────────────────── */
+  .addRow,
+  .expenseAddRow {
+    position: static;
+    grid-template-columns: minmax(0, 1fr) minmax(104px, 34%) 48px;
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .rowStack {
+    min-height: 0;
+  }
+
+  /* Headline figures sit two to a row instead of one long column of near-empty cards. */
+  .summaryStrip,
+  .widgetCell.size-s .summaryStrip,
+  .widgetCell.size-m .summaryStrip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .metricCard {
+    min-height: 92px;
+    gap: 8px;
+    padding: 14px 16px;
+  }
+
+  .metricCard strong {
+    font-size: clamp(19px, 6.4vw, 28px);
+    overflow-wrap: anywhere;
+  }
+
+  .widgetGrid {
+    gap: 16px;
+  }
+
+  .incomeRow > input[aria-label="Income source"] {
+    grid-column: 3 / 5;
+  }
+
+  .panel {
+    min-height: 0;
+  }
+
+  /* The tick on the right adds the line; a second "+" is one button too many on a phone. */
+  .addRow .addIcon {
+    display: none;
+  }
+
+  .addRow > input,
+  .addRow .moneyInput,
+  .addRow .checkButton {
+    min-height: 48px;
+  }
+
+  .addRow .checkButton {
+    width: 48px;
+  }
+
+  .appBar .topActions {
+    flex: 0 0 auto;
+    gap: 2px;
+    margin-left: auto;
+  }
+
+  .appBar .iconButton {
+    border-color: transparent;
+    background: transparent;
+  }
+
+  .appBar .searchShell {
+    flex: 1 1 100%;
+    order: 3;
+    max-width: none;
+    min-height: 42px;
+  }
+
+  /* A narrow window with a mouse (a desktop browser pulled thin): hover hints that are not showing
+     take no space at all, so one sitting near the edge cannot widen the page. */
+  [data-tip]:not(:hover):not(:focus-visible)::after {
+    display: none;
+  }
+
+  /* Hover hints on the bar's right-hand buttons open below and inwards. Centred on the button they
+     reached past the screen edge and, even while invisible, widened the page. */
+  .appBar .topActions [data-tip]::after {
+    top: calc(100% + 8px);
+    right: 0;
+    bottom: auto;
+    left: auto;
+    transform: translate(0, -4px);
+  }
+
+  .appBar .topActions [data-tip]:hover::after,
+  .appBar .topActions [data-tip]:focus-visible::after {
+    transform: none;
+  }
+
+  /* The country picker shrinks to its currency symbol; the native picker still opens on tap. */
+  .appBar .countryControl {
+    position: relative;
+    gap: 3px;
+    min-height: 40px;
+    padding: 0 8px 0 10px;
+    border-radius: 999px;
+  }
+
+  .appBar .countryControl select {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    padding: 0;
+    opacity: 0;
+  }
+
+  .countryChevron {
+    display: block;
+    color: var(--muted);
+  }
+
+  /* ── Page canvas ─────────────────────────────────────────────────────── */
+  /* Grid and flex children default to "never narrower than my content", which is what pushes a
+     page sideways on a narrow screen. Zero specificity: any explicit min-width still wins. */
+  .contentCanvas :where(section, article, aside, div, label, form, ul, li, p, h2, h3) {
+    min-width: 0;
+  }
+
+  .viewStack {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .contentCanvas :where(select, input, textarea, button) {
+    max-width: 100%;
+  }
+
+  .contentCanvas :where(select) {
+    min-width: 0;
+    text-overflow: ellipsis;
+  }
+
+  .strategyChartHead {
+    flex-wrap: wrap;
+  }
+
+  .strategyChartHead select {
+    flex: 0 1 auto;
+  }
+
+  .contentCanvas {
+    width: auto;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 16px max(14px, var(--safe-right)) 24px max(14px, var(--safe-left));
+  }
+
+  .viewStack {
+    gap: 16px;
+  }
+
+  .pageHeader {
+    gap: 12px;
+    min-height: 0;
+  }
+
+  .pageHeader h2 {
+    font-size: 30px;
+    letter-spacing: -0.01em;
+  }
+
+  .pageHeader p {
+    margin-top: 8px;
+    font-size: 15px;
+    line-height: 1.45;
+  }
+
+  /* Charts draw a little past their box (ripples, glows); on a narrow screen that would widen the
+     page, so the card clips them. */
+  .insightCard .moneyFlowSvg {
+    overflow: hidden;
+  }
+
+  .barChart {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: clamp(3px, 1.6vw, 9px);
+  }
+
+  /* The hover figure under the first and last bars stays inside the chart. */
+  .barItem:nth-child(-n + 2) em {
+    left: 0;
+  }
+
+  .barItem:nth-last-child(-n + 2) em {
+    right: 0;
+  }
+
+  .goalsCardGrid {
+    grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+  }
+
+  .allocateInputs {
+    grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
+  }
+
+  .architectureNote {
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .architectureNote > div {
+    flex: 1 1 180px;
+  }
+
+  /* Account rows: two fields a row once the desktop five-column grid no longer fits. */
+  .debtAccountRow,
+  .debtAccountRow.isDebt {
+    grid-template-columns: 28px minmax(0, 1fr) minmax(0, 1fr) 44px;
+    row-gap: 12px;
+  }
+
+  .debtAccountRow {
+    grid-template-areas:
+      "swatch main main remove"
+      "meta meta meta meta"
+      "balance balance minimum minimum"
+      "limit limit apr apr"
+      "interest interest due due"
+      "details details details details";
+  }
+
+  .debtAccountRow.isDebt {
+    grid-template-areas:
+      "swatch main main remove"
+      "meta meta meta meta"
+      "balance balance minimum minimum"
+      "limit limit apr apr"
+      "interest interest promo promo"
+      "due due . ."
+      "details details details details";
+  }
+
+  .debtAccountRow .debtField,
+  .debtAccountRow .numberField {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .debtAccountRow .numberField.hintField,
+  .debtAccountRow .numberField.compact.hintField {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  /* ── Goals ───────────────────────────────────────────────────────────── */
+  .goalsView {
+    gap: 16px;
+  }
+
+  .goalsPlannerBar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+    padding: 16px;
+  }
+
+  .goalsSurplusField {
+    flex: none;
+    min-width: 0;
+  }
+
+  .goalsHorizonTabs {
+    display: grid;
+    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-flow: column;
+  }
+
+  .goalsHorizonTabs button {
+    min-height: 40px;
+    padding: 6px 4px;
+    font-size: 13px;
+  }
+
+  /* The timeline keeps a readable scale and scrolls sideways inside its card. */
+  .goalsTimeline {
+    padding: 16px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .goalsTimeline svg {
+    width: max(100%, 560px);
+    max-width: none !important;
+    height: auto;
+  }
+
+  .goalCard {
+    padding: 16px;
+  }
+
+  /* The year's totals stop floating over the page and close it instead, clear of the tab bar. */
+  .bottomRail {
+    position: static;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 16px;
+    min-height: 0;
+    margin: 0 max(14px, var(--safe-right)) 0 max(14px, var(--safe-left));
+    padding: 14px 16px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    backdrop-filter: none;
+  }
+
+  .bottomRail > span {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    font-size: 12px;
+  }
+
+  .bottomRail > span:first-child {
+    grid-column: 1 / -1;
+    color: var(--ink);
+    font-weight: 700;
+  }
+
+  .bottomRail b {
+    margin-left: 0;
+    font-size: 16px;
+  }
+
+  /* ── Things that float: keep them above the tab bar ──────────────────── */
+  .statusToast {
+    bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 14px);
+    max-width: calc(100vw - 28px);
+  }
+
+  .undoImportToast {
+    right: 14px;
+    left: 14px;
+    bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 14px);
+    max-width: none;
+  }
+
+  .syncNudge {
+    left: 14px;
+    right: 14px;
+    bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 14px);
+  }
+}
+
+/* ── Phones and folded foldables ──────────────────────────────────────────── */
+@media (max-width: 599px) {
+  /* Dialogs rise from the bottom edge as sheets instead of floating mid-screen. */
+  .modalBackdrop {
+    align-items: end;
+    justify-items: stretch;
+    padding: 0;
+  }
+
+  .modalBackdrop > * {
+    width: 100%;
+    max-width: none;
+    max-height: calc(100dvh - 24px - env(safe-area-inset-top, 0px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-bottom: 0;
+    border-radius: 22px 22px 0 0;
+    padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
+    animation: sheetUp 320ms cubic-bezier(0.32, 0.72, 0, 1) both;
+  }
+
+  .motion-off .modalBackdrop > * {
+    animation: none;
+  }
+
+  .modalBackdrop > * {
+    overflow-wrap: anywhere;
+  }
+
+  /* A message that arrives while a sheet is up shows at the top, clear of the sheet's buttons. */
+  body:has(.modalBackdrop) .statusToast {
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    bottom: auto;
+  }
+
+  /* ── Statement review: one scrolling sheet, cards instead of a seven-column table ── */
+  .importModal {
+    display: flex;
+    flex-direction: column;
+    height: calc(100dvh - 24px - env(safe-area-inset-top, 0px));
+    max-height: none;
+    padding-bottom: 0;
+    overflow-y: auto;
+  }
+
+  .importModal > * {
+    flex: 0 0 auto;
+  }
+
+  .importModalHeader {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    flex-direction: row;
+    align-items: center;
+    padding: 14px 12px 12px 16px;
+    background: var(--nav);
+  }
+
+  .importModalHeader > div {
+    min-width: 0;
+  }
+
+  .importModalHeader h2 {
+    overflow: hidden;
+    font-size: 19px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .importStats {
+    flex-wrap: nowrap;
+    gap: 8px;
+    padding: 12px 16px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .importStats::-webkit-scrollbar {
+    display: none;
+  }
+
+  .importStats span {
+    flex: 0 0 auto;
+  }
+
+  .importToolbar {
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px 16px;
+  }
+
+  .importToolbar .buttonRow {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 0;
+  }
+
+  .importToolbar .buttonRow .commandButton {
+    min-height: 44px;
+    white-space: normal;
+  }
+
+  .importToolbar .bulkCategoryField {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .importToolbar .bulkCategoryField input,
+  .importToolbar .bulkCategoryField select {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+    min-height: 44px;
+  }
+
+  .importToolbar .bulkCategoryField select {
+    padding: 0 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background-color: var(--surface);
+    color: var(--ink);
+  }
+
+  .importToolbar .bulkCategoryField .commandButton {
+    flex: 0 0 auto;
+    width: auto;
+    min-height: 44px;
+  }
+
+  .importTableShell {
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .importTable,
+  .importTable tbody {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  /* Still read out to screen readers, just not drawn. */
+  .importTable thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .importTable tr {
+    display: grid;
+    grid-template-areas:
+      "check name name"
+      "check date amount"
+      "check type category"
+      "check signal signal";
+    grid-template-columns: 34px minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px 10px;
+    align-items: center;
+    padding: 14px 16px 14px 10px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .importTable td {
+    width: auto;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .importTable td:nth-child(1) {
+    grid-area: check;
+    align-self: start;
+    width: auto;
+  }
+
+  .importTable td:nth-child(2) {
+    grid-area: date;
+    color: var(--muted);
+  }
+
+  .importTable td:nth-child(3) {
+    grid-area: name;
+  }
+
+  .importTable td:nth-child(4) {
+    grid-area: amount;
+    font-size: 16px;
+    font-weight: 700;
+    text-align: right;
+  }
+
+  .importTable td:nth-child(5) {
+    grid-area: type;
+  }
+
+  .importTable td:nth-child(6) {
+    grid-area: category;
+  }
+
+  .importTable td:nth-child(7) {
+    grid-area: signal;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+  }
+
+  .importTable td:nth-child(7) em {
+    margin-top: 0;
+  }
+
+  .importTable td:nth-child(3) input.importNameInput,
+  .importTable td:nth-child(3) span {
+    max-width: none;
+  }
+
+  .importTable input:not([type="checkbox"]),
+  .importTable select {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .importTable .importDebtAccountSelect {
+    margin-top: 8px;
+  }
+
+  .checkCell {
+    min-height: 44px;
+  }
+
+  .checkCell input {
+    width: 22px;
+    height: 22px;
+  }
+
+  .importModalFooter {
+    position: sticky;
+    bottom: 0;
+    z-index: 3;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 10px;
+    margin-top: auto;
+    padding: 12px 16px max(12px, env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--line);
+    background: var(--nav);
+  }
+
+  .importModalFooter .commandButton {
+    flex: 0 0 auto;
+    width: auto;
+    min-height: 50px;
+  }
+
+  .importModalFooter .inlineCta {
+    flex: 1 1 auto;
+    width: auto;
+    min-height: 50px;
+    margin: 0;
+  }
+}
+
+@media (max-width: 479px) {
+  /* The month needs the room on the Ledger, so the logo steps aside there. */
+  .appBarTitle:has(.monthSwitch) .appBarBrand {
+    display: none;
+  }
+
+  .insightCard .insightCardHead .segmented button {
+    padding: 4px 8px;
+    font-size: 11.5px;
+  }
+
+  /* Name on its own line, then amount and the tick: nothing gets cut off mid-word. */
+  .addRow,
+  .expenseAddRow {
+    grid-template-columns: minmax(0, 1fr) 48px;
+  }
+
+  .addRow > input {
+    grid-column: 1 / -1;
+  }
+
+  .debtAccountRow {
+    grid-template-areas:
+      "swatch main main remove"
+      "meta meta meta meta"
+      "balance balance balance balance"
+      "limit limit limit limit"
+      "minimum minimum minimum minimum"
+      "apr apr apr apr"
+      "interest interest interest interest"
+      "due due due due"
+      "details details details details";
+  }
+
+  .debtAccountRow.isDebt {
+    grid-template-areas:
+      "swatch main main remove"
+      "meta meta meta meta"
+      "balance balance balance balance"
+      "limit limit limit limit"
+      "minimum minimum minimum minimum"
+      "apr apr apr apr"
+      "interest interest interest interest"
+      "promo promo promo promo"
+      "due due due due"
+      "details details details details";
+  }
+
+  .debtAccountMain {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* The original Galaxy Fold's cover screen is 280px wide: every pixel counts. */
+@media (max-width: 359px) {
+  .contentCanvas {
+    padding-left: max(10px, env(safe-area-inset-left, 0px));
+    padding-right: max(10px, env(safe-area-inset-right, 0px));
+  }
+
+  .appBar {
+    gap: 6px;
+    padding-left: max(8px, env(safe-area-inset-left, 0px));
+    padding-right: max(8px, env(safe-area-inset-right, 0px));
+  }
+
+  .appBarBrand {
+    display: none;
+  }
+
+  /* No room for the country picker beside the month on a cover screen; Settings has it too. */
+  .appBar .countryControl {
+    display: none;
+  }
+
+  .appBar .monthLabel strong {
+    font-size: 15px;
+  }
+
+  .appBar .iconButton {
+    min-width: 38px;
+    width: 38px;
+  }
+
+  .appBar .monthSwitch .iconButton {
+    width: 30px;
+    min-width: 30px;
+  }
+
+  .categoryNameInput {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+  }
+
+  .expenseGroup:not(.ungrouped) .expenseGroupHeader {
+    padding-left: 12px;
+  }
+
+  .pageHeader h2 {
+    font-size: 26px;
+  }
+
+  .tabBarItem {
+    font-size: 9.5px;
+  }
+
+  .bottomRail {
+    margin-left: 10px;
+    margin-right: 10px;
+  }
+
+  .sideNav .navItem {
+    gap: 8px;
+    padding: 0 10px;
+    font-size: 13.5px;
+  }
+}
+
+/* ── Unfolded foldables, small tablets, phones on their side: a side rail ─── */
+@media (min-width: 600px) and (max-width: 900px) {
+  :root {
+    --tabbar-h: 0px;
+    --rail-w: calc(80px + env(safe-area-inset-left, 0px));
+  }
+
+  .tabBar {
+    inset: 0 auto 0 0;
+    grid-auto-flow: row;
+    grid-auto-rows: min-content;
+    align-content: start;
+    gap: 4px;
+    width: var(--rail-w);
+    height: auto;
+    padding: calc(14px + var(--safe-top)) 6px calc(14px + var(--safe-bottom)) calc(6px + var(--safe-left));
+    overflow-y: auto;
+    border-top: 0;
+    border-right: 1px solid var(--line);
+  }
+
+  .tabBarItem {
+    min-height: 60px;
+    font-size: 11px;
+  }
+
+  .tabBarItem::before {
+    top: 7px;
+  }
+
+  .tabBarItem.wideOnly {
+    display: flex;
+  }
+
+  .tabBarMore.activeNarrow:not(.active) {
+    color: var(--muted);
+  }
+
+  .tabBarMore.activeNarrow:not(.active)::before {
+    opacity: 0;
+  }
+
+  .workspace {
+    margin-left: var(--rail-w);
+    padding-bottom: 24px;
+  }
+
+  .appBarBrand {
+    display: none;
+  }
+
+  .appBar {
+    padding-left: 20px;
+  }
+
+  .contentCanvas {
+    padding: 22px 20px 24px;
+  }
+
+  .pageHeader h2 {
+    font-size: 34px;
+  }
+
+  .bottomRail {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    max-width: 720px;
+    margin: 0 auto;
+  }
+
+  .bottomRail > span:first-child {
+    grid-column: auto;
+  }
+
+  /* The More sheet opens beside the rail rather than across it. */
+  .sideNav {
+    left: var(--rail-w);
+  }
+
+  .statusToast {
+    left: calc(50% + var(--rail-w) / 2);
+    bottom: 24px;
+  }
+
+  .undoImportToast,
+  .syncNudge {
+    left: auto;
+    bottom: 24px;
+  }
+}
+
+/* A phone on its side has almost no height: let the top bar scroll away with the page. */
+@media (max-width: 900px) and (max-height: 480px) {
+  .appBar {
+    position: static;
+  }
+}
+
+@keyframes sheetUp {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes sheetFade {
+  from {
+    opacity: 0;
+  }
 }

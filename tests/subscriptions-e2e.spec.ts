@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { useFullDashboard } from "./helpers/dashboard";
+import { primaryNav } from "./helpers/shell";
 
 // The Subscriptions page end to end: a year of bank rows comes in through the CSV importer, the
 // page finds the subscriptions, bills and renewals in them, and the user's decisions (cancel,
@@ -97,7 +98,7 @@ test.describe("subscriptions page", () => {
     await importStatement(page);
 
     // An everyday page: in every sidebar, with its own URL.
-    await tap(page.locator(".sideNav").getByRole("button", { name: "Subscriptions", exact: true }));
+    await tap((await primaryNav(page)).getByRole("button", { name: "Subscriptions", exact: true }));
     await expect(page).toHaveURL(/\/subscriptions$/);
     const view = page.getByLabel("Subscriptions", { exact: true });
     await expect(view.getByRole("heading", { name: "Subscriptions", exact: true })).toBeVisible();
@@ -179,7 +180,7 @@ test.describe("subscriptions page", () => {
   test("the Dashboard widget summarises the same report and opens the page", async ({ page }) => {
     await useFullDashboard(page);
     await importStatement(page);
-    await tap(page.locator(".sideNav").getByRole("button", { name: "Dashboard", exact: true }));
+    await tap((await primaryNav(page)).getByRole("button", { name: "Dashboard", exact: true }));
     const widget = page.locator('[data-widget-id="subscriptions"]');
     await expect(widget).toContainText("Subscriptions & regular payments");
     await expect(widget).toContainText("Netflix went up £10.99 → £12.99");

@@ -1346,7 +1346,7 @@ const CSS = `
   font-size: 13px; color: rgba(212, 228, 250, 0.35);
 }
 .lp-footer-brand { letter-spacing: -0.01em; }
-.lp-footer-links { display: flex; align-items: center; gap: 10px; }
+.lp-footer-links { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; min-width: 0; }
 .lp-footer-link {
   color: rgba(212, 228, 250, 0.45); text-decoration: none;
   transition: color 120ms ease;
@@ -1357,7 +1357,30 @@ const CSS = `
   font: inherit; cursor: pointer;
 }
 @media (max-width: 880px) {
-  .lp-footer { padding: 18px 24px; }
+  .lp-footer { padding: 18px 24px calc(18px + env(safe-area-inset-bottom, 0px)); }
+  .lp-footer-link { padding: 6px 0; }
+  .lp-nav { height: calc(56px + env(safe-area-inset-top, 0px)); padding-top: env(safe-area-inset-top, 0px); }
+  .lp-nav-inner { padding: 0 16px; gap: 12px; }
+  .lp-nav-brand { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lp-nav .lp-btn { flex: 0 0 auto; min-height: 40px; }
+  /* Nothing on the page may be wider than the phone: a wide child would drag the fixed nav
+     (and its button) off the right edge. */
+  .lp-page { overflow-x: clip; }
+  .lp-demo > *, .lp-hero > * { min-width: 0; }
+  .lp-btn--lg { min-height: 52px; }
+}
+
+/* Folded foldables and other very narrow screens (down to 280px). */
+@media (max-width: 380px) {
+  .lp-hero { padding: 28px 16px 44px; }
+  .lp-demo { padding: 48px 16px; }
+  .lp-banks, .lp-res, .lp-faq, .lp-cmp, .lp-end { padding-left: 16px; padding-right: 16px; }
+  .lp-cmp-head, .lp-cmp-row { grid-template-columns: minmax(0, 1fr) repeat(3, 58px); }
+  .lp-cmp-col { font-size: 11px; padding: 10px 2px; }
+  .lp-cmp-label { padding: 10px 8px; font-size: 12px; }
+  .lp-nav-inner { padding: 0 12px; }
+  .lp-btn--sm { padding: 8px 11px; }
+  .lp-btn--lg { width: 100%; justify-content: center; }
 }
 
 /* ── Reduced motion ── */

@@ -52,6 +52,7 @@ import {
   Sun,
   Target,
   Trash2,
+  Menu,
   X,
   Upload,
   WalletCards,
@@ -902,6 +903,8 @@ function App() {
   const syncEngine = syncEngineRef.current;
 
   function setActiveView(view: AppView) {
+    // A different page starts at its top, as it would in a native app.
+    if (view !== activeView) window.scrollTo(0, 0);
     setActiveViewState(view);
     const path = pathForView(view);
     if (window.location.pathname !== path) {
@@ -1154,6 +1157,37 @@ function App() {
   // Which specialist pages sit in the sidebar. See navTools.ts.
   const [navTools, setNavTools] = useState<NavToolsPrefs | null>(readNavTools);
   const [toolsTrayOpen, setToolsTrayOpen] = useState(false);
+  // Phones and folded foldables: the sidebar becomes a sheet that slides up from the tab bar's
+  // More button. Wider screens never open it (the sidebar is always on show there).
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  // The phone top bar names the page only once the page's own heading has scrolled away under it
+  // (the large-title pattern), so the name is never on screen twice.
+  const [pageScrolled, setPageScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setPageScrolled(window.scrollY > 56);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+    const onKey = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") setMobileNavOpen(false);
+    };
+    // Rotating or unfolding to a width that shows the sidebar must not leave the page locked.
+    const wide = window.matchMedia("(min-width: 901px)");
+    const onWide = () => {
+      if (wide.matches) setMobileNavOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    wide.addEventListener("change", onWide);
+    document.documentElement.classList.add("navSheetOpen");
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      wide.removeEventListener("change", onWide);
+      document.documentElement.classList.remove("navSheetOpen");
+    };
+  }, [mobileNavOpen]);
   useEffect(() => {
     if (!hydrated || navTools) return;
     const hasData = Object.values(setupProgress).some(Boolean);
@@ -3545,7 +3579,23 @@ function App() {
         }}
       />
 
-      <aside className="sideNav" aria-label="Primary">
+      {mobileNavOpen && <div className="navSheetBackdrop" onClick={() => setMobileNavOpen(false)} aria-hidden="true" />}
+
+      <aside
+        className={mobileNavOpen ? "sideNav open" : "sideNav"}
+        aria-label="Primary"
+        onClick={(event) => {
+          // Picking a page (or anything that opens over the app) puts the sheet away.
+          if ((event.target as HTMLElement).closest(".navItem, .navToolOpen, .sideTutorialBtn, .sideSignInBtn, .viewHomepageBtn")) setMobileNavOpen(false);
+        }}
+      >
+        <div className="navSheetHeader">
+          <span className="navSheetGrip" aria-hidden="true" />
+          <strong>Menu</strong>
+          <button className="iconButton" type="button" onClick={() => setMobileNavOpen(false)} aria-label="Close menu">
+            <X size={19} />
+          </button>
+        </div>
         <div className="brandCluster">
           <img src="/icon.svg" alt="" width="36" height="36" style={{borderRadius: '10px', flexShrink: 0}} aria-hidden="true" />
           <div>
@@ -3712,11 +3762,52 @@ function App() {
         </button>
       </aside>
 
+      {/* Phones get the everyday pages as a tab bar (a rail on an unfolded foldable or small
+          tablet); everything else in the sidebar is one tap away under More. */}
+      <nav className="tabBar" aria-label="Quick navigation" aria-hidden={mobileNavOpen || undefined}>
+        {navItems.slice(0, 6).map((item, index) => (
+          <button
+            key={item.id}
+            className={`tabBarItem${activeView === item.id ? " active" : ""}${index >= 4 ? " wideOnly" : ""}`}
+            type="button"
+            onClick={() => {
+              if (activeView === item.id) window.scrollTo({ top: 0, behavior: "smooth" });
+              else setActiveView(item.id);
+            }}
+            aria-current={activeView === item.id ? "page" : undefined}
+            tabIndex={mobileNavOpen ? -1 : undefined}
+          >
+            {item.icon}
+            <span>{item.label}</span>
+          </button>
+        ))}
+        <button
+          className={`tabBarItem tabBarMore${mobileNavOpen || !navItems.slice(0, 6).some((item) => item.id === activeView) ? " active" : ""}${
+            navItems.slice(4, 6).some((item) => item.id === activeView) ? " activeNarrow" : ""
+          }`}
+          type="button"
+          onClick={() => setMobileNavOpen((open) => !open)}
+          aria-expanded={mobileNavOpen}
+          aria-label="More"
+          tabIndex={mobileNavOpen ? -1 : undefined}
+        >
+          <Menu size={20} />
+          <span>More</span>
+          {toolBadge > 0 && <i className="tabBarBadge" aria-hidden="true" />}
+        </button>
+      </nav>
+
       <div className="workspace">
-        <header className="appBar">
+        <header className={pageScrolled ? "appBar scrolled" : "appBar"}>
           {/* The page names itself in its own header below, so the bar only carries controls:
               the month switcher on the Ledger, and the country, theme and privacy toggles. */}
           <div className="appBarTitle">
+            <img className="appBarBrand" src="/icon.svg" alt="" width="28" height="28" aria-hidden="true" />
+            {activeView !== "ledger" && (
+              <span className="appBarPage" aria-hidden="true">
+                {activeView === "settings" ? "Settings" : navEntry(activeView).label}
+              </span>
+            )}
             {activeView === "ledger" && (
               <div className="monthSwitch" aria-label="Selected month">
                 <button className="iconButton" type="button" onClick={() => changeMonth(-1)} aria-label="Previous month" aria-keyshortcuts="Alt+ArrowLeft">
@@ -3756,6 +3847,7 @@ function App() {
                   </option>
                 ))}
               </select>
+              <ChevronDown className="countryChevron" size={14} aria-hidden="true" />
             </label>
             <button
               className="iconButton"

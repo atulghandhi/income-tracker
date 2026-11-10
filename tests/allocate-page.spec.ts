@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { primaryNav } from "./helpers/shell";
 
 // The Allocate page end to end: the sidebar entry and URL, the plan built from the sample ledger,
 // switching priorities (and having the choice survive a reload), including a debt that is left out
@@ -26,7 +27,8 @@ test.describe("Allocate page", () => {
     await expect(page.getByRole("tooltip")).toContainText("Not financial advice");
     await page.mouse.move(10, 10);
     await expect(page.getByRole("tooltip")).toHaveCount(0);
-    await expect(page.locator(".sideNav").getByRole("button", { name: "Allocate", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect((await primaryNav(page)).getByRole("button", { name: "Allocate", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await page.keyboard.press("Escape");
 
     // The sample carries a £2,500 bonus and the ledger's spare-per-month figure.
     await expect(page.getByLabel("Spare each month", { exact: true })).not.toHaveValue("");

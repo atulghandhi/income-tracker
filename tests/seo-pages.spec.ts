@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { primaryNav } from "./helpers/shell";
 
 // The static SEO pages are served straight from /public by the dev server, so
 // these run against the same pages that ship to production.
@@ -121,7 +122,7 @@ test.describe("Landing page and attribution", () => {
       localStorage.setItem("gettingStartedDismissed", "1");
     });
     await page.goto("/");
-    await page.locator("nav.navStack").getByRole("button", { name: "Settings" }).click();
+    await (await primaryNav(page)).locator("nav.navStack").getByRole("button", { name: "Settings" }).click();
     const panel = page.getByLabel("Monthly reminder");
     await expect(panel).toBeVisible();
     await panel.locator("#reminder-bank").selectOption("monzo-csv");

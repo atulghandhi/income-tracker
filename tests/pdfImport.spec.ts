@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { primaryNav } from "./helpers/shell";
 
 // PDF statements in the app shell: the same file picker and review screen as a
 // CSV, a clear message for PDFs the importer cannot read, and the one-off
@@ -23,7 +24,7 @@ async function inputValues(page: Page, selector: string) {
 }
 
 async function openView(page: Page, name: "Dashboard" | "Ledger" | "Settings") {
-  await page.locator(".sideNav").getByRole("button", { name, exact: true }).click();
+  await (await primaryNav(page)).getByRole("button", { name, exact: true }).click();
 }
 
 async function uploadPdf(page: Page, name: string) {
