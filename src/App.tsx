@@ -107,7 +107,8 @@ import {
 } from "./accountFlow";
 import { goalPlanInputs } from "./accountLinks";
 import { matchDebtPaymentRows, skipScheduledPayment } from "./debtSync";
-import { applyRecurringFlag, reconcileSeededEntries } from "./recurrence";
+import { applyRecurringFlag } from "./recurrence";
+import { findLedgerDuplicates, keepDuplicateGroupApart, keepRowApart, matchLedgerEntries, mergeDuplicateGroup, removeEntries, replacedEntryFor, type DuplicateGroup } from "./dedupe";
 import {
   deleteSubscription,
   detectSubscriptions,
@@ -276,6 +277,7 @@ import type {
   GoalStatus,
   HealthScoreBreakdown,
   ImportBatch,
+  ImportedTransactionMeta,
   ImportedTransactionRef,
   IncomeEntry,
   InsightsState,
@@ -1121,6 +1123,9 @@ function App() {
     [currentMonth],
   );
   const showSeededBanner = seededEntryCount > 0 && !seededBannerDismissed.has(ledger.selectedMonth);
+  // The same money entered twice in this month (a planned row beside its bank transaction, a
+  // statement imported from two exports). Shown in the ledger to merge or keep.
+  const duplicateGroups = useMemo(() => findLedgerDuplicates(ledger, ledger.selectedMonth), [ledger.months, ledger.selectedMonth]);
   // Subscriptions, bills and renewals detected from the ledger, with the user's decisions applied.
   const subscriptionReport = useMemo(() => detectSubscriptions(ledger), [ledger]);
   // Learned (non-transfer) rules with live match counts, for the hygiene panel.
@@ -2623,7 +2628,7 @@ function App() {
     });
     setImportReview({
       fileName: BANK_FEED_SOURCE_NAME,
-      rows: matchDebtPaymentRows(review.rows, effectiveAccounts, moneyFormatter),
+      rows: matchLedgerEntries(matchDebtPaymentRows(review.rows, effectiveAccounts, moneyFormatter), ledger, moneyFormatter),
       errors: [],
       totalRows: review.total,
       signInverted: false,
@@ -2695,7 +2700,7 @@ function App() {
     const format: ImportFormat = source.kind === "pdf" ? "pdf" : importSourceOf(sourceName);
     setImportReview({
       fileName: sourceName,
-      rows: matchDebtPaymentRows(result.rows, effectiveAccounts, moneyFormatter),
+      rows: matchLedgerEntries(matchDebtPaymentRows(result.rows, effectiveAccounts, moneyFormatter), ledger, moneyFormatter),
       errors: result.errors,
       totalRows: result.totalRows,
       signInverted: Boolean(result.signInverted),
@@ -2780,6 +2785,11 @@ function App() {
         ),
       };
     });
+  }
+
+  // "Keep both": the bank row no longer replaces the entry it was paired with.
+  function keepImportRowApart(id: string) {
+    setImportReview((current) => (current ? { ...current, rows: current.rows.map((row) => (row.id === id ? keepRowApart(row) : row)) } : current));
   }
 
   function setAllImportRowsIncluded(include: boolean) {
@@ -2874,13 +2884,18 @@ function App() {
     const batchId = createId("batch");
     const importedAt = new Date().toISOString();
     const transactionRefs: ImportedTransactionRef[] = [];
+    const replacedCount = new Set(rowsToImport.filter((row) => replacedEntryFor(ledger.months, row)).map((row) => row.replaces!.entryId)).size;
 
     updateLedger((current) => {
-      const months = { ...current.months };
+      let months = { ...current.months };
+      // Entries the user already had for this money (a planned salary, a row typed by hand):
+      // the bank row takes their place, so the month counts it once.
+      const replaced = new Map<string, NonNullable<CsvImportRow["replaces"]>>();
 
       rowsToImport.forEach((row, index) => {
         const month = months[row.monthKey] ?? seedMonthFromPrevious();
-        const imported = {
+        const planned = replacedEntryFor(current.months, row);
+        const imported: ImportedTransactionMeta = {
           batchId,
           fileName: importReview.fileName,
           rowNumber: row.rowNumber,
@@ -2888,6 +2903,14 @@ function App() {
           originalDescription: row.description,
           importedAt,
         };
+        // The first row to replace an entry carries it, so undoing the import puts it back.
+        if (planned && row.replaces && !replaced.has(planned.id)) {
+          imported.replaced = planned;
+          replaced.set(planned.id, row.replaces);
+        }
+        // A replaced entry hands on its repeat flag: next month still expects this payment.
+        const repeats = planned ? Boolean(planned.seededFrom) || planned.recurring !== false : false;
+        const keptApart = row.keptApartFrom ? [row.keptApartFrom] : undefined;
 
         if (row.kind === "income") {
           const entry: IncomeEntry = {
@@ -2896,11 +2919,12 @@ function App() {
             amount: Math.abs(row.amount),
             color: row.color || colors[index % colors.length],
             // Imported bank rows are historical actuals — one-off by default, not run-rate.
-            recurring: false,
+            recurring: repeats,
             date: row.date,
             imported,
             accountId: importReview.accountId,
             categorySource: row.categorySource,
+            keptApart,
           };
           months[row.monthKey] = {
             ...month,
@@ -2917,12 +2941,14 @@ function App() {
           category: row.category.trim() || (row.kind === "debt-payment" ? "Debt payments" : "Unsorted"),
           color: row.color || colors[(index + 2) % colors.length],
           // Imported bank rows are historical actuals — one-off by default, not run-rate.
-          recurring: false,
+          recurring: repeats,
           date: row.date,
           imported,
           debtAccountId: row.kind === "debt-payment" ? row.debtAccountId : undefined,
+          toAccountId: planned && "toAccountId" in planned ? planned.toAccountId : undefined,
           accountId: importReview.accountId,
           categorySource: row.categorySource,
+          keptApart,
         };
         months[row.monthKey] = {
           ...month,
@@ -2931,15 +2957,7 @@ function App() {
         transactionRefs.push({ monthKey: row.monthKey, entryId: entry.id, kind: "expense" });
       });
 
-      // Auto-seeded recurring rows fold into the imported actuals for the same
-      // merchant instead of doubling — the import wins, and inherits the
-      // recurring role (and category) from the seeded template.
-      const touchedMonthKeys = new Set(rowsToImport.map((row) => row.monthKey));
-      for (const monthKey of touchedMonthKeys) {
-        if (months[monthKey]) {
-          months[monthKey] = reconcileSeededEntries(months[monthKey]).month;
-        }
-      }
+      months = removeEntries(months, [...replaced.values()]);
 
       // Learn rules from both imported rows and transfer rows, then sweep any existing ledger
       // entries (from earlier imports) that match the now-known transfer payees.
@@ -3005,9 +3023,15 @@ function App() {
 
     const parts: string[] = [];
     if (rowsToImport.length) parts.push(`Imported ${rowsToImport.length} transaction${rowsToImport.length === 1 ? "" : "s"}`);
+    if (replacedCount) parts.push(`replaced ${replacedCount} you already had`);
     if (transferRows.length) parts.push(`saved ${transferRows.length} transfer rule${transferRows.length === 1 ? "" : "s"}`);
     if (removed) parts.push(`removed ${removed} matching`);
     setToast(parts.join(" · ") || "Nothing to import");
+  }
+
+  function resolveDuplicateGroup(group: DuplicateGroup, action: "merge" | "keep") {
+    updateLedger((current) => (action === "merge" ? mergeDuplicateGroup(current, group) : keepDuplicateGroupApart(current, group)));
+    setToast(action === "merge" ? "Merged — counted once now" : "Kept both");
   }
 
   function undoImportBatch(batchId: string) {
@@ -4021,6 +4045,24 @@ function App() {
                     Review
                   </button>
                 </div>
+              )}
+
+              {duplicateGroups.slice(0, 3).map((group) => (
+                <div className="seededBanner duplicateBanner" role="status" key={group.id}>
+                  <AlertCircle size={15} />
+                  <span>{describeDuplicateGroup(group, moneyFormatter)}</span>
+                  <button className="commandButton" type="button" onClick={() => resolveDuplicateGroup(group, "merge")}>
+                    {group.reason === "planned" ? "Merge" : "Remove one"}
+                  </button>
+                  <button className="commandButton" type="button" onClick={() => resolveDuplicateGroup(group, "keep")}>
+                    Keep both
+                  </button>
+                </div>
+              ))}
+              {duplicateGroups.length > 3 && (
+                <p className="panelHint">
+                  {duplicateGroups.length - 3} more possible duplicate{duplicateGroups.length - 3 === 1 ? "" : "s"} this month.
+                </p>
               )}
 
               {showSeededBanner && (
@@ -5150,6 +5192,7 @@ function App() {
             onRowChange={updateImportReviewRow}
             onToggleAll={setAllImportRowsIncluded}
             onSkipDuplicates={skipDuplicateImportRows}
+            onKeepApart={keepImportRowApart}
             onBulkCategory={applyImportCategoryToIncluded}
             onConfirm={confirmCsvImport}
           />
@@ -5785,6 +5828,7 @@ function ImportReviewModal({
   onRowChange,
   onToggleAll,
   onSkipDuplicates,
+  onKeepApart,
   onBulkCategory,
   onConfirm,
 }: {
@@ -5799,6 +5843,7 @@ function ImportReviewModal({
   onRowChange: (id: string, patch: Partial<CsvImportRow>) => void;
   onToggleAll: (include: boolean) => void;
   onSkipDuplicates: () => void;
+  onKeepApart: (id: string) => void;
   onBulkCategory: (category: string) => void;
   onConfirm: () => void;
 }) {
@@ -5806,6 +5851,7 @@ function ImportReviewModal({
   const [showAutoRows, setShowAutoRows] = useState(false);
   const selectedCount = review.rows.filter((row) => row.include).length;
   const duplicateCount = review.rows.filter((row) => row.duplicate).length;
+  const replacingCount = new Set(review.rows.filter((row) => row.include && row.replaces).map((row) => row.replaces!.entryId)).size;
   const totalAmount = review.rows.filter((row) => row.include).reduce((sum, row) => sum + row.amount, 0);
   const hasErrors = review.errors.length > 0 && review.rows.length === 0;
 
@@ -5844,6 +5890,11 @@ function ImportReviewModal({
           <span>
             Duplicates <b>{duplicateCount}</b>
           </span>
+          {replacingCount > 0 && (
+            <span title="Bank rows that take the place of entries already in your ledger, so the money counts once">
+              Replacing <b>{replacingCount}</b>
+            </span>
+          )}
           <span>
             Net <b className={totalAmount >= 0 ? "positiveText" : "negativeText"}>{formatter.format(totalAmount)}</b>
           </span>
@@ -5943,7 +5994,7 @@ function ImportReviewModal({
                     {showAutoRows ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                   </button>
                   {showAutoRows && (
-                    <ImportBucketTable rows={autoRows} formatter={formatter} categoryOptions={categoryOptions} debtAccounts={debtAccounts} onRowChange={onRowChange} />
+                    <ImportBucketTable rows={autoRows} formatter={formatter} categoryOptions={categoryOptions} debtAccounts={debtAccounts} onRowChange={onRowChange} onKeepApart={onKeepApart} />
                   )}
                 </div>
               )}
@@ -5956,7 +6007,7 @@ function ImportReviewModal({
                       <b>{checkRows.length}</b> probably right — worth a glance
                     </span>
                   </div>
-                  <ImportBucketTable rows={checkRows} formatter={formatter} categoryOptions={categoryOptions} debtAccounts={debtAccounts} onRowChange={onRowChange} />
+                  <ImportBucketTable rows={checkRows} formatter={formatter} categoryOptions={categoryOptions} debtAccounts={debtAccounts} onRowChange={onRowChange} onKeepApart={onKeepApart} />
                 </div>
               )}
 
@@ -5968,7 +6019,7 @@ function ImportReviewModal({
                       <b>{needsYouRows.length}</b> need you — duplicates and unknowns
                     </span>
                   </div>
-                  <ImportBucketTable rows={needsYouRows} formatter={formatter} categoryOptions={categoryOptions} debtAccounts={debtAccounts} onRowChange={onRowChange} />
+                  <ImportBucketTable rows={needsYouRows} formatter={formatter} categoryOptions={categoryOptions} debtAccounts={debtAccounts} onRowChange={onRowChange} onKeepApart={onKeepApart} />
                 </div>
               )}
             </div>
@@ -5994,12 +6045,14 @@ function ImportBucketTable({
   categoryOptions,
   debtAccounts,
   onRowChange,
+  onKeepApart,
 }: {
   rows: CsvImportRow[];
   formatter: Intl.NumberFormat;
   categoryOptions: string[];
   debtAccounts: Account[];
   onRowChange: (id: string, patch: Partial<CsvImportRow>) => void;
+  onKeepApart: (id: string) => void;
 }) {
   return (
     <table className="importTable">
@@ -6023,6 +6076,7 @@ function ImportBucketTable({
             categoryOptions={categoryOptions}
             debtAccounts={debtAccounts}
             onChange={(patch) => onRowChange(row.id, patch)}
+            onKeepApart={() => onKeepApart(row.id)}
           />
         ))}
       </tbody>
@@ -6036,12 +6090,14 @@ function ImportReviewTableRow({
   categoryOptions,
   debtAccounts,
   onChange,
+  onKeepApart,
 }: {
   row: CsvImportRow;
   formatter: Intl.NumberFormat;
   categoryOptions: string[];
   debtAccounts: Account[];
   onChange: (patch: Partial<CsvImportRow>) => void;
+  onKeepApart: () => void;
 }) {
   return (
     <tr className={`${row.include ? "selected" : ""} ${row.duplicate ? "duplicate" : ""}`}>
@@ -6098,9 +6154,14 @@ function ImportReviewTableRow({
       </td>
       <td>
         <span className={row.duplicate ? "importSignal duplicate" : row.confidence < 0.5 ? "importSignal low" : "importSignal"}>
-          {row.duplicate ? "Duplicate" : `${Math.round(row.confidence * 100)}%`}
+          {row.duplicate ? "Duplicate" : row.replaces ? "Replaces" : `${Math.round(row.confidence * 100)}%`}
         </span>
         <em>{row.note}</em>
+        {row.replaces && (
+          <button className="importKeepBoth" type="button" onClick={onKeepApart} aria-label={`Keep ${row.description} and ${row.replaces.label} as two entries`}>
+            Keep both
+          </button>
+        )}
       </td>
     </tr>
   );
@@ -7918,6 +7979,21 @@ function upsertTransferRule(rules: CategoryRule[], pattern: string, timestamp: s
 
 // Remove every ledger entry whose description matches a saved transfer rule. Returns the
 // pruned months plus how many entries were swept, so callers can report it.
+function describeDuplicateGroup(group: DuplicateGroup, formatter: Intl.NumberFormat): string {
+  const extra = `“${group.remove.label}” (${formatter.format(group.remove.amount)})`;
+  if (group.reason === "repeat") {
+    return group.remove.imported
+      ? `${extra} looks imported twice${group.remove.date ? ` on ${formatShortDate(group.remove.date)}` : ""}.`
+      : `${extra} is in this month twice.`;
+  }
+  const [first] = group.keep;
+  const bank =
+    group.keep.length === 1
+      ? `“${first.label}” (${formatter.format(first.amount)}${first.date ? `, ${formatShortDate(first.date)}` : ""})`
+      : `${group.keep.length} bank transactions (${formatter.format(group.keep.reduce((sum, ref) => sum + ref.amount, 0))})`;
+  return `${extra} looks like the same money as ${bank} from your bank — it may be counted twice.`;
+}
+
 function sweepTransferEntries(
   months: Record<string, MonthBudget>,
   rules: CategoryRule[],
@@ -7975,19 +8051,25 @@ function removeImportBatchFromState(state: LedgerState, batchId: string): Ledger
   if (!batch) return state;
 
   const refKeys = new Set(batch.transactionRefs.map((ref) => `${ref.monthKey}:${ref.entryId}:${ref.kind}`));
+  // Entries the import replaced (a planned salary, a hand-typed row) come back with it gone.
+  const restore = <T extends IncomeEntry | ExpenseEntry>(removed: T[], kept: T[]): T[] => {
+    const present = new Set(kept.map((entry) => entry.id));
+    const back = removed.flatMap((entry) => (entry.imported?.replaced && !present.has(entry.imported.replaced.id) ? [entry.imported.replaced as T] : []));
+    return back.length ? [...kept, ...back] : kept;
+  };
   const months = Object.fromEntries(
-    Object.entries(state.months).map(([monthKey, month]) => [
-      monthKey,
-      {
-        ...month,
-        incomes: month.incomes.filter(
-          (income) => income.imported?.batchId !== batchId && !refKeys.has(`${monthKey}:${income.id}:income`),
-        ),
-        expenses: month.expenses.filter(
-          (expense) => expense.imported?.batchId !== batchId && !refKeys.has(`${monthKey}:${expense.id}:expense`),
-        ),
-      },
-    ]),
+    Object.entries(state.months).map(([monthKey, month]) => {
+      const goesIncome = (income: IncomeEntry) => income.imported?.batchId === batchId || refKeys.has(`${monthKey}:${income.id}:income`);
+      const goesExpense = (expense: ExpenseEntry) => expense.imported?.batchId === batchId || refKeys.has(`${monthKey}:${expense.id}:expense`);
+      return [
+        monthKey,
+        {
+          ...month,
+          incomes: restore(month.incomes.filter(goesIncome), month.incomes.filter((income) => !goesIncome(income))),
+          expenses: restore(month.expenses.filter(goesExpense), month.expenses.filter((expense) => !goesExpense(expense))),
+        },
+      ];
+    }),
   );
 
   return {

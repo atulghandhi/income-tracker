@@ -30,6 +30,28 @@ export type CsvImportRow = {
   // For debt-payment rows: which debt account this payment reduces. Optional — unlinked
   // debt payments still import as expenses, they just don't feed the balance roll-forward.
   debtAccountId?: string;
+  // The entry already in the ledger that this bank row is the real version of (a planned salary,
+  // a row typed by hand). Importing the row removes that entry so the money counts once. See
+  // dedupe.ts.
+  replaces?: LedgerMatch;
+  // Set when the user said "keep both": the imported entry remembers the one it is not.
+  keptApartFrom?: string;
+};
+
+export type LedgerMatch = {
+  monthKey: string;
+  entryId: string;
+  kind: "income" | "expense";
+  label: string;
+  amount: number;
+  // "name": the bank text names the entry. "amount": only the amount (and month) agree.
+  basis: "name" | "amount";
+  // What the row looked like before it took the entry's name and category, for "keep both".
+  rowName: string;
+  rowCategory: string;
+  rowColor: string;
+  rowConfidence: number;
+  rowNote: string;
 };
 
 export type CsvImportResult = {
