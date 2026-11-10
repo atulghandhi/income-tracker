@@ -236,6 +236,7 @@ export function seedMonthFromPrevious(previous?: MonthBudget, context?: SeedMont
       recurring: true,
       date: seedEntryDate(income.date, context.toMonthKey),
       imported: undefined,
+      keptApart: undefined,
       seededFrom: { monthKey: context.fromMonthKey, entryId: income.id },
     })),
     expenses: previous.expenses.filter(isRecurring).map((expense) => ({
@@ -244,6 +245,7 @@ export function seedMonthFromPrevious(previous?: MonthBudget, context?: SeedMont
       recurring: true,
       date: seedEntryDate(expense.date, context.toMonthKey),
       imported: undefined,
+      keptApart: undefined,
       seededFrom: { monthKey: context.fromMonthKey, entryId: expense.id },
     })),
     note: previous.note,

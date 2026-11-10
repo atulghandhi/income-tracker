@@ -27,6 +27,8 @@ export type IncomeEntry = {
   accountId?: string;
   seededFrom?: SeededFromRef;
   categorySource?: CategorySource;
+  // Ids of entries the user said this one is not a duplicate of. See dedupe.ts.
+  keptApart?: string[];
 };
 
 export type ExpenseEntry = {
@@ -56,6 +58,8 @@ export type ExpenseEntry = {
   toAccountId?: string;
   seededFrom?: SeededFromRef;
   categorySource?: CategorySource;
+  // Ids of entries the user said this one is not a duplicate of. See dedupe.ts.
+  keptApart?: string[];
 };
 
 export type GoalFundingMode = "fixed" | "fill" | "auto";
@@ -92,6 +96,9 @@ export type ImportedTransactionMeta = {
   hash: string;
   originalDescription: string;
   importedAt: string;
+  // The planned or hand-typed entry this bank row took the place of. Undoing the import puts it
+  // back.
+  replaced?: IncomeEntry | ExpenseEntry;
 };
 
 export type ImportedTransactionRef = {
