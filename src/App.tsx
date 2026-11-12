@@ -1,3 +1,6 @@
+import { FinancialGlossary } from "./FinancialGlossary";
+import { TutorialOverlay } from "./GuidedTour";
+import { DashboardExportControls } from "./DashboardExportControls";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Analytics } from "@vercel/analytics/react";
 import LandingPage from "./LandingPage";
@@ -3916,6 +3919,7 @@ function App() {
                   <div className="pageTitleRow">
                     <h2>Dashboard</h2>
                     <LayoutEditButton page="dashboard" editing={layoutEditing === "dashboard"} onToggle={() => setLayoutEditing((current) => (current === "dashboard" ? null : "dashboard"))} t={t} />
+                    {layoutEditing !== "dashboard" && <DashboardExportControls month={ledger.selectedMonth} label={formatMonth(ledger.selectedMonth)} notify={setToast} />}
                   </div>
                   <p>Your money at a glance — this month and where it&rsquo;s heading.</p>
                 </div>
@@ -5180,6 +5184,8 @@ function App() {
                 )}
               </article>
 
+              <FinancialGlossary />
+
               <article className="dangerPanel">
                 <div>
                   <h3>Danger Zone</h3>
@@ -5253,7 +5259,7 @@ function App() {
 
         {onboardingOpen && <Onboarding initialCountry={ledger.country} initialCurrency={ledger.currency} onFinish={finishOnboarding} />}
 
-        {tutorialView && <TutorialOverlay tutorial={tutorialsFor(region)[tutorialView]} t={t} onClose={closeTutorial} />}
+        {tutorialView && <TutorialOverlay key={tutorialView} view={tutorialView} tutorial={tutorialsFor(region)[tutorialView]} t={t} onClose={closeTutorial} />}
 
         {toastVisible && (
           <div className="statusToast" role="status" aria-live="polite">
@@ -7634,67 +7640,6 @@ function LedgerAccountsPanel({
         </button>
       </div>
     </article>
-  );
-}
-
-function TutorialOverlay({ tutorial, t, onClose }: { tutorial: PageTutorial; t: (text: string) => string; onClose: () => void }) {
-  const [step, setStep] = useState(0);
-  const total = tutorial.steps.length;
-  const current = tutorial.steps[Math.min(step, total - 1)];
-  const isLast = step >= total - 1;
-
-  useEffect(() => {
-    function onKey(event: globalThis.KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  return (
-    <div className="tutorialBackdrop" role="dialog" aria-modal="true" aria-label={`${tutorial.title} tutorial`}>
-      <div className="tutorialCard">
-        <span className="tutorialBadge">
-          <GraduationCap size={13} />
-          {tutorial.badge} · 60-second tour
-        </span>
-        <h2 className="tutorialTitle">{t(tutorial.title)}</h2>
-        {current.heading ? <h3 className="tutorialStepHeading">{t(current.heading)}</h3> : null}
-        <ul className="tutorialBullets">
-          {current.bullets.map((bullet, index) => (
-            <li key={index}>{t(bullet)}</li>
-          ))}
-        </ul>
-
-        {total > 1 ? (
-          <div className="tutorialDots" aria-hidden="true">
-            {tutorial.steps.map((_, index) => (
-              <span key={index} className={index === step ? "active" : ""} />
-            ))}
-          </div>
-        ) : null}
-
-        <div className="tutorialActions">
-          <button className="tutorialSkip" type="button" onClick={onClose}>
-            Skip tutorial
-          </button>
-          <div className="tutorialNav">
-            {step > 0 ? (
-              <button className="commandButton" type="button" onClick={() => setStep((value) => value - 1)}>
-                Back
-              </button>
-            ) : null}
-            <button
-              className="tutorialNext"
-              type="button"
-              onClick={() => (isLast ? onClose() : setStep((value) => value + 1))}
-            >
-              {isLast ? "Got it" : "Next"}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
   );
 }
 

@@ -51,6 +51,7 @@ export type FlowNode = {
   label: string;
   value: number;
   color: string;
+  children?: FlowNode[];
   // Individual transactions behind a node, largest first (for the drill-down).
   items: Array<{ id: string; label: string; value: number; date?: string; recurring: boolean }>;
   // The same node over the six months ending with the selected one (for the drill-down).
@@ -157,6 +158,7 @@ export type InsightsModel = {
   compare: CategoryDelta[];
   upcoming: UpcomingItem[];
   calendar: CalendarDay[];
+  calendarMonths: Array<{ monthKey: string; label: string; days: CalendarDay[] }>;
   netWorthOutlook: Record<12 | 24 | 60, NetWorthPoint[]>;
   goals: SavingsGoal[];
   goalSequence: GoalSequenceResult;
@@ -200,6 +202,7 @@ export function buildFlowModel(month: MonthBudget, projection: Projection): Flow
         value: rest.reduce((sum, node) => sum + node.value, 0),
         color: "#8e98a9",
         items: rest.flatMap((node) => node.items),
+        children: rest,
       },
     ];
   }
@@ -224,6 +227,7 @@ export function buildFlowModel(month: MonthBudget, projection: Projection): Flow
         value: rest.reduce((sum, node) => sum + node.value, 0),
         color: "#8e98a9",
         items: rest.flatMap((node) => node.items).sort((a, b) => b.value - a.value),
+        children: rest,
       },
     ];
   }
@@ -609,6 +613,10 @@ export function buildInsightsModel(ledger: LedgerState, monthKey: string, option
     compare: buildCategoryDeltas(categories, previousCategories),
     upcoming: buildUpcoming(recurring, accounts, today),
     calendar: buildCalendar(month, monthKey, today),
+    calendarMonths: [-3, -2, -1, 0].map((offset) => {
+      const key = shiftMonth(monthKey, offset);
+      return { monthKey: key, label: formatMonth(key), days: buildCalendar(ledger.months[key] ?? emptyBudget, key, today) };
+    }),
     netWorthOutlook: { 12: outlook(12), 24: outlook(24), 60: outlook(60) },
     goals: ledger.goals,
     goalSequence,

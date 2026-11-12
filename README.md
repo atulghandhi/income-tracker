@@ -153,6 +153,29 @@ The widgets' own data (their look, dismissed anomaly flags, notes and to-dos) li
 transactions do; the arrangement itself stays a per-device preference.
 
 
+## Dashboard reports and help
+
+**Export** beside the Dashboard title saves the current widget layout as an image (PNG) or a PDF,
+including widgets below the screen. Exports are made in the browser and nothing is uploaded. With
+amounts hidden, the export shows dots in place of every figure. A PDF is a set of images on A4
+pages, split between rows of widgets, not selectable text. Very large dashboards are scaled down to
+stay within browser image limits.
+
+The **Spending calendar** shows one to four months ending at the selected month (1M to 4M in its
+header). The choice is saved with the ledger. Months sit side by side when the card is wide enough
+and stack when it is not, and the card grows to fit them.
+
+In **Money flow**, click a stream or bucket, or pick one from **Explore** (the keyboard route).
+A payee that appears more than once in a category opens into its transactions, and "Other" opens
+into the categories it hides. Escape, the back arrow and the path above the breakdown step back out.
+
+The **Tutorial** button opens a guided tour: the page's own steps, then chapters for customising,
+Money flow, the calendar and exports (and for importing and allocation on their pages). A chapter
+spotlights the thing it describes. The dots jump between chapters; Escape closes the tour.
+
+Surplus and Savings rate carry a short definition beside their label, and Settings has an
+expandable **Financial terms explained** glossary.
+
 ## Licence
 
 Released under the [MIT License](LICENSE). The licence covers the code; it does not grant use of the name "The Income Tracker" or its logo for your own product.

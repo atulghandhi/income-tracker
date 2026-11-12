@@ -83,7 +83,8 @@ export function widgetHasData(type: InsightWidgetType, model: InsightsModel): bo
     case "upcoming":
       return model.upcoming.length > 0;
     case "calendar":
-      return model.month.expenses.some((expense) => Boolean(expense.date));
+      // Any of the months the card can show: an earlier month with spending is worth seeing.
+      return model.calendarMonths.some((month) => month.days.some((day) => day.count > 0));
     case "todo":
     case "notes":
       return true;
@@ -1081,15 +1082,47 @@ export function UpcomingWidget({ model, size, formatter, privacy }: WidgetContex
 
 // ─── Spending calendar ───────────────────────────────────────────────────────
 
-export function CalendarWidget({ model, size, formatter, privacy }: WidgetContext) {
-  const { shellRef, show, hide, node } = useTip();
-  const leading = model.calendar[0]?.weekday ?? 0;
-  const cells = [...Array.from({ length: leading }, () => null), ...model.calendar];
-  const busiest = [...model.calendar].sort((a, b) => b.spent - a.spent)[0];
-  const rowsNeeded = Math.ceil(cells.length / 7);
-  const cellHeight = Math.max(16, Math.min(44, (size.bodyHeight - 40) / rowsNeeded - 4));
+// How many months the card shows and how they tile at a given body width: side by side while each
+// keeps a readable width, and four months as a 2×2 block rather than three and an orphan.
+export function calendarLayout(bodyWidth: number, variant: string | undefined): { count: number; columns: number; rows: number } {
+  const count = Math.min(4, Math.max(1, Math.round(Number(variant)) || 1));
+  let columns = Math.min(count, Math.max(1, Math.floor((bodyWidth + CALENDAR_GAP) / (230 + CALENDAR_GAP))));
+  if (count === 4 && columns === 3) columns = 2;
+  return { count, columns, rows: Math.ceil(count / columns) };
+}
+
+const CALENDAR_GAP = 20;
+const CALENDAR_TITLE = 24;
+
+export function CalendarWidget(context: WidgetContext) {
+  const { model, size, widget } = context;
+  const { count, columns, rows } = calendarLayout(size.bodyWidth, widget.variant);
+  if (count === 1) return <CalendarMonth {...context} days={model.calendar} height={size.bodyHeight} foot={size.h >= 3} />;
+  const months = model.calendarMonths.slice(-count);
+  // Every month gets the same number of week rows, so the day cells line up across the card.
+  const weeks = Math.max(...months.map((month) => Math.ceil(((month.days[0]?.weekday ?? 0) + month.days.length) / 7)));
+  const height = (size.bodyHeight - CALENDAR_GAP * (rows - 1)) / rows - CALENDAR_TITLE;
   return (
-    <div className="calendarWidget" ref={shellRef} onMouseLeave={hide}>
+    <div className="multiMonthCalendar" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gap: CALENDAR_GAP }}>
+      {months.map((month) => (
+        <section key={month.monthKey} aria-label={month.label}>
+          <h4 style={{ height: CALENDAR_TITLE }}>{month.label}</h4>
+          <CalendarMonth {...context} days={month.days} height={height} weeks={weeks} foot={false} />
+        </section>
+      ))}
+    </div>
+  );
+}
+
+function CalendarMonth({ days, height, weeks, foot, formatter, privacy }: WidgetContext & { days: InsightsModel["calendar"]; height: number; weeks?: number; foot: boolean }) {
+  const { shellRef, show, hide, node } = useTip();
+  const leading = days[0]?.weekday ?? 0;
+  const cells = [...Array.from({ length: leading }, () => null), ...days];
+  const busiest = [...days].sort((a, b) => b.spent - a.spent)[0];
+  const rowsNeeded = weeks ?? Math.ceil(cells.length / 7);
+  const cellHeight = Math.max(16, Math.min(44, (height - (foot ? 40 : 20)) / rowsNeeded - 4));
+  return (
+    <div className="calendarWidget" style={{ height }} ref={shellRef} onMouseLeave={hide}>
       <div className="calendarHead">
         {["M", "T", "W", "T", "F", "S", "S"].map((day, index) => (
           <span key={index}>{day}</span>
@@ -1111,7 +1144,7 @@ export function CalendarWidget({ model, size, formatter, privacy }: WidgetContex
           ),
         )}
       </div>
-      {size.h >= 3 && busiest && busiest.spent > 0 && (
+      {foot && busiest && busiest.spent > 0 && (
         <div className="calendarFoot">
           Busiest day: <b>{busiest.date.slice(8, 10)}</b> · <Money value={busiest.spent} formatter={formatter} privacy={privacy} />
         </div>

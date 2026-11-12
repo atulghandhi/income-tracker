@@ -3,7 +3,7 @@ import { Sparkles, X } from "lucide-react";
 import { buildDemoLedger } from "./demoData";
 import { getMonthKey, shiftMonth } from "./finance";
 import { buildInsightsModel, type InsightsModel } from "./insightsData";
-import { WIDGET_COMPONENTS, widgetEmptyHint, widgetHasData, type WidgetActions, type WidgetSize } from "./insightWidgets";
+import { WIDGET_COMPONENTS, calendarLayout, widgetEmptyHint, widgetHasData, type WidgetActions, type WidgetSize } from "./insightWidgets";
 import { widgetInstance } from "./insightsState";
 import type { InsightWidgetType, InsightsState } from "./types";
 import { InfoHint } from "./ui";
@@ -25,10 +25,11 @@ const LIVE_SAMPLE_TYPES = new Set<InsightWidgetType>(["spendingPace", "upcoming"
 export type InsightWidgetSpec = {
   type: InsightWidgetType;
   rows: number;
-  // Rows at a given card width, for a widget whose tiles stack when it is narrow.
-  rowsAt?: (width: number) => number;
+  // Rows at a given card width (and chosen look), for a widget whose tiles stack when it is narrow.
+  rowsAt?: (width: number, variant?: string) => number;
   hint?: { label: string; text: string };
-  variants?: Array<{ id: string; label: string }>;
+  // `name` is the spoken label when the visible one is an abbreviation.
+  variants?: Array<{ id: string; label: string; name?: string }>;
   // Muted words beside the title saying what the card covers, e.g. "October 2026".
   context?: (model: InsightsModel) => string;
 };
@@ -60,7 +61,13 @@ export const INSIGHT_WIDGET_SPECS: Record<string, InsightWidgetSpec> = {
   "debt-overview": { type: "debt", rows: 1, rowsAt: (width) => (width >= 760 ? 1 : width >= 480 ? 2 : 3) },
   "month-compare": { type: "monthCompare", rows: 2, context: (model) => `vs ${model.previous.label}` },
   upcoming: { type: "upcoming", rows: 2 },
-  calendar: { type: "calendar", rows: 2 },
+  // One to four months ending at the selected one; the card grows by two rows per row of months.
+  calendar: {
+    type: "calendar",
+    rows: 2,
+    rowsAt: (width, variant) => calendarLayout(width - 40, variant).rows * 2,
+    variants: [1, 2, 3, 4].map((count) => ({ id: String(count), label: `${count}M`, name: `${count} ${count === 1 ? "month" : "months"}` })),
+  },
   todo: { type: "todo", rows: 2 },
   notes: { type: "notes", rows: 2 },
 };
@@ -114,7 +121,7 @@ export function InsightWidgetCard({
     return buildInsightsModel(demo, LIVE_SAMPLE_TYPES.has(spec.type) ? current : shiftMonth(current, -1), { today, formatter });
   }, [showSample, model.today, spec.type, formatter]);
 
-  const rows = width > 0 && spec.rowsAt ? spec.rowsAt(width) : spec.rows;
+  const rows = width > 0 && spec.rowsAt ? spec.rowsAt(width, widget.variant) : spec.rows;
   const height = rows * ROW_HEIGHT + (rows - 1) * ROW_GAP;
   const narrow = width > 0 && width < 340;
   const size: WidgetSize = {
@@ -151,6 +158,8 @@ export function InsightWidgetCard({
                   key={variant.id}
                   type="button"
                   role="radio"
+                  aria-label={variant.name}
+                  title={variant.name}
                   aria-checked={(widget.variant ?? spec.variants![0].id) === variant.id}
                   className={(widget.variant ?? spec.variants![0].id) === variant.id ? "selected" : ""}
                   onClick={() => onVariant(variant.id)}
