@@ -26,6 +26,8 @@
     "@supabase/supabase-js": "2.108.1",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
+    "@zumer/snapdom": "^3.7.4",
+    "jspdf": "^4.2.1",
     "lucide-react": "^0.475.0",
     "pdfjs-dist": "^5.4.394",
     "react": "^19.0.0",

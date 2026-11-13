@@ -1,7 +1,8 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
-import { ArrowLeft, Droplets, Repeat } from "lucide-react";
+import { ArrowLeft, ChevronRight, Droplets, Repeat } from "lucide-react";
 import type { FlowModel, FlowNode } from "./insightsData";
+import { flowChildren } from "./flowDrilldown";
 import { categoryEmoji } from "./ledgerGroups";
 
 // ─── Money flow ──────────────────────────────────────────────────────────────
@@ -126,26 +127,53 @@ function horizontalCentre(x0: number, y0: number, x1: number, y1: number): strin
 
 export function MoneyFlow(props: MoneyFlowProps) {
   const { flow, variant, formatter, privacy } = props;
-  const [selected, setSelected] = useState<FlowNode | null>(null);
+  const [path, setPath] = useState<FlowNode[]>([]);
+  const selected = path[path.length - 1] ?? null;
+  const setSelected = (node: FlowNode | null) => setPath(node ? [node] : []);
   const shellRef = useRef<HTMLDivElement | null>(null);
+  const exploreRef = useRef<HTMLSelectElement>(null);
+  const hadSelection = useRef(false);
   const { tip, show, hide } = useTip(shellRef);
 
-  // A node that vanished (say the month changed) closes its own breakdown.
+  // Fresh figures (an edit, another month) keep the breakdown open on the same nodes; a node that
+  // vanished closes back to the nearest level that still exists.
   useEffect(() => {
-    if (!selected) return;
-    const stillThere = [...flow.sources, ...flow.targets].some((node) => node.id === selected.id);
-    if (!stillThere) setSelected(null);
-  }, [flow, selected]);
+    setPath((current) => {
+      const next: FlowNode[] = [];
+      let pool = [...flow.sources, ...flow.targets];
+      for (const part of current) {
+        const found = pool.find((node) => node.id === part.id);
+        if (!found) break;
+        next.push(found);
+        pool = flowChildren(found);
+      }
+      return next.length === current.length && next.every((node, index) => node === current[index]) ? current : next;
+    });
+  }, [flow]);
+  // Closing the breakdown hands focus back to the picker, unless the person has moved elsewhere.
+  useEffect(() => {
+    const active = document.activeElement;
+    const focusWasHere = !active || active === document.body || Boolean(shellRef.current?.contains(active));
+    if (!selected && hadSelection.current && focusWasHere) exploreRef.current?.focus({ preventScroll: true });
+    hadSelection.current = Boolean(selected);
+  }, [selected]);
 
   const money = (value: number) => (privacy ? "•••" : formatter.format(value));
   const percent = (value: number) => `${((value / Math.max(flow.total, 1)) * 100).toFixed(1)}%`;
 
   return (
     <div className={`moneyFlow ${variant}`} ref={shellRef} onMouseLeave={hide}>
+      <label className="flowExplore" data-export-ignore>
+        Explore <select ref={exploreRef} aria-label="Explore money flow" value={path[0]?.id ?? ""} onChange={(event) => setSelected([...flow.sources, ...flow.targets].find((node) => node.id === event.target.value) ?? null)}>
+          <option value="">Choose income or spending</option>
+          <optgroup label="Income">{flow.sources.map((node) => <option value={node.id} key={node.id}>{node.label}</option>)}</optgroup>
+          <optgroup label="Spending and savings">{flow.targets.map((node) => <option value={node.id} key={node.id}>{node.label}</option>)}</optgroup>
+        </select>
+      </label>
       {variant === "waterfall" ? (
-        <Waterfall {...props} onSelect={setSelected} showTip={show} />
+        <Waterfall {...props} height={Math.max(100, props.height - 36)} onSelect={setSelected} showTip={show} />
       ) : (
-        <Particles {...props} onSelect={setSelected} showTip={show} />
+        <Particles {...props} height={Math.max(100, props.height - 36)} onSelect={setSelected} showTip={show} />
       )}
       {tip && !selected && (
         <div className="chartTip" style={{ left: Math.min(tip.x + 14, Math.max(0, props.width - 200)), top: tip.y + 14 }}>
@@ -157,7 +185,7 @@ export function MoneyFlow(props: MoneyFlowProps) {
       )}
       <div className={`flowDetail ${selected ? "open" : ""}`} aria-hidden={!selected}>
         {selected && (
-          <FlowBreakdown node={selected} flow={flow} money={money} percent={percent} privacy={privacy} onClose={() => setSelected(null)} />
+          <FlowBreakdown key={selected.id} path={path} onNavigate={(index) => setPath(path.slice(0, index + 1))} onSelect={(node) => setPath([...path, node])} node={selected} flow={flow} money={money} percent={percent} privacy={privacy} onClose={() => setPath(path.slice(0, -1))} />
         )}
       </div>
     </div>
@@ -171,7 +199,13 @@ function FlowBreakdown({
   percent,
   privacy,
   onClose,
+  path,
+  onNavigate,
+  onSelect,
 }: {
+  path: FlowNode[];
+  onNavigate: (index: number) => void;
+  onSelect: (node: FlowNode) => void;
   node: FlowNode;
   flow: FlowModel;
   money: (value: number) => string;
@@ -179,19 +213,44 @@ function FlowBreakdown({
   privacy: boolean;
   onClose: () => void;
 }) {
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => { headingRef.current?.focus({ preventScroll: true }); }, []);
+  const children = flowChildren(node);
   const isSavings = node.id === "cat-savings";
   const isShortfall = node.id === "src-shortfall";
   const max = Math.max(1, ...node.items.map((item) => item.value));
+  const groupMax = Math.max(1, ...children.map((child) => child.value));
   const recurringTotal = node.items.filter((item) => item.recurring).reduce((sum, item) => sum + item.value, 0);
   return (
-    <div className="flowDetailCard" role="dialog" aria-label={`${node.label} breakdown`}>
+    <div
+      className="flowDetailCard"
+      role="dialog"
+      aria-label={`${node.label} breakdown`}
+      onKeyDown={(event) => {
+        if (event.key !== "Escape") return;
+        event.stopPropagation();
+        onClose();
+      }}
+    >
+      {path.length > 1 && (
+        <nav className="flowBreadcrumbs" aria-label="Money flow path">
+          <button type="button" className="linkButton" onClick={() => onNavigate(-1)}>Money flow</button>
+          {path.map((part, index) =>
+            index === path.length - 1 ? (
+              <span key={part.id} aria-current="page">{part.label}</span>
+            ) : (
+              <button key={part.id} type="button" className="linkButton" onClick={() => onNavigate(index)}>{part.label}</button>
+            ),
+          )}
+        </nav>
+      )}
       <div className="flowDetailHead">
-        <button className="iconButton" type="button" onClick={onClose} aria-label="Back to money flow">
+        <button className="iconButton" type="button" onClick={onClose} aria-label={path.length > 1 ? "Back to previous group" : "Back to money flow"}>
           <ArrowLeft size={17} />
         </button>
         <div>
           <span className="swatch small" style={{ background: node.color }} />
-          <h4>{categoryEmoji(node.label) ? `${categoryEmoji(node.label)} ${node.label}` : node.label}</h4>
+          <h4 ref={headingRef} tabIndex={-1}>{categoryEmoji(node.label) ? `${categoryEmoji(node.label)} ${node.label}` : node.label}</h4>
           <em className={privacy ? "masked" : ""}>
             {money(node.value)} · {percent(node.value)} of the flow
           </em>
@@ -218,20 +277,54 @@ function FlowBreakdown({
         </div>
       ) : (
         <>
-          <ul className="flowItems">
-            {node.items.map((item, index) => (
-              <li key={item.id} style={{ animationDelay: `${Math.min(index, 12) * 28}ms` }}>
-                <div className="flowItemLabel">
-                  <span>{item.label}</span>
-                  {item.recurring && <Repeat size={11} aria-label="Recurring" />}
-                  {item.date && <small>{item.date.slice(8, 10)}/{item.date.slice(5, 7)}</small>}
-                </div>
-                <div className="flowItemBar">
-                  <i style={{ width: `${(item.value / max) * 100}%`, background: node.color }} />
-                </div>
-                <strong className={privacy ? "masked" : ""}>{money(item.value)}</strong>
-              </li>
-            ))}
+          <ul className={`flowItems ${children.length > 0 ? "grouped" : ""}`}>
+            {children.length > 0
+              ? children.map((child, index) => {
+                  const opens = Boolean(node.children?.length) || child.items.length > 1;
+                  const only = child.items[0];
+                  const bar = (
+                    <div className="flowItemBar">
+                      <i style={{ width: `${(child.value / groupMax) * 100}%`, background: child.color }} />
+                    </div>
+                  );
+                  const amount = <strong className={privacy ? "masked" : ""}>{money(child.value)}</strong>;
+                  return opens ? (
+                    <li className="flowGroup" key={child.id} style={{ animationDelay: `${Math.min(index, 12) * 28}ms` }}>
+                      <button type="button" onClick={() => onSelect(child)} aria-label={`${child.label}, ${child.items.length} ${child.items.length === 1 ? "transaction" : "transactions"}`}>
+                        <div className="flowItemLabel">
+                          <span>{child.label}</span>
+                          <small>×{child.items.length}</small>
+                        </div>
+                        {bar}
+                        {amount}
+                        <ChevronRight size={14} aria-hidden="true" />
+                      </button>
+                    </li>
+                  ) : (
+                    <li key={child.id} style={{ animationDelay: `${Math.min(index, 12) * 28}ms` }}>
+                      <div className="flowItemLabel">
+                        <span>{child.label}</span>
+                        {only?.recurring && <Repeat size={11} aria-label="Recurring" />}
+                        {only?.date && <small>{only.date.slice(8, 10)}/{only.date.slice(5, 7)}</small>}
+                      </div>
+                      {bar}
+                      {amount}
+                    </li>
+                  );
+                })
+              : node.items.map((item, index) => (
+                  <li key={item.id} style={{ animationDelay: `${Math.min(index, 12) * 28}ms` }}>
+                    <div className="flowItemLabel">
+                      <span>{item.label}</span>
+                      {item.recurring && <Repeat size={11} aria-label="Recurring" />}
+                      {item.date && <small>{item.date.slice(8, 10)}/{item.date.slice(5, 7)}</small>}
+                    </div>
+                    <div className="flowItemBar">
+                      <i style={{ width: `${(item.value / max) * 100}%`, background: node.color }} />
+                    </div>
+                    <strong className={privacy ? "masked" : ""}>{money(item.value)}</strong>
+                  </li>
+                ))}
           </ul>
           <div className="flowDetailFoot">
             <span>

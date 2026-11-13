@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { CSSProperties, KeyboardEvent, ReactNode, Ref } from "react";
+import { FINANCIAL_GLOSSARY } from "./glossary";
 import { Info } from "lucide-react";
 import { clampPercent, getCurrencyFormatter } from "./finance";
 import type { NetWorthPoint } from "./types";
@@ -25,7 +26,7 @@ export function MetricCard({
 }) {
   return (
     <article className={`metricCard ${tone}`}>
-      <span>{label}</span>
+      <span><GlossaryTerm term={label} /></span>
       <strong className={privacy && !suffix ? "masked" : ""}>
         {suffix ? `${formatDecimal(value)}${suffix}` : <AnimatedCurrency value={value} formatter={formatter ?? getCurrencyFormatter("GBP")} />}
       </strong>
@@ -84,7 +85,13 @@ export function ShowMoreList<T>({ items, renderItem }: { items: T[]; renderItem:
 // leaves the icon; on a touch screen a tap opens it and a tap anywhere else (or Escape) closes it.
 // The bubble is rendered at the document root with fixed coordinates, so it is never clipped by a
 // scrolling table or a panel, and it flips to whichever side and edge of the icon has room.
+export function GlossaryTerm({ term, children }: { term: string; children?: ReactNode }) {
+  const definition = FINANCIAL_GLOSSARY[term];
+  return <span className="glossaryTerm">{children ?? term}{definition && <InfoHint label={`What is ${term.toLowerCase()}?`} text={definition} />}</span>;
+}
+
 export function InfoHint({ text, label = "More information" }: { text: ReactNode; label?: string }) {
+  const tooltipId = useId();
   const [hovering, setHovering] = useState(false);
   const [pinned, setPinned] = useState(false);
   const [style, setStyle] = useState<CSSProperties | null>(null);
@@ -118,12 +125,16 @@ export function InfoHint({ text, label = "More information" }: { text: ReactNode
     };
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKey);
-    window.addEventListener("scroll", close, true);
+    const onScroll = () => {
+      if (document.activeElement === ref.current) place();
+      else close();
+    };
+    window.addEventListener("scroll", onScroll, true);
     window.addEventListener("resize", close);
     return () => {
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKey);
-      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", close);
     };
   }, [visible]);
@@ -136,6 +147,7 @@ export function InfoHint({ text, label = "More information" }: { text: ReactNode
       role="button"
       aria-label={label}
       aria-expanded={visible}
+      aria-describedby={visible ? tooltipId : undefined}
       onMouseEnter={() => {
         place();
         setHovering(true);
@@ -163,7 +175,7 @@ export function InfoHint({ text, label = "More information" }: { text: ReactNode
       {visible &&
         style &&
         createPortal(
-          <span role="tooltip" className="infoHintBubble" style={style} onClick={(event) => event.stopPropagation()}>
+          <span id={tooltipId} role="tooltip" className="infoHintBubble" style={style} onClick={(event) => event.stopPropagation()}>
             {text}
           </span>,
           document.body,
@@ -212,7 +224,7 @@ export function focusNextFrame(ref: { current: HTMLInputElement | null }) {
 
 export function AnimatedCurrency({ value, formatter }: { value: number; formatter: Intl.NumberFormat }) {
   const displayValue = useAnimatedNumber(value);
-  return <>{formatter.format(displayValue)}</>;
+  return <data value={String(value)} data-export-value={formatter.format(value)}>{formatter.format(displayValue)}</data>;
 }
 
 export function useAnimatedNumber(value: number) {
