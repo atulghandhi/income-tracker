@@ -92,7 +92,7 @@ export const BUDGET_TOOLS = [
     slug: 'budget-planner-uk', published: '2026-09-16', updated: '2026-09-16', checked: '2026-09-16',
     card: 'Budget planner (UK)', cardD: 'Income, seven spending groups, surplus and savings rate', crumb: 'Budget planner',
     title: 'Budget Planner UK | Free Monthly Budget Calculator',
-    description: 'A free UK monthly budget planner. Enter take-home pay and seven spending groups to see your surplus, savings rate, essentials share and how you compare with the 50/30/20 guideline. No sign-up.',
+    description: 'A free UK monthly budget planner. Enter take-home pay and seven spending groups to see your surplus, savings rate and how you compare with the 50/30/20 rule.',
     h1: 'Budget planner (UK)',
     tldr: 'Enter your monthly take-home pay and what you spend on housing, bills, food, transport, debt, subscriptions and everything else. The planner shows what is left, your savings rate, and how your essentials compare with the 50/30/20 guideline. It works in your browser and stores nothing.',
     fields: [
@@ -141,7 +141,7 @@ export const BUDGET_TOOLS = [
     slug: 'rent-affordability-calculator-uk', published: '2026-09-16', updated: '2026-09-16', checked: '2026-09-16',
     card: 'Rent affordability (UK)', cardD: 'The 30% rule and the letting-agent income check, side by side', crumb: 'Rent affordability',
     title: 'Rent Affordability Calculator UK | How Much Rent Can I Afford?',
-    description: 'How much rent can you afford in the UK? Compare the 30% of take-home guideline with the 30-times-rent income check letting agents use, and see the rent you have room for.',
+    description: 'How much rent can you afford in the UK? Compare the 30% of take-home rule with the 30-times-rent check letting agents use, and see what you have room for.',
     h1: 'Rent affordability calculator (UK)',
     tldr: 'Two tests. Budgeting guidance says rent should be around 30% of take-home pay or less. Letting agents and referencing companies usually ask for gross annual income of at least 30 times the monthly rent (sometimes 2.5 times the annual rent). Enter your take-home, your gross salary and a rent to see both, and the rent that passes each test.',
     fields: [
@@ -185,7 +185,7 @@ export const BUDGET_TOOLS = [
     slug: 'overdraft-cost-calculator-uk', published: '2026-09-16', updated: '2026-09-16', checked: '2026-09-16',
     card: 'Overdraft cost (UK)', cardD: 'What being overdrawn costs by the day, month and year', crumb: 'Overdraft cost',
     title: 'Overdraft Cost Calculator UK | Daily Interest at Your EAR',
-    description: 'Work out what an arranged overdraft costs in the UK from the amount, the days you are overdrawn and your bank’s EAR. See the daily, monthly and yearly cost and compare it with a credit card rate.',
+    description: 'Work out what a UK arranged overdraft costs from the amount, days overdrawn and your bank’s EAR, and compare the daily, monthly and yearly cost with a card.',
     h1: 'Overdraft cost calculator (UK)',
     tldr: 'UK banks charge overdrafts as a single interest rate, quoted as an EAR (equivalent annual rate), with no fixed fees since the 2020 rules. At a typical 39.9% EAR, £500 overdrawn for 14 days costs about £6.48; permanently overdrawn by £500 costs around £200 a year. Enter your own figures below.',
     fields: [
@@ -228,7 +228,7 @@ export const BUDGET_TOOLS = [
     slug: 'pro-rata-salary-calculator-uk', published: '2026-09-16', updated: '2026-09-16', checked: '2026-09-16',
     card: 'Pro rata salary (UK)', cardD: 'Part-time pay, hourly rate and holiday from a full-time salary', crumb: 'Pro rata salary',
     title: 'Pro Rata Salary Calculator UK | Part-Time Pay & Holiday',
-    description: 'Convert a full-time salary to a part-time pro rata salary in the UK. Enter the full-time hours and your hours to see the annual, monthly and weekly pay, the hourly rate and your statutory holiday.',
+    description: 'Convert a full-time UK salary to part-time pro rata pay. Enter full-time hours and yours to see annual, monthly, weekly and hourly pay plus statutory holiday.',
     h1: 'Pro rata salary calculator (UK)',
     tldr: 'Pro rata pay is the full-time salary multiplied by your hours divided by the full-time hours. A £30,000 job on 37.5 hours pays £18,000 for 22.5 hours a week, or £1,500 a month before tax. Statutory holiday is 5.6 weeks of your own working hours, so 22.5 hours a week gives 126 hours a year.',
     fields: [

@@ -221,7 +221,7 @@ export const COMPARISONS = [
     crumb: "vs Plum",
     title: "Plum vs The Income Tracker: autopilot saving or a real budget",
     description:
-      "Plum links your bank to save and invest automatically, with paid tiers from £3.99 a month and no manual mode. The Income Tracker is a free CSV budget with no bank link.",
+      "Plum links your bank to save automatically, with paid tiers from £3.99 a month and no manual mode. The Income Tracker is a free CSV budget with no bank link.",
     h1: "The Income Tracker vs Plum",
     published: "2026-09-08",
     checked: CHECKED,
@@ -280,7 +280,7 @@ export const COMPARISONS = [
     crumb: "vs Monzo Trends",
     title: "Monzo Trends vs The Income Tracker: one bank or all of them",
     description:
-      "Trends is free inside Monzo and adds one other bank free, more on paid plans. The Income Tracker is free, works with every UK bank via CSV and needs no Monzo account.",
+      "Monzo Trends adds one other bank free, more on paid plans. The Income Tracker is free, works with every UK bank via CSV and needs no Monzo account.",
     h1: "The Income Tracker vs Monzo Trends",
     published: "2026-09-08",
     checked: CHECKED,
@@ -345,7 +345,7 @@ export const COMPARISONS = [
     crumb: "Moneyhub alternative",
     title: "Moneyhub alternative (2026): what to use now the app has closed",
     description:
-      "Moneyhub's consumer app was sunsetted on 31 July 2026. The Income Tracker is a free Moneyhub alternative with no bank connection and data kept on your own device.",
+      "Moneyhub's consumer app closed on 31 July 2026. The Income Tracker is a free Moneyhub alternative with no bank connection and data kept on your own device.",
     h1: "Moneyhub alternative: what to use now the app has closed",
     published: "2026-09-08",
     checked: CHECKED,
@@ -407,7 +407,7 @@ export const COMPARISONS = [
     crumb: "Money Dashboard alternative",
     title: "Money Dashboard alternative (UK): a free replacement",
     description:
-      "Money Dashboard shut down on 31 October 2023. The Income Tracker is a free alternative: the multi-account monthly view with no bank connection and data on your device.",
+      "Money Dashboard shut down on 31 October 2023. The Income Tracker is a free alternative: a multi-account monthly view, no bank connection, data on your device.",
     h1: "Money Dashboard alternative: a free replacement",
     published: "2026-09-08",
     checked: CHECKED,
@@ -469,7 +469,7 @@ export const ROUNDUP = {
   crumb: "Best free budgeting apps",
   title: "Best free budgeting apps in the UK (2026): honest verdicts",
   description:
-    "Ten free budgeting apps for UK users compared on price, open banking, manual or CSV entry and who each suits. Prices checked September 2026. Our own weaknesses included.",
+    "Ten free UK budgeting apps compared on price, open banking, CSV entry and who each suits. Prices checked September 2026, our own weaknesses included.",
   h1: "The best free budgeting apps in the UK (2026)",
   published: "2026-09-08",
   checked: CHECKED,
@@ -496,7 +496,7 @@ export const ROUNDUP = {
       pros: ["No bank connection and no account needed; import a file or type entries.", "Free for everything, including CSV import, custom categories and export.", "Guides for exporting a CSV from 27 UK banks and card providers."],
       cons: ["No automatic daily feed: you export once a month yourself.", "Simpler than YNAB's method; no per-category envelope goals.", "The iOS app is still in development, so on a phone you install the web app."],
       url: "https://www.theincometracker.com/",
-      href: "/?ref=roundup",
+      href: "/#ref=roundup",
       hrefLabel: "Open The Income Tracker",
     },
     {

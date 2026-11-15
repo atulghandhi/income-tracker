@@ -183,7 +183,7 @@ export const LANDINGS = [
     crumb: "Free budget planner",
     title: "Free budget planner UK (no sign-up, no bank login)",
     description:
-      "A free UK budget planner that works from your real bank transactions. Import a CSV, see income, bills, spending and what is left month by month. No sign-up, no subscription, no bank login.",
+      "A free UK budget planner built on your real transactions. Import a bank CSV to see income, bills, spending and what is left each month, with no bank login.",
     h1: "A free UK budget planner built on your real transactions",
     tldr:
       "Most budget planners ask you to type estimates into boxes. The Income Tracker builds the plan from what actually happened: import last month's bank CSV, sort it into categories, and your income, essentials, flexible spending and surplus are on screen. Free, private, and nothing connects to your bank.",
@@ -224,7 +224,7 @@ export const LANDINGS = [
     crumb: "Free expense tracker",
     title: "Free expense tracker UK (private, no bank login)",
     description:
-      "A free UK expense tracker that reads your bank CSV and sorts every payment into categories. See where the money goes each month. No sign-up, no subscription, no bank connection.",
+      "A free UK expense tracker that reads your bank CSV and sorts every payment into categories, so you see where the money goes. No sign-up and no bank connection.",
     h1: "A free expense tracker for the UK",
     tldr:
       "Import your bank CSV and every expense lands in a monthly list, ready to sort into categories with a drag. Totals per category, recurring payments flagged, transfers between your own accounts skipped. Free, private, works with every UK bank, and nothing connects to your account.",

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Check } from "lucide-react";
 import { BANK_GUIDES } from "./generated/bankGuides";
+import { LANDING_COPY, rememberLandingRegion } from "./landingContent";
+import type { RegionKey } from "./region";
 
 // ─── Audio ────────────────────────────────────────────────────────────────────
 
@@ -44,13 +46,6 @@ function sndChime(ctx: AudioContext) {
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
-const CSV_ROWS = [
-  { date: "13 Jun", desc: "TESCO EXTRA 4261", amt: "42.61", cat: "Food" },
-  { date: "12 Jun", desc: "SOUTHERN RAIL",    amt: "12.40", cat: "Transport" },
-  { date: "11 Jun", desc: "COSTA COFFEE",     amt: "4.35",  cat: "Eating out" },
-  { date: "09 Jun", desc: "BUPA DENTAL PLAN", amt: "75.00", cat: "Health" },
-] as const;
-
 // 40-month bar data — SVG 1044px wide, scrolls 312px (12 bars = 1 year) left
 const BAR_EXT = [
   { m: "Nov", v: -340 }, { m: "Dec", v:  920 },
@@ -84,35 +79,16 @@ const CMP = [
   { label: "Free",                                       s: "Yes",          b: "Yes" },
 ];
 
-const FAQ = [
-  { q: "Is The Income Tracker free?", a: "Yes. Completely free: no credit card, no subscription, no sign-up. Open it and start." },
-  { q: "Do I need to connect or log in to my bank?", a: "No. Download a CSV from your bank and drop it in. There is no open banking connection and you never enter bank credentials." },
-  { q: "Which UK banks does it work with?", a: "Any bank that exports CSV, OFX, QIF or a PDF statement: Barclays, HSBC, Lloyds, NatWest, Santander, Nationwide, Halifax, TSB, Monzo, Starling, Revolut, Chase, Amex and more. Step-by-step export guides cover 27 banks, and PDF statements import directly." },
-  { q: "Where is my financial data stored?", a: "In your browser, on your device. Nothing is uploaded unless you choose to sign in to sync across devices, and you can export everything at any time." },
-  { q: "Is it an alternative to YNAB, Emma or Money Dashboard?", a: "For a free, private monthly picture of income, spending and surplus, yes. The comparison pages say plainly where each of those wins." },
-  { q: "Does it work on a phone?", a: "Yes. It runs in any browser, installs to your home screen like an app, and works offline once loaded." },
-] as const;
-
-const RESOURCES = [
-  { href: "/tools/budget-planner-uk.html", t: "Budget planner (UK)", d: "Surplus, savings rate and the 50/30/20 check" },
-  { href: "/tools/rent-affordability-calculator-uk.html", t: "Rent affordability", d: "The 30% rule and the letting-agent income check" },
-  { href: "/guides/income-and-expenditure-form-uk.html", t: "Income and expenditure form", d: "Fill in the Standard Financial Statement from real statements" },
-  { href: "/tools/weekly-to-monthly-budget-calculator.html", t: "Weekly to monthly calculator", d: "Convert pay and bills to the same budget period" },
-  { href: "/tools/split-bills-by-income-calculator.html", t: "Split bills by income", d: "Compare proportional contributions with 50/50" },
-  { href: "/tools/christmas-budget-savings-calculator.html", t: "Christmas savings planner", d: "Work out how much to put aside each payday" },
-  { href: "/import/", t: "Bank CSV guides", d: "Export from 27 UK banks, step by step" },
-  { href: "/guides/", t: "Budgeting guides", d: "Answer-first, no jargon, no bank login" },
-  { href: "/tools/", t: "Free calculators", d: "50/30/20, emergency fund, payoff, surplus" },
-  { href: "/templates/", t: "Budget templates", d: "Free CSVs that import in one step" },
-  { href: "/compare/", t: "Compare apps", d: "Honest side-by-sides, including where we lose" },
-  { href: "/whats-new.html", t: "What\u2019s new", d: "Release notes, newest first" },
-] as const;
-
 type HeroFocus = "inc-name" | "inc-amt" | "exp-name" | "exp-amt" | null;
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function LandingPage({ onEnter, onFeedback }: { onEnter: () => void; onFeedback: () => void }) {
+export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { onEnter: () => void; onFeedback: () => void; region?: RegionKey }) {
+  const copy = LANDING_COPY[region];
+  const cur = copy.currency;
+  const CSV_ROWS = copy.csvRows;
+  const incomeRow = copy.heroIncome;
+  const [exp1, exp2] = copy.heroExpenses;
   const ctxRef    = useRef<AudioContext | null>(null);
   const csvRef    = useRef<HTMLElement | null>(null);
   const annualRef = useRef<HTMLElement | null>(null);
@@ -208,11 +184,8 @@ export default function LandingPage({ onEnter, onFeedback }: { onEnter: () => vo
   // ── Hero animation loop ───────────────────────────────────────────────────
   useEffect(() => {
     if (reduced) {
-      setHeroIncAdded([{ name: "Interest", amt: "78.00" }]);
-      setHeroExpAdded([
-        { name: "Costa Coffee", amt: "4.20" },
-        { name: "Work commute", amt: "120.00" },
-      ]);
+      setHeroIncAdded([incomeRow]);
+      setHeroExpAdded([exp1, exp2]);
       return;
     }
 
@@ -242,47 +215,47 @@ export default function LandingPage({ onEnter, onFeedback }: { onEnter: () => vo
 
       let t = 0;
 
-      // Income: "Interest" → Tab → "78" → Enter
+      // Income: name → Tab → amount → Enter
       t = 600;
-      t = typeStr("Interest", setHeroName, t);
+      t = typeStr(incomeRow.name, setHeroName, t);
       t += 320; push(() => setHeroTabBadge(true), t);
       t += 350; push(() => { setHeroTabBadge(false); setHeroFocus("inc-amt"); }, t);
-      t += 100; t = typeStr("78", setHeroAmt, t, 200);
+      t += 100; t = typeStr(incomeRow.amt.replace(/\.00$/, ""), setHeroAmt, t, 200);
       t += 250; push(() => setHeroEnterBadge(true), t);
       t += 350; push(() => {
         setHeroEnterBadge(false);
         setHeroFocus(null);
-        setHeroIncAdded([{ name: "Interest", amt: "78.00" }]);
+        setHeroIncAdded([incomeRow]);
         setHeroName(""); setHeroAmt("");
       }, t);
       t += 400;
 
-      // Expense 1: "Costa Coffee" → Tab → "4.20" → Enter
+      // Expense 1: name → Tab → amount → Enter
       push(() => setHeroFocus("exp-name"), t);
-      t += 250; t = typeStr("Costa Coffee", setHeroName, t);
+      t += 250; t = typeStr(exp1.name, setHeroName, t);
       t += 320; push(() => setHeroTabBadge(true), t);
       t += 350; push(() => { setHeroTabBadge(false); setHeroFocus("exp-amt"); }, t);
-      t += 100; t = typeStr("4.20", setHeroAmt, t, 200);
+      t += 100; t = typeStr(exp1.amt.replace(/\.00$/, ""), setHeroAmt, t, 200);
       t += 250; push(() => setHeroEnterBadge(true), t);
       t += 350; push(() => {
         setHeroEnterBadge(false);
         setHeroFocus(null);
-        setHeroExpAdded([{ name: "Costa Coffee", amt: "4.20" }]);
+        setHeroExpAdded([exp1]);
         setHeroName(""); setHeroAmt("");
       }, t);
       t += 400;
 
-      // Expense 2: "Work commute" → Tab → "120" → Enter
+      // Expense 2: name → Tab → amount → Enter
       push(() => setHeroFocus("exp-name"), t);
-      t += 250; t = typeStr("Work commute", setHeroName, t);
+      t += 250; t = typeStr(exp2.name, setHeroName, t);
       t += 320; push(() => setHeroTabBadge(true), t);
       t += 350; push(() => { setHeroTabBadge(false); setHeroFocus("exp-amt"); }, t);
-      t += 100; t = typeStr("120", setHeroAmt, t, 200);
+      t += 100; t = typeStr(exp2.amt.replace(/\.00$/, ""), setHeroAmt, t, 200);
       t += 250; push(() => setHeroEnterBadge(true), t);
       t += 350; push(() => {
         setHeroEnterBadge(false);
         setHeroFocus(null);
-        setHeroExpAdded(prev => [...prev, { name: "Work commute", amt: "120.00" }]);
+        setHeroExpAdded(prev => [...prev, exp2]);
         setHeroName(""); setHeroAmt("");
       }, t);
 
@@ -293,7 +266,7 @@ export default function LandingPage({ onEnter, onFeedback }: { onEnter: () => vo
 
     push(runLoop, 800);
     return () => { alive = false; tids.forEach(clearTimeout); };
-  }, [reduced]);
+  }, [reduced, region]);
 
   // ── Annual chart: visibility tracking ────────────────────────────────────
   useEffect(() => {
@@ -384,7 +357,8 @@ export default function LandingPage({ onEnter, onFeedback }: { onEnter: () => vo
   const expenseTotal = heroExpAdded.reduce((s, r) => s + parseFloat(r.amt), 0);
   const incomeCount  = 1 + heroIncAdded.length;
   const expenseCount = heroExpAdded.length;
-  const fmt = (n: number) => n.toLocaleString("en-GB", { minimumFractionDigits: 2 });
+  const fmt = (n: number) => n.toLocaleString(copy.locale, { minimumFractionDigits: 2 });
+  const miniExpenseTotal = parseFloat(copy.miniFood.amt) + copy.miniRows.reduce((s, r) => s + parseFloat(r.amt), 0);
 
   const maxV   = Math.max(...BAR_EXT.map(b => Math.abs(b.v)));
   const svgW   = 4 + BAR_EXT.length * 26; // 1044px for 40 bars
@@ -404,10 +378,8 @@ export default function LandingPage({ onEnter, onFeedback }: { onEnter: () => vo
         <div className="lp-nav-inner">
           <span className="lp-nav-brand">The Income Tracker</span>
           <nav className="lp-nav-links" aria-label="Site">
-            <a href="/import/">Bank guides</a>
-            <a href="/guides/">Guides</a>
-            <a href="/tools/">Calculators</a>
-            <a href="/compare/">Compare</a>
+            {copy.nav.map(link => <a key={link.href} href={link.href}>{link.label}</a>)}
+            <a href={copy.switchTo.href} hrefLang={copy.switchTo.region === "US" ? "en-US" : "en-GB"} onClick={() => rememberLandingRegion(copy.switchTo.region)}>{copy.switchTo.label}</a>
           </nav>
           <button className="lp-btn lp-btn--sm" onClick={enter} onMouseEnter={hover}>
             Continue to app <ArrowRight size={14} />
@@ -424,11 +396,7 @@ export default function LandingPage({ onEnter, onFeedback }: { onEnter: () => vo
               Track income and spending<br />
               <span className="lp-accent">without linking your bank.</span>
             </h1>
-            <p className="lp-sub">
-              A month-by-month ledger for your income and expenses.
-              Download a CSV from Barclays, HSBC, Monzo or Starling
-              and import it in seconds. No account connection needed.
-            </p>
+            <p className="lp-sub">{copy.heroSub}</p>
             <div className="lp-actions">
               <button className="lp-btn lp-btn--lg" onClick={enter} onMouseEnter={hover}>
                 Open the ledger <ArrowRight size={18} />
@@ -456,19 +424,19 @@ export default function LandingPage({ onEnter, onFeedback }: { onEnter: () => vo
                       <div className="lp-mp-title"><span className="lp-glyph lp-glyph--in">↓</span> Income</div>
                       <div className="lp-mp-sub">{incomeCount} item{incomeCount !== 1 ? "s" : ""}</div>
                     </div>
-                    <span className="lp-mp-total lp-mp-total--income">£{fmt(incomeTotal)}</span>
+                    <span className="lp-mp-total lp-mp-total--income">{cur}{fmt(incomeTotal)}</span>
                   </div>
                   <div className="lp-col-head"><span>Source</span><span>Amount</span></div>
                   <div className="lp-mrow">
                     <span className="lp-dot-swatch" style={{ background: "#6c5ce7" }} />
-                    <span className="lp-mname">Salary</span>
-                    <span className="lp-mamt">£ 3,248.72</span>
+                    <span className="lp-mname">{copy.salaryLabel}</span>
+                    <span className="lp-mamt">{cur} {fmt(3248.72)}</span>
                   </div>
                   {heroIncAdded.map(r => (
                     <div key={r.name} className="lp-mrow lp-mrow--new">
                       <span className="lp-dot-swatch" style={{ background: "#00b894" }} />
                       <span className="lp-mname">{r.name}</span>
-                      <span className="lp-mamt">£ {r.amt}</span>
+                      <span className="lp-mamt">{cur} {r.amt}</span>
                     </div>
                   ))}
                   <div className="lp-madd">
@@ -486,8 +454,8 @@ export default function LandingPage({ onEnter, onFeedback }: { onEnter: () => vo
                     </span>
                     <span className={`lp-madd-field lp-madd-field--amt${heroFocus === "inc-amt" ? " lp-madd-field--focus" : ""}`}>
                       {heroFocus === "inc-amt"
-                        ? <>£{heroAmt}<span className="lp-cursor" /></>
-                        : <span className="lp-ph">£</span>}
+                        ? <>{cur}{heroAmt}<span className="lp-cursor" /></>
+                        : <span className="lp-ph">{cur}</span>}
                     </span>
                     <span className="lp-key-badge lp-key-badge--enter"
                       style={{ opacity: heroEnterBadge && heroFocus === "inc-amt" ? 1 : 0 }}>
@@ -504,13 +472,13 @@ export default function LandingPage({ onEnter, onFeedback }: { onEnter: () => vo
                       <div className="lp-mp-title"><span className="lp-glyph lp-glyph--out">↑</span> Expenses</div>
                       <div className="lp-mp-sub">{expenseCount} item{expenseCount !== 1 ? "s" : ""}</div>
                     </div>
-                    <span className="lp-mp-total">£{fmt(expenseTotal)}</span>
+                    <span className="lp-mp-total">{cur}{fmt(expenseTotal)}</span>
                   </div>
                   <div className="lp-col-head"><span>Expense</span><span>Amount</span></div>
                   {heroExpAdded.map(r => (
                     <div key={r.name} className="lp-mrow lp-mrow--new">
                       <span className="lp-mname">{r.name}</span>
-                      <span className="lp-mamt lp-mamt--exp">£ {r.amt}</span>
+                      <span className="lp-mamt lp-mamt--exp">{cur} {r.amt}</span>
                     </div>
                   ))}
                   <div className="lp-madd lp-madd--exp">
@@ -528,8 +496,8 @@ export default function LandingPage({ onEnter, onFeedback }: { onEnter: () => vo
                     </span>
                     <span className={`lp-madd-field lp-madd-field--amt${heroFocus === "exp-amt" ? " lp-madd-field--focus" : ""}`}>
                       {heroFocus === "exp-amt"
-                        ? <>£{heroAmt}<span className="lp-cursor" /></>
-                        : <span className="lp-ph">£</span>}
+                        ? <>{cur}{heroAmt}<span className="lp-cursor" /></>
+                        : <span className="lp-ph">{cur}</span>}
                     </span>
                     <span className="lp-key-badge lp-key-badge--enter"
                       style={{ opacity: heroEnterBadge && heroFocus === "exp-amt" ? 1 : 0 }}>
@@ -547,8 +515,7 @@ export default function LandingPage({ onEnter, onFeedback }: { onEnter: () => vo
         {/* ════ PRIVACY STRIP ════ */}
         <div className="lp-strip lp-r">
           <span className="lp-strip-pip" aria-hidden="true" />
-          No open banking. No Plaid. No third-party access to your accounts.
-          Just a CSV file you download yourself.
+          {copy.strip}
         </div>
 
         {/* ════ DEMO 1: CSV import ════ */}
@@ -562,7 +529,7 @@ export default function LandingPage({ onEnter, onFeedback }: { onEnter: () => vo
                 <div key={row.desc} className={`lp-csv-row${csvStep > i ? " lp-csv-row--in" : ""}`}>
                   <span className="lp-csv-date">{row.date}</span>
                   <span className="lp-csv-desc">{row.desc}</span>
-                  <span className="lp-csv-amt">£{row.amt}</span>
+                  <span className="lp-csv-amt">{cur}{row.amt}</span>
                   <span className={`lp-csv-cat${csvStep > CSV_ROWS.length + i ? " lp-csv-cat--in" : ""}`}>{row.cat}</span>
                 </div>
               ))}
@@ -570,12 +537,8 @@ export default function LandingPage({ onEnter, onFeedback }: { onEnter: () => vo
           </div>
           <div className="lp-demo-copy">
             <span className="lp-eyebrow">Bank CSV import</span>
-            <h2 className="lp-demo-h2">Import from any UK bank</h2>
-            <p className="lp-demo-p">
-              Download a statement from Barclays, HSBC, Monzo or Starling.
-              Drop the CSV into the app. Dates, descriptions and amounts are
-              read automatically.
-            </p>
+            <h2 className="lp-demo-h2">{copy.csvHeading}</h2>
+            <p className="lp-demo-p">{copy.csvBody}</p>
             <p className="lp-demo-note">No formatting required. Works with standard bank exports.</p>
           </div>
         </section>
@@ -596,23 +559,23 @@ export default function LandingPage({ onEnter, onFeedback }: { onEnter: () => vo
               <div className="lp-mini-panel lp-mini-panel--income">
                 <div className="lp-mini-head">
                   <span>Income</span>
-                  <span className="lp-mini-total lp-mini-total--income">£3,248.72</span>
+                  <span className="lp-mini-total lp-mini-total--income">{cur}{fmt(3248.72)}</span>
                 </div>
-                <div className="lp-mini-row"><span>Salary (BACS)</span><span>£3,248.72</span></div>
+                <div className="lp-mini-row"><span>{copy.miniIncomeLabel}</span><span>{cur}{fmt(3248.72)}</span></div>
               </div>
               <div className="lp-mini-panel lp-mini-panel--expense">
                 <div className="lp-mini-head">
                   <span>Expenses</span>
-                  <span className="lp-mini-total">£144.35</span>
+                  <span className="lp-mini-total">{cur}{fmt(miniExpenseTotal)}</span>
                 </div>
                 <div className="lp-mini-cat">
-                  <span className="lp-mini-cat-pip" /><span>Food</span>
-                  <span className="lp-mini-cat-amt">£42.61</span>
+                  <span className="lp-mini-cat-pip" /><span>{copy.miniFood.label}</span>
+                  <span className="lp-mini-cat-amt">{cur}{copy.miniFood.amt}</span>
                 </div>
-                <div className="lp-mini-row lp-mini-row--indent"><span>Tesco Extra</span><span>£42.61</span></div>
-                <div className="lp-mini-row"><span>Southern Rail</span><span>£12.40</span></div>
-                <div className="lp-mini-row"><span>Costa Coffee</span><span>£4.35</span></div>
-                <div className="lp-mini-row"><span>Dentist (Bupa)</span><span>£75.00</span></div>
+                <div className="lp-mini-row lp-mini-row--indent"><span>{copy.miniFood.merchant}</span><span>{cur}{copy.miniFood.amt}</span></div>
+                {copy.miniRows.map(r => (
+                  <div className="lp-mini-row" key={r.name}><span>{r.name}</span><span>{cur}{r.amt}</span></div>
+                ))}
               </div>
             </div>
           </div>
@@ -663,15 +626,15 @@ export default function LandingPage({ onEnter, onFeedback }: { onEnter: () => vo
                   <div className="lp-proj-grid">
                     <div className="lp-proj-stat">
                       <span className="lp-proj-label">Projected income</span>
-                      <span className="lp-proj-val">£39,330</span>
+                      <span className="lp-proj-val">{cur}39,330</span>
                     </div>
                     <div className="lp-proj-stat">
                       <span className="lp-proj-label">Projected outgoings</span>
-                      <span className="lp-proj-val">£33,140</span>
+                      <span className="lp-proj-val">{cur}33,140</span>
                     </div>
                     <div className="lp-proj-stat">
                       <span className="lp-proj-label">Projected surplus</span>
-                      <span className="lp-proj-val lp-proj-val--pos">+£6,190</span>
+                      <span className="lp-proj-val lp-proj-val--pos">+{cur}6,190</span>
                     </div>
                     <div className="lp-proj-stat lp-proj-stat--rate">
                       <div>
@@ -716,19 +679,33 @@ export default function LandingPage({ onEnter, onFeedback }: { onEnter: () => vo
 
         {/* ════ BANKS ════ */}
         <section className="lp-banks lp-r" aria-labelledby="lp-banks-h2">
-          <span className="lp-eyebrow">Works with your bank</span>
-          <h2 className="lp-cmp-h2" id="lp-banks-h2">CSV export guides for {BANK_GUIDES.length} UK banks</h2>
-          <p className="lp-section-p">
-            Every major UK bank lets you download your own transactions. Pick yours for the exact steps, then import the file here.
-            Only got a PDF? <a href="/guides/import-pdf-bank-statement.html">Import it directly</a>.
-          </p>
-          <ul className="lp-bank-grid">
-            {BANK_GUIDES.map(bank => (
-              <li key={bank.slug}>
-                <a className="lp-bank" href={`/import/${bank.slug}.html`}>{bank.name}</a>
-              </li>
-            ))}
-          </ul>
+          <span className="lp-eyebrow">{copy.banksEyebrow}</span>
+          {copy.bankNames ? (
+            <>
+              <h2 className="lp-cmp-h2" id="lp-banks-h2">{copy.banksHeading}</h2>
+              <p className="lp-section-p">{copy.banksBody}</p>
+              <ul className="lp-bank-grid">
+                {copy.bankNames.map(name => (
+                  <li key={name}><span className="lp-bank">{name}</span></li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <>
+              <h2 className="lp-cmp-h2" id="lp-banks-h2">CSV export guides for {BANK_GUIDES.length} UK banks</h2>
+              <p className="lp-section-p">
+                {copy.banksBody}{" "}
+                Only got a PDF? <a href="/guides/import-pdf-bank-statement.html">Import it directly</a>.
+              </p>
+              <ul className="lp-bank-grid">
+                {BANK_GUIDES.map(bank => (
+                  <li key={bank.slug}>
+                    <a className="lp-bank" href={`/import/${bank.slug}.html`}>{bank.name}</a>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
         </section>
 
         {/* ════ COMPARISON ════ */}
@@ -760,8 +737,9 @@ export default function LandingPage({ onEnter, onFeedback }: { onEnter: () => vo
         <section className="lp-res lp-r" aria-labelledby="lp-res-h2">
           <span className="lp-eyebrow">Free, with or without the app</span>
           <h2 className="lp-cmp-h2" id="lp-res-h2">Guides, calculators and templates</h2>
+          {copy.resourcesNote && <p className="lp-section-p">{copy.resourcesNote}</p>}
           <div className="lp-res-grid">
-            {RESOURCES.map(r => (
+            {copy.resources.map(r => (
               <a className="lp-res-card" href={r.href} key={r.href}>
                 <strong>{r.t}</strong>
                 <span>{r.d}</span>
@@ -774,7 +752,7 @@ export default function LandingPage({ onEnter, onFeedback }: { onEnter: () => vo
         <section className="lp-faq lp-r" aria-labelledby="lp-faq-h2">
           <h2 className="lp-cmp-h2" id="lp-faq-h2">Questions people ask</h2>
           <dl className="lp-faq-list">
-            {FAQ.map(item => (
+            {copy.faq.map(item => (
               <div className="lp-faq-item" key={item.q}>
                 <dt>{item.q}</dt>
                 <dd>{item.a}</dd>
@@ -818,6 +796,8 @@ export default function LandingPage({ onEnter, onFeedback }: { onEnter: () => vo
             <a href="/privacy.html" className="lp-footer-link">Privacy Policy</a>
             <span aria-hidden="true">·</span>
             <a href="/tos.html" className="lp-footer-link">Terms of Service</a>
+            <span aria-hidden="true">·</span>
+            <a href={copy.switchTo.href} hrefLang={copy.switchTo.region === "US" ? "en-US" : "en-GB"} className="lp-footer-link" onClick={() => rememberLandingRegion(copy.switchTo.region)}>{copy.switchTo.label}</a>
           </nav>
         </footer>
 

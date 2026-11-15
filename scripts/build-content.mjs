@@ -63,7 +63,7 @@ export function humanDate(iso) {
 const UPDATED_HUMAN = humanDate(UPDATED);
 
 const PAGE_UPDATES = new Map([
-  ["/", "2026-09-16"], ["/tools/", "2026-09-16"], ["/whats-new.html", "2026-10-18"],
+  ["/", "2026-11-15"], ["/us/", "2026-11-15"], ["/tools/", "2026-09-16"], ["/whats-new.html", "2026-10-18"],
   ["/import/", "2026-09-16"], ["/guides/", "2026-09-16"], ["/templates/", "2026-09-16"],
   ...BANKS.map(p => [`/import/${p.slug}.html`, p.updated || UPDATED]),
   ...GUIDES.map(p => [`/guides/${p.slug}.html`, p.updated || UPDATED]),
@@ -225,7 +225,7 @@ function siteHeader() {
       <a class="brand" href="/">${BRAND}</a>
       <nav class="sitenav" aria-label="Site">
 ${NAV_LINKS.map((l) => `        <a href="${l.href}">${esc(l.label)}</a>`).join("\n")}
-        <a class="navbtn" href="/?ref=nav" data-track="cta_click" data-ref="nav">Open the tracker</a>
+        <a class="navbtn" href="/#ref=nav" data-track="cta_click" data-ref="nav">Open the tracker</a>
       </nav>
     </header>`;
 }
@@ -236,7 +236,7 @@ function siteFooter() {
           <div>
             <h4>Use it</h4>
             <ul>
-              <li><a href="/?ref=footer" data-track="cta_click" data-ref="footer">Open the tracker</a></li>
+              <li><a href="/#ref=footer" data-track="cta_click" data-ref="footer">Open the tracker</a></li>
               <li><a href="/import/">Bank CSV guides</a></li>
               <li><a href="/templates/">Budget templates</a></li>
               <li><a href="/tools/">Calculators</a></li>
@@ -255,7 +255,7 @@ function siteFooter() {
             <h4>About</h4>
             <ul>
               <li><a href="/about.html">About</a></li>
-              <li><a href="/?feedback=1">Contact us</a></li>
+              <li><a href="/#feedback">Contact us</a></li>
               <li><a href="/privacy.html">Privacy</a></li>
               <li><a href="/tos.html">Terms</a></li>
               <li><a href="/feed.xml">RSS feed</a></li>
@@ -439,7 +439,7 @@ function faqHtml(faqs) {
 function ctaHtml(line = "Track it free. No account, no bank login.", ref = "content") {
   return `<div class="cta">
   <div class="cta-text"><strong>${BRAND}</strong><span>${esc(line)}</span></div>
-  <a class="btn" href="/?ref=${encodeURIComponent(ref)}" data-track="cta_click" data-ref="${esc(ref)}">Open the tracker &rarr;</a>
+  <a class="btn" href="/#ref=${encodeURIComponent(ref)}" data-track="cta_click" data-ref="${esc(ref)}">Open the tracker &rarr;</a>
 </div>`;
 }
 
@@ -494,7 +494,7 @@ function sourcesHtml(sources, checked) {
   if (!sources || !sources.length) return "";
   return `<div class="sources"><h3>Sources and checking</h3><p>Facts on this page were last checked on ${esc(checked || UPDATED_HUMAN)} against:</p><ul>${sources
     .map((s) => `<li><a href="${esc(s.href)}" rel="noopener" target="_blank">${esc(s.t)}</a></li>`)
-    .join("")}</ul><p>Spotted something out of date? <a href="/?feedback=1">Tell us</a> and we will fix it.</p></div>`;
+    .join("")}</ul><p>Spotted something out of date? <a href="/#feedback">Tell us</a> and we will fix it.</p></div>`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -510,11 +510,11 @@ function bankPage(bank) {
   const pdfOnly = !!bank.pdfOnly;
   const title = pageTitle(
     pdfOnly
-      ? `How to download your ${bank.name} statement and track it free (2026)`
+      ? `${bank.name} statement download: track it free (2026)`
       : `How to export your ${bank.name} statement to CSV (free, 2026)`,
   );
   const description = pdfOnly
-    ? `${bank.name} only issues PDF statements. Here is where to download one and how to paste it into a free income and expense tracker. No account and no bank login required.`
+    ? `${bank.name} only issues PDF statements. Where to find it and how to track it in a free income and expense tracker, no bank login.`
     : `Step-by-step: download your ${bank.name} transactions as a CSV file and track your income and spending free. No account and no bank login required.`;
   const trail = [
     { name: "Home", path: "/" },
@@ -791,7 +791,7 @@ function calcWidget(calc) {
         <noscript><p>Enable JavaScript to calculate your own result. The formulas and worked examples below are available without it.</p></noscript>
         <div class="calc-actions">
           <button class="btn ghost" type="button" id="calc-share">Share this result</button>
-          <a class="btn" href="/?ref=calc-${esc(calc.slug)}" data-track="cta_click" data-ref="calc-${esc(calc.slug)}">Track it in the app &rarr;</a>
+          <a class="btn" href="/#ref=calc-${esc(calc.slug)}" data-track="cta_click" data-ref="calc-${esc(calc.slug)}">Track it in the app &rarr;</a>
           <span class="calc-share-note" id="calc-share-note">Calculated on your device. Shared links include the amounts you enter.</span>
         </div>
       </div>`;
@@ -1194,7 +1194,7 @@ function templatePage(t) {
       <div class="tldr"><strong>In short</strong><p>${esc(t.tldr)}</p></div>
       <div class="btnrow">
         <a class="btn" href="${filePath}" download data-track="template_download" data-ref="${esc(t.slug)}">Download the CSV template &darr;</a>
-        <a class="btn ghost" href="/?ref=template-${esc(t.slug)}" data-track="cta_click" data-ref="template-${esc(t.slug)}">Open the tracker instead</a>
+        <a class="btn ghost" href="/#ref=template-${esc(t.slug)}" data-track="cta_click" data-ref="template-${esc(t.slug)}">Open the tracker instead</a>
       </div>
       <p class="note">Opens in Excel, Google Sheets, Numbers and LibreOffice. It is a plain CSV, so nothing is locked, tracked or macro-enabled.</p>
 
@@ -1295,7 +1295,7 @@ function aboutPage() {
   const path = "/about.html";
   const title = `About ${BRAND}: who makes it and how it is funded`;
   const description =
-    "The Income Tracker is a free, independent, local-first budgeting tool for the UK. Who makes it, how it is funded, how your data is handled, and how to get in touch.";
+    "The Income Tracker is a free, independent, local-first UK budgeting tool. Who makes it, how it is funded, how your data is handled and how to get in touch.";
   const trail = [
     { name: "Home", path: "/" },
     { name: "About", path },
@@ -1309,7 +1309,7 @@ function aboutPage() {
       <p>A month-by-month ledger for income and expenses. You import a bank CSV (or type entries in), drag transactions into categories, mark the recurring ones, and the app works out your surplus, savings rate, annual picture and goal dates. There is an optional sign-in if you want the same data on two devices. That is the whole product, on purpose.</p>
 
       <h2>Who makes it</h2>
-      <p>It is built and maintained by a small independent team, not a bank, a fintech or a venture-funded start-up. There is no growth team optimising for time in app, and no product roadmap that depends on selling your data. Feedback goes straight to the people who write the code: use the <a href="/?feedback=1">contact form</a> or email <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>.</p>
+      <p>It is built and maintained by a small independent team, not a bank, a fintech or a venture-funded start-up. There is no growth team optimising for time in app, and no product roadmap that depends on selling your data. Feedback goes straight to the people who write the code: use the <a href="/#feedback">contact form</a> or email <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>.</p>
 
       <h2>How it is funded</h2>
       <p>Right now, it is not. The core tracker is free and we intend to keep it free. If we ever add paid extras, they will be optional conveniences (for example automatic bank feeds for people who want them), never a paywall on your own data or on the basic ledger. We do not sell data, run adverts or take affiliate payments from the apps we compare ourselves with.</p>
@@ -1323,7 +1323,7 @@ function aboutPage() {
       </ul>
 
       <h2>How we check our facts</h2>
-      <p>Bank export steps are checked against the bank&rsquo;s own help pages and re-checked when readers report a change. Figures in guides (tax thresholds, allowances, official guidance) cite the primary source on the page and carry the date they were last checked. If something is out of date, <a href="/?feedback=1">tell us</a> and we will fix it, usually within days.</p>
+      <p>Bank export steps are checked against the bank&rsquo;s own help pages and re-checked when readers report a change. Figures in guides (tax thresholds, allowances, official guidance) cite the primary source on the page and carry the date they were last checked. If something is out of date, <a href="/#feedback">tell us</a> and we will fix it, usually within days.</p>
 
       <h2>What we collect</h2>
       <p>On these content pages we count page views and a handful of anonymous events (a calculator was used, a template was downloaded) so we know what is useful. We never see what you type into a calculator or a ledger. The full detail is in the <a href="/privacy.html">privacy policy</a>.</p>
@@ -1396,14 +1396,14 @@ function notFoundPage() {
       <h1>That page isn&rsquo;t here</h1>
       <p class="lede">The link may be old, or the address has a typo. Nothing is lost: your ledger lives in your own browser and this page cannot touch it.</p>
       <div class="grid">
-        <a class="card" href="/?ref=404" data-track="cta_click" data-ref="404"><span class="card-t">Open the tracker</span><span class="card-d">Free, no account, no bank login</span></a>
+        <a class="card" href="/#ref=404" data-track="cta_click" data-ref="404"><span class="card-t">Open the tracker</span><span class="card-d">Free, no account, no bank login</span></a>
         <a class="card" href="/import/"><span class="card-t">Bank CSV guides</span><span class="card-d">Export from ${BANKS.length} UK banks</span></a>
         <a class="card" href="/guides/"><span class="card-t">Budgeting guides</span><span class="card-d">Answer-first, no jargon</span></a>
         <a class="card" href="/tools/"><span class="card-t">Calculators</span><span class="card-d">${CALCULATORS.length} free money tools</span></a>
         <a class="card" href="/compare/"><span class="card-t">Compare apps</span><span class="card-d">Honest side-by-sides</span></a>
         <a class="card" href="/templates/"><span class="card-t">Budget templates</span><span class="card-d">Free CSVs for Excel and Sheets</span></a>
       </div>
-      <p>Think this is our mistake? <a href="/?feedback=1">Tell us</a> which link brought you here.</p>`;
+      <p>Think this is our mistake? <a href="/#feedback">Tell us</a> which link brought you here.</p>`;
   return {
     path,
     html: shell({ title, description, path, ogType: "website", noindex: true, jsonLd: [], body }),
@@ -1420,7 +1420,7 @@ const RELATED_INDEX = {
   guides: { href: "/guides/", t: "Budgeting guides", d: "Private, free, no bank login" },
   compare: { href: "/compare/", t: "Compare budgeting apps", d: "Honest side-by-sides" },
   templates: { href: "/templates/", t: "Free budget templates", d: "CSVs for Excel, Sheets and the app" },
-  app: { href: "/?ref=related", t: "Open The Income Tracker", d: "Free, no account, no bank login" },
+  app: { href: "/#ref=related", t: "Open The Income Tracker", d: "Free, no account, no bank login" },
   about: { href: "/about.html", t: "About The Income Tracker", d: "Who makes it and how it is funded" },
   "whats-new": { href: "/whats-new.html", t: "What's new", d: "Latest updates and release notes" },
 };
@@ -1711,6 +1711,8 @@ async function main() {
   // Sitemap: home + existing legal pages + all generated content.
   const urls = [
     { path: "/", changefreq: "weekly", priority: "1.0" },
+    // The US homepage is written by scripts/prerender-home.mjs after the Vite build.
+    { path: "/us/", changefreq: "weekly", priority: "0.9" },
     { path: "/import/", changefreq: "monthly", priority: "0.9" },
     ...BANKS.map((b) => ({ path: `/import/${b.slug}.html`, changefreq: "monthly", priority: "0.8" })),
     { path: "/tools/", changefreq: "monthly", priority: "0.8" },

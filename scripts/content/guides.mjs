@@ -9,7 +9,7 @@ export const GUIDES = [
     published: "2026-06-16",
     title: "How to budget without linking your bank account (2026)",
     description:
-      "You do not need open banking to budget. Here is how to track your income and spending privately in 2026 using a bank CSV. No account connection, no credentials shared.",
+      "You do not need open banking to budget. How to track income and spending privately in 2026 with a bank CSV, without connecting an account or sharing a login.",
     h1: "How to budget without linking your bank account",
     tldr:
       "Yes, you can budget without open banking. Download a CSV of your transactions from your bank, import it into a local-first tool like The Income Tracker, and you are done. Nothing connects to your bank. No credentials shared. Your data stays in your browser.",
@@ -102,7 +102,7 @@ export const GUIDES = [
     published: "2026-06-16",
     title: "Is it safe to upload your bank statement to a budgeting app?",
     description:
-      "Is it safe to upload a bank statement or CSV to a budgeting app? It depends on where the data goes. Here is what to check, and how a local-first tool keeps it private.",
+      "Is it safe to upload a bank statement to a budgeting app? It depends where the data goes. What to check, and how a local-first tool keeps it private.",
     h1: "Is it safe to upload your bank statement to a budgeting app?",
     tldr:
       "It depends on where the file goes. The safest setup is a local-first tool that reads your CSV in your browser and never uploads it. That is exactly how The Income Tracker works. Steer clear of tools that quietly send your statement to their servers.",
@@ -156,7 +156,7 @@ export const GUIDES = [
     readMinutes: 4,
     title: "How to import a PDF bank statement (free, no converter)",
     description:
-      "Bank only gives you a PDF? Import it directly. The Income Tracker reads the transaction table out of the PDF in your browser, from Barclays, HSBC, Lloyds, NatWest, Santander, Nationwide, Monzo, Starling, Revolut and more. Nothing is uploaded.",
+      "Bank only gives you a PDF? Import it directly. The Income Tracker reads the transactions out of a Barclays, HSBC, Monzo or other UK statement in your browser.",
     h1: "How to import a PDF bank statement",
     tldr:
       "Open The Income Tracker, go to Settings, then Import data, click Import CSV / OFX / QIF / PDF and choose the PDF statement. The app reads the dates, descriptions and amounts from the statement's table and shows them on the same review screen as a CSV import. The PDF is read on your own device and never uploaded. If the PDF is a scanned image with no text, copy the rows and paste them in instead.",
@@ -315,7 +315,7 @@ export const GUIDES = [
     readMinutes: 5,
     title: "How to categorise bank transactions (a list that sticks)",
     description:
-      "How to categorise bank transactions for a budget: the ten categories that cover most UK households, rules that stop overthinking, and how to make sorting automatic.",
+      "How to categorise bank transactions for a budget: ten categories that cover most UK households, rules that stop overthinking, and how to automate sorting.",
     h1: "How to categorise bank transactions",
     tldr:
       "Use about ten categories, decide them once, and let rules do the repeat work. Housing, Bills, Groceries, Transport, Eating out, Subscriptions, Health, Shopping, Fun and Savings cover almost everyone. Transfers between your own accounts are not spending at all, so keep them out.",
@@ -436,7 +436,7 @@ export const GUIDES = [
     readMinutes: 5,
     title: "Find and cancel unused subscriptions from your bank statement",
     description:
-      "How to spot forgotten subscriptions in a UK bank statement and cancel each type properly: Direct Debits, standing orders, card continuous payments and app stores.",
+      "How to spot forgotten subscriptions on a UK bank statement and cancel each kind properly: Direct Debits, standing orders, card payments and app stores.",
     h1: "How to find and cancel unused subscriptions",
     tldr:
       "Export three months of transactions, import them, and look for the same amount from the same name every month. That list is your subscriptions. Cancel the ones you do not use with the company first, then, if it is a card payment, tell your bank to block the continuous payment authority. Banks must stop a CPA when you ask.",
@@ -517,7 +517,7 @@ export const GUIDES = [
     readMinutes: 5,
     title: "Budgeting as a couple with separate accounts (UK)",
     description:
-      "How UK couples with separate accounts budget together: the 50/50 split, the proportional split and yours-mine-ours, plus one ledger for both banks without shared logins.",
+      "How UK couples with separate accounts budget together: 50/50, proportional or yours-mine-ours, with one ledger for both banks and no shared logins.",
     h1: "Budgeting as a couple with separate accounts",
     tldr:
       "You do not need a joint account or a shared banking login to budget as a couple. Pick a split for the shared costs (equal, proportional to income, or a joint bills pot), then import each person's bank CSV into one ledger. Transfers between you are skipped automatically, so nothing double-counts.",
@@ -691,7 +691,7 @@ export const GUIDES = [
     readMinutes: 7,
     title: "Self-employed income tracking for Self Assessment (UK, 2026)",
     description:
-      "For UK sole traders: what records to keep, the 2025/26 Self Assessment deadlines, the £1,000 trading allowance, and what Making Tax Digital means from April 2026.",
+      "For UK sole traders: records to keep, 2025/26 Self Assessment deadlines, the £1,000 trading allowance and what Making Tax Digital means from April 2026.",
     h1: "Track self-employed income and expenses for Self Assessment",
     tldr:
       "Keep a dated record of every payment in and every business cost out, with a category that matches the expense headings on the self-employment pages of the tax return, and a tax pot. Import your business account's CSV each month and the record builds itself. If your gross self-employed and property income is over £50,000 you are in Making Tax Digital from April 2026, which adds quarterly updates through HMRC-recognised software.",
@@ -787,7 +787,7 @@ export const GUIDES = [
     readMinutes: 5,
     title: "How much should I save each month? (UK guide)",
     description:
-      "How much to save each month in the UK: the 20% guideline, why the first £1,000 matters most, the three-to-six-month emergency fund, and how to find your own number.",
+      "How much to save each month in the UK: the 20% guideline, why the first £1,000 matters most, the emergency fund, and how to find your own number.",
     h1: "How much should you save each month?",
     tldr:
       "The common guideline is 20% of take-home pay, from the 50/30/20 rule. The more useful answer is an order: first £1,000 in instant-access savings, then three to six months of essential outgoings as an emergency fund, then the percentage. Around three in ten UK adults have under £1,000 saved, so the first milestone is a real one.",
@@ -846,7 +846,7 @@ export const GUIDES = [
     readMinutes: 7,
     title: "How to fill in an income and expenditure form (UK, 2026)",
     description:
-      "What an income and expenditure form is, who asks for one (creditors, debt advisers, courts, lenders), the Standard Financial Statement categories, and how to fill it in accurately from your bank statements.",
+      "What an income and expenditure form is, who asks for one, the Standard Financial Statement categories, and how to fill it in accurately from bank statements.",
     h1: "How to fill in an income and expenditure form",
     tldr:
       "An income and expenditure form lists everything coming in and everything going out each month, so a creditor, adviser, lender or court can see what you can genuinely afford. Most UK creditors and advice charities now use one shared layout, the Standard Financial Statement. Fill it in from three months of real bank statements rather than memory, convert every figure to a monthly amount, include the irregular costs, and keep the evidence.",
@@ -940,7 +940,7 @@ export const GUIDES = [
     readMinutes: 5,
     title: "Does a budgeting app need your bank login? (UK, 2026)",
     description:
-      "No budgeting app needs your online banking password. Here is how UK apps actually get your transactions (open banking or a file you download), what each one means for your privacy, and the one warning sign to never ignore.",
+      "No budgeting app needs your online banking password. How UK apps really get your transactions, what each route means for privacy, and the warning sign to heed.",
     h1: "Does a budgeting app need your bank login?",
     tldr:
       "No. A budgeting app needs your transactions, not your login. UK apps that connect to your bank use open banking, a regulated consent you grant on your bank's own site or app, never by typing your password into the budgeting app. Apps that avoid connections altogether work from a CSV you download yourself. If any app asks for your online banking password or your card PIN, close it.",
@@ -1002,7 +1002,7 @@ export const GUIDES = [
     readMinutes: 5,
     title: "What does open banking share about you? (and how to revoke it)",
     description:
-      "Exactly what data a UK open banking app can read once you consent (balances, 12 months of transactions, direct debits, standing orders), how often it refreshes, how long it can keep it, and how to revoke access at the app or at your bank.",
+      "What a UK open banking app can read once you consent, how often it refreshes, how long it keeps your data, and how to revoke access at the app or your bank.",
     h1: "What does open banking share about you?",
     tldr:
       "With your consent, an account information provider can read your account name and numbers, balances, up to 12 months of transaction history, and your standing orders, direct debits and saved payees. It can refresh that data several times a day for 90 days, after which it must ask you to reconfirm. It cannot move money unless you approve a separate payment consent. You can revoke access in the app's settings or from your bank's list of connected apps at any time.",
@@ -1063,7 +1063,7 @@ export const GUIDES = [
     readMinutes: 6,
     title: "Self Assessment countdown: get your records ready before 31 January",
     description:
-      "A six-week plan for the 2025/26 Self Assessment return: register by 5 October, find your UTR, export a year of business transactions, total them under HMRC's expense headings, check payments on account, and file before 31 January 2027.",
+      "A six-week plan for your 2025/26 Self Assessment: find your UTR, total a year of transactions under HMRC's expense headings and file before 31 January 2027.",
     h1: "Self Assessment countdown: a six-week plan",
     tldr:
       "The online return for the 2025/26 tax year (6 April 2025 to 5 April 2026) is due by 31 January 2027, and any tax owed is due the same day. Six jobs, one a week: register if you are new (deadline 5 October 2026), find your UTR and Government Gateway login, export twelve months of business bank transactions, total income and expenses under HMRC's headings, check whether payments on account apply, and set the money aside. Start in November and January is boring.",
@@ -1158,7 +1158,7 @@ export const GUIDES = [
     readMinutes: 6,
     title: "How to budget: a beginner's guide for the UK (2026)",
     description:
-      "How to make a budget for the first time in the UK: find your take-home pay, pull one month of real transactions, sort them into ten categories, read your three numbers, pick a method, and check it monthly.",
+      "How to make your first budget in the UK: find your take-home pay, sort one month of real transactions into ten categories, pick a method and check it monthly.",
     h1: "How to budget: a beginner's guide",
     tldr:
       "A budget is your income minus your spending, planned before the month starts and checked after it ends. Start with one month of real bank transactions, not estimates. Sort them into about ten categories and you will know your essentials, your flexible spending and your surplus (or deficit) inside twenty minutes. Then decide three things: what to cut, what to save, and when you will look again.",
@@ -1253,7 +1253,7 @@ export const GUIDES = [
     readMinutes: 6,
     title: "How to check your bank statement for errors and unknown charges (UK)",
     description:
-      "A monthly routine for spotting unknown payments, wrong amounts and forgotten subscriptions on a UK bank statement, plus your rights: the Direct Debit Guarantee, chargeback, Section 75, and refunds for unauthorised payments.",
+      "Spot unknown payments, wrong amounts and forgotten subscriptions on a UK bank statement, and know your rights: Direct Debit Guarantee, chargeback, Section 75.",
     h1: "How to check your bank statement for errors and unknown charges",
     tldr:
       "Once a month, run down every transaction and ask three questions: do I recognise it, is the amount right, and do I still want it? Unknown card payments can be disputed through your bank by chargeback, credit card purchases over £100 are also covered by Section 75, direct debits are protected by the Direct Debit Guarantee, and a payment you did not authorise must normally be refunded by the end of the next business day unless the bank can show you acted fraudulently or with gross negligence.",

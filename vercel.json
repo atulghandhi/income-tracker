@@ -78,15 +78,48 @@
           "value": "noindex, follow"
         }
       ]
+    },
+    {
+      "source": "/:view(dashboard|ledger|accounts|pay|goals|subscriptions|allocate|settings)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, follow"
+        }
+      ]
+    },
+    {
+      "source": "/app-shell/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, follow"
+        }
+      ]
     }
   ],
   "rewrites": [
     {
-      "source": "/:view(dashboard|ledger|accounts|pay|goals|subscriptions|allocate|insights|settings)",
-      "destination": "/index.html"
+      "source": "/:view(dashboard|ledger|accounts|pay|goals|subscriptions|allocate|settings)",
+      "destination": "/app-shell/:view.html"
     }
   ],
   "redirects": [
+    {
+      "source": "/insights",
+      "destination": "/dashboard",
+      "permanent": true
+    },
+    {
+      "source": "/us",
+      "destination": "/us/",
+      "permanent": true
+    },
+    {
+      "source": "/us/index.html",
+      "destination": "/us/",
+      "permanent": true
+    },
     {
       "source": "/index.html",
       "destination": "/",

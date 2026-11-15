@@ -46,6 +46,19 @@ Added without query data (Search Console is still not connected to this domain, 
 - Landings: free budget planner UK, free expense tracker UK.
 - robots.txt now lists the newer AI crawlers (Perplexity-User, DuckAssistBot, Amazonbot, meta-externalagent, MistralAI-User and others) and points at llms.txt.
 
+## 15 November 2026: Bing Site Scan fixes and the US homepage
+
+Bing reported too many pages with identical titles and descriptions. Two causes, both fixed:
+
+- **App URLs served the homepage.** `/dashboard`, `/ledger` and the other app pages were rewritten to `index.html`, so each carried the homepage title, description and `index, follow`. `scripts/prerender-home.mjs` now writes `dist/app-shell/<view>.html` per page with its own title (`VIEW_META` in `src/routes.ts`), `noindex, follow` and no canonical; `vercel.json` rewrites each URL to its shell and adds an `X-Robots-Tag: noindex` header. `/insights` is now a real 308 to `/dashboard`.
+- **Tracking links minted homepage duplicates.** Static pages linked to `/?ref=nav`, `/?ref=calc-…`, `/?feedback=1` and so on, about 50 distinct URLs with the homepage title. They now use fragments (`/#ref=…`, `/#feedback`), which are not separate URLs. The app still reads the old query forms. In Bing Webmaster Tools, also set `ref`, `feedback` and `sample` as ignored URL parameters so the already-crawled variants drop out.
+
+Also: every meta description is now 160 characters or fewer (Bing flags longer ones), and `check-seo.mjs` fails the build on a description over 160 or under 50, a title over 70, any `/?…` link, an app view without a noindex shell, or a missing hreflang pair.
+
+**US homepage.** `/us/` is the same landing component rendered with US copy (`src/landingContent.ts`): dollars, US banks, Plaid-free wording, US FAQ and its own `en-US` head, canonical and JSON-LD. `/` and `/us/` carry reciprocal hreflang with `/` as x-default. A first-time visitor on `/` whose browser says US (time zone and language, the same detection the app uses) sees the US copy in place, without a redirect; crawlers always get the page the URL names. "US version" and "UK version" links switch, and the choice is remembered. Entering the app from `/us/` starts a US ledger. The importer also accepts `.qfx` files now, which US banks offer widely.
+
+After deploying: submit `/` and `/us/` with `npm run indexnow -- --since 2026-11-15 --submit`, and inspect `/us/` in Bing Webmaster Tools.
+
 ## What to write next (in order of expected return)
 
 1. Connect Google Search Console to this domain. Every item below is a guess until there is query data.

@@ -44,6 +44,31 @@
       })();
     </script>
     <link rel="canonical" href="https://www.theincometracker.com/" />
+    <link rel="alternate" hreflang="en-GB" href="https://www.theincometracker.com/" />
+    <link rel="alternate" hreflang="en-US" href="https://www.theincometracker.com/us/" />
+    <link rel="alternate" hreflang="x-default" href="https://www.theincometracker.com/" />
+    <style>html[data-landing-pending] #root{visibility:hidden}</style>
+    <script>
+      // A first-time visitor on "/" whose clock is on a US time zone is about to get the US
+      // homepage (src/landingContent.ts). Hide the prerendered UK copy until React draws it, so
+      // it never flashes. App.tsx removes the attribute on mount; the timeout is a safety net.
+      (function () {
+        try {
+          if (location.pathname !== "/" || localStorage.getItem("hasSeenLanding")) return;
+          if (/bot|crawler|spider|slurp|bingpreview|mediapartners|lighthouse/i.test(navigator.userAgent)) return;
+          var pref = localStorage.getItem("it_landing_region");
+          if (pref === "GB") return;
+          var zone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+          var usZone = /^(America\/(New_York|Detroit|Kentucky\/|Indiana\/|Chicago|Menominee|North_Dakota\/|Denver|Boise|Phoenix|Los_Angeles|Anchorage|Juneau|Sitka|Metlakatla|Yakutat|Nome|Adak)|Pacific\/Honolulu|US\/)/.test(zone);
+          if (pref !== "US" && !usZone) return;
+          var root = document.documentElement;
+          root.setAttribute("data-landing-pending", "");
+          setTimeout(function () { root.removeAttribute("data-landing-pending"); }, 3000);
+        } catch (e) {
+          /* show the page as served */
+        }
+      })();
+    </script>
 
     <!-- UK / geo targeting -->
     <meta name="geo.region" content="GB" />

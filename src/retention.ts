@@ -100,7 +100,7 @@ function reminderText(bankSlug: string) {
   const bank = bankName(bankSlug);
   return {
     summary: `Import last month's ${bank === "your bank" ? "bank" : bank} statement into The Income Tracker`,
-    description: `Export last month's transactions as a CSV from ${bank} and import them into The Income Tracker. Ten minutes, once a month.\nExport guide: ${bankGuideUrl(bankSlug)}\nOpen the tracker: ${SITE_URL}/?ref=reminder`,
+    description: `Export last month's transactions as a CSV from ${bank} and import them into The Income Tracker. Ten minutes, once a month.\nExport guide: ${bankGuideUrl(bankSlug)}\nOpen the tracker: ${SITE_URL}/#ref=reminder`,
   };
 }
 
@@ -140,7 +140,7 @@ export function buildReminderIcs({ dayOfMonth, bankSlug, today = new Date(), uid
     `RRULE:FREQ=MONTHLY;BYMONTHDAY=${Math.min(Math.max(1, Math.round(dayOfMonth)), 28)}`,
     `SUMMARY:${icsEscape(summary)}`,
     `DESCRIPTION:${icsEscape(description)}`,
-    `URL:${SITE_URL}/?ref=reminder`,
+    `URL:${SITE_URL}/#ref=reminder`,
     "BEGIN:VALARM",
     "TRIGGER:PT9H",
     "ACTION:DISPLAY",
@@ -204,7 +204,7 @@ function debtReminderText(reminder: DebtReminder) {
   const amount = reminder.amountLabel ? ` (${reminder.amountLabel})` : "";
   return {
     summary: `${reminder.name} payment due${amount}`,
-    description: `Your ${reminder.name} payment${amount} is due on the ${ordinal(reminder.dueDay)} of each month.\nOpen the tracker: ${SITE_URL}/?ref=debt-reminder`,
+    description: `Your ${reminder.name} payment${amount} is due on the ${ordinal(reminder.dueDay)} of each month.\nOpen the tracker: ${SITE_URL}/#ref=debt-reminder`,
   };
 }
 
@@ -225,7 +225,7 @@ export function buildDebtRemindersIcs({ reminders, today = new Date() }: { remin
       `RRULE:${dueDayRule(reminder.dueDay)}`,
       `SUMMARY:${icsEscape(summary)}`,
       `DESCRIPTION:${icsEscape(description)}`,
-      `URL:${SITE_URL}/?ref=debt-reminder`,
+      `URL:${SITE_URL}/#ref=debt-reminder`,
       "BEGIN:VALARM",
       "TRIGGER:-P1DT15H",
       "ACTION:DISPLAY",

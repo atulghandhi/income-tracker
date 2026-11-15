@@ -1027,7 +1027,7 @@ export function parseBankText({
   const trimmed = text.trimStart();
   const lowerName = fileName.toLowerCase();
 
-  if (/^ofxheader/i.test(trimmed) || /<OFX>/i.test(trimmed) || lowerName.endsWith(".ofx")) {
+  if (/^ofxheader/i.test(trimmed) || /<OFX>/i.test(trimmed) || lowerName.endsWith(".ofx") || lowerName.endsWith(".qfx")) {
     return withTransferPairs(parseOfx({ text, fileName, state, fallbackMonthKey }));
   }
   if (/^!type:/i.test(trimmed) || lowerName.endsWith(".qif")) {

@@ -229,7 +229,7 @@ export const TEMPLATES = [
     crumb: "Income and expenditure form",
     title: "Free income and expenditure form template (UK, CSV)",
     description:
-      "A free UK income and expenditure form template in the layout lenders and debt advisers expect: income, fixed costs, living costs, debts. CSV for Excel or Sheets.",
+      "A free UK income and expenditure form template in the layout lenders and debt advisers expect: income, fixed costs, living costs and debts. CSV for Excel.",
     h1: "Free income and expenditure form template",
     tldr:
       "An income and expenditure form is a one-page monthly budget: everything coming in, everything going out, grouped into fixed costs, living costs, flexible costs and debts. Download the template, fill in your monthly figures, and you have the sheet a mortgage lender, landlord or debt adviser will ask for.",
@@ -326,7 +326,7 @@ export const TEMPLATES = [
     crumb: "Household bills tracker",
     title: "Free household bills tracker template (UK, CSV)",
     description:
-      "A free UK household bills tracker template: every direct debit, standing order and subscription with its billing day. Excel, Sheets, or import as recurring bills.",
+      "A free UK household bills template: every direct debit, standing order and subscription with its billing day. For Excel or Sheets, or import as recurring bills.",
     h1: "Free household bills tracker template",
     tldr:
       "List every regular payment once, with its billing day and how it is paid, and you will never be surprised by a direct debit again. Download the CSV, fill it in from your last statement, and import it into The Income Tracker to have the bills seed themselves every month.",
@@ -375,7 +375,7 @@ export const TEMPLATES = [
     crumb: "Weekly budget planner",
     title: "Free weekly budget planner template (UK, CSV)",
     description:
-      "A free UK weekly budget planner template for people paid weekly. Four weeks in one sheet, monthly bills placed in the week they fall, and a running view of what is left. Excel, Sheets, or import into the app.",
+      "A free UK weekly budget planner for people paid weekly: four weeks in one sheet, monthly bills in the week they fall, and a running total of what is left.",
     h1: "Free weekly budget planner template",
     tldr:
       "If you are paid weekly, a monthly budget never quite fits. This template runs week by week: wages in, rent share and weekly food out, and the monthly bills placed in the week they are actually collected. Download the CSV, replace the example rows, and see which week is the tight one.",
@@ -424,7 +424,7 @@ export const TEMPLATES = [
     crumb: "Savings tracker",
     title: "Free savings tracker template (UK, CSV)",
     description:
-      "A free UK savings tracker template: log transfers, interest and withdrawals against named goals with targets. Open in Excel or Sheets, or import into The Income Tracker for projected dates.",
+      "A free UK savings tracker template: log transfers, interest and withdrawals against named goals. Open in Excel or Sheets, or import it for projected dates.",
     h1: "Free savings tracker template",
     tldr:
       "One row per movement, one goal per name. Log every payday transfer, every bit of interest and every withdrawal, and the running total for each goal is one filter away. Import it into The Income Tracker and each goal gets a projected finish date.",
@@ -472,7 +472,7 @@ export const TEMPLATES = [
     crumb: "Debt payoff tracker",
     title: "Free debt payoff tracker template (UK, CSV)",
     description:
-      "A free UK debt payoff tracker template: list each card, loan and overdraft with its balance, rate and payments, and watch the balances fall. Works with the snowball or avalanche method.",
+      "A free UK debt payoff tracker template: list each card, loan and overdraft with its balance, rate and payments. Works with the snowball or avalanche method.",
     h1: "Free debt payoff tracker template",
     tldr:
       "One row per payment, with the balance after it and the rate on that debt. Sort by APR for the avalanche order or by balance for the snowball, and the sheet shows which debt to overpay next. Download the CSV, list what you owe today, and update it every payday.",
@@ -521,7 +521,7 @@ export const TEMPLATES = [
     crumb: "Student budget",
     title: "Free student budget template (UK, CSV)",
     description:
-      "A free UK student budget template built around termly maintenance loan instalments: rent, food, travel, study costs and going out, with a term column so the loan lasts until the next one arrives.",
+      "A free UK student budget template built around termly maintenance loan payments, so rent, food, travel and going out last until the next instalment.",
     h1: "Free student budget template",
     tldr:
       "The maintenance loan arrives three times a year and has to last until the next instalment. This template works by term: loan and any job income in, halls or rent out first, then the weekly costs. Download the CSV, put in your own figures, and divide what is left by the weeks until the next payment.",

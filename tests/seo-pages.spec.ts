@@ -105,14 +105,80 @@ test.describe("Landing page and attribution", () => {
     await expect(page.locator(".lp-res-card", { hasText: "Compare apps" })).toBeVisible();
   });
 
-  test("?ref= is recorded and stripped from the address bar", async ({ page }) => {
+  test("#ref= is recorded and stripped from the address bar", async ({ page }) => {
     await page.addInitScript(() => {
       localStorage.setItem("hasSeenLanding", "1");
       localStorage.setItem("onboardingComplete", "1");
     });
-    await page.goto("/?ref=guide-import-pdf-bank-statement");
-    await page.waitForFunction(() => !window.location.search.includes("ref="));
+    await page.goto("/#ref=guide-import-pdf-bank-statement");
+    await page.waitForFunction(() => !window.location.hash.includes("ref="));
     expect(await page.evaluate(() => localStorage.getItem("it_first_ref"))).toBe("guide-import-pdf-bank-statement");
+  });
+
+  test("the old ?ref= links still record attribution", async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem("hasSeenLanding", "1");
+      localStorage.setItem("onboardingComplete", "1");
+    });
+    await page.goto("/?ref=guide-legacy-link");
+    await page.waitForFunction(() => !window.location.search.includes("ref="));
+    expect(await page.evaluate(() => localStorage.getItem("it_first_ref"))).toBe("guide-legacy-link");
+  });
+
+  test("static pages link into the app without query strings", async ({ page }) => {
+    await page.goto("/guides/import-pdf-bank-statement.html");
+    for (const href of await page.locator('a[href^="/"]').evaluateAll((links) => links.map((a) => a.getAttribute("href")))) {
+      expect(href, "a /?… link is a separate URL to a crawler").not.toMatch(/^\/\?/);
+    }
+  });
+
+  test("the US homepage is prerendered with its own language, canonical and copy", async ({ request }) => {
+    const html = await (await request.get("/us/")).text();
+    expect(html).toContain('<html lang="en-US">');
+    expect(html).toContain('<link rel="canonical" href="https://www.theincometracker.com/us/" />');
+    expect(html).toContain('hreflang="en-GB" href="https://www.theincometracker.com/"');
+    expect(html).toContain("Import from any US bank");
+    expect(html).toContain("Chase");
+    expect(html).not.toContain("Barclays");
+    expect(html).not.toContain("£");
+    const home = await (await request.get("/")).text();
+    expect(home).toContain('hreflang="en-US" href="https://www.theincometracker.com/us/"');
+    expect(home).toContain('href="/us/"');
+  });
+
+  test("a visitor in the US sees the US homepage on /, and can choose the UK one", async ({ browser }) => {
+    const context = await browser.newContext({ timezoneId: "America/Chicago", locale: "en-US" });
+    const page = await context.newPage();
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: "Import from any US bank" })).toBeVisible();
+    await expect(page.locator(".lp-faq-item dt", { hasText: "Plaid" })).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe("/");
+    await page.locator("footer").getByRole("link", { name: "UK version" }).click();
+    await expect(page.getByRole("heading", { name: "Import from any UK bank" })).toBeVisible();
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: "Import from any UK bank" })).toBeVisible();
+    await context.close();
+  });
+
+  test("a visitor in the UK sees the UK homepage", async ({ browser }) => {
+    const context = await browser.newContext({ timezoneId: "Europe/London", locale: "en-GB" });
+    const page = await context.newPage();
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: "Import from any UK bank" })).toBeVisible();
+    await context.close();
+  });
+
+  test("entering the app from the US homepage starts a US ledger", async ({ browser }) => {
+    const context = await browser.newContext({ timezoneId: "Europe/London", locale: "en-GB" });
+    const page = await context.newPage();
+    await page.addInitScript(() => localStorage.setItem("onboardingComplete", "1"));
+    await page.goto("/us/");
+    await expect(page.getByRole("heading", { name: "Import from any US bank" })).toBeVisible();
+    await page.getByRole("button", { name: /Open the ledger/ }).click();
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page.getByLabel("Country", { exact: true })).toHaveValue("US");
+    expect(await page.evaluate(() => document.title)).toBe("Dashboard · The Income Tracker");
+    await context.close();
   });
 
   test("settings offers a monthly reminder that downloads a calendar file", async ({ page, isMobile }) => {

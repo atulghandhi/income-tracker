@@ -205,7 +205,8 @@ import {
   type NavToolsPrefs,
   type ToolView,
 } from "./navTools";
-import { APP_VIEWS, DEFAULT_VIEW, pathForView, viewFromPath, type AppView } from "./routes";
+import { APP_VIEWS, DEFAULT_VIEW, pathForView, titleForView, viewFromPath, type AppView } from "./routes";
+import { chooseLandingRegion, initialCountry, isLandingPath, LANDING_COPY } from "./landingContent";
 import { buildSampleLedger, sampleCountry } from "./sampleData";
 import { WidgetGrid, type WidgetRenderer } from "./WidgetGrid";
 import { INSIGHT_WIDGET_SPECS, InsightWidgetCard } from "./InsightWidgetCard";
@@ -758,7 +759,9 @@ function App() {
   // A deep link straight into an app page (/accounts) skips the marketing landing.
   const [showLanding, setShowLanding] = useState(() => !DEV_SAMPLE_COUNTRY && !viewFromPath(window.location.pathname) && !localStorage.getItem("hasSeenLanding"));
   // A brand-new ledger starts on the country the browser suggests; anything stored replaces it.
-  const [ledger, setLedger] = useState<LedgerState>(() => createInitialState(detectCountryFromBrowser()));
+  const [ledger, setLedger] = useState<LedgerState>(() => createInitialState(initialCountry(window.location.pathname, detectCountryFromBrowser())));
+  // Which homepage a first-time visitor sees: "/us/" or a US visitor on "/" gets the US copy.
+  const [landingRegion] = useState(() => chooseLandingRegion(window.location.pathname));
   const [hydrated, setHydrated] = useState(false);
   const [session, setSession] = useState<AuthSession | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -926,11 +929,19 @@ function App() {
   // Keep the address bar naming the page on show: "/" becomes "/dashboard" once the shell is up,
   // and going back to the homepage clears it again.
   useEffect(() => {
-    const path = showLanding ? "/" : pathForView(activeView);
+    const onLandingPath = isLandingPath(window.location.pathname);
+    const path = showLanding ? (onLandingPath ? window.location.pathname : "/") : pathForView(activeView);
     if (window.location.pathname !== path) {
       window.history.replaceState({ view: activeView }, "", path + window.location.search + window.location.hash);
     }
-  }, [showLanding, activeView]);
+    document.title = showLanding ? LANDING_COPY[landingRegion].meta.title : titleForView(activeView);
+  }, [showLanding, activeView, landingRegion]);
+
+  // index.html hides the prerendered UK homepage from a visitor its inline check thinks is in the
+  // US, so they never see UK copy flash before the US version renders. Rendering is done by now.
+  useEffect(() => {
+    document.documentElement.removeAttribute("data-landing-pending");
+  }, []);
 
   // Country decides the experience: US labels, account types and tools, or the UK-geared original.
   const region: RegionKey = regionOf(ledger.country);
@@ -1529,24 +1540,28 @@ function App() {
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#051424" : "#eef1f8");
   }, [theme]);
 
-  // Static content pages (guides, tools, privacy) link "Contact us" to /?feedback=1.
-  // Pick that up on load, open the feedback modal, then strip the param from the URL
-  // so a refresh doesn't reopen it.
+  // Static content pages (guides, tools, privacy) link "Contact us" to /#feedback and tag their
+  // CTAs with /#ref=<page>. Fragments, not query strings: every /?ref=… was a separate URL to a
+  // crawler, each carrying the homepage title, and Bing reported them as duplicate pages. The old
+  // query forms are still read so links already out in the wild keep working. Act on them on
+  // load, then strip them from the address bar so a refresh doesn't repeat it.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
     let changed = false;
-    if (params.has("feedback")) {
+    if (params.has("feedback") || hashParams.has("feedback")) {
       setShowFeedbackModal(true);
       params.delete("feedback");
+      hashParams.delete("feedback");
       changed = true;
     }
     if (params.has("sample")) {
       params.delete("sample");
       changed = true;
     }
-    // Static pages tag their CTAs with ?ref=<page> so we can see which guides,
-    // calculators and comparisons actually send people into the app.
-    const ref = params.get("ref");
+    // Which guides, calculators and comparisons actually send people into the app.
+    const ref = hashParams.get("ref") ?? params.get("ref");
+    hashParams.delete("ref");
     if (ref !== null) {
       const clean = ref.replace(/[^a-z0-9_-]/gi, "").slice(0, 60);
       if (clean) {
@@ -1562,7 +1577,9 @@ function App() {
     }
     if (changed) {
       const query = params.toString();
-      const url = window.location.pathname + (query ? `?${query}` : "") + window.location.hash;
+      const hadHashParams = /(^#|&)(ref|feedback)(=|&|$)/.test(window.location.hash);
+      const hash = hadHashParams ? (hashParams.toString() ? `#${hashParams}` : "") : window.location.hash;
+      const url = window.location.pathname + (query ? `?${query}` : "") + hash;
       window.history.replaceState(null, "", url);
     }
   }, []);
@@ -3563,11 +3580,11 @@ function App() {
 
   if (showLanding) {
     // The feedback modal lives in the main shell below, but the landing page
-    // (and first-time visitors arriving via /?feedback=1) never reach it, so
+    // (and first-time visitors arriving via /#feedback) never reach it, so
     // "Contact us" would set state with nothing rendered. Render it here too.
     return (
       <>
-        <LandingPage onEnter={() => setShowLanding(false)} onFeedback={() => setShowFeedbackModal(true)} />
+        <LandingPage region={landingRegion} onEnter={() => setShowLanding(false)} onFeedback={() => setShowFeedbackModal(true)} />
         {showFeedbackModal && (
           <FeedbackModal
             userId={user?.id}
@@ -3598,7 +3615,7 @@ function App() {
         ref={csvInputRef}
         className="hiddenFile"
         type="file"
-        accept="text/csv,.csv,.ofx,.qif,.txt,application/pdf,.pdf"
+        accept="text/csv,.csv,.ofx,.qfx,.qif,.txt,application/pdf,.pdf"
         aria-label="Import a bank statement file"
         onChange={(event) => {
           const file = event.currentTarget.files?.[0];
@@ -7912,7 +7929,7 @@ function importSourceOf(fileName: string): ImportFormat {
   if (fileName === BANK_FEED_SOURCE_NAME) return "feed";
   if (fileName === "Pasted transactions") return "paste";
   const lower = fileName.toLowerCase();
-  if (lower.endsWith(".ofx")) return "ofx";
+  if (lower.endsWith(".ofx") || lower.endsWith(".qfx")) return "ofx";
   if (lower.endsWith(".qif")) return "qif";
   if (lower.endsWith(".pdf")) return "pdf";
   return "csv";

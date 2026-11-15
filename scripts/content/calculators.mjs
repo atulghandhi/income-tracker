@@ -257,7 +257,7 @@ export const CALCULATORS = [
     crumb: "Loan repayment + savings",
     title: "Loan repayment and savings goal planner (UK)",
     description:
-      "Free loan repayment calculator and savings goal planner. See how long to clear your loan and the interest it costs, then how fast that payment builds your savings.",
+      "Free loan repayment and savings goal planner. See how long a loan takes to clear and what it costs, then how fast that payment builds savings afterwards.",
     h1: "Loan repayment and savings goal planner",
     tldr:
       "See how long your loan takes to clear and what the interest costs. Then watch what happens when you point that same monthly payment at savings. Same money, two very different jobs.",
@@ -322,7 +322,7 @@ export const CALCULATORS = [
     crumb: "50/30/20 budget",
     title: "50/30/20 budget calculator (UK)",
     description:
-      "Free UK 50/30/20 budget calculator. Enter your monthly take-home pay to see the needs, wants and savings targets, then compare them with what you actually spend.",
+      "Free UK 50/30/20 budget calculator. Enter monthly take-home pay to see your needs, wants and savings targets, then compare them with what you actually spend.",
     h1: "50/30/20 budget calculator",
     tldr:
       "The 50/30/20 rule splits take-home pay three ways: half for needs, 30% for wants, 20% for savings and debt repayment. Enter your monthly pay for the targets. Add what you actually spend on needs and wants and it tells you how far off you are.",
@@ -462,7 +462,7 @@ export const CALCULATORS = [
     crumb: "Spend per day until payday",
     title: "Spend per day until payday calculator",
     description:
-      "Enter what is left in your account, the days until payday and the bills still to come out, and see what you can spend per day and per week without going overdrawn.",
+      "Enter what is left in your account, the days until payday and bills still to come out, and see what you can spend each day and week without going overdrawn.",
     h1: "How much can I spend per day until payday?",
     tldr:
       "Take what is in your account, subtract the bills that still have to come out before payday, and divide by the days left. That is your daily allowance. Enter the three numbers and the calculator does it, with a weekly figure too.",
@@ -515,7 +515,7 @@ export const CALCULATORS = [
     crumb: "Snowball vs avalanche",
     title: "Debt snowball vs avalanche calculator (UK)",
     description:
-      "Free snowball vs avalanche calculator. Enter up to three debts with balance, APR and minimum payment, plus your extra payment, and compare the months and interest.",
+      "Free snowball vs avalanche calculator. Enter up to three debts with balance, APR and minimum payment plus any extra, and compare the months and interest.",
     h1: "Debt snowball vs avalanche calculator",
     tldr:
       "Avalanche pays the highest APR first and costs the least in interest. Snowball pays the smallest balance first and gives quicker wins. Enter your debts and your extra monthly payment to see the months and the interest for both, side by side. Then pick the one you will stick to.",
@@ -603,7 +603,7 @@ export const CALCULATORS = [
     crumb: "Subscription cost",
     title: "Subscription cost calculator (yearly and five-year cost)",
     description:
-      "Free subscription cost calculator: enter your monthly subscriptions and see the yearly and five-year total, plus what cancelling a few is worth if you save it instead.",
+      "Free subscription cost calculator: enter your monthly subscriptions to see the yearly and five-year total, and what cancelling a few is worth if you save it.",
     h1: "Subscription cost calculator",
     tldr:
       "Small monthly amounts hide big yearly ones. Enter your monthly subscription total to see the annual and five-year cost. Add the amount you could cancel and the calculator shows what that becomes if you save it at a typical interest rate.",
