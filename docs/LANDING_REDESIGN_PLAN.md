@@ -94,7 +94,7 @@ The current wizard asks people to type their income, outgoings, accounts and goa
 
 **Week 1, quick wins (all small, all reversible):** remove sounds and scroll reveals; one CTA label with reassurance under it; headline and button first on phones; add the `first_import` event and confirm analytics is collecting; add "Try with example data".
 
-**Weeks 2-3, the core change:** homepage drop zone; real screenshots for UK and US; the "after one import" section; new hero copy (test two headlines against each other, measured on `first_import`, not on clicks).
+**Weeks 2-3, the core change:** homepage drop zone; real screenshots for UK and US; the "after one import" section; new hero copy. At the traffic of mid-November 2026 (about 40 human visitors a week) a split test would take months to say anything, so ship one version and compare `first_import` per homepage visitor for the four weeks before and after, knowing it is directional.
 
 **Weeks 3-6, proof and doors:** founder note; open-source line; persona cards; onboarding reordered (why, then import, then celebrate, then sign-in offer); testimonial prompt; Product Hunt launch once the new page is live.
 
