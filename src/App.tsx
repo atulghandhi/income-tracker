@@ -3,6 +3,7 @@ import { TutorialOverlay } from "./GuidedTour";
 import { DashboardExportControls } from "./DashboardExportControls";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Analytics } from "@vercel/analytics/react";
+import { track as trackVercel } from "@vercel/analytics";
 import LandingPage from "./LandingPage";
 import Onboarding, { type OnboardingResult } from "./Onboarding";
 import type { CSSProperties, Dispatch, DragEvent, FormEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode, Ref, SetStateAction } from "react";
@@ -3074,6 +3075,18 @@ function App() {
       imported: rowsToImport.length,
       transfers: transferRows.length,
     });
+    // The homepage's job is to get someone to their first import: this is the event to judge it on.
+    // Vercel only, once per browser, with no amounts or names.
+    if (rowsToImport.length) {
+      try {
+        if (!localStorage.getItem("it_first_import")) {
+          localStorage.setItem("it_first_import", new Date().toISOString().slice(0, 10));
+          trackVercel("first_import", { source: importSourceOf(importReview.fileName), region });
+        }
+      } catch {
+        // Storage unavailable: skip rather than count the same browser twice.
+      }
+    }
 
     const parts: string[] = [];
     if (rowsToImport.length) parts.push(`Imported ${rowsToImport.length} transaction${rowsToImport.length === 1 ? "" : "s"}`);
@@ -3585,6 +3598,8 @@ function App() {
     return (
       <>
         <LandingPage region={landingRegion} onEnter={() => setShowLanding(false)} onFeedback={() => setShowFeedbackModal(true)} />
+        {/* Without this the homepage was invisible to Vercel Analytics: only the app shell rendered it. */}
+        <Analytics />
         {showFeedbackModal && (
           <FeedbackModal
             userId={user?.id}

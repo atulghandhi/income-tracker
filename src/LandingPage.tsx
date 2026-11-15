@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Check } from "lucide-react";
+import { track } from "@vercel/analytics";
 import { BANK_GUIDES } from "./generated/bankGuides";
 import { LANDING_COPY, rememberLandingRegion } from "./landingContent";
 import type { RegionKey } from "./region";
@@ -119,6 +120,7 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
   }
 
   function enter() {
+    try { track("cta_click", { ref: "home", region }); } catch { /* analytics is best-effort */ }
     const c = getCtx();
     if (c) sndClick(c);
     localStorage.setItem("hasSeenLanding", "1");
