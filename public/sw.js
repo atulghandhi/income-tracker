@@ -49,6 +49,8 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith("/_vercel/")) return;
+  // PostHog, proxied through our domain: never cache its scripts or config.
+  if (url.pathname.startsWith("/ingest/")) return;
 
   if (request.mode === "navigate" || request.destination === "document") {
     event.respondWith(networkFirst(request, SHELL_CACHE));

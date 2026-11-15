@@ -82,6 +82,18 @@
   ],
   "rewrites": [
     {
+      "source": "/ingest/static/:path*",
+      "destination": "https://eu-assets.i.posthog.com/static/:path*"
+    },
+    {
+      "source": "/ingest/array/:path*",
+      "destination": "https://eu-assets.i.posthog.com/array/:path*"
+    },
+    {
+      "source": "/ingest/:path*",
+      "destination": "https://eu.i.posthog.com/:path*"
+    },
+    {
       "source": "/:view(dashboard|ledger|accounts|pay|goals|subscriptions|allocate|insights|settings)",
       "destination": "/index.html"
     }

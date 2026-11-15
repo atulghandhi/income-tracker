@@ -1,16 +1,25 @@
-// Effort-metric instrumentation (docs/AUTOMATION_PLAN.md §1).
+// Effort-metric instrumentation (docs/AUTOMATION_PLAN.md §1), on the PostHog SDK.
 //
-// Dependency-free PostHog capture over fetch. Entirely dormant unless the
-// deployment sets VITE_POSTHOG_KEY (and optionally VITE_POSTHOG_HOST).
+// Entirely dormant unless the deployment sets VITE_POSTHOG_KEY. Events go to
+// PostHog EU Cloud through our own domain (/ingest, rewritten in vercel.json),
+// so ad blockers that block posthog.com don't drop them.
 //
 // Privacy contract: event names and small numeric/categorical properties only.
 // Never transaction descriptions, amounts, merchants, categories, or balances.
-// Respects Do Not Track, and trackers identify by Supabase user id (or a random
-// local id) — nothing else about the person.
+// The SDK adds page views and clicks, but with every piece of on-screen text and
+// every element attribute masked, so a click on a merchant row records that a row
+// was clicked and nothing about the row. No session replay, no exception capture
+// (error messages can quote a CSV line). Respects Do Not Track, and identifies by
+// Supabase user id only.
+
+import posthog from "posthog-js";
 
 const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY as string | undefined;
-const POSTHOG_HOST = (import.meta.env.VITE_POSTHOG_HOST as string | undefined) ?? "https://us.i.posthog.com";
-const DISTINCT_ID_KEY = "it_analytics_id";
+// Always our own domain. VITE_POSTHOG_HOST is ignored on purpose: production has it set
+// to eu.i.posthog.com, which ad blockers block.
+const POSTHOG_HOST = "/ingest";
+// The id the old fetch-based tracker kept, so visitors seen before the switch stay one person.
+const LEGACY_ID_KEY = "it_analytics_id";
 
 // The §1 effort metrics are derived from these events:
 //   touches per transaction → entry_added.method (manual ≈ 4–6, quick_add ≈ 1,
@@ -47,6 +56,7 @@ export type AnalyticsEvent =
   | "nav_tool"; // { tool, action: "add"|"remove" } — a specialist page added to or removed from the sidebar
 
 let identifiedUserId: string | null = null;
+let started = false;
 
 export function isAnalyticsEnabled(): boolean {
   if (!POSTHOG_KEY) return false;
@@ -54,41 +64,51 @@ export function isAnalyticsEnabled(): boolean {
   return true;
 }
 
-export function identifyAnalytics(userId: string | null) {
-  identifiedUserId = userId;
+/** Start the SDK once, before the app renders. Records the first page view. */
+export function initAnalytics() {
+  if (started || !isAnalyticsEnabled()) return;
+  started = true;
+  posthog.init(POSTHOG_KEY!, {
+    api_host: POSTHOG_HOST,
+    ui_host: "https://eu.posthog.com",
+    defaults: "2026-08-30",
+    person_profiles: "identified_only",
+    respect_dnt: true,
+    mask_all_text: true,
+    mask_all_element_attributes: true,
+    disable_session_recording: true,
+    capture_exceptions: false,
+    bootstrap: legacyId() ? { distinctID: legacyId()! } : undefined,
+  });
+  posthog.register({ app: "income-tracker-web" });
 }
 
-export function track(event: AnalyticsEvent, properties: Record<string, string | number | boolean> = {}) {
-  if (!isAnalyticsEnabled()) return;
-  try {
-    void fetch(`${POSTHOG_HOST}/capture/`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      keepalive: true,
-      body: JSON.stringify({
-        api_key: POSTHOG_KEY,
-        event,
-        distinct_id: identifiedUserId ?? anonymousId(),
-        properties: { ...properties, app: "income-tracker-web" },
-        timestamp: new Date().toISOString(),
-      }),
-    }).catch(() => {
-      // Analytics must never break the app.
-    });
-  } catch {
-    // Same: fire-and-forget.
+export function identifyAnalytics(userId: string | null) {
+  const previous = identifiedUserId;
+  identifiedUserId = userId;
+  if (!started) return;
+  if (userId) {
+    if (userId !== previous) posthog.identify(userId);
+  } else if (previous) {
+    // Signed out: stop linking this browser's next events to that account.
+    posthog.reset();
   }
 }
 
-function anonymousId(): string {
+export function track(event: AnalyticsEvent, properties: Record<string, string | number | boolean> = {}) {
+  if (!started) return;
   try {
-    const existing = localStorage.getItem(DISTINCT_ID_KEY);
-    if (existing) return existing;
-    const generated = `anon-${crypto.randomUUID()}`;
-    localStorage.setItem(DISTINCT_ID_KEY, generated);
-    return generated;
+    posthog.capture(event, properties);
   } catch {
-    return "anon-ephemeral";
+    // Analytics must never break the app.
+  }
+}
+
+function legacyId(): string | null {
+  try {
+    return localStorage.getItem(LEGACY_ID_KEY);
+  } catch {
+    return null;
   }
 }
 
