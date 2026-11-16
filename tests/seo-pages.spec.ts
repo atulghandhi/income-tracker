@@ -96,6 +96,84 @@ test.describe("Static content pages", () => {
   });
 });
 
+test.describe("Bank guides: promise, deliver, hand over", () => {
+  test("the search listing promises the guide without giving the steps away", async ({ request }) => {
+    const html = await (await request.get("/import/santander-csv.html")).text();
+    const title = html.match(/<title>(.*?)<\/title>/)?.[1] ?? "";
+    const description = html.match(/<meta name="description" content="([^"]+)"/)?.[1] ?? "";
+    expect(title).toContain("Santander");
+    expect(title).toContain("step-by-step");
+    expect(description).toContain("step-by-step guide");
+    // The answer belongs on the page. In the listing it would make the click pointless.
+    expect(description).not.toContain("midata");
+    expect(description).not.toContain("Download transactions");
+    // A bank with no CSV must not be listed as offering one.
+    const zopa = await (await request.get("/import/zopa-csv.html")).text();
+    expect(zopa.match(/<title>(.*?)<\/title>/)?.[1]).not.toMatch(/CSV/);
+  });
+
+  test("the page answers the question and the usual follow-ups in the first screen", async ({ page }) => {
+    await page.goto("/import/santander-csv.html");
+    const glance = page.locator(".glance");
+    await expect(glance).toContainText("CSV export?");
+    await expect(glance).toContainText("From the mobile app?");
+    await expect(glance).toContainText("How far back?");
+    await expect(glance).toContainText("12 months");
+    await expect(page.locator("ol.steps")).toContainText("midata (CSV)");
+    await expect(page.locator(".faq")).toContainText("Can I download a Santander CSV from the mobile app?");
+    await page.goto("/import/wise-csv.html");
+    await expect(page.getByRole("heading", { name: "Export more than a year of Wise transactions" })).toBeVisible();
+    // No sideways scroll on a phone.
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  });
+
+  test("a file dropped on a bank guide opens in the tracker's import review", async ({ page }) => {
+    await page.goto("/import/monzo-csv.html");
+    await expect(page.locator("#drop")).toContainText("Got your Monzo file? Drop it here.");
+    await page.locator("#dropfile").setInputFiles({
+      name: "monzo-october.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from("Date,Description,Amount\n2026-10-01,Salary,2480.00\n2026-10-02,Tesco,-42.10\n2026-10-03,Rent,-950.00\n"),
+    });
+    await page.waitForURL(/\/ledger/);
+    const dialog = page.getByRole("dialog", { name: "monzo-october.csv" });
+    await expect(dialog).toBeVisible({ timeout: 15_000 });
+    await expect(dialog).toContainText("Rows 3");
+    await expect(dialog).toContainText("Matched grocery merchant");
+    // The import review is the first thing they meet: no setup wizard on top of it.
+    await expect(page.getByRole("dialog", { name: "First-time setup" })).toHaveCount(0);
+    await page.waitForFunction(() => !window.location.hash.includes("handoff"));
+    expect(await page.evaluate(() => localStorage.getItem("it_first_ref"))).toBe("import-monzo-csv");
+    // They are a user now: the bare domain should open the app next time.
+    expect(await page.evaluate(() => localStorage.getItem("hasSeenLanding"))).toBe("1");
+    // The parked copy is gone once collected.
+    const left = await page.evaluate(
+      () =>
+        new Promise((resolve) => {
+          const open = indexedDB.open("it_handoff", 1);
+          open.onsuccess = () => {
+            const read = open.result.transaction("files").objectStore("files").get("pending");
+            read.onsuccess = () => resolve(read.result ?? null);
+          };
+        }),
+    );
+    expect(left).toBeNull();
+  });
+
+  test("arriving for a handoff with no file waiting falls back to the normal first run", async ({ page }) => {
+    await page.goto("/ledger#ref=import-monzo-csv&handoff=1");
+    await expect(page.getByRole("dialog", { name: "First-time setup" })).toBeVisible({ timeout: 15_000 });
+    await page.waitForFunction(() => !window.location.hash.includes("handoff"));
+  });
+
+  test("a file that is not a statement is refused on the page", async ({ page }) => {
+    await page.goto("/import/monzo-csv.html");
+    await page.locator("#dropfile").setInputFiles({ name: "holiday.png", mimeType: "image/png", buffer: Buffer.from("not a statement") });
+    await expect(page.locator("#dropmsg")).toContainText("does not look like a statement");
+    expect(page.url()).toContain("/import/monzo-csv.html");
+  });
+});
+
 test.describe("Landing page and attribution", () => {
   test("home page shows the bank grid, resources and FAQ for crawlers and people", async ({ page }) => {
     await page.goto("/");

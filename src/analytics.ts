@@ -35,6 +35,7 @@ export type AnalyticsEvent =
   | "onboarding_completed" // { added: bucket, skipped_steps }
   | "onboarding_skipped" // { added: bucket, skipped_steps }
   | "landing_ref" // { ref } — which static page or CTA sent the visitor to the app
+  | "handoff_import" // { format, found } — a bank guide's drop zone handed a statement file to the app
   | "bank_selected" // { bank }
   | "reminder_added" // { method: "ics"|"google" }
   | "new_month_nudge" // { action: "shown"|"import"|"guide"|"dismiss" }

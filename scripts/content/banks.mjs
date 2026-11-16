@@ -3,7 +3,7 @@
 // carry `published` (ISO date) so the sitemap/schema keep the original
 // publish date; anything without it falls back to the site-wide default.
 
-export const BANKS = [
+const BASE_BANKS = [
   {
     slug: "barclays-csv",
     group: "High street banks",
@@ -28,13 +28,14 @@ export const BANKS = [
     name: "HSBC UK",
     where: "HSBC Online Banking on desktop, from the transactions list rather than the PDF statement",
     steps: [
-      "Log in to HSBC UK Online Banking on a computer (a mobile browser works too, but not the app).",
-      "Open the account you want to export.",
-      "Go to the transactions or previous statements view for that account.",
-      "Use the <em>Download</em> option and choose <em>CSV</em> (or Excel).",
+      "Log on to HSBC UK Online Banking in a browser. The mobile app only downloads PDF statements.",
+      "Choose the account you want to export.",
+      "Select <em>Search and filter</em> above the transactions list and set your date range, then select <em>Search</em>.",
+      "Scroll to the bottom of the results and click <em>Download</em>.",
+      "Choose <em>CSV</em> as the format (Excel is offered too) and select <em>Continue</em>.",
       "Save the file and import it into The Income Tracker.",
     ],
-    note: "HSBC's official monthly statements are PDF only. CSV comes from the transactions list and usually covers recent activity, so export in chunks if you need more history.",
+    note: "HSBC's official statements are PDF only and go back six years. The CSV comes from the transactions list instead, so if a long search returns less than you expected, run it again in shorter date ranges and import each file. Overlaps are safe.",
   },
   {
     slug: "monzo-csv",
@@ -111,9 +112,10 @@ export const BANKS = [
       "From <em>My accounts and transactions</em>, choose the account.",
       "Click <em>Download transactions</em> above the transactions table.",
       "In the <em>Download to</em> drop-down, choose <em>midata (CSV)</em>.",
-      "Click <em>Download</em>, save the file, and import it into The Income Tracker.",
+      "Click <em>Download</em>, confirm the details and click <em>Continue</em>. The file saves as a CSV.",
+      "Import the file into The Income Tracker.",
     ],
-    note: "Santander's midata export covers up to 12 months and masks some sensitive details for security. That is normal and still imports fine.",
+    note: "Santander's midata file covers 12 months of transactions. It leaves out your name, address and account number and masks some sensitive transactions. That is by design, and the file still imports fine.",
   },
   {
     slug: "revolut-csv",
@@ -424,13 +426,14 @@ export const BANKS = [
     where: "the Tide app or web app",
     formats: "CSV (standard and accounting-package layouts) and PDF statements",
     steps: [
-      "In the Tide app, tap <em>Pay</em>, then <em>Find a transaction</em>, and filter by date range.",
-      "Tap <em>View more</em> under the list, then the export icon at the top right.",
-      "Choose the <em>Standard</em> CSV and tap <em>Export</em>, then save or share the file.",
-      "On the web instead: go to <em>Accounts</em>, choose the account, click the funnel icon, set your filters, click <em>Apply Filter</em>, then <em>Export</em>.",
-      "Import the file into The Income Tracker.",
+      "For a CSV of transactions in the Tide app: tap <em>Pay</em>, then <em>View more</em> under the transactions list, and filter by date.",
+      "Tap the share icon, choose the <em>Standard</em> CSV type and tap <em>Export</em>. Save or share the file.",
+      "On the web instead: go to <em>Accounts</em>, choose the account, click the funnel icon, set your filters, click <em>Apply Filter</em>, then <em>Export</em> and pick a CSV type.",
+      "For an official PDF statement in the app: tap your profile icon, then <em>Bank account</em>, then <em>Account statements</em>. Select the month or months and tap <em>Share</em> to save the PDF.",
+      "For a PDF covering your own dates, choose <em>Custom date range</em> in the same place. On the web it is under <em>Account details</em> (the i icon), then <em>Statements</em>.",
+      "Import the CSV or the PDF into The Income Tracker.",
     ],
-    note: "The Standard CSV excludes pending transactions, so export once the month has settled. Official PDF statements arrive on the 4th of the following month, and custom-range statements can cover up to six months.",
+    note: "Monthly PDF statements are issued in the app on the 4th of the following month. A custom-range statement can cover up to six months and its end date has to be at least three days ago. The Standard CSV leaves out pending transactions, so export once the month has settled.",
     faqs: [
       { q: "Can I track my Tide business account alongside personal spending?", a: "Yes. Import the Tide CSV and give the business rows their own categories, or keep a separate ledger for the business. The self-employed template on this site uses Self Assessment expense headings." },
     ],
@@ -566,20 +569,23 @@ export const BANKS = [
     where: "the Zopa app",
     formats: "PDF monthly statements only",
     steps: [
-      "Open the Zopa app and select the account: current account, savings, ISA or credit card.",
-      "Tap the three dots (or <em>Manage</em>), then <em>Statements</em>.",
-      "Pick the month. Zopa adds each statement on the first calendar day of the following month.",
-      "Download or share the PDF.",
-      "Import the PDF directly from Settings, then Import data, in The Income Tracker.",
+      "Savings (Smart Savings Hub pots and the Cash ISA): open the Zopa app, go to the <em>Save &amp; Invest</em> tab and tap the three dots next to <em>Withdraw</em>.",
+      "Current account: tap the account, then the three dots next to <em>Send</em>.",
+      "Tap <em>Statements</em>. They are organised by year and month, so pick the one you want.",
+      "The statement opens as a PDF. Download it or share it to yourself.",
+      "Import the PDF into The Income Tracker. No retyping needed.",
     ],
-    note: "Zopa issues one PDF statement per month and no CSV, so import the PDF itself. The app reads the dates, descriptions and amounts from the statement's table. Do a month at a time and check the totals against the statement.",
+    note: "Savings statements appear on the first calendar day of each month and show every deposit, withdrawal, interest payment and move between pots for the month before. Current account statements are issued on the 8th and cover everything since the last one. There is no CSV option on either, so import the PDF itself, a month at a time, and check the totals against the statement.",
     pdfOnlyNote: "Zopa statements are PDF only.",
     faqs: [
-      { q: "Where are Zopa savings statements?", a: "In the app, open the Save and Invest tab, tap the three dots next to Withdraw, then Statements. Cash ISA and Smart Saver statements sit in the same place." },
+      { q: "Where is my Zopa Smart Savings Hub monthly statement?", a: "In the app, open the Save & Invest tab, tap the three dots next to Withdraw, then Statements. A new monthly statement appears on the first calendar day of each month. Cash ISA statements sit in the same place." },
+      { q: "What does a Zopa statement show?", a: "A savings statement lists every deposit, withdrawal, interest payment and movement between pots for that month. A current account statement lists each transaction since the previous statement. Both are PDFs with a dated row per transaction, which is the layout the tracker reads." },
+      { q: "Is the Zopa certificate of interest the same as a statement?", a: "No. The certificate of interest is a yearly document for tax purposes, generated at the start of each tax year on 6 April. Find it under the profile icon, then Statements and Documents, then Certificate of Interest. Monthly statements are the ones to import for tracking." },
     ],
     sources: [
-      { t: "Zopa help: where can I find and download my statement of account?", href: "https://www.zopa.com/help/article/can-i-download-a-statement" },
-      { t: "Zopa help: statements and interest", href: "https://www.zopa.com/help/collection/smart-savings-hub-statements-and-interest" },
+      { t: "Zopa help: can I download a statement? (Smart Savings Hub)", href: "https://www.zopa.com/help/article/can-i-download-a-tax-statement" },
+      { t: "Zopa help: how do I find my bank account statements and transaction history?", href: "https://www.zopa.com/help/article/how-do-i-find-statements-and-transaction-history" },
+      { t: "Zopa help: how can I download my certificate of interest?", href: "https://www.zopa.com/help/article/download-certificate-interest-smart-saver" },
       { t: "MoneySavingExpert forum: Zopa Smart Saver and downloading statements", href: "https://forums.moneysavingexpert.com/discussion/6392050/zopa-smart-saver-and-downloading-statements" },
     ],
   },
@@ -636,3 +642,255 @@ export const BANKS = [
     ],
   },
 ];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Search answers
+//
+// What people actually type into Bing is a question: "can I export CSV from
+// Revolut", "Santander download CSV from app", "export all Wise transactions
+// greater than a year". The work is split in two:
+//
+//   The search listing PROMISES exactly what they searched for and stops there.
+//   "Step-by-step guide to downloading your Santander transactions as a CSV:
+//   whether the app can do it and how far back it goes." It names the question,
+//   including the awkward variant (app, past a year, instead of a PDF), and does
+//   not answer it. A listing that gives the steps away has made the click
+//   unnecessary.
+//
+//   The page DELIVERS, fast: the answer and the two usual follow-ups sit in the
+//   first screen, then the steps, then the reason to stay.
+//
+// Per bank:
+//   title, description  the search listing. A promise in the searcher's words.
+//                       Title 70 characters at most, description 50 to 160.
+//                       Never promise a CSV from a bank that only issues PDFs.
+//   app                 on the page: "Can I do it from the mobile app?"
+//   history             on the page: "How far back does it go?"
+//   faqs, sources       added to the entry's own.
+//   sections            extra h2 blocks for a follow-up that needs more than a line.
+//   checked             set when the facts were re-read against the bank's help pages.
+//
+// Only state what the entry's sources support. A bank with no `app` or `history`
+// simply gets fewer rows in its at-a-glance box.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ANSWERS = {
+  "barclays-csv": {
+    title: "How to export Barclays transactions to CSV: step-by-step",
+    description: "A step-by-step guide to downloading your Barclays transactions as a CSV file: where the export is, whether the app can do it, and what to do with the file.",
+    app: "No. The Barclays app cannot export a file. Use Online Banking on a computer.",
+  },
+  "hsbc-csv": {
+    title: "How to download HSBC statements as CSV: step-by-step guide",
+    description: "A step-by-step guide to downloading your HSBC transactions as a CSV: where the download option is, whether the app has it, and how far back you can go.",
+    app: "No. The app downloads statements as PDFs only. CSV and Excel come from the transactions list in Online Banking.",
+    history: "PDF statements go back six years. The CSV covers whatever your transaction search returns.",
+    checked: "2026-11-16",
+    faqs: [
+      { q: "Can I download an HSBC statement as a CSV?", a: "Not the statement itself, which is PDF only. HSBC says other formats such as Excel or CSV have to come from your transactions list: choose the account, select Search and filter, set the dates, search, then Download at the bottom and pick CSV." },
+      { q: "Can the HSBC app download a CSV?", a: "No. The mobile banking app downloads statements in PDF format. For a CSV, log on to Online Banking in a browser. If a PDF is all you have, The Income Tracker imports that directly too." },
+    ],
+    sources: [{ t: "HSBC UK: how to get a bank statement online", href: "https://www.hsbc.co.uk/help/banking-made-easy/online-statements/" }],
+  },
+  "monzo-csv": {
+    title: "How to export Monzo transactions to CSV: step-by-step guide",
+    description: "A step-by-step guide to exporting your Monzo transactions as a CSV file: where to tap, which format to pick, and how to turn the file into a budget.",
+    app: "Yes. The export lives in the Monzo app on iOS and Android.",
+  },
+  "starling-csv": {
+    title: "How to export a Starling statement to CSV: step-by-step",
+    description: "A step-by-step guide to downloading your Starling Bank statement as a CSV: where to find it in the app and online, and what to do with the file next.",
+    app: "Yes, from the app or from web banking.",
+    history: "Any date range you choose.",
+  },
+  "lloyds-csv": {
+    title: "How to export Lloyds transactions to CSV: step-by-step guide",
+    description: "A step-by-step guide to downloading your Lloyds Bank transactions as a CSV, including how to get past the export limit when one file is not enough.",
+    app: "No. The Lloyds app cannot export CSV. Use Internet Banking on a computer.",
+    history: "The last 12 months, 150 transactions per file. Narrow the dates and export again for more.",
+  },
+  "natwest-csv": {
+    title: "How to export NatWest transactions to CSV: step-by-step",
+    description: "A step-by-step guide to downloading your NatWest transactions as a CSV file: which menu to use, which format to choose, and what to do with the file.",
+  },
+  "santander-csv": {
+    title: "Download a Santander CSV, app or online: step-by-step guide",
+    description: "A step-by-step guide to downloading your Santander transactions as a CSV: where the option is, whether the mobile app can do it, and how far back it goes.",
+    app: "Santander documents the CSV for Online Banking in a browser, not for the mobile app. On a phone, log on to Online Banking in the browser, or import a PDF statement instead.",
+    history: "12 months of transactions per midata file.",
+    checked: "2026-11-16",
+    faqs: [
+      { q: "Can I download a Santander CSV from the mobile app?", a: "Santander's instructions for the CSV are for Online Banking: choose the account, click Download transactions above the transactions table and pick midata (CSV). If you only have your phone, open Online Banking in the phone's browser, or import a PDF statement, which The Income Tracker also reads." },
+      { q: "Why is my name and account number missing from the Santander CSV?", a: "The midata file is built that way. Santander says it will not contain personal information such as your name, address or account number, and that potentially sensitive transactions are masked. Dates, descriptions and amounts are all there, which is what a budget needs." },
+      { q: "How far back does the Santander CSV go?", a: "Twelve months. For anything older, download the PDF statements for those months and import them alongside the CSV. Duplicates are caught, so overlapping dates are safe." },
+    ],
+    sources: [{ t: "Santander UK: midata, including how to download the CSV", href: "https://www.santander.co.uk/personal/support/understanding-our-services/midata" }],
+  },
+  "revolut-csv": {
+    title: "How to export a CSV from Revolut: step-by-step guide (2026)",
+    description: "Can you export a CSV from Revolut? A step-by-step guide to downloading your Revolut statement, handling several currencies, and using the file afterwards.",
+    app: "Yes. Statements export from the Revolut app and the web app.",
+    faqs: [
+      { q: "Can I export a CSV from Revolut?", a: "Yes. Open Accounts, tap Statements, choose the account or currency and the date range, and pick the Excel/CSV format. Each currency has its own statement, so export one file per currency." },
+    ],
+  },
+  "nationwide-csv": {
+    title: "Nationwide CSV download, app or browser: step-by-step guide",
+    description: "A step-by-step guide to downloading your Nationwide transactions as a CSV: whether the Banking app can do it, where the option really is, and how far back.",
+    app: "No. The Banking app only produces PDF statements. Use the Internet Bank in a desktop browser.",
+    history: "Around 15 months as CSV. PDF statements go back 36 months.",
+  },
+  "halifax-csv": {
+    title: "How to export Halifax transactions to CSV: step-by-step",
+    description: "A step-by-step guide to downloading your Halifax transactions as a CSV file: where the export is, whether the app has it, and how many years you can get.",
+    app: "No. The app only offers PDF statements. Use Online Banking in a browser.",
+    history: "Up to 12 months per search, going back seven years.",
+  },
+  "bank-of-scotland-csv": {
+    title: "Bank of Scotland CSV download: step-by-step export guide",
+    description: "A step-by-step guide to downloading your Bank of Scotland transactions as a CSV: where the export is, whether the app can do it, and what comes next.",
+    app: "No. The app offers PDF statements only. Use Internet Banking in a browser.",
+    history: "Up to 12 months per search.",
+  },
+  "tsb-csv": {
+    title: "How to export TSB transactions to CSV: step-by-step guide",
+    description: "A step-by-step guide to downloading your TSB transactions as a CSV, including how to export a full year when each file only covers part of it.",
+    app: "No. The app only offers PDF statements in your Inbox. Use Internet Banking on a computer.",
+    history: "90 days or 150 transactions per file. Repeat with consecutive dates for longer.",
+  },
+  "chase-uk-csv": {
+    title: "How to export Chase UK statements to CSV: step-by-step",
+    description: "Can Chase UK export a CSV? A step-by-step guide to downloading your Chase statements, choosing custom dates, and turning the file into a budget.",
+    app: "Yes. The app is the only route, because Chase UK has no web banking.",
+    history: "Custom statements cover up to 90 days each. Monthly statements stay available for six years.",
+  },
+  "first-direct-csv": {
+    title: "first direct CSV download: step-by-step export guide (2026)",
+    description: "A step-by-step guide to downloading your first direct transactions as a CSV: where the option is hiding, whether the app has it, and how far back it goes.",
+    app: "No. The app only offers PDF statements, and the option is often hidden on phone browsers.",
+    history: "One year per download, going back up to six years on current accounts.",
+  },
+  "amex-csv": {
+    title: "How to download an Amex statement as CSV: step-by-step (UK)",
+    description: "Can you download a CSV of your American Express statement? A step-by-step UK guide: where the download is, how far back it goes, and how to import it.",
+    app: "No. The Amex app shows PDF statements only. Use the website in a desktop browser.",
+    history: "Roughly two years as CSV. Older periods are PDF only.",
+    faqs: [
+      { q: "Can I download a CSV of my American Express statement?", a: "Yes. Log in to your online account in a desktop browser, open Statements & Activity, pick a statement period or a custom date range, click the download icon above the transactions and choose CSV. The app only shows PDFs." },
+    ],
+  },
+  "virgin-money-csv": {
+    title: "How to export Virgin Money transactions to CSV: step-by-step",
+    description: "A step-by-step guide to downloading your Virgin Money transactions as a CSV: where the export is, which accounts have it, and what to do if yours does not.",
+    app: "No. The app produces PDF statements only. Use Internet Banking in a desktop browser.",
+  },
+  "co-operative-bank-csv": {
+    title: "Co-operative Bank CSV download: step-by-step export guide",
+    description: "A step-by-step guide to downloading your Co-operative Bank transactions as a CSV, including the one step that makes the download button appear.",
+  },
+  "metro-bank-csv": {
+    title: "How to export Metro Bank transactions to CSV: step-by-step",
+    description: "A step-by-step guide to downloading your Metro Bank transactions as a CSV, covering longer date ranges and what to check when Export does nothing.",
+    app: "No. The app offers PDF statements only. Use Internet Banking in a desktop browser.",
+    history: "Back to when the account opened, using Advanced Search.",
+  },
+  "wise-csv": {
+    title: "How to export all your Wise transactions, even past a year",
+    description: "A step-by-step guide to exporting all your Wise transactions as CSV, including how to get more than a year of history and several currencies at once.",
+    app: "Yes. The app exports CSV, Excel and PDF. The website adds QIF, MT940 and CAMT.053.",
+    history: "365 days per statement. For longer, create one statement per year. There is no single all-time file.",
+    checked: "2026-11-16",
+    sections: [
+      {
+        h: "Export more than a year of Wise transactions",
+        p: [
+          "Wise will not put more than 365 days in one statement. Its help centre says that for a longer period you need to download several statements, each covering a maximum of 365 days. So the way to export everything is one file per year.",
+        ],
+        ol: [
+          "Create a statement for the most recent 365 days and download it as CSV.",
+          "Create the next one ending the day before the first one starts, and keep going back until you reach the day you opened the account.",
+          "Repeat for each currency balance and jar you want to track. On the web and on Android you can select several currencies for one statement.",
+          "Import every file into The Income Tracker. If two files overlap by a few days the duplicates are dropped, so you do not have to line the dates up exactly.",
+        ],
+        after: [
+          "Three years across two currencies is six files and about ten minutes. After that you only need the latest month each time.",
+        ],
+      },
+    ],
+    faqs: [
+      { q: "How do I export all my Wise transactions?", a: "Create statements in Statements and reports, one for each 365-day period back to when you opened the account, and choose CSV each time. Wise limits a single statement to 365 days, so a full history is one file per year, per currency." },
+      { q: "Can I export Wise transactions for more than a year at once?", a: "No. Wise says a statement covers a maximum of 365 days and that longer periods need multiple statements. Download one per year and import them together. Overlapping dates are safe because duplicates are dropped." },
+      { q: "Can I download an old Wise statement again?", a: "Yes. In Statements and reports you choose the period yourself, so you can create a statement for any past dates, up to 365 days at a time, as often as you need." },
+    ],
+  },
+  "tide-csv": {
+    title: "Tide statements download: step-by-step guide (PDF and CSV)",
+    description: "A step-by-step guide to downloading Tide statements and exporting transactions as a CSV: where each one is in the app and on the web, and which to use.",
+    app: "Yes. PDF statements and the CSV export are both in the app and on the web.",
+    history: "Monthly PDFs are issued on the 4th of the following month. A custom-range statement covers up to six months.",
+    checked: "2026-11-16",
+    faqs: [
+      { q: "Where do I download Tide statements?", a: "In the app, tap your profile icon, then Bank account, then Account statements, select the month or months and tap Share to save the PDF. On the web, open Account details (the i icon) and choose Statements. Statements are issued on the 4th of each following month." },
+      { q: "Should I download the Tide PDF statement or the CSV?", a: "The PDF is the official document, which is what a lender or accountant asks for. The CSV is the one to use for tracking and bookkeeping, because every transaction is a row you can sort and categorise. The Income Tracker imports either." },
+    ],
+  },
+  "tesco-bank-csv": {
+    title: "Tesco Bank CSV download: step-by-step guide (card, savings)",
+    description: "A step-by-step guide to downloading your Tesco Bank credit card or savings transactions as a CSV: where the download is and whether the app can do it.",
+    app: "No. The app shows transactions but does not export them. Use Online Banking in a browser, on a computer or a phone.",
+  },
+  "barclaycard-csv": {
+    title: "How to download Barclaycard transactions as CSV, not PDF",
+    description: "Want your Barclaycard transactions as a CSV instead of a PDF statement? A step-by-step guide to the routes that work, with or without a Barclays account.",
+    app: "No. The Barclaycard app and website give PDF statements, and the Barclays app cannot export files either.",
+    history: "Recent months as CSV through Barclays Online Banking. PDF statements go back years.",
+    faqs: [
+      { q: "How can I download Barclaycard transactions as a CSV instead of a PDF?", a: "Link your Barclaycard to Barclays Online Banking, log in on a computer, open the card's transactions, choose View all transactions, set your dates, then Export all and pick CSV (Excel). If you have no Barclays login, skip the conversion: The Income Tracker imports the Barclaycard PDF statement directly." },
+    ],
+  },
+  "monzo-business-csv": {
+    title: "Monzo Business CSV export: step-by-step guide (2026)",
+    description: "A step-by-step guide to exporting Monzo Business statements as a CSV for bookkeeping, including the monthly auto-export and what to do with the file.",
+    app: "Yes. The export is in the Monzo app, the same route as a personal account.",
+  },
+  "starling-business-csv": {
+    title: "Starling Business CSV export: step-by-step guide (2026)",
+    description: "A step-by-step guide to downloading Starling Business statements as a CSV, in the app or online, for any date range, and using the file for bookkeeping.",
+    app: "Yes, from the app or from Online Banking in a browser.",
+    history: "Any date range you choose.",
+  },
+  "zopa-csv": {
+    title: "Zopa statements: how to find, download and read them",
+    description: "A step-by-step guide to your Zopa monthly statements: where they are for savings and the current account, when they arrive, what they show, and how to use them.",
+    app: "Yes, and the app is the only place. Statements open as PDFs you can download or share.",
+    history: "One PDF per month, organised by year and month.",
+    checked: "2026-11-16",
+  },
+  "kroo-csv": {
+    title: "Kroo statement download: step-by-step guide (2026)",
+    description: "A step-by-step guide to downloading your Kroo statements: where they are in the app, which formats Kroo offers, and how to track the transactions free.",
+    app: "Yes, and the app is the only place. Statements download as PDFs.",
+  },
+  "marcus-csv": {
+    title: "Marcus statement download: step-by-step guide (2026)",
+    description: "A step-by-step guide to downloading your Marcus by Goldman Sachs statements: where they are, which formats are offered, and how to track your savings.",
+    app: "Yes, as PDFs, on the website or in the app under Documents.",
+  },
+};
+
+// Every bank page changed on this date: answer-first listing, at-a-glance box,
+// and the drop-your-file handoff into the tracker.
+const ANSWERS_UPDATED = "2026-11-16";
+
+export const BANKS = BASE_BANKS.map((bank) => {
+  const answer = ANSWERS[bank.slug] || {};
+  return {
+    ...bank,
+    ...answer,
+    updated: ANSWERS_UPDATED,
+    // The entry's own questions first where the answer adds none, otherwise the
+    // search questions lead: they are the ones the visitor arrived with.
+    faqs: [...(answer.faqs || []), ...(bank.faqs || [])],
+    sources: [...(answer.sources || []), ...(bank.sources || [])],
+  };
+});

@@ -146,7 +146,7 @@ self-employed income tracker for Self Assessment, or a free CSV budget template.
 - Free self-employed income and expense tracker template: https://www.theincometracker.com/templates/self-employed-income-tracker-template.html (CSV: https://www.theincometracker.com/templates/self-employed-income-tracker-template.csv)
 - Free household bills tracker template: https://www.theincometracker.com/templates/household-bills-tracker-template.html (CSV: https://www.theincometracker.com/templates/household-bills-tracker-template.csv)
 - Free weekly budget planner template: https://www.theincometracker.com/templates/weekly-budget-planner-template.html (CSV: https://www.theincometracker.com/templates/weekly-budget-planner-template.csv)
-- Free savings tracker template: https://www.theincometracker.com/templates/savings-tracker-template.html (CSV: https://www.theincometracker.com/templates/savings-tracker-template.csv)
+- Free savings tracker spreadsheet: https://www.theincometracker.com/templates/savings-tracker-template.html (CSV: https://www.theincometracker.com/templates/savings-tracker-template.csv)
 - Free debt payoff tracker template: https://www.theincometracker.com/templates/debt-payoff-tracker-template.html (CSV: https://www.theincometracker.com/templates/debt-payoff-tracker-template.csv)
 - Free student budget template: https://www.theincometracker.com/templates/student-budget-template.html (CSV: https://www.theincometracker.com/templates/student-budget-template.csv)
 - All templates: https://www.theincometracker.com/templates/

@@ -58,7 +58,8 @@
   .meta { color: #9ea8b7; font-size: 0.85rem; margin-bottom: 24px; }
   .lede { font-size: 1.12rem; color: #eaf2ff; line-height: 1.65; margin: 0 0 24px; }
   .tldr { background: rgba(0,223,193,0.07); border: 1px solid rgba(0,223,193,0.22); border-radius: 12px; padding: 16px 20px; margin: 0 0 28px; }
-  .tldr strong { color: #00dfc1; letter-spacing: 0.02em; font-size: 0.8rem; text-transform: uppercase; display: block; margin-bottom: 6px; }
+  .tldr > strong { color: #00dfc1; letter-spacing: 0.02em; font-size: 0.8rem; text-transform: uppercase; display: block; margin-bottom: 6px; }
+  .tldr p strong { color: #fff; }
   .tldr p { margin: 0; color: #d4e4fa; }
   h2 { font-size: 1.3rem; font-weight: 700; color: #fff; margin: 40px 0 12px; letter-spacing: -0.01em; }
   h3 { font-size: 1.05rem; font-weight: 650; color: #fff; margin: 28px 0 8px; }
@@ -133,6 +134,33 @@
   .calc-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 16px; }
   .calc-actions .btn { padding: 9px 14px; font-size: 0.88rem; }
   .calc-share-note { font-size: 0.82rem; color: #9ea8b7; }
+  .sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+  /* Bank guides: at-a-glance answers, file drop zone, result preview */
+  .glance { margin: 0 0 28px; border: 1px solid rgba(212,228,250,0.12); border-radius: 12px; overflow: hidden; }
+  .glance > div { display: grid; grid-template-columns: 168px 1fr; gap: 4px 16px; padding: 11px 16px; border-bottom: 1px solid rgba(212,228,250,0.08); }
+  .glance > div:last-child { border-bottom: none; }
+  .glance dt { color: #9ea8b7; font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; padding-top: 3px; }
+  .glance dd { margin: 0; color: #eaf2ff; font-size: 0.96rem; }
+  .drop { margin: 34px 0; padding: 24px; background: rgba(0,223,193,0.06); border: 2px dashed rgba(0,223,193,0.45); border-radius: 16px; transition: background 140ms ease, border-color 140ms ease; }
+  .drop.over { background: rgba(0,223,193,0.16); border-color: #00dfc1; }
+  .drop.busy { opacity: 0.7; pointer-events: none; }
+  .drop-text strong { display: block; color: #fff; font-size: 1.15rem; margin-bottom: 4px; }
+  .drop-text span { color: #b8c8e0; font-size: 0.95rem; }
+  .drop-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-top: 16px; }
+  .drop-alt { font-size: 0.92rem; font-weight: 600; }
+  .drop-msg { margin: 12px 0 0; font-size: 0.9rem; color: #ffd479; }
+  .drop-msg:empty { display: none; }
+  .drop input:focus-visible + a, .drop label:focus-within { outline: 2px solid #00dfc1; outline-offset: 3px; }
+  .preview { margin: 18px 0; background: rgba(8,22,38,0.9); border: 1px solid rgba(212,228,250,0.12); border-radius: 14px; overflow: hidden; font-size: 0.93rem; }
+  .preview-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: rgba(0,223,193,0.07); color: #fff; font-weight: 700; }
+  .preview-sur { font-weight: 500; color: #b8c8e0; font-size: 0.88rem; }
+  .preview-sur b { color: #00dfc1; font-size: 1.02rem; margin-left: 4px; }
+  .preview-row { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; padding: 10px 16px; border-top: 1px solid rgba(212,228,250,0.07); }
+  .preview-n { color: #eaf2ff; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .preview-c { color: #00dfc1; background: rgba(0,223,193,0.1); border-radius: 999px; padding: 1px 10px; font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
+  .preview-a { color: #c8d8ee; font-variant-numeric: tabular-nums; text-align: right; min-width: 92px; }
+  .preview-a.in { color: #00dfc1; }
+  .preview-foot { padding: 8px 16px; border-top: 1px solid rgba(212,228,250,0.07); color: #7f8b9c; font-size: 0.78rem; }
   hr { border: none; border-top: 1px solid rgba(212,228,250,0.1); margin: 48px 0 24px; }
   footer.site { color: #9ea8b7; font-size: 0.85rem; }
   footer.site .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 18px; margin-bottom: 22px; }
@@ -147,6 +175,10 @@
     header.site { padding-top: 14px; }
     nav.sitenav { font-size: 0.84rem; gap: 2px 12px; }
     .calc { padding: 16px; }
+    .glance > div { grid-template-columns: 1fr; }
+    .drop { padding: 18px; }
+    .preview-row { grid-template-columns: 1fr auto; }
+    .preview-c { display: none; }
   }
 </style>
     <script type="application/ld+json">
@@ -420,7 +452,9 @@ window.va=window.va||function(){(window.vaq=window.vaq||[]).push(arguments)};
     var t=ev.target;if(!t||!t.closest)return;var el=t.closest("[data-track]");if(!el)return;
     track(el.getAttribute("data-track"),{ref:el.getAttribute("data-ref")||"",href:el.getAttribute("href")||""});
   });
-  if(PH_KEY&&!dnt)track("static_pageview",{});
+  // Which search engine or site sent the visitor: a name from a short list, never the URL or the query.
+  function source(){try{var r=document.referrer;if(!r)return "direct";var h=new URL(r).hostname.replace(/^www\./,"");if(h===location.hostname.replace(/^www\./,""))return "internal";var m=/(bing|google|duckduckgo|yahoo|ecosia|brave|startpage|yandex|chatgpt|openai|perplexity|copilot|claude|gemini|reddit|facebook|moneysavingexpert)/.exec(h);return m?m[1]:"other";}catch(e){return "other";}}
+  if(PH_KEY&&!dnt)track("static_pageview",{source:source()});
 })();
 </script>
 <script defer src="/_vercel/insights/script.js"></script>

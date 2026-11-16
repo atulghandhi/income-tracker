@@ -8,6 +8,13 @@
     <language>en-gb</language>
     <lastBuildDate>Tue, 08 Sep 2026 09:00:00 GMT</lastBuildDate>
     <item>
+      <title>Update: Drop your statement straight onto a bank guide</title>
+      <link>https://www.theincometracker.com/whats-new.html</link>
+      <guid isPermaLink="true">https://www.theincometracker.com/whats-new.html#2026-11-16-drop-your-statement-straight-onto-a-bank</guid>
+      <pubDate>Mon, 16 Nov 2026 09:00:00 GMT</pubDate>
+      <description>Each bank guide now has a drop zone under the steps. Once you have downloaded the file from your bank, drop it there and it opens in the tracker with the import review ready, instead of sending you to the homepage to find the import button. The file is passed inside your browser and is never uploaded. The guides also open with an at-a-glance box answering the questions people ask most: can the mobile app do it, and how far back does the export go.</description>
+    </item>
+    <item>
       <title>Update: Insights moves onto the Dashboard</title>
       <link>https://www.theincometracker.com/whats-new.html</link>
       <guid isPermaLink="true">https://www.theincometracker.com/whats-new.html#2026-10-19-insights-moves-onto-the-dashboard</guid>
@@ -64,11 +71,11 @@
       <description>A free UK debt payoff tracker template: list each card, loan and overdraft with its balance, rate and payments. Works with the snowball or avalanche method.</description>
     </item>
     <item>
-      <title>Free savings tracker template</title>
+      <title>Free savings tracker spreadsheet</title>
       <link>https://www.theincometracker.com/templates/savings-tracker-template.html</link>
       <guid isPermaLink="true">https://www.theincometracker.com/templates/savings-tracker-template.html</guid>
       <pubDate>Wed, 16 Sep 2026 09:00:00 GMT</pubDate>
-      <description>A free UK savings tracker template: log transfers, interest and withdrawals against named goals. Open in Excel or Sheets, or import it for projected dates.</description>
+      <description>A free UK savings tracker spreadsheet to download: track several savings goals, interest and withdrawals in Excel or Google Sheets. No sign-up needed.</description>
     </item>
     <item>
       <title>Free weekly budget planner template</title>
@@ -145,7 +152,7 @@
       <link>https://www.theincometracker.com/guides/income-and-expenditure-form-uk.html</link>
       <guid isPermaLink="true">https://www.theincometracker.com/guides/income-and-expenditure-form-uk.html</guid>
       <pubDate>Wed, 16 Sep 2026 09:00:00 GMT</pubDate>
-      <description>What an income and expenditure form is, who asks for one, the Standard Financial Statement categories, and how to fill it in accurately from bank statements.</description>
+      <description>Why creditors, advisers and courts ask for an income and expenditure form, what they do with it, and a step-by-step guide to filling one in from statements.</description>
     </item>
     <item>
       <title>How to export your Marcus by Goldman Sachs statement to CSV</title>
@@ -279,13 +286,6 @@
       <guid isPermaLink="true">https://www.theincometracker.com/compare/moneyhub-alternative.html</guid>
       <pubDate>Tue, 08 Sep 2026 09:00:00 GMT</pubDate>
       <description>Moneyhub's consumer app closed on 31 July 2026. The Income Tracker is a free Moneyhub alternative with no bank connection and data kept on your own device.</description>
-    </item>
-    <item>
-      <title>The Income Tracker vs Monzo Trends</title>
-      <link>https://www.theincometracker.com/compare/monzo-trends-alternative.html</link>
-      <guid isPermaLink="true">https://www.theincometracker.com/compare/monzo-trends-alternative.html</guid>
-      <pubDate>Tue, 08 Sep 2026 09:00:00 GMT</pubDate>
-      <description>Monzo Trends adds one other bank free, more on paid plans. The Income Tracker is free, works with every UK bank via CSV and needs no Monzo account.</description>
     </item>
   </channel>
 </rss>

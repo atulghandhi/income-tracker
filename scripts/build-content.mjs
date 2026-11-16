@@ -63,8 +63,8 @@ export function humanDate(iso) {
 const UPDATED_HUMAN = humanDate(UPDATED);
 
 const PAGE_UPDATES = new Map([
-  ["/", "2026-11-15"], ["/us/", "2026-11-15"], ["/tools/", "2026-09-16"], ["/whats-new.html", "2026-10-18"],
-  ["/import/", "2026-09-16"], ["/guides/", "2026-09-16"], ["/templates/", "2026-09-16"],
+  ["/", "2026-11-15"], ["/us/", "2026-11-15"], ["/tools/", "2026-09-16"], ["/whats-new.html", "2026-11-16"],
+  ["/import/", "2026-11-16"], ["/guides/", "2026-09-16"], ["/templates/", "2026-09-16"],
   ...BANKS.map(p => [`/import/${p.slug}.html`, p.updated || UPDATED]),
   ...GUIDES.map(p => [`/guides/${p.slug}.html`, p.updated || UPDATED]),
   // All calculator pages received input validation and accessible result updates.
@@ -120,7 +120,8 @@ const CSS = `
   .meta { color: #9ea8b7; font-size: 0.85rem; margin-bottom: 24px; }
   .lede { font-size: 1.12rem; color: #eaf2ff; line-height: 1.65; margin: 0 0 24px; }
   .tldr { background: rgba(0,223,193,0.07); border: 1px solid rgba(0,223,193,0.22); border-radius: 12px; padding: 16px 20px; margin: 0 0 28px; }
-  .tldr strong { color: #00dfc1; letter-spacing: 0.02em; font-size: 0.8rem; text-transform: uppercase; display: block; margin-bottom: 6px; }
+  .tldr > strong { color: #00dfc1; letter-spacing: 0.02em; font-size: 0.8rem; text-transform: uppercase; display: block; margin-bottom: 6px; }
+  .tldr p strong { color: #fff; }
   .tldr p { margin: 0; color: #d4e4fa; }
   h2 { font-size: 1.3rem; font-weight: 700; color: #fff; margin: 40px 0 12px; letter-spacing: -0.01em; }
   h3 { font-size: 1.05rem; font-weight: 650; color: #fff; margin: 28px 0 8px; }
@@ -195,6 +196,33 @@ const CSS = `
   .calc-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 16px; }
   .calc-actions .btn { padding: 9px 14px; font-size: 0.88rem; }
   .calc-share-note { font-size: 0.82rem; color: #9ea8b7; }
+  .sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+  /* Bank guides: at-a-glance answers, file drop zone, result preview */
+  .glance { margin: 0 0 28px; border: 1px solid rgba(212,228,250,0.12); border-radius: 12px; overflow: hidden; }
+  .glance > div { display: grid; grid-template-columns: 168px 1fr; gap: 4px 16px; padding: 11px 16px; border-bottom: 1px solid rgba(212,228,250,0.08); }
+  .glance > div:last-child { border-bottom: none; }
+  .glance dt { color: #9ea8b7; font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; padding-top: 3px; }
+  .glance dd { margin: 0; color: #eaf2ff; font-size: 0.96rem; }
+  .drop { margin: 34px 0; padding: 24px; background: rgba(0,223,193,0.06); border: 2px dashed rgba(0,223,193,0.45); border-radius: 16px; transition: background 140ms ease, border-color 140ms ease; }
+  .drop.over { background: rgba(0,223,193,0.16); border-color: #00dfc1; }
+  .drop.busy { opacity: 0.7; pointer-events: none; }
+  .drop-text strong { display: block; color: #fff; font-size: 1.15rem; margin-bottom: 4px; }
+  .drop-text span { color: #b8c8e0; font-size: 0.95rem; }
+  .drop-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-top: 16px; }
+  .drop-alt { font-size: 0.92rem; font-weight: 600; }
+  .drop-msg { margin: 12px 0 0; font-size: 0.9rem; color: #ffd479; }
+  .drop-msg:empty { display: none; }
+  .drop input:focus-visible + a, .drop label:focus-within { outline: 2px solid #00dfc1; outline-offset: 3px; }
+  .preview { margin: 18px 0; background: rgba(8,22,38,0.9); border: 1px solid rgba(212,228,250,0.12); border-radius: 14px; overflow: hidden; font-size: 0.93rem; }
+  .preview-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: rgba(0,223,193,0.07); color: #fff; font-weight: 700; }
+  .preview-sur { font-weight: 500; color: #b8c8e0; font-size: 0.88rem; }
+  .preview-sur b { color: #00dfc1; font-size: 1.02rem; margin-left: 4px; }
+  .preview-row { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; padding: 10px 16px; border-top: 1px solid rgba(212,228,250,0.07); }
+  .preview-n { color: #eaf2ff; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .preview-c { color: #00dfc1; background: rgba(0,223,193,0.1); border-radius: 999px; padding: 1px 10px; font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
+  .preview-a { color: #c8d8ee; font-variant-numeric: tabular-nums; text-align: right; min-width: 92px; }
+  .preview-a.in { color: #00dfc1; }
+  .preview-foot { padding: 8px 16px; border-top: 1px solid rgba(212,228,250,0.07); color: #7f8b9c; font-size: 0.78rem; }
   hr { border: none; border-top: 1px solid rgba(212,228,250,0.1); margin: 48px 0 24px; }
   footer.site { color: #9ea8b7; font-size: 0.85rem; }
   footer.site .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 18px; margin-bottom: 22px; }
@@ -209,6 +237,10 @@ const CSS = `
     header.site { padding-top: 14px; }
     nav.sitenav { font-size: 0.84rem; gap: 2px 12px; }
     .calc { padding: 16px; }
+    .glance > div { grid-template-columns: 1fr; }
+    .drop { padding: 18px; }
+    .preview-row { grid-template-columns: 1fr auto; }
+    .preview-c { display: none; }
   }
 `;
 
@@ -290,7 +322,9 @@ window.va=window.va||function(){(window.vaq=window.vaq||[]).push(arguments)};
     var t=ev.target;if(!t||!t.closest)return;var el=t.closest("[data-track]");if(!el)return;
     track(el.getAttribute("data-track"),{ref:el.getAttribute("data-ref")||"",href:el.getAttribute("href")||""});
   });
-  if(PH_KEY&&!dnt)track("static_pageview",{});
+  // Which search engine or site sent the visitor: a name from a short list, never the URL or the query.
+  function source(){try{var r=document.referrer;if(!r)return "direct";var h=new URL(r).hostname.replace(/^www\\./,"");if(h===location.hostname.replace(/^www\\./,""))return "internal";var m=/(bing|google|duckduckgo|yahoo|ecosia|brave|startpage|yandex|chatgpt|openai|perplexity|copilot|claude|gemini|reddit|facebook|moneysavingexpert)/.exec(h);return m?m[1]:"other";}catch(e){return "other";}}
+  if(PH_KEY&&!dnt)track("static_pageview",{source:source()});
 })();
 </script>
 <script defer src="/_vercel/insights/script.js"></script>`;
@@ -492,7 +526,8 @@ function relatedCards(keys) {
 
 function sourcesHtml(sources, checked) {
   if (!sources || !sources.length) return "";
-  return `<div class="sources"><h3>Sources and checking</h3><p>Facts on this page were last checked on ${esc(checked || UPDATED_HUMAN)} against:</p><ul>${sources
+  const when = /^\d{4}-\d{2}-\d{2}$/.test(checked || "") ? humanDate(checked) : checked || UPDATED_HUMAN;
+  return `<div class="sources"><h3>Sources and checking</h3><p>Facts on this page were last checked on ${esc(when)} against:</p><ul>${sources
     .map((s) => `<li><a href="${esc(s.href)}" rel="noopener" target="_blank">${esc(s.t)}</a></li>`)
     .join("")}</ul><p>Spotted something out of date? <a href="/#feedback">Tell us</a> and we will fix it.</p></div>`;
 }
@@ -503,34 +538,133 @@ function sourcesHtml(sources, checked) {
 
 const BANK_GROUPS = ["High street banks", "App-based banks and fintechs", "Credit cards and business accounts"];
 
+// The at-a-glance box. A searcher who typed "can I export CSV from Revolut" or
+// "Santander download csv from app" gets the answer, and the two follow-ups
+// (from the app? how far back?), before the first scroll.
+function glanceHtml(bank) {
+  const pdfOnly = !!bank.pdfOnly;
+  const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+  const rows = [
+    ["CSV export?", pdfOnly ? "No. PDF statements only, which the tracker imports directly." : "Yes, and it is free."],
+    bank.app ? ["From the mobile app?", bank.app] : null,
+    ["Where", `${cap(bank.where)}.`],
+    bank.history ? ["How far back?", bank.history] : null,
+    bank.formats ? ["Formats", `${cap(bank.formats)}.`] : null,
+    ["Time needed", "About three minutes."],
+  ].filter(Boolean);
+  return `<dl class="glance" aria-label="${esc(bank.name)} export at a glance">
+${rows.map(([k, v]) => `        <div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("\n")}
+      </dl>`;
+}
+
+// Drop zone on the bank pages. Someone who has just followed the steps is
+// holding the file: let them drop it here and land in the tracker with the
+// import already open, instead of sending them to the homepage to start again.
+// The file never leaves the browser. It is parked in IndexedDB on this origin,
+// the app collects it on load (src/handoff.ts) and deletes it.
+function dropZoneHtml(bank) {
+  const ref = `import-${bank.slug}`;
+  const kind = bank.pdfOnly ? "PDF" : "file";
+  return `<div class="drop" id="drop" data-ref="${esc(ref)}">
+        <div class="drop-text">
+          <strong>Got your ${esc(bank.name)} ${kind}? Drop it here.</strong>
+          <span>It opens in the tracker with every transaction sorted by month, ready to categorise. The file stays in your browser and is never uploaded. No account, no bank login.</span>
+        </div>
+        <div class="drop-actions">
+          <label class="btn" for="dropfile">Choose the ${kind}</label>
+          <input class="sr" type="file" id="dropfile" accept=".csv,.ofx,.qfx,.qif,.txt,.pdf,text/csv,application/pdf" />
+          <a class="drop-alt" href="/#ref=${encodeURIComponent(ref)}" data-track="cta_click" data-ref="${esc(ref)}">No file yet? Open the tracker &rarr;</a>
+        </div>
+        <p class="drop-msg" id="dropmsg" role="status" aria-live="polite"></p>
+      </div>`;
+}
+
+const DROP_SCRIPT = `<script>
+(function(){
+  var zone=document.getElementById("drop");if(!zone)return;
+  var input=document.getElementById("dropfile"),msg=document.getElementById("dropmsg"),ref=zone.getAttribute("data-ref")||"import";
+  var appUrl="/ledger#ref="+encodeURIComponent(ref);
+  function say(t){msg.textContent=t;}
+  function ext(n){var m=/\\.([a-z0-9]+)$/i.exec(n||"");return m?m[1].toLowerCase():"none";}
+  function manual(){say("Your browser would not hold the file for the next page. Open the tracker and add it from Settings, Import data.");zone.classList.remove("busy");}
+  function take(file){
+    if(!file)return;
+    if(!/^(csv|ofx|qfx|qif|txt|pdf)$/.test(ext(file.name))){say("That does not look like a statement. Use the CSV, OFX, QIF or PDF your bank gave you.");return;}
+    if(file.size>20*1024*1024){say("That file is over 20 MB. Export a shorter date range and try again.");return;}
+    zone.classList.add("busy");say("Opening "+file.name+" in the tracker…");
+    var reader=new FileReader();
+    reader.onerror=manual;
+    reader.onload=function(){
+      try{
+        var open=indexedDB.open("it_handoff",1);
+        open.onupgradeneeded=function(){open.result.createObjectStore("files");};
+        open.onerror=manual;
+        open.onsuccess=function(){
+          try{
+            var db=open.result,tx=db.transaction("files","readwrite");
+            tx.objectStore("files").put({name:file.name,type:file.type||"",bytes:reader.result,at:Date.now()},"pending");
+            tx.onerror=manual;
+            tx.oncomplete=function(){db.close();if(window.itTrack)window.itTrack("file_handoff",{ref:ref,format:ext(file.name)});location.href=appUrl+"&handoff=1";};
+          }catch(e){manual();}
+        };
+      }catch(e){manual();}
+    };
+    reader.readAsArrayBuffer(file);
+  }
+  input.addEventListener("change",function(){take(input.files&&input.files[0]);});
+  ["dragenter","dragover"].forEach(function(n){zone.addEventListener(n,function(e){e.preventDefault();zone.classList.add("over");});});
+  ["dragleave","drop"].forEach(function(n){zone.addEventListener(n,function(e){e.preventDefault();zone.classList.remove("over");});});
+  zone.addEventListener("drop",function(e){take(e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]);});
+  // A file dropped anywhere else on the page would otherwise navigate away to it.
+  window.addEventListener("dragover",function(e){e.preventDefault();});
+  window.addEventListener("drop",function(e){e.preventDefault();});
+})();
+</script>`;
+
+// What the file turns into. A static picture of the result, in HTML so it is
+// crawlable and weightless: the reader should see the payoff before deciding.
+function previewHtml(bank) {
+  const rows = [
+    ["Salary", "Income", "+£2,480.00", "in"],
+    ["Rent", "Housing", "-£950.00", ""],
+    ["Tesco", "Groceries", "-£312.40", ""],
+    ["Octopus Energy", "Bills", "-£118.00", ""],
+    ["Netflix, Spotify, gym", "Subscriptions", "-£61.97", ""],
+  ];
+  return `<div class="preview" role="img" aria-label="Example: a month of ${esc(bank.name)} transactions after import, grouped into categories with a surplus of £1,037.63">
+        <div class="preview-head"><span>October</span><span class="preview-sur">Surplus <b>£1,037.63</b></span></div>
+${rows.map(([n, c, a, k]) => `        <div class="preview-row"><span class="preview-n">${esc(n)}</span><span class="preview-c">${esc(c)}</span><span class="preview-a${k ? " in" : ""}">${esc(a)}</span></div>`).join("\n")}
+        <div class="preview-foot">Example figures. Yours come from your file.</div>
+      </div>`;
+}
+
 function bankPage(bank) {
   const path = `/import/${bank.slug}.html`;
   // Some providers only issue PDF statements. Their page is honest about that
-  // and leads with the paste route instead of promising a CSV that does not exist.
+  // and leads with the PDF import instead of promising a CSV that does not exist.
   const pdfOnly = !!bank.pdfOnly;
-  const title = pageTitle(
-    pdfOnly
-      ? `${bank.name} statement download: track it free (2026)`
-      : `How to export your ${bank.name} statement to CSV (free, 2026)`,
-  );
-  const description = pdfOnly
-    ? `${bank.name} only issues PDF statements. Where to find it and how to track it in a free income and expense tracker, no bank login.`
-    : `Step-by-step: download your ${bank.name} transactions as a CSV file and track your income and spending free. No account and no bank login required.`;
+  const title = pageTitle(bank.title);
+  const description = bank.description;
   const trail = [
     { name: "Home", path: "/" },
     { name: "Bank CSV guides", path: "/import/" },
     { name: bank.name, path },
   ];
   const faqs = [
+    ...(bank.faqs || []),
     pdfOnly
       ? {
           q: `Can I export ${bank.name} transactions to CSV?`,
-          a: `Not directly. ${bank.name} provides PDF statements from ${bank.where}, with no CSV, OFX or QIF option at the time of checking. Download the PDF, copy the transaction rows and paste them into The Income Tracker, which reads the dates, descriptions and amounts from the text.`,
+          a: `Not directly. ${bank.name} provides PDF statements from ${bank.where}, with no CSV, OFX or QIF option at the time of checking. You do not need to convert it: download the PDF and import it into The Income Tracker, which reads the dates, descriptions and amounts from the statement.`,
         }
       : {
-          q: `Can I export ${bank.name} transactions to CSV for free?`,
-          a: `Yes. ${bank.name} lets you download your own transactions as a file at no cost from ${bank.where}. You then import that file into a budgeting tool such as The Income Tracker.`,
+          q: `Is it free to export ${bank.name} transactions to CSV?`,
+          a: `Yes. ${bank.name} lets you download your own transactions as a file at no cost from ${bank.where}. You then import that file into a budgeting tool such as The Income Tracker, which is also free.`,
         },
+    {
+      q: `What can I do with my ${bank.name} ${pdfOnly ? "statement" : "CSV"} once I have it?`,
+      a: `Open it in a spreadsheet to read it, or import it into The Income Tracker to see it as a month-by-month budget: income, spending by category, recurring bills and what is left over. Importing takes a few seconds and you can add next month's file on top without creating duplicates.`,
+    },
     {
       q: `Do I need to connect or log in to my bank to use The Income Tracker?`,
       a: `No. There is no open-banking connection and you never enter bank credentials into The Income Tracker. You download the file from ${bank.name} yourself and drop it into the app, which runs entirely in your browser.`,
@@ -539,33 +673,42 @@ function bankPage(bank) {
       q: `Is my ${bank.name} data kept private?`,
       a: `Yes. The Income Tracker is local-first. Your imported transactions stay in your own browser and are never uploaded to a server, unless you choose to sign in to sync across devices.`,
     },
-    ...(bank.faqs || []),
   ];
-  const formats = bank.formats ? `<p>Formats ${esc(bank.name)} offers: <strong>${esc(bank.formats)}</strong>. CSV is the cleanest import. OFX and QIF also import directly.</p>` : "";
   const pdfNote = bank.pdfOnlyNote
     ? `<p class="note">${esc(bank.pdfOnlyNote)} See <a href="/guides/import-pdf-bank-statement.html">how to import a PDF bank statement</a>.</p>`
     : `<p class="note">Only got a PDF? You can still import it. See <a href="/guides/import-pdf-bank-statement.html">how to import a PDF bank statement</a>.</p>`;
   const landing = bank.landing ? `<p>Want the use-case view? See the <a href="/${bank.landing}.html">${esc(RELATED_INDEX[bank.landing].t)}</a> page.</p>` : "";
   const h1 = pdfOnly ? `How to download your ${bank.name} statement (and track it free)` : `How to export your ${bank.name} statement to CSV`;
+  const appClause = bank.app && /^No\b/.test(bank.app) ? " The mobile app cannot do it." : "";
   const tldr = pdfOnly
-    ? `${esc(bank.name)} does not offer a CSV export. Download the <strong>PDF statement</strong> from ${esc(bank.where)}, copy the transaction rows, and paste them into ${BRAND}. It reads the dates and amounts for you. Free, no bank login.`
-    : `Log in to ${esc(bank.where)}, open the account, pick a date range and export as <strong>CSV</strong>. Then import that file into ${BRAND} and track your money for free, with no bank login.`;
+    ? `${esc(bank.name)} does not offer a CSV export. Download the <strong>PDF statement</strong> from ${esc(bank.where)} and import the PDF itself into ${BRAND}. It reads the dates and amounts for you. Free, no bank login.`
+    : `Yes, you can. Log in to ${esc(bank.where)}, open the account, pick a date range and export as <strong>CSV</strong>.${appClause} Then drop that file into ${BRAND} to see it as a budget, free and with no bank login.`;
   const body = `      <header class="top">${breadcrumbHtml(trail)}</header>
       <h1>${esc(h1)}</h1>
       <p class="meta">By ${BRAND} · Updated ${UPDATED_HUMAN}</p>
       <div class="tldr"><strong>In short</strong><p>${tldr}</p></div>
+      ${glanceHtml(bank)}
 
       <h2>${pdfOnly ? `Download your ${esc(bank.name)} statement` : `Export ${esc(bank.name)} transactions as CSV`}</h2>
       <ol class="steps">
 ${bank.steps.map((s) => `        <li>${s}</li>`).join("\n")}
       </ol>
       <p class="note">${esc(bank.note)}</p>
-      ${formats}
 
-      ${ctaHtml(`Import your ${bank.name} CSV. Free, no account, no bank login.`, `import-${bank.slug}`)}
+      ${dropZoneHtml(bank)}
 
-      <h2>What happens after you import</h2>
-      <p>Drop the file in and every transaction lands in a month-by-month ledger. Drag items into categories, flag the recurring ones, and watch your surplus update as you go. Money moved between your own accounts gets auto-skipped, so transfers never double-count. Duplicates are caught too, so importing overlapping date ranges is safe.</p>
+      ${renderSections(bank.sections)}
+
+      <h2>What the file turns into</h2>
+      <p>A ${pdfOnly ? "statement" : "CSV"} on its own is a long list. Dropped into the tracker, every transaction lands in a month-by-month ledger and the totals appear straight away.</p>
+      ${previewHtml(bank)}
+      <ul>
+        <li><strong>Sorted for you.</strong> Shops and bills you have categorised once are remembered, so month two takes a fraction of the time.</li>
+        <li><strong>Transfers do not double-count.</strong> Money moved between your own accounts is spotted and skipped.</li>
+        <li><strong>Safe to re-import.</strong> Duplicates are caught, so overlapping date ranges never inflate your spending.</li>
+        <li><strong>Recurring bills found.</strong> Subscriptions and regular payments are flagged, which is usually where the first saving turns up.</li>
+      </ul>
+      <p>Next month, export the new file and drop it in again. Five minutes a month keeps the whole year up to date.</p>
       ${pdfNote}
       ${landing}
 
@@ -576,7 +719,7 @@ ${bank.steps.map((s) => `        <li>${s}</li>`).join("\n")}
       <h2>Other banks</h2>
       <div class="grid">
 ${BANKS.filter((b) => b.slug !== bank.slug)
-  .map((b) => `        <a class="card" href="/import/${b.slug}.html"><span class="card-t">${esc(b.name)} &rarr; CSV</span><span class="card-d">Export ${esc(b.name)} transactions</span></a>`)
+  .map((b) => `        <a class="card" href="/import/${b.slug}.html"><span class="card-t">${esc(b.name)} &rarr; ${b.pdfOnly ? "PDF" : "CSV"}</span><span class="card-d">${b.pdfOnly ? "Download" : "Export"} ${esc(b.name)} ${b.pdfOnly ? "statements" : "transactions"}</span></a>`)
   .join("\n")}
       </div>
 
@@ -589,6 +732,7 @@ ${BANKS.filter((b) => b.slug !== bank.slug)
       path,
       trail,
       published: bank.published,
+      script: DROP_SCRIPT,
       jsonLd: [
         {
           "@type": "HowTo",
@@ -598,7 +742,7 @@ ${BANKS.filter((b) => b.slug !== bank.slug)
           step: bank.steps.map((s, i) => ({
             "@type": "HowToStep",
             position: i + 1,
-            text: stripTags(s),
+            text: stripTags(s).replace(/&amp;/g, "&"),
           })),
         },
         faqLd(faqs),
@@ -610,8 +754,8 @@ ${BANKS.filter((b) => b.slug !== bank.slug)
 
 function importHub() {
   const path = "/import/";
-  const title = `Bank statement CSV export guides for ${BANKS.length} UK banks`;
-  const description = `Step-by-step CSV export guides for ${BANKS.length} UK banks, from Barclays and HSBC to Monzo, Nationwide and Halifax. Then track them free, with no bank login.`;
+  const title = `How to download a bank statement as CSV: ${BANKS.length} UK bank guides`;
+  const description = `Step-by-step guides to downloading your transactions as a CSV from ${BANKS.length} UK banks, including Barclays, HSBC, Santander, Monzo, Nationwide and Halifax.`;
   const trail = [
     { name: "Home", path: "/" },
     { name: "Bank CSV guides", path },

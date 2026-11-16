@@ -100,9 +100,10 @@ export const LANDINGS = [
     card: "Budget app, no open banking",
     cardD: "Private by design",
     crumb: "Budget app without open banking",
-    title: "UK budget app without open banking (free)",
+    updated: "2026-11-16",
+    title: "Budgeting app without linking your bank account (free, UK)",
     description:
-      "A free UK budget app that never uses open banking. Import a CSV from your bank and track spending privately, with no credentials shared.",
+      "Looking for a budgeting tool that does not link to your bank account? A free UK budget app with no open banking: how it works and what you trade for it.",
     h1: "A UK budget app with no open banking",
     tldr:
       "The Income Tracker is a free UK budget app that does not use open banking. You import a CSV you download yourself, so no third party ever connects to your accounts. Private by design.",
@@ -125,9 +126,17 @@ export const LANDINGS = [
           "Open banking is convenient, but it means handing a third party an ongoing window into your accounts. That is a real trade, and not everyone wants to make it. A CSV gives you the same insight with none of the exposure. You download the file, you import it, and nothing else touches your bank.",
         ],
       },
+      {
+        h: "What you trade for it",
+        p: [
+          "Not linking your bank has a cost, and it is worth being straight about it. Nothing updates on its own. Once a month you download a statement file from your bank and drop it in, which takes about five minutes. You will not see today's balance or a payment that is still pending.",
+          "What you get back is that nobody else holds a connection to your accounts. There is no consent to keep renewing, no provider to stop supporting your bank, and nothing to revoke if you stop using the app. For a monthly budget, last month's complete statement is the more useful picture anyway.",
+        ],
+      },
     ],
     exportNoteHtml: 'Not sure how to export a CSV? Pick your bank in the <a href="/import/">bank CSV guides</a>.',
     faqs: [
+      { q: "Are there budgeting tools that work without linking a bank account?", a: "Yes. The Income Tracker is one: you download a statement file from your bank and import it, so the app never connects to your account. Spreadsheets and paper budgets work the same way. The trade is a few minutes of importing each month in exchange for no third-party access." },
       { q: "Is there a budget app that does not use open banking?", a: "Yes. The Income Tracker never uses open banking. You import a CSV you download from your bank, so no third party connects to your accounts." },
       { q: "How does it get my transactions then?", a: "You download a CSV from your bank and import it. The app reads the dates, descriptions and amounts automatically." },
       { q: "Is it really free?", a: "Yes. No account, no subscription, no credit card." },

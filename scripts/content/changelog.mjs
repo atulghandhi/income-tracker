@@ -4,6 +4,12 @@
 
 export const CHANGELOG = [
   {
+    date: "2026-11-16",
+    title: "Drop your statement straight onto a bank guide",
+    body:
+      "Each bank guide now has a drop zone under the steps. Once you have downloaded the file from your bank, drop it there and it opens in the tracker with the import review ready, instead of sending you to the homepage to find the import button. The file is passed inside your browser and is never uploaded. The guides also open with an at-a-glance box answering the questions people ask most: can the mobile app do it, and how far back does the export go.",
+  },
+  {
     date: "2026-10-19",
     title: "Insights moves onto the Dashboard",
     body:

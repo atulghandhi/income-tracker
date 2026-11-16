@@ -841,12 +841,12 @@ export const GUIDES = [
     topic: "Budgeting basics",
     cardD: "The Standard Financial Statement, filled in from real statements",
     published: "2026-09-16",
-    updated: "2026-09-16",
+    updated: "2026-11-16",
     checked: "2026-09-16",
     readMinutes: 7,
-    title: "How to fill in an income and expenditure form (UK, 2026)",
+    title: "Income and expenditure form: what it is for, how to fill it in",
     description:
-      "What an income and expenditure form is, who asks for one, the Standard Financial Statement categories, and how to fill it in accurately from bank statements.",
+      "Why creditors, advisers and courts ask for an income and expenditure form, what they do with it, and a step-by-step guide to filling one in from statements.",
     h1: "How to fill in an income and expenditure form",
     tldr:
       "An income and expenditure form lists everything coming in and everything going out each month, so a creditor, adviser, lender or court can see what you can genuinely afford. Most UK creditors and advice charities now use one shared layout, the Standard Financial Statement. Fill it in from three months of real bank statements rather than memory, convert every figure to a monthly amount, include the irregular costs, and keep the evidence.",
@@ -923,6 +923,7 @@ export const GUIDES = [
       { t: "Citizens Advice: work out your budget", href: "https://www.citizensadvice.org.uk/debt-and-money/budgeting/budgeting/work-out-your-budget/" },
     ],
     faqs: [
+      { q: "What is the reason for filling in an income and expenditure form?", a: "To show, in one agreed layout, what you can genuinely afford. Whoever asked for it uses the figure left after essential costs to decide a fair repayment, a payment arrangement or whether a commitment is affordable. Because most UK creditors and advice charities accept the same Standard Financial Statement, a realistic form also stops each creditor arguing over your spending line by line." },
       { q: "What is an income and expenditure form?", a: "A monthly statement of all your income and all your outgoings, used by creditors, debt advisers, lenders and courts to see what you can afford to pay. In the UK most of them use the Standard Financial Statement layout." },
       { q: "Is there a free income and expenditure form template?", a: "Yes. This site has a free CSV income and expenditure template with the standard headings, and MoneyHelper offers an online budget planner. Both are free and need no sign-up." },
       { q: "Should I include irregular costs like car repairs?", a: "Yes. Average them over the year and enter a monthly figure. A form with no allowance for repairs, birthdays or the dentist is not realistic and will not last." },

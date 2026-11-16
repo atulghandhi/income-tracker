@@ -6,196 +6,196 @@
 ## Bank CSV export guides (hub)
 
 URL: https://www.theincometracker.com/import/
-Updated: 2026-09-16
+Updated: 2026-11-16
 
 Index of step-by-step CSV export guides for 27 UK banks and fintechs, with notes on PDF-only statements.
 
 ## How to export your Barclays statement to CSV
 
 URL: https://www.theincometracker.com/import/barclays-csv.html
-Updated: 2026-09-08
+Updated: 2026-11-16
 
 Where to find the export in Barclays Online Banking on a computer (the app cannot export CSV), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Barclays only offers CSV export on the desktop Online Banking site. The mobile app cannot do it.
 
 ## How to export your HSBC UK statement to CSV
 
 URL: https://www.theincometracker.com/import/hsbc-csv.html
-Updated: 2026-09-08
+Updated: 2026-11-16
 
-Where to find the export in HSBC Online Banking on desktop, from the transactions list rather than the PDF statement, the exact steps, formats offered, limits, and how to import the file into The Income Tracker. HSBC's official monthly statements are PDF only. CSV comes from the transactions list and usually covers recent activity, so export in chunks if you need more history.
+Where to find the export in HSBC Online Banking on desktop, from the transactions list rather than the PDF statement, the exact steps, formats offered, limits, and how to import the file into The Income Tracker. HSBC's official statements are PDF only and go back six years. The CSV comes from the transactions list instead, so if a long search returns less than you expected, run it again in shorter date ranges and import each file. Overlaps are safe.
 
 ## How to export your Monzo statement to CSV
 
 URL: https://www.theincometracker.com/import/monzo-csv.html
-Updated: 2026-09-08
+Updated: 2026-11-16
 
 Where to find the export in the Monzo app (iOS or Android), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Monzo also offers PDF and QIF. Pick CSV for the cleanest import.
 
 ## How to export your Starling Bank statement to CSV
 
 URL: https://www.theincometracker.com/import/starling-csv.html
-Updated: 2026-09-08
+Updated: 2026-11-16
 
 Where to find the export in the Starling app or web banking, the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Starling lets you export specific date ranges as CSV, which is handy for filling one month at a time.
 
 ## How to export your Lloyds Bank statement to CSV
 
 URL: https://www.theincometracker.com/import/lloyds-csv.html
-Updated: 2026-09-08
+Updated: 2026-11-16
 
 Where to find the export in Lloyds Internet Banking on a computer (the app cannot export CSV), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Lloyds caps each export at the last 12 months and 150 transactions. Hit the cap? Export again with a narrower date range and import each file.
 
 ## How to export your NatWest statement to CSV
 
 URL: https://www.theincometracker.com/import/natwest-csv.html
-Updated: 2026-09-08
+Updated: 2026-11-16
 
 Where to find the export in NatWest Online Banking on desktop, the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Always set the date range before exporting so you capture the full period you want.
 
 ## How to export your Santander UK statement to CSV
 
 URL: https://www.theincometracker.com/import/santander-csv.html
-Updated: 2026-09-08
+Updated: 2026-11-16
 
-Where to find the export in Santander Online Banking on desktop, the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Santander's midata export covers up to 12 months and masks some sensitive details for security. That is normal and still imports fine.
+Where to find the export in Santander Online Banking on desktop, the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Santander's midata file covers 12 months of transactions. It leaves out your name, address and account number and masks some sensitive transactions. That is by design, and the file still imports fine.
 
 ## How to export your Revolut statement to CSV
 
 URL: https://www.theincometracker.com/import/revolut-csv.html
-Updated: 2026-09-08
+Updated: 2026-11-16
 
 Where to find the export in the Revolut app or web app, the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Revolut's CSV can include multi-currency columns. If a file looks messy, export one currency per file for the cleanest import.
 
 ## How to export your Nationwide statement to CSV
 
 URL: https://www.theincometracker.com/import/nationwide-csv.html
-Updated: 2026-09-08
+Updated: 2026-11-16
 
 Where to find the export in the Nationwide Internet Bank on a computer (the Banking app only offers PDF statements), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Download transactions appears on current accounts and credit cards. Some savings accounts only offer PDF statements, which import directly too. Older months live under Documents, then Statements, as PDFs going back 36 months.
 
 ## How to export your Halifax statement to CSV
 
 URL: https://www.theincometracker.com/import/halifax-csv.html
-Updated: 2026-09-08
+Updated: 2026-11-16
 
 Where to find the export in Halifax Online Banking in a web browser (the app only offers PDF statements), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Each export covers at most 12 months, so a longer history means a few files. Overlaps are fine: the tracker drops duplicates. Credit card statements are not downloadable in Online Banking, only in the app as PDFs.
 
 ## How to export your Bank of Scotland statement to CSV
 
 URL: https://www.theincometracker.com/import/bank-of-scotland-csv.html
-Updated: 2026-09-08
+Updated: 2026-11-16
 
 Where to find the export in Bank of Scotland Internet Banking in a web browser (the app only offers PDF statements), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Bank of Scotland shares its online platform with Halifax and Lloyds, so the screens match those guides. Business Internet Banking has the export under Statement options, then Export transactions (CSV, QIF), with a cap of 1,000 lines per file.
 
 ## How to export your TSB statement to CSV
 
 URL: https://www.theincometracker.com/import/tsb-csv.html
-Updated: 2026-09-08
+Updated: 2026-11-16
 
 Where to find the export in TSB Internet Banking on a computer (the app only offers PDF statements in your Inbox), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. The 90-day, 150-transaction cap means a full year takes four or five files. Overlapping ranges are safe because the tracker drops duplicates. TSB's CSV dates carry a time stamp, which the importer strips.
 
 ## How to export your Chase UK statement to CSV
 
 URL: https://www.theincometracker.com/import/chase-uk-csv.html
-Updated: 2026-09-08
+Updated: 2026-11-16
 
 Where to find the export in the Chase app (Chase has no web banking), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Custom statements are capped at 90 days each. Monthly statements appear on the 2nd of the following month (the 3rd for the credit card) and stay available for six years, even after you close the account.
 
 ## How to export your first direct statement to CSV
 
 URL: https://www.theincometracker.com/import/first-direct-csv.html
-Updated: 2026-09-08
+Updated: 2026-11-16
 
 Where to find the export in first direct Online Banking in a desktop browser (the app only offers PDF statements), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. first direct's own help pages only describe PDF statements, so the label on the download option may differ from what you expect. Look on the transactions page rather than under Statements. Credit card exports cover a shorter period, around six months.
 
 ## How to export your American Express statement to CSV
 
 URL: https://www.theincometracker.com/import/amex-csv.html
-Updated: 2026-09-08
+Updated: 2026-11-16
 
 Where to find the export in your American Express online account in a desktop browser (the app shows PDF statements only), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Card statements list spending as positive numbers. The tracker spots this and flips the signs so purchases land as expenses, with a one-click undo if it guesses wrong. Roughly two years of transactions are downloadable; older periods are PDF only.
 
 ## How to export your Virgin Money statement to CSV
 
 URL: https://www.theincometracker.com/import/virgin-money-csv.html
-Updated: 2026-09-08
+Updated: 2026-11-16
 
 Where to find the export in Virgin Money Internet Banking in a desktop browser (the app offers PDF statements only), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Virgin Money says the export is not available on every account type. If yours only shows PDF statements, import the PDF directly instead.
 
 ## How to export your Co-operative Bank statement to CSV
 
 URL: https://www.theincometracker.com/import/co-operative-bank-csv.html
-Updated: 2026-09-08
+Updated: 2026-11-16
 
 Where to find the export in Co-operative Bank online banking in a desktop browser, the exact steps, formats offered, limits, and how to import the file into The Income Tracker. The export is easy to miss because it only shows once you have searched. Personal exports include Date, Description, Type, Money In, Money Out and Balance columns, which the tracker reads directly. Business online banking keeps 25 months of transactions.
 
 ## How to export your Metro Bank statement to CSV
 
 URL: https://www.theincometracker.com/import/metro-bank-csv.html
-Updated: 2026-09-08
+Updated: 2026-11-16
 
 Where to find the export in Metro Bank Internet Banking in a desktop browser (the app offers PDF statements only), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Advanced Search reaches back to when the account opened. Metro's CSV writes dates like 12-Sep-26 and puts commas in large amounts; the importer handles both.
 
 ## How to export your Wise statement to CSV
 
 URL: https://www.theincometracker.com/import/wise-csv.html
-Updated: 2026-09-08
+Updated: 2026-11-16
 
 Where to find the export in the Wise app or wise.com, the exact steps, formats offered, limits, and how to import the file into The Income Tracker. One statement per currency balance, 365 days each. Payments made straight from an external card do not appear in statements, only on the Transactions page, so check that page if something is missing.
 
 ## How to export your Tide statement to CSV
 
 URL: https://www.theincometracker.com/import/tide-csv.html
-Updated: 2026-09-08
+Updated: 2026-11-16
 
-Where to find the export in the Tide app or web app, the exact steps, formats offered, limits, and how to import the file into The Income Tracker. The Standard CSV excludes pending transactions, so export once the month has settled. Official PDF statements arrive on the 4th of the following month, and custom-range statements can cover up to six months.
+Where to find the export in the Tide app or web app, the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Monthly PDF statements are issued in the app on the 4th of the following month. A custom-range statement can cover up to six months and its end date has to be at least three days ago. The Standard CSV leaves out pending transactions, so export once the month has settled.
 
 ## How to export your Tesco Bank statement to CSV
 
 URL: https://www.theincometracker.com/import/tesco-bank-csv.html
-Updated: 2026-09-16
+Updated: 2026-11-16
 
 Where to find the export in Tesco Bank Online Banking in a browser (credit cards and savings accounts), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Tesco Bank no longer runs current accounts, so this covers credit cards and savings. Card downloads list spending as positive numbers; the importer spots that and flips the signs, with a one-click undo. Tesco Bank's banking business is now owned by Barclays, but the login, app and export flow still carry the Tesco Bank name.
 
 ## How to export your Barclaycard statement to CSV
 
 URL: https://www.theincometracker.com/import/barclaycard-csv.html
-Updated: 2026-09-16
+Updated: 2026-11-16
 
 Where to find the export in Barclays Online Banking on a computer, once your Barclaycard is linked to it (the Barclaycard site and app give PDF statements), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. The Barclays app cannot export files, and Barclays' web export only covers recent months, while PDFs go back years. Card spending exports as positive numbers; the importer flips the signs automatically and lets you undo it.
 
 ## How to export your Monzo Business statement to CSV
 
 URL: https://www.theincometracker.com/import/monzo-business-csv.html
-Updated: 2026-09-16
+Updated: 2026-11-16
 
 Where to find the export in the Monzo app, the same route as a personal account, the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Business CSVs end with a running Balance and Balance currency column, which the importer ignores. The Insights tab also offers an Export cash flow file, but that is category totals rather than transactions. Use Bank statements for a row-per-transaction file.
 
 ## How to export your Starling Business statement to CSV
 
 URL: https://www.theincometracker.com/import/starling-business-csv.html
-Updated: 2026-09-16
+Updated: 2026-11-16
 
 Where to find the export in the Starling app or Starling Online Banking in a browser, the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Starling's CSV is one of the cleanest around: date, counterparty, reference, type, amount, balance and Starling's own category. Bookkeeping integrations with Xero, FreeAgent or QuickBooks are separate and not needed for this.
 
 ## How to export your Zopa statement to CSV
 
 URL: https://www.theincometracker.com/import/zopa-csv.html
-Updated: 2026-09-16
+Updated: 2026-11-16
 
-Where to find the export in the Zopa app, the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Zopa issues one PDF statement per month and no CSV, so import the PDF itself. The app reads the dates, descriptions and amounts from the statement's table. Do a month at a time and check the totals against the statement.
+Where to find the export in the Zopa app, the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Savings statements appear on the first calendar day of each month and show every deposit, withdrawal, interest payment and move between pots for the month before. Current account statements are issued on the 8th and cover everything since the last one. There is no CSV option on either, so import the PDF itself, a month at a time, and check the totals against the statement.
 
 ## How to export your Kroo statement to CSV
 
 URL: https://www.theincometracker.com/import/kroo-csv.html
-Updated: 2026-09-16
+Updated: 2026-11-16
 
 Where to find the export in the Kroo app, the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Kroo statements are monthly PDFs. The in-app feed can differ slightly from the statement because pending payments show in the feed but only settled transactions appear on the statement, so treat the statement as the record.
 
 ## How to export your Marcus by Goldman Sachs statement to CSV
 
 URL: https://www.theincometracker.com/import/marcus-csv.html
-Updated: 2026-09-16
+Updated: 2026-11-16
 
 Where to find the export in the Marcus website or app, under Documents, the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Marcus offers no CSV, OFX or QIF download and no accounting-software connection. For a savings account you mostly want the interest and transfer lines, which is a quick PDF import once a month or once a quarter.
 
@@ -300,7 +300,7 @@ The common guideline is 20% of take-home pay, from the 50/30/20 rule. The more u
 ## How to fill in an income and expenditure form
 
 URL: https://www.theincometracker.com/guides/income-and-expenditure-form-uk.html
-Updated: 2026-09-16
+Updated: 2026-11-16
 
 An income and expenditure form lists everything coming in and everything going out each month, so a creditor, adviser, lender or court can see what you can genuinely afford. Most UK creditors and advice charities now use one shared layout, the Standard Financial Statement. Fill it in from three months of real bank statements rather than memory, convert every figure to a monthly amount, include the irregular costs, and keep the evidence.
 
@@ -489,7 +489,7 @@ Export a CSV from Starling, import it into The Income Tracker, and track your sp
 ## A UK budget app with no open banking
 
 URL: https://www.theincometracker.com/budget-app-without-open-banking.html
-Updated: 2026-09-08
+Updated: 2026-11-16
 
 The Income Tracker is a free UK budget app that does not use open banking. You import a CSV you download yourself, so no third party ever connects to your accounts. Private by design.
 
@@ -619,10 +619,10 @@ Updated: 2026-09-16
 
 If you are paid weekly, a monthly budget never quite fits. This template runs week by week: wages in, rent share and weekly food out, and the monthly bills placed in the week they are actually collected. Download the CSV, replace the example rows, and see which week is the tight one. Download: https://www.theincometracker.com/templates/weekly-budget-planner-template.csv
 
-## Free savings tracker template
+## Free savings tracker spreadsheet
 
 URL: https://www.theincometracker.com/templates/savings-tracker-template.html
-Updated: 2026-09-16
+Updated: 2026-11-16
 
 One row per movement, one goal per name. Log every payday transfer, every bit of interest and every withdrawal, and the running total for each goal is one filter away. Import it into The Income Tracker and each goal gets a projected finish date. Download: https://www.theincometracker.com/templates/savings-tracker-template.csv
 
@@ -650,6 +650,6 @@ Who makes The Income Tracker, how it is funded (it is free; no ads, no data sale
 ## What's new
 
 URL: https://www.theincometracker.com/whats-new.html
-Updated: 2026-10-18
+Updated: 2026-11-16
 
 Release notes for The Income Tracker, newest first.

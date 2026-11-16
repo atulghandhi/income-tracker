@@ -422,14 +422,14 @@ export const TEMPLATES = [
     card: "Savings tracker",
     cardD: "Several goals in one sheet, with interest and withdrawals",
     crumb: "Savings tracker",
-    title: "Free savings tracker template (UK, CSV)",
+    title: "Free savings tracker spreadsheet (UK): Excel, Sheets or CSV",
     description:
-      "A free UK savings tracker template: log transfers, interest and withdrawals against named goals. Open in Excel or Sheets, or import it for projected dates.",
-    h1: "Free savings tracker template",
+      "A free UK savings tracker spreadsheet to download: track several savings goals, interest and withdrawals in Excel or Google Sheets. No sign-up needed.",
+    h1: "Free savings tracker spreadsheet",
     tldr:
       "One row per movement, one goal per name. Log every payday transfer, every bit of interest and every withdrawal, and the running total for each goal is one filter away. Import it into The Income Tracker and each goal gets a projected finish date.",
     published: "2026-09-16",
-    updated: "2026-09-16",
+    updated: "2026-11-16",
     file: { name: "savings-tracker-template.csv", rows: SAVINGS_ROWS },
     columns: [
       { name: "Date", meaning: "When the money moved." },

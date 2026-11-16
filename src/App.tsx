@@ -4,6 +4,7 @@ import { DashboardExportControls } from "./DashboardExportControls";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Analytics } from "@vercel/analytics/react";
 import LandingPage from "./LandingPage";
+import { hashRequestsHandoff, takeHandoffFile } from "./handoff";
 import Onboarding, { type OnboardingResult } from "./Onboarding";
 import type { CSSProperties, Dispatch, DragEvent, FormEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode, Ref, SetStateAction } from "react";
 import {
@@ -763,6 +764,9 @@ function App() {
   // Which homepage a first-time visitor sees: "/us/" or a US visitor on "/" gets the US copy.
   const [landingRegion] = useState(() => chooseLandingRegion(window.location.pathname));
   const [hydrated, setHydrated] = useState(false);
+  // Arrived from a bank guide's drop zone with a statement file waiting (src/handoff.ts).
+  const [handoffPending, setHandoffPending] = useState(() => hashRequestsHandoff(window.location.hash));
+  const handoffImportedRef = useRef(false);
   const [session, setSession] = useState<AuthSession | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authWorking, setAuthWorking] = useState(false);
@@ -1562,6 +1566,10 @@ function App() {
     // Which guides, calculators and comparisons actually send people into the app.
     const ref = hashParams.get("ref") ?? params.get("ref");
     hashParams.delete("ref");
+    if (hashParams.has("handoff")) {
+      hashParams.delete("handoff");
+      changed = true;
+    }
     if (ref !== null) {
       const clean = ref.replace(/[^a-z0-9_-]/gi, "").slice(0, 60);
       if (clean) {
@@ -1577,7 +1585,7 @@ function App() {
     }
     if (changed) {
       const query = params.toString();
-      const hadHashParams = /(^#|&)(ref|feedback)(=|&|$)/.test(window.location.hash);
+      const hadHashParams = /(^#|&)(ref|feedback|handoff)(=|&|$)/.test(window.location.hash);
       const hash = hadHashParams ? (hashParams.toString() ? `#${hashParams}` : "") : window.location.hash;
       const url = window.location.pathname + (query ? `?${query}` : "") + hash;
       window.history.replaceState(null, "", url);
@@ -1599,6 +1607,9 @@ function App() {
   useEffect(() => {
     if (showLanding || !hydrated || authLoading) return;
     if (user && !cloudHydrated) return;
+    // Someone who arrived with a statement file gets the import review, not the
+    // setup wizard on top of it. If no file turned up, the wizard runs as usual.
+    if (handoffPending || handoffImportedRef.current) return;
     if (readFlag(ONBOARDING_KEY)) return;
     if (hasLocalData(ledger)) {
       // Existing user from before the wizard existed — never interrupt them.
@@ -1609,7 +1620,40 @@ function App() {
     // Deliberately not keyed on `ledger`: the gate should only re-evaluate when
     // hydration/auth state settles, not on every keystroke afterwards.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showLanding, hydrated, authLoading, user?.id, cloudHydrated]);
+  }, [showLanding, hydrated, authLoading, user?.id, cloudHydrated, handoffPending]);
+
+  // Collect the statement file a bank guide handed over and open it for review.
+  // Waits for the ledger to hydrate so duplicate matching and learned rules apply.
+  useEffect(() => {
+    if (!handoffPending || !hydrated || authLoading) return;
+    if (user && !cloudHydrated) return;
+    let cancelled = false;
+    void takeHandoffFile().then((file) => {
+      if (cancelled) return;
+      if (file) {
+        handoffImportedRef.current = true;
+        try {
+          // They are a user now: the bare domain should open their ledger, not the homepage.
+          localStorage.setItem("hasSeenLanding", "1");
+        } catch {
+          // Storage unavailable; the import still opens.
+        }
+        setShowLanding(false);
+        setActiveView("ledger");
+        track("handoff_import", { format: importSourceOf(file.name), found: true });
+        void importStatementFile(file);
+      } else {
+        track("handoff_import", { format: "none", found: false });
+        setToast("That file did not come through. Import it from Settings.");
+      }
+      setHandoffPending(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // importStatementFile closes over the hydrated ledger of this render, which is the point.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handoffPending, hydrated, authLoading, user?.id, cloudHydrated]);
 
   function finishOnboarding(result: OnboardingResult, meta: { completed: boolean; skippedSteps: number }) {
     writeFlag(ONBOARDING_KEY);

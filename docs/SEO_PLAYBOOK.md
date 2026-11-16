@@ -8,7 +8,7 @@ How the content side of The Income Tracker is built, and the short list of thing
 
 | Data file | Pages | Notes |
 | --- | --- | --- |
-| `banks.mjs` | `/import/<bank>-csv.html` + `/import/` hub | One page per bank. `steps` are HTML, everything else is escaped. Each entry carries `sources`, `checked` and `published`. |
+| `banks.mjs` | `/import/<bank>-csv.html` + `/import/` hub | One page per bank. `steps` are HTML, everything else is escaped. Each entry carries `sources`, `checked` and `published`. The `ANSWERS` map at the bottom holds the search listing and the at-a-glance answers; see the 16 November section. |
 | `guides.mjs` | `/guides/<slug>.html` + hub | Answer-first articles. `topic` groups them on the hub. Optional `howto`, `sources`, `table` sections. |
 | `calculators.mjs` | `/tools/<slug>.html` + hub | `compute` is browser JS. It must not contain backticks or `${`. Fields prefill from `?id=value` and the Share button builds that link. |
 | `comparisons.mjs` | `/compare/<slug>.html`, the round-up, hub | Every page must say where the competitor wins. Prices carry a `checked` date. |
@@ -58,6 +58,32 @@ Also: every meta description is now 160 characters or fewer (Bing flags longer o
 **US homepage.** `/us/` is the same landing component rendered with US copy (`src/landingContent.ts`): dollars, US banks, Plaid-free wording, US FAQ and its own `en-US` head, canonical and JSON-LD. `/` and `/us/` carry reciprocal hreflang with `/` as x-default. A first-time visitor on `/` whose browser says US (time zone and language, the same detection the app uses) sees the US copy in place, without a redirect; crawlers always get the page the URL names. "US version" and "UK version" links switch, and the choice is remembered. Entering the app from `/us/` starts a US ledger. The importer also accepts `.qfx` files now, which US banks offer widely.
 
 After deploying: submit `/` and `/us/` with `npm run indexnow -- --since 2026-11-15 --submit`, and inspect `/us/` in Bing Webmaster Tools.
+
+## 16 November 2026: first Bing query data, and what it changed
+
+The first Bing Webmaster Tools keyword export (17 queries, 23 impressions, 1 click, positions 2 to 10) and three days of PostHog events. Small numbers, so treat this as direction and not proof. Two things were clear enough to act on.
+
+**The queries are questions about one bank.** 13 of the 17 were of the form "can I export CSV from Revolut", "Santander download csv from app", "export all Wise transactions greater than a year", "how can I download Barclaycard transactions as a CSV file instead". The pages ranked on page one and got almost no clicks.
+
+**Content visitors reached the homepage and stopped.** 11 people followed a CTA from a content page to `/`. None recorded another event. The CTA said "Open the tracker" and delivered a marketing page to someone already holding a statement file.
+
+The rule that came out of it has three parts, and each belongs in a different place.
+
+1. **The search listing promises.** Title and description say exactly what the person searched for and stop there: "Download a Santander CSV, app or online: step-by-step guide". Name the awkward variant in their query (the app, past a year, instead of a PDF) so they can see their case is covered. Do not put the steps or the answer in the listing: a listing that says "Download transactions, then midata (CSV)" has made the click unnecessary. Never promise a CSV from a bank that only issues PDFs.
+2. **The page delivers, in the first screen.** The "In short" box answers the question. The at-a-glance box under it answers the two follow-ups nearly every query carried: can the mobile app do it, and how far back does it go. Then the steps. A follow-up that needs more than a line gets its own section (`sections` in `banks.mjs`, as on the Wise page).
+3. **Then hand over, not sell.** Under the steps is a drop zone. The visitor drops the file they just downloaded, it is parked in IndexedDB on this origin, and `/ledger#ref=…&handoff=1` opens the app with the import review already showing (`src/handoff.ts`). No homepage, no setup wizard on top. The file never leaves the browser. Completing that import also sets `hasSeenLanding`, so the bare domain opens their ledger next time.
+
+Where it lives: `ANSWERS` at the bottom of `scripts/content/banks.mjs` holds each bank's listing, `app`, `history`, extra FAQs and sections. `glanceHtml`, `dropZoneHtml`, `previewHtml` and `DROP_SCRIPT` in `build-content.mjs` render them. Facts for Santander, HSBC, Wise, Tide and Zopa were re-read against each bank's own help page on 16 November; the Zopa page had the wrong statement day for the current account (it is the 8th; savings statements are the 1st) and that is corrected.
+
+Also changed: the savings tracker page now says "spreadsheet" (query: "free savings tracker spreadsheet uk", position 2, no clicks), the no-open-banking page is titled for "without linking your bank account" and says honestly what you trade for it, and the income and expenditure guide answers "what is the reason for filling one in" in those words.
+
+### How to tell if it worked
+
+- Bing Webmaster Tools, 28 days after deploy against the 28 before: clicks and CTR on `/import/*` pages. Position should hold; CTR is the number that should move.
+- PostHog: `static_pageview` now carries `source` (bing, google, duckduckgo, chatgpt and so on, a name from a short list and never a URL or query). `file_handoff` fires on the guide when a file is dropped, `handoff_import` in the app when it is collected. The funnel is `static_pageview` on `/import/*` to `file_handoff` to `import_committed`.
+- If `file_handoff` is rare while `cta_click` on the "No file yet?" link is common, people are reading the guide before they have exported anything. Then the next step is a reminder to come back, not a bigger drop zone.
+
+Untested and worth an experiment next: every other CTA on the site still goes to the homepage. Sending `#ref=` arrivals straight into the app is the obvious trial, but the homepage also does the explaining for someone with no file, so measure it first.
 
 ## What to write next (in order of expected return)
 
