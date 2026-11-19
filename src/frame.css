@@ -1407,9 +1407,9 @@
   }
 }
 
-/* Phones keep the rounded amount as the way into details; the icon is for wider rows. */
+/* Phones too show the amount once: the details icon sits with the row's other actions. */
 @media (max-width: 680px) {
-  .rowPeekIcon {
+  .panel.expense .expenseRow > .rowTotal {
     display: none;
   }
 }
@@ -1487,5 +1487,59 @@
 
   .panel.expense .expenseGroup:not(.ungrouped) .expenseRow > .accountDot {
     left: 26px;
+  }
+}
+
+/* ─── Quiet rows ──────────────────────────────────────────────────────────────
+   At rest a row is its name, its amount and (if it repeats) a small teal mark.
+   Everything else waits for the pointer or keyboard focus. On touch screens,
+   which have no hover, all of it stays visible. */
+.financeRow .moneyInput {
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+/* The currency sign sits against the number (£950), not a column away from it. */
+.financeRow .moneyInput input {
+  width: auto;
+  max-width: 100%;
+  field-sizing: content;
+  min-width: 2ch;
+  flex: 0 1 auto;
+}
+
+.recurToggle.active {
+  border-color: transparent;
+  background: transparent;
+}
+
+.recurToggle.active:hover {
+  background: var(--field);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .financeRow.quietAccount > .accountDot,
+  .financeRow .dragHandle,
+  .financeRow .rowActions .rowAction,
+  .financeRow .recurToggle:not(.active) {
+    opacity: 0;
+    transition: opacity 140ms ease;
+  }
+
+  .financeRow .dragHandle {
+    opacity: 0.35;
+  }
+
+  .financeRow:hover > .accountDot,
+  .financeRow:focus-within > .accountDot,
+  .financeRow:hover .dragHandle,
+  .financeRow:focus-within .dragHandle,
+  .financeRow:hover .rowActions .rowAction,
+  .financeRow:focus-within .rowActions .rowAction,
+  .financeRow:hover .recurToggle,
+  .financeRow:focus-within .recurToggle,
+  .financeRow .rowAction:focus-visible,
+  .financeRow .recurToggle:focus-visible {
+    opacity: 1;
   }
 }

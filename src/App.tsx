@@ -3824,6 +3824,11 @@ function App() {
   const navEntry = (view: AppView): NavEntry => (isToolView(view) ? toolNavItems[view] : coreNavItems.find((item) => item.id === view)!);
   const isAppleDevice = isApple();
 
+  // A row's account dot only earns its place when the money moved through somewhere other
+  // than the usual account; otherwise it waits for hover (rows stay as calm as a list).
+  const usualAccountId = defaultAccountId(ledger);
+  const isUsualAccount = (accountId?: string) => !accountId || accountId === usualAccountId;
+
   // Order in which a fresh import's rows arrive on screen.
   const arrivalOrder = new Map<string, number>();
   if (arrivingBatch) {
@@ -4692,6 +4697,7 @@ function App() {
                           onRemove={() => removeIncome(income.id)}
                           onPeek={(origin) => openPeek({ kind: "income", id: income.id, monthKey: ledger.selectedMonth }, origin)}
                           arriveIndex={arrivalOrder.get(income.id)}
+                          quietAccount={isUsualAccount(income.accountId)}
                         />
                       ))
                     ) : currentMonth.incomes.length ? (
@@ -4863,6 +4869,7 @@ function App() {
                                   onRemove={() => removeExpense(expense.id)}
                                   onPeek={(origin) => openPeek({ kind: "expense", id: expense.id, monthKey: ledger.selectedMonth }, origin)}
                                   arriveIndex={arrivalOrder.get(expense.id)}
+                                  quietAccount={isUsualAccount(expense.accountId)}
                                 />
                               );
                             })}
@@ -7035,6 +7042,7 @@ function IncomeRow({
   onRemove,
   onPeek,
   arriveIndex,
+  quietAccount,
 }: {
   income: IncomeEntry;
   account?: Account;
@@ -7053,6 +7061,7 @@ function IncomeRow({
   onRemove: () => void;
   onPeek: (origin: HTMLElement) => void;
   arriveIndex?: number;
+  quietAccount?: boolean;
 }) {
   const renameTracking = useRenameTracking(onRenamed);
   // A custom MIME type keeps income drags out of the expense column's drop targets.
@@ -7073,7 +7082,7 @@ function IncomeRow({
 
   return (
     <div
-      className={`financeRow incomeRow ${dragging ? "dragging" : ""} ${dropClass}${arriveIndex !== undefined ? " rowArrive" : ""}`}
+      className={`financeRow incomeRow ${dragging ? "dragging" : ""} ${dropClass}${arriveIndex !== undefined ? " rowArrive" : ""}${quietAccount ? " quietAccount" : ""}`}
       style={arriveIndex !== undefined ? ({ "--arrive-i": arriveIndex } as CSSProperties) : undefined}
       data-income-id={income.id}
       draggable
@@ -7265,6 +7274,7 @@ function ExpenseRow({
   onRemove,
   onPeek,
   arriveIndex,
+  quietAccount,
 }: {
   expense: ExpenseEntry;
   account?: Account;
@@ -7288,6 +7298,7 @@ function ExpenseRow({
   onRemove: () => void;
   onPeek: (origin: HTMLElement) => void;
   arriveIndex?: number;
+  quietAccount?: boolean;
 }) {
   const renameTracking = useRenameTracking(onRenamed);
   function handleDragStart(event: DragEvent<HTMLElement>) {
@@ -7310,7 +7321,7 @@ function ExpenseRow({
 
   return (
     <div
-      className={`financeRow expenseRow ${expense.scheduledPayment ? "isPlanned" : ""} ${dragging ? "dragging" : ""} ${grouping ? "groupingSource" : ""} ${dropClass}${arriveIndex !== undefined ? " rowArrive" : ""}`}
+      className={`financeRow expenseRow ${expense.scheduledPayment ? "isPlanned" : ""} ${dragging ? "dragging" : ""} ${grouping ? "groupingSource" : ""} ${dropClass}${arriveIndex !== undefined ? " rowArrive" : ""}${quietAccount ? " quietAccount" : ""}`}
       style={arriveIndex !== undefined ? ({ "--arrive-i": arriveIndex } as CSSProperties) : undefined}
       data-expense-name={expense.name}
       data-expense-id={expense.id}
