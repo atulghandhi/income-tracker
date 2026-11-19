@@ -3,7 +3,11 @@ import { TutorialOverlay } from "./GuidedTour";
 import { DashboardExportControls } from "./DashboardExportControls";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Analytics } from "@vercel/analytics/react";
+import { applyFrame, readStoredGrain, readStoredHue, storeFrame } from "./frame";
 import LandingPage from "./LandingPage";
+import FramePicker from "./FramePicker";
+import CommandPalette, { type PaletteItem } from "./CommandPalette";
+import { isApple, matchShortcut, SHORTCUTS } from "./shortcuts";
 import { hashRequestsHandoff, takeHandoffFile } from "./handoff";
 import Onboarding, { type OnboardingResult } from "./Onboarding";
 import type { CSSProperties, Dispatch, DragEvent, FormEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode, Ref, SetStateAction } from "react";
@@ -60,6 +64,11 @@ import {
   X,
   Upload,
   WalletCards,
+  Palette,
+  PanelLeftClose,
+  PanelLeftOpen,
+  CalendarDays,
+  Tag,
 } from "lucide-react";
 import {
   isDebtClass,
@@ -792,6 +801,17 @@ function App() {
   const [activeView, setActiveViewState] = useState<AppView>(() => viewFromPath(window.location.pathname) ?? DEFAULT_VIEW);
   const [layoutEditing, setLayoutEditing] = useState<LayoutPage | null>(null);
   const [theme, setTheme] = useState<ThemeMode>(readStoredTheme);
+  const [frameHue, setFrameHue] = useState<number>(readStoredHue);
+  const [frameGrain, setFrameGrain] = useState<number>(readStoredGrain);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  // Focus mode: the sidebar steps aside on wide screens. Remembered per device.
+  const [focusMode, setFocusMode] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("it_focus") === "1";
+    } catch {
+      return false;
+    }
+  });
   const [tutorialView, setTutorialView] = useState<AppView | null>(null);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [confirmClearAll, setConfirmClearAll] = useState(false);
@@ -1543,6 +1563,20 @@ function App() {
     }
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#051424" : "#eef1f8");
   }, [theme]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("it_focus", focusMode ? "1" : "0");
+    } catch {
+      // Not remembered; it still works for this visit.
+    }
+  }, [focusMode]);
+
+  // The frame follows the theme and the person's hue. Stored per device, like the theme.
+  useEffect(() => {
+    applyFrame(frameHue, theme, frameGrain);
+    storeFrame(frameHue, frameGrain);
+  }, [theme, frameHue, frameGrain]);
 
   // Static content pages (guides, tools, privacy) link "Contact us" to /#feedback and tag their
   // CTAs with /#ref=<page>. Fragments, not query strings: every /?ref=… was a separate URL to a
@@ -3234,40 +3268,35 @@ function App() {
 
   useEffect(() => {
     function handleGlobalShortcuts(event: globalThis.KeyboardEvent) {
-      const key = event.key.toLowerCase();
-      const isCommand = event.metaKey || event.ctrlKey;
       const isEditable = isEditableTarget(event.target);
+      const id = matchShortcut(event, isEditable);
 
-      if (isCommand && key === "k") {
+      if (id === "palette") {
+        event.preventDefault();
+        setPaletteOpen((open) => !open);
+        return;
+      }
+      // While the command bar is open it owns the keyboard.
+      if (paletteOpen) return;
+
+      if (id === "focusMode") {
+        event.preventDefault();
+        setFocusMode((on) => !on);
+        return;
+      }
+      if (id === "search") {
         event.preventDefault();
         focusSearch();
         return;
       }
-
-      // Single-key shortcuts only fire with no modifier, so Cmd+C, Cmd+/ and the like stay the browser's.
-      const isPlainKey = !isEditable && !isCommand && !event.altKey;
-
-      if (isPlainKey && event.key === "/") {
-        event.preventDefault();
-        focusSearch();
-        return;
-      }
-
-      if ((isCommand && key === "n") || (isPlainKey && (key === "n" || key === "c"))) {
+      if (id === "newTransaction") {
         event.preventDefault();
         openNewTransaction();
         return;
       }
-
-      if (!isEditable && event.altKey && !event.metaKey && !event.ctrlKey && !event.shiftKey && event.key === "ArrowLeft") {
+      if (id === "prevMonth" || id === "nextMonth") {
         event.preventDefault();
-        changeMonth(-1);
-        return;
-      }
-
-      if (!isEditable && event.altKey && !event.metaKey && !event.ctrlKey && !event.shiftKey && event.key === "ArrowRight") {
-        event.preventDefault();
-        changeMonth(1);
+        changeMonth(id === "prevMonth" ? -1 : 1);
         return;
       }
 
@@ -3282,7 +3311,7 @@ function App() {
 
     window.addEventListener("keydown", handleGlobalShortcuts);
     return () => window.removeEventListener("keydown", handleGlobalShortcuts);
-  }, [categoryMenu, groupingSourceId, query]);
+  }, [categoryMenu, groupingSourceId, query, paletteOpen]);
 
   function changeLayout(page: LayoutPage, action: "move" | "resize" | "remove" | "add" | "reset", updater: (layout: PageLayout) => PageLayout) {
     updateLayout(page, updater);
@@ -3604,6 +3633,81 @@ function App() {
   const hiddenViews = toolPrefs.hidden ?? [];
   const inSidebar = (view: AppView) => (isToolView(view) ? toolPrefs.pinned.includes(view) : !(isHideableView(view) && hiddenViews.includes(view)));
   const navEntry = (view: AppView): NavEntry => (isToolView(view) ? toolNavItems[view] : coreNavItems.find((item) => item.id === view)!);
+  const isAppleDevice = isApple();
+
+  function goToMonth(monthKey: string) {
+    updateLedger((current) => (current.months[monthKey] ? { ...current, selectedMonth: monthKey } : current));
+    setActiveView("ledger");
+  }
+
+  // Everything the command bar lists before you type. Transactions are searched
+  // only once there is a query (paletteSearch below): there can be thousands.
+  function paletteItems(): PaletteItem[] {
+    const items: PaletteItem[] = [
+      { id: "act-new", group: "Actions", label: "New transaction", icon: <Plus size={16} />, shortcut: "newTransaction", keywords: "add expense income spend", run: openNewTransaction },
+      { id: "act-import", group: "Actions", label: "Import a bank statement", icon: <Upload size={16} />, keywords: "csv pdf ofx qif file upload", run: () => csvInputRef.current?.click() },
+      { id: "act-search", group: "Actions", label: "Search this month\u2019s ledger", icon: <Search size={16} />, shortcut: "search", run: focusSearch },
+      { id: "act-prev", group: "Actions", label: "Previous month", icon: <ChevronLeft size={16} />, shortcut: "prevMonth", run: () => { setActiveView("ledger"); changeMonth(-1); } },
+      { id: "act-next", group: "Actions", label: "Next month", icon: <ChevronRight size={16} />, shortcut: "nextMonth", run: () => { setActiveView("ledger"); changeMonth(1); } },
+      { id: "act-focus", group: "Actions", label: focusMode ? "Show sidebar" : "Hide sidebar (focus mode)", icon: focusMode ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />, shortcut: "focusMode", keywords: "focus distraction full width", run: () => setFocusMode((on) => !on) },
+      { id: "act-theme", group: "Actions", label: theme === "dark" ? "Switch to light mode" : "Switch to dark mode", icon: theme === "dark" ? <Sun size={16} /> : <Moon size={16} />, keywords: "theme appearance", run: () => setTheme((t) => (t === "dark" ? "light" : "dark")) },
+      { id: "act-colour", group: "Actions", label: "Change the app\u2019s colour", icon: <Palette size={16} />, keywords: "colour color hue theme appearance frame", run: () => setActiveView("settings") },
+      { id: "act-privacy", group: "Actions", label: ledger.privacyMode ? "Show amounts" : "Hide amounts", icon: ledger.privacyMode ? <Eye size={16} /> : <EyeOff size={16} />, keywords: "privacy blur", run: () => updateLedger((c) => ({ ...c, privacyMode: !c.privacyMode })) },
+      { id: "act-json", group: "Actions", label: "Export everything (JSON)", icon: <FileJson size={16} />, keywords: "backup download", run: exportJson },
+      { id: "act-csv", group: "Actions", label: "Export transactions (CSV)", icon: <Download size={16} />, keywords: "download spreadsheet", run: exportCsv },
+      { id: "act-setup", group: "Actions", label: "Run quick setup", icon: <Sparkles size={16} />, keywords: "onboarding wizard", run: () => setOnboardingOpen(true) },
+      { id: "act-tour", group: "Actions", label: "Replay this page\u2019s tutorial", icon: <GraduationCap size={16} />, keywords: "help guide tour", run: () => setTutorialView(activeView) },
+      { id: "act-feedback", group: "Actions", label: "Send feedback", icon: <CircleHelp size={16} />, keywords: "contact help bug", run: () => setShowFeedbackModal(true) },
+    ];
+    if (!user) items.push({ id: "act-signin", group: "Actions", label: "Sign in to sync", icon: <LogIn size={16} />, keywords: "account cloud backup", run: () => setShowSignInModal(true) });
+
+    for (const view of APP_VIEWS) {
+      const entry = view === "settings" ? { label: "Settings", icon: <SettingsIcon size={16} /> } : navEntry(view);
+      items.push({ id: `view-${view}`, group: "Go to", label: entry.label, icon: entry.icon, hint: activeView === view ? "You are here" : undefined, run: () => setActiveView(view) });
+    }
+
+    const months = Object.keys(ledger.months).sort().reverse();
+    for (const key of months) {
+      items.push({ id: `month-${key}`, group: "Months", label: formatMonth(key), icon: <CalendarDays size={16} />, hint: key === ledger.selectedMonth ? "Open now" : undefined, run: () => goToMonth(key) });
+    }
+
+    const categories = new Set<string>();
+    for (const key of months) for (const e of ledger.months[key].expenses) if (e.category) categories.add(e.category);
+    for (const category of categories) {
+      items.push({ id: `cat-${category}`, group: "Categories", label: category, icon: <Tag size={16} />, hint: "Show in this month", run: () => { setActiveView("ledger"); setQuery(category); } });
+    }
+    return items;
+  }
+
+  function paletteSearch(q: string): PaletteItem[] {
+    const needle = q.toLowerCase();
+    const found: PaletteItem[] = [];
+    const months = Object.keys(ledger.months).sort().reverse();
+    for (const key of months) {
+      const month = ledger.months[key];
+      const rows: { id: string; name: string; amount: number; kind: "income" | "expense"; raw?: string }[] = [
+        ...month.incomes.map((i) => ({ id: i.id, name: i.source, amount: i.amount, kind: "income" as const, raw: i.imported?.originalDescription })),
+        ...month.expenses.map((e) => ({ id: e.id, name: e.name, amount: e.amount, kind: "expense" as const, raw: e.imported?.originalDescription })),
+      ];
+      for (const row of rows) {
+        if (!row.name.toLowerCase().includes(needle) && !(row.raw ?? "").toLowerCase().includes(needle)) continue;
+        found.push({
+          id: `tx-${key}-${row.id}`,
+          group: "Transactions",
+          label: row.name || "(no name)",
+          keywords: row.raw,
+          icon: <ReceiptText size={16} />,
+          hint: `${formatMonth(key)} \u00b7 ${ledger.privacyMode ? "\u2022\u2022\u2022" : moneyFormatter.format(row.kind === "income" ? row.amount : -row.amount)}`,
+          run: () => {
+            goToMonth(key);
+            setQuery(row.name);
+          },
+        });
+        if (found.length >= 40) return found;
+      }
+    }
+    return found;
+  }
   const navItems = [...coreNavItems.map((item) => item.id), ...TOOL_VIEWS].filter(inSidebar).map(navEntry);
   // Everything out of the sidebar, listed under More tools: hidden everyday pages first, then tools.
   // Viewing one (from there, a widget or a link) doesn't add it back; the page's banner offers that.
@@ -3644,7 +3748,7 @@ function App() {
   }
 
   return (
-    <div className={`appShell ${ledger.privacyMode ? "privacy-on" : ""} ${animationsEnabled ? "motion-on" : "motion-off"}`}>
+    <div className={`appShell ${ledger.privacyMode ? "privacy-on" : ""} ${animationsEnabled ? "motion-on" : "motion-off"}${focusMode ? " focusMode" : ""}`}>
       <input
         ref={fileInputRef}
         className="hiddenFile"
@@ -3666,6 +3770,8 @@ function App() {
           if (file) void importStatementFile(file);
         }}
       />
+
+      {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} items={paletteItems()} searchMore={paletteSearch} />}
 
       {mobileNavOpen && <div className="navSheetBackdrop" onClick={() => setMobileNavOpen(false)} aria-hidden="true" />}
 
@@ -3890,6 +3996,17 @@ function App() {
           {/* The page names itself in its own header below, so the bar only carries controls:
               the month switcher on the Ledger, and the country, theme and privacy toggles. */}
           <div className="appBarTitle">
+            <button
+              className="iconButton focusToggle"
+              type="button"
+              onClick={() => setFocusMode((on) => !on)}
+              aria-pressed={focusMode}
+              aria-label={focusMode ? "Show sidebar" : "Hide sidebar"}
+              aria-keyshortcuts={SHORTCUTS.focusMode.aria}
+              data-tip={focusMode ? "Show sidebar" : "Hide sidebar"}
+            >
+              {focusMode ? <PanelLeftOpen size={19} /> : <PanelLeftClose size={19} />}
+            </button>
             <img className="appBarBrand" src="/icon.svg" alt="" width="28" height="28" aria-hidden="true" />
             {activeView !== "ledger" && (
               <span className="appBarPage" aria-hidden="true">
@@ -3920,12 +4037,17 @@ function App() {
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search transactions..."
                 aria-label="Search transactions"
-                aria-keyshortcuts="/ Meta+K Control+K"
+                aria-keyshortcuts={SHORTCUTS.search.aria}
               />
             </label>
           )}
 
           <div className="topActions">
+            <button className="paletteButton" type="button" onClick={() => setPaletteOpen(true)} aria-keyshortcuts={SHORTCUTS.palette.aria} aria-haspopup="dialog">
+              <Search size={16} aria-hidden="true" />
+              <span>Go to or do anything</span>
+              <kbd>{isAppleDevice ? "⌘" : "Ctrl"} K</kbd>
+            </button>
             <label className="currencyControl countryControl">
               <span>{currencySymbol}</span>
               <select value={ledger.country} onChange={(event) => changeCountry(event.target.value as CountryCode)} aria-label="Country">
@@ -4946,6 +5068,11 @@ function App() {
               )}
 
               <section className="settingsGrid">
+                <article className="settingsPanel appearancePanel">
+                  <PanelTitle title="Appearance" icon={<Palette size={17} />} />
+                  <p className="settingsHint">The colour your app sits on. Saved on this device, like light and dark mode.</p>
+                  <FramePicker hue={frameHue} grain={frameGrain} theme={theme} onHue={setFrameHue} onGrain={setFrameGrain} />
+                </article>
                 <article className="settingsPanel dataPanel">
                   <PanelTitle title="Data control" icon={<Database size={17} />} />
                   <div className="dataActionGrid">

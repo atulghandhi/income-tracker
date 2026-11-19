@@ -34,6 +34,7 @@ import { CALCULATORS } from "./content/calculators.mjs";
 import { LANDINGS } from "./content/landings.mjs";
 import { COMPARISONS, ROUNDUP } from "./content/comparisons.mjs";
 import { TEMPLATES } from "./content/templates.mjs";
+import { framePalette } from "../src/framePalette.mjs";
 import { CHANGELOG } from "./content/changelog.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -119,52 +120,20 @@ function sectionFor(path) {
   return SECTION_HUES[top] ? top : "home";
 }
 
-function hslToRgb(h, s, l) {
-  s /= 100; l /= 100;
-  const k = (n) => (n + h / 30) % 12;
-  const a = s * Math.min(l, 1 - l);
-  const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
-  return [f(0), f(8), f(4)].map((v) => Math.round(v * 255));
-}
-const hex = (rgb) => "#" + rgb.map((v) => v.toString(16).padStart(2, "0")).join("");
-function luminance([r, g, b]) {
-  const lin = (c) => { c /= 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
-  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-}
-function contrast(a, b) {
-  const [x, y] = [luminance(a), luminance(b)].sort((m, n) => n - m);
-  return (x + 0.05) / (y + 0.05);
-}
-// What a translucent ink actually looks like over a given background.
-const over = (ink, alpha, bg) => ink.map((c, i) => Math.round(c * alpha + bg[i] * (1 - alpha)));
-
-const INK_DARK = [14, 24, 38];
-const INK_LIGHT = [238, 244, 255];
-
-function framePalette(name, scheme) {
+// Colour maths and the contrast guarantee live in src/framePalette.mjs, shared with the app.
+function framePaletteFor(name, scheme) {
   const { hue, sat } = SECTION_HUES[name];
-  const stops = scheme === "light"
-    ? [hslToRgb(hue, 58 * sat, 85), hslToRgb(hue + 28, 50 * sat, 77)]
-    : [hslToRgb(hue, 46 * sat, 16), hslToRgb(hue + 28, 40 * sat, 9)];
-  // Pick the ink by measuring, then prove the soft ink also passes on every stop.
-  const ink = luminance(stops[1]) > 0.18 ? INK_DARK : INK_LIGHT;
-  const softAlpha = 0.76;
-  for (const stop of stops) {
-    for (const [label, colour] of [["ink", ink], ["soft ink", over(ink, softAlpha, stop)]]) {
-      const ratio = contrast(colour, stop);
-      if (ratio < 4.5) throw new Error(`Frame contrast too low: ${name}/${scheme} ${label} on ${hex(stop)} is ${ratio.toFixed(2)}:1`);
-    }
-  }
-  const [r, g, b] = ink;
+  const f = framePalette(hue, scheme, sat);
+  const v = f.vars;
   return {
-    a: hex(stops[0]),
-    b: hex(stops[1]),
-    vars: `--frame-a: ${hex(stops[0])}; --frame-b: ${hex(stops[1])}; --frame-ink: rgb(${r} ${g} ${b}); --frame-ink-soft: rgb(${r} ${g} ${b} / ${softAlpha}); --frame-hover: rgb(${r} ${g} ${b} / 0.1); --frame-line: rgb(${r} ${g} ${b} / 0.16);`,
+    a: f.a,
+    b: f.b,
+    vars: `--frame-a: ${v["--frame-a"]}; --frame-b: ${v["--frame-b"]}; --frame-ink: ${v["--frame-ink"]}; --frame-ink-soft: ${v["--frame-ink-soft"]}; --frame-hover: ${v["--frame-hover"]}; --frame-line: ${v["--frame-line"]};`,
   };
 }
 
 const FRAMES = Object.fromEntries(
-  Object.keys(SECTION_HUES).map((name) => [name, { light: framePalette(name, "light"), dark: framePalette(name, "dark") }]),
+  Object.keys(SECTION_HUES).map((name) => [name, { light: framePaletteFor(name, "light"), dark: framePaletteFor(name, "dark") }]),
 );
 
 // Canvas tokens. Light first, then the same names for dark.

@@ -1,0 +1,10 @@
+export declare const DEFAULT_HUE: number;
+export declare const SOFT_ALPHA: number;
+export type Rgb = [number, number, number] | number[];
+export declare function hslToRgb(h: number, s: number, l: number): number[];
+export declare function hex(rgb: Rgb): string;
+export declare function luminance(rgb: Rgb): number;
+export declare function contrast(a: Rgb, b: Rgb): number;
+export declare function over(ink: Rgb, alpha: number, bg: Rgb): number[];
+export type FramePalette = { a: string; b: string; ratio: number; vars: Record<string, string> };
+export declare function framePalette(hue: number, scheme: "light" | "dark", sat?: number): FramePalette;
