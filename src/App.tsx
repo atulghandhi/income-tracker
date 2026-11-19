@@ -4785,20 +4785,11 @@ function App() {
                           >
                             {group.category && (
                               <div className="expenseGroupHeader">
-                                <button
-                                  className="categoryCollapseButton"
-                                  type="button"
-                                  onClick={() => toggleCategoryCollapse(group.category)}
-                                  aria-label={`${categoryCollapsed ? "Expand" : "Collapse"} ${group.category} category`}
-                                  aria-expanded={!categoryCollapsed}
-                                >
-                                  {categoryCollapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
-                                </button>
-                                {categoryEmoji(group.category) && (
-                                  <span className="categoryEmoji" aria-hidden="true">
-                                    {categoryEmoji(group.category)}
-                                  </span>
-                                )}
+                                {/* A folder-style header: icon tile, name, count, total, then its quiet actions.
+                                    Categories without a known emoji show their initial, so every header lines up. */}
+                                <span className="categoryEmoji" aria-hidden="true">
+                                  {categoryEmoji(group.category) || group.category.trim().charAt(0).toUpperCase()}
+                                </span>
                                 <input
                                   className="categoryNameInput"
                                   aria-label="Category name"
@@ -4810,15 +4801,26 @@ function App() {
                                 />
                                 <em>{group.items.length} {group.items.length === 1 ? "expense" : "expenses"}</em>
                                 <b className={ledger.privacyMode ? "masked" : ""}>{moneyFormatter.format(group.total)}</b>
-                                <button
-                                  className="categoryDeleteButton"
-                                  type="button"
-                                  onClick={() => deleteExpenseCategory(group.category)}
-                                  aria-label={`Delete ${group.category} category`}
-                                  title="Delete category"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
+                                <span className="categoryActions">
+                                  <button
+                                    className="categoryCollapseButton"
+                                    type="button"
+                                    onClick={() => toggleCategoryCollapse(group.category)}
+                                    aria-label={`${categoryCollapsed ? "Expand" : "Collapse"} ${group.category} category`}
+                                    aria-expanded={!categoryCollapsed}
+                                  >
+                                    {categoryCollapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
+                                  </button>
+                                  <button
+                                    className="categoryDeleteButton"
+                                    type="button"
+                                    onClick={() => deleteExpenseCategory(group.category)}
+                                    aria-label={`Delete ${group.category} category`}
+                                    title="Delete category"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </span>
                               </div>
                             )}
                             {!categoryCollapsed && group.items.map((expense) => {
@@ -7352,7 +7354,7 @@ function ExpenseRow({
         className={privacy ? "rowTotal rowTotalPeek masked" : "rowTotal rowTotalPeek"}
         type="button"
         onClick={(event) => onPeek(event.currentTarget)}
-        aria-label={`Details for ${expense.name || "this expense"}`}
+        aria-label={`Open details for ${expense.name || "this expense"}`}
         data-tip="Details"
       >
         {formatter.format(expense.amount)}
@@ -7394,6 +7396,15 @@ function ExpenseRow({
             onToggle={() => onChange({ recurring: !expense.recurring })}
           />
         )}
+        <button
+          className="iconButton rowAction rowPeek rowPeekIcon"
+          type="button"
+          onClick={(event) => onPeek(event.currentTarget)}
+          aria-label={`Details for ${expense.name || "this expense"}`}
+          data-tip="Details"
+        >
+          <PanelRight size={16} />
+        </button>
         <button className="iconButton rowAction" type="button" onClick={onRemove} aria-label="Remove expense">
           <Trash2 size={17} />
         </button>
