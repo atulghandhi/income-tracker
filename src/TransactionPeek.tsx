@@ -25,22 +25,49 @@ export default function TransactionPeek({ kind, entry, monthLabel, account, form
   const raw = entry.imported?.originalDescription?.trim();
   const amount = privacy ? "•••" : formatter.format(kind === "income" ? entry.amount : -entry.amount);
 
+  const panelRef = useRef<HTMLElement>(null);
+  // The latest onClose, so the key handler below is set up once and focus is only moved
+  // when the peek opens, never again on a re-render of the app behind it.
+  const closeLatest = useRef(onClose);
+  closeLatest.current = onClose;
+
   useEffect(() => {
     closeRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
     function onKey(event: KeyboardEvent) {
+      // The command bar opens over the peek and takes its own Esc and Tab.
+      if (document.querySelector(".paletteLayer")) return;
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopPropagation();
-        onClose();
+        closeLatest.current();
+        return;
+      }
+      // A modal dialog keeps Tab inside itself: past the last control back to the first.
+      if (event.key === "Tab" && panelRef.current) {
+        const focusable = Array.from(panelRef.current.querySelectorAll<HTMLElement>("button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex='-1'])"));
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        const inside = panelRef.current.contains(document.activeElement);
+        if (event.shiftKey && (document.activeElement === first || !inside)) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && (document.activeElement === last || !inside)) {
+          event.preventDefault();
+          first.focus();
+        }
       }
     }
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [onClose]);
+  }, []);
 
   return (
     <div className="peekLayer" onPointerDown={(event) => event.target === event.currentTarget && onClose()}>
-      <aside className="peek" role="dialog" aria-modal="true" aria-label={`${name || "Transaction"} details`}>
+      <aside ref={panelRef} className="peek" role="dialog" aria-modal="true" aria-label={`${name || "Transaction"} details`}>
         <header className="peekHead">
           <span className={kind === "income" ? "peekKind in" : "peekKind out"}>{kind === "income" ? "Money in" : "Money out"}</span>
           <button ref={closeRef} className="iconButton" type="button" onClick={onClose} aria-label="Close details">
@@ -61,7 +88,7 @@ export default function TransactionPeek({ kind, entry, monthLabel, account, form
             <dt><CalendarDays size={15} aria-hidden="true" /> When</dt>
             <dd>{entry.date ? new Date(entry.date + "T12:00:00").toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" }) : monthLabel}</dd>
           </div>
-          {"category" in entry && (
+          {(kind === "expense" || entry.category) && (
             <div>
               <dt><Tag size={15} aria-hidden="true" /> Category</dt>
               <dd>{entry.category || "Not grouped"}</dd>

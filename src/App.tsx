@@ -223,7 +223,7 @@ import { chooseLandingRegion, initialCountry, isLandingPath, LANDING_COPY } from
 import { buildSampleLedger, sampleCountry } from "./sampleData";
 import { WidgetGrid, type WidgetRenderer } from "./WidgetGrid";
 import { INSIGHT_WIDGET_SPECS, InsightWidgetCard } from "./InsightWidgetCard";
-import { buildCategoryRows, buildExpenseGroups, buildMonthlyBars, categoryColor, categoryEmoji } from "./ledgerGroups";
+import { buildCategoryRows, buildExpenseGroups, buildIncomeGroups, buildMonthlyBars, categoryColor, categoryEmoji } from "./ledgerGroups";
 import { buildInsightsModel, visibleSignals } from "./insightsData";
 import { normalizeInsightsState, setWidgetVariant } from "./insightsState";
 import type { WidgetActions } from "./insightWidgets";
@@ -888,7 +888,7 @@ function App() {
   const [dropPreview, setDropPreview] = useState<ExpenseDropPreview>(null);
   const [incomeSort, setIncomeSort] = useState<IncomeSortMode>(readStoredIncomeSort);
   const [draggingIncomeId, setDraggingIncomeId] = useState<string | null>(null);
-  const [incomeDropPreview, setIncomeDropPreview] = useState<{ targetId: string; edge: "before" | "after" } | null>(null);
+  const [incomeDropPreview, setIncomeDropPreview] = useState<ExpenseDropPreview>(null);
   const [categoryMenu, setCategoryMenu] = useState<CategoryMenuState | null>(null);
   const [renamePrompt, setRenamePrompt] = useState<RenamePrompt | null>(null);
   const [importReview, setImportReview] = useState<ImportReviewState | null>(null);
@@ -1046,7 +1046,7 @@ function App() {
   const visibleIncomes = useMemo(() => {
     const ordered = orderIncomes(currentMonth.incomes, incomeSort);
     if (!normalizedQuery) return ordered;
-    return ordered.filter((income) => income.source.toLowerCase().includes(normalizedQuery));
+    return ordered.filter((income) => income.source.toLowerCase().includes(normalizedQuery) || (income.category ?? "").toLowerCase().includes(normalizedQuery));
   }, [currentMonth.incomes, incomeSort, normalizedQuery]);
   const visibleExpenseGroups = useMemo(() => {
     if (!normalizedQuery) return expenseGroups;
@@ -1840,7 +1840,13 @@ function App() {
   }, [toast]);
 
   // Drop a statement anywhere on the app. Only file drags count: rows dragged between
-  // categories carry text, not files, and keep their own handling.
+  // categories carry text, not files, and keep their own handling. File drags are caught on
+  // the way down (capture phase), so a statement dropped on a row or a category group imports
+  // instead of being swallowed by that row's own drop handler.
+  // The listener is set up once, so it calls the latest importStatementFile through a ref:
+  // the review must check duplicates and rules against today's ledger, not the one at mount.
+  const importFileRef = useRef(importStatementFile);
+  importFileRef.current = importStatementFile;
   useEffect(() => {
     if (showLanding) return;
     let depth = 0;
@@ -1853,6 +1859,7 @@ function App() {
     function onOver(event: globalThis.DragEvent) {
       if (!hasFiles(event)) return;
       event.preventDefault();
+      event.stopPropagation();
       if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
     }
     function onLeave(event: globalThis.DragEvent) {
@@ -1863,23 +1870,25 @@ function App() {
     function onDrop(event: globalThis.DragEvent) {
       if (!hasFiles(event)) return;
       event.preventDefault();
+      event.stopPropagation();
       depth = 0;
       setFileDrag(false);
       const file = event.dataTransfer?.files?.[0];
-      if (file) void importStatementFile(file);
+      if (file) {
+        track("statement_dropped", {});
+        void importFileRef.current(file);
+      }
     }
-    window.addEventListener("dragenter", onEnter);
-    window.addEventListener("dragover", onOver);
-    window.addEventListener("dragleave", onLeave);
-    window.addEventListener("drop", onDrop);
+    window.addEventListener("dragenter", onEnter, true);
+    window.addEventListener("dragover", onOver, true);
+    window.addEventListener("dragleave", onLeave, true);
+    window.addEventListener("drop", onDrop, true);
     return () => {
-      window.removeEventListener("dragenter", onEnter);
-      window.removeEventListener("dragover", onOver);
-      window.removeEventListener("dragleave", onLeave);
-      window.removeEventListener("drop", onDrop);
+      window.removeEventListener("dragenter", onEnter, true);
+      window.removeEventListener("dragover", onOver, true);
+      window.removeEventListener("dragleave", onLeave, true);
+      window.removeEventListener("drop", onDrop, true);
     };
-    // importStatementFile only reads stable setters and refs.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showLanding]);
 
   useEffect(() => {
@@ -2251,7 +2260,10 @@ function App() {
     const calm = !animationsEnabled || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (!doc.startViewTransition || calm || !origin) {
       setPeek(null);
-      trigger?.focus();
+      // Opened from the command bar there is no row to go back to: the command bar's button is
+      // the nearest thing to where the person came from, else the ledger search.
+      const visible = (el: HTMLElement | null) => (el && el.offsetParent !== null ? el : null);
+      (trigger ?? visible(document.querySelector<HTMLElement>(".paletteButton")) ?? visible(document.querySelector<HTMLElement>(".searchShell input")))?.focus();
       return;
     }
     const transition = doc.startViewTransition(() => {
@@ -2570,10 +2582,23 @@ function App() {
 
   // Dragging while an automatic order is showing adopts what's on screen as the
   // custom order first, so the row lands where it was dropped and stays there.
+  // Dropping next to a row also adopts that row's group, as expenses do: dragging a grouped
+  // income beside an ungrouped one takes it out of its group.
   function reorderIncome(sourceId: string, targetId: string, edge: "before" | "after") {
     if (sourceId === targetId) return;
-    updateCurrentMonth((month) => ({ ...month, incomes: moveEntry(orderIncomes(month.incomes, incomeSort), sourceId, targetId, edge) }));
-    setToast(incomeSort === "custom" ? "Income reordered" : "Income reordered · now using your order");
+    let leftGroup = false;
+    updateCurrentMonth((month) => {
+      const ordered = orderIncomes(month.incomes, incomeSort);
+      const target = ordered.find((income) => income.id === targetId);
+      const targetCategory = (target?.category ?? "").trim();
+      const adjusted = ordered.map((income) => {
+        if (income.id !== sourceId || (income.category ?? "").trim() === targetCategory) return income;
+        leftGroup = !targetCategory;
+        return { ...income, category: targetCategory || undefined, color: targetCategory && target ? target.color : income.color };
+      });
+      return { ...month, incomes: moveEntry(adjusted, sourceId, targetId, edge) };
+    });
+    setToast(leftGroup ? "Removed from category" : incomeSort === "custom" ? "Income reordered" : "Income reordered · now using your order");
     setIncomeSort("custom");
   }
 
@@ -2586,6 +2611,9 @@ function App() {
     requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-income-id="${id}"] .dragHandle`)?.focus());
   }
 
+  // Income drops work like expense drops: onto a grouped row joins its group, onto the middle
+  // of an ungrouped row makes a new group of the two, and near a row's top or bottom edge
+  // reorders. Only income drags count (their own MIME type), so expenses never land here.
   function previewIncomeDrop(event: DragEvent<HTMLDivElement>, target: IncomeEntry) {
     if (!draggingIncomeId) return;
     event.preventDefault();
@@ -2595,16 +2623,102 @@ function App() {
       setIncomeDropPreview(null);
       return;
     }
+    const targetCategory = (target.category ?? "").trim();
+    if (targetCategory) {
+      setIncomeDropPreview((current) => (current?.type === "category" && current.category === targetCategory ? current : { type: "category", category: targetCategory }));
+      return;
+    }
     const rect = event.currentTarget.getBoundingClientRect();
-    const edge = event.clientY - rect.top < rect.height / 2 ? "before" : "after";
-    setIncomeDropPreview((current) => (current?.targetId === target.id && current.edge === edge ? current : { targetId: target.id, edge }));
+    const y = event.clientY - rect.top;
+    const band = Math.max(16, rect.height * 0.28);
+    const next: ExpenseDropPreview =
+      y <= band ? { type: "reorder", targetId: target.id, edge: "before" } : y >= rect.height - band ? { type: "reorder", targetId: target.id, edge: "after" } : { type: "combine", targetId: target.id };
+    setIncomeDropPreview((current) => (JSON.stringify(current) === JSON.stringify(next) ? current : next));
+  }
+
+  function previewIncomeCategoryDrop(event: DragEvent<HTMLDivElement>, category: string) {
+    if (!draggingIncomeId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = "move";
+    setIncomeDropPreview((current) => (current?.type === "category" && current.category === category ? current : { type: "category", category }));
   }
 
   function dropOnIncome(target: IncomeEntry) {
-    if (draggingIncomeId && incomeDropPreview?.targetId === target.id) {
-      reorderIncome(draggingIncomeId, target.id, incomeDropPreview.edge);
+    const sourceId = draggingIncomeId;
+    const preview = incomeDropPreview;
+    if (sourceId && preview && sourceId !== target.id) {
+      if (preview.type === "reorder" && preview.targetId === target.id) reorderIncome(sourceId, target.id, preview.edge);
+      else if (preview.type === "combine" && preview.targetId === target.id) groupIncomes(sourceId, target.id);
+      else if (preview.type === "category") moveIncomeToCategory(sourceId, preview.category);
     }
     clearIncomeDragState();
+  }
+
+  function dropOnIncomeCategory(category: string) {
+    if (draggingIncomeId) moveIncomeToCategory(draggingIncomeId, category);
+    clearIncomeDragState();
+  }
+
+  // Two ungrouped incomes dropped together become a new group (or join the one either is in).
+  function groupIncomes(sourceId: string, targetId: string) {
+    if (sourceId === targetId) return;
+    updateCurrentMonth((month) => {
+      const source = month.incomes.find((income) => income.id === sourceId);
+      const target = month.incomes.find((income) => income.id === targetId);
+      if (!source || !target) return month;
+      const targetCategory = (target.category ?? "").trim();
+      const sourceCategory = (source.category ?? "").trim();
+      const category = targetCategory || sourceCategory || nextCategoryName(month.incomes);
+      const color = targetCategory ? target.color : sourceCategory ? source.color : randomCategoryColor(month.incomes);
+      return {
+        ...month,
+        incomes: month.incomes.map((income) => (income.id === sourceId || income.id === targetId ? { ...income, category, color } : income)),
+      };
+    });
+    setToast("Category created");
+    track("income_grouped", { action: "create" });
+  }
+
+  function moveIncomeToCategory(sourceId: string, category: string) {
+    updateCurrentMonth((month) => {
+      const source = month.incomes.find((income) => income.id === sourceId);
+      const anchor = month.incomes.find((income) => income.id !== sourceId && (income.category ?? "").trim() === category);
+      if (!source || !anchor || (source.category ?? "").trim() === category) return month;
+      const remaining = month.incomes.filter((income) => income.id !== sourceId);
+      const lastIndex = remaining.map((income) => (income.category ?? "").trim()).lastIndexOf(category);
+      const insertAt = lastIndex >= 0 ? lastIndex + 1 : remaining.length;
+      const moved = { ...source, category, color: anchor.color };
+      return { ...month, incomes: [...remaining.slice(0, insertAt), moved, ...remaining.slice(insertAt)] };
+    });
+    setToast("Moved into category");
+    track("income_grouped", { action: "join" });
+  }
+
+  function renameIncomeCategory(from: string, to: string) {
+    if (from === to) return;
+    updateCurrentMonth((month) => ({
+      ...month,
+      incomes: month.incomes.map((income) => ((income.category ?? "").trim() === from ? { ...income, category: to } : income)),
+    }));
+    setCollapsedCategories((current) => {
+      const key = `income:${from}`;
+      if (!current.has(key)) return current;
+      const next = new Set(current);
+      next.delete(key);
+      next.add(`income:${to}`);
+      return next;
+    });
+  }
+
+  function deleteIncomeCategory(category: string) {
+    offerUndo();
+    updateCurrentMonth((month) => ({
+      ...month,
+      incomes: month.incomes.map((income) => ((income.category ?? "").trim() === category ? { ...income, category: undefined } : income)),
+    }));
+    setIncomeDropPreview(null);
+    setToast("Category removed");
   }
 
   function clearIncomeDragState() {
@@ -4675,31 +4789,104 @@ function App() {
                     <span>Amount</span>
                     <span />
                   </div>
-                  <div className="rowStack">
+                  <div className="rowStack incomeGroups">
                     {visibleIncomes.length ? (
-                      visibleIncomes.map((income) => (
-                        <IncomeRow
-                          key={income.id}
-                          income={income}
-                          account={accountById.get(income.accountId ?? "")}
-                          onCycleAccount={() => cycleEntryAccount("income", income.id)}
-                          privacy={ledger.privacyMode}
-                          symbol={currencySymbol}
-                          dragging={draggingIncomeId === income.id}
-                          dropState={incomeDropPreview?.targetId === income.id ? incomeDropPreview.edge : undefined}
-                          onDragStart={() => setDraggingIncomeId(income.id)}
-                          onDragOver={(event) => previewIncomeDrop(event, income)}
-                          onDragEnd={clearIncomeDragState}
-                          onDrop={() => dropOnIncome(income)}
-                          onMove={(direction) => moveIncomeByKeyboard(income.id, direction)}
-                          onChange={(patch) => updateIncome(income.id, patch)}
-                          onRenamed={(previousName) => offerRenameAll("income", income.id, previousName)}
-                          onRemove={() => removeIncome(income.id)}
-                          onPeek={(origin) => openPeek({ kind: "income", id: income.id, monthKey: ledger.selectedMonth }, origin)}
-                          arriveIndex={arrivalOrder.get(income.id)}
-                          quietAccount={isUsualAccount(income.accountId)}
-                        />
-                      ))
+                      buildIncomeGroups(visibleIncomes).map((group) => {
+                        const renderIncome = (income: IncomeEntry) => (
+                          <IncomeRow
+                            key={income.id}
+                            income={income}
+                            account={accountById.get(income.accountId ?? "")}
+                            onCycleAccount={() => cycleEntryAccount("income", income.id)}
+                            privacy={ledger.privacyMode}
+                            symbol={currencySymbol}
+                            dragging={draggingIncomeId === income.id}
+                            dropState={
+                              incomeDropPreview?.type === "reorder" && incomeDropPreview.targetId === income.id
+                                ? incomeDropPreview.edge
+                                : incomeDropPreview?.type === "combine" && incomeDropPreview.targetId === income.id
+                                  ? "combine"
+                                  : undefined
+                            }
+                            onDragStart={() => setDraggingIncomeId(income.id)}
+                            onDragOver={(event) => previewIncomeDrop(event, income)}
+                            onDragEnd={clearIncomeDragState}
+                            onDrop={() => dropOnIncome(income)}
+                            onMove={(direction) => moveIncomeByKeyboard(income.id, direction)}
+                            onChange={(patch) => updateIncome(income.id, patch)}
+                            onRenamed={(previousName) => offerRenameAll("income", income.id, previousName)}
+                            onRemove={() => removeIncome(income.id)}
+                            onPeek={(origin) => openPeek({ kind: "income", id: income.id, monthKey: ledger.selectedMonth }, origin)}
+                            arriveIndex={arrivalOrder.get(income.id)}
+                            quietAccount={isUsualAccount(income.accountId)}
+                          />
+                        );
+                        // Ungrouped income stays a plain row, exactly as before groups existed.
+                        if (!group.category) return group.items.map(renderIncome);
+                        const collapseKey = `income:${group.category}`;
+                        const collapsed = collapsedCategories.has(collapseKey);
+                        const dropActive = incomeDropPreview?.type === "category" && incomeDropPreview.category === group.category;
+                        return (
+                          <div
+                            className={`expenseGroup incomeGroup${dropActive ? " categoryDropTarget" : ""}${collapsed ? " collapsed" : ""}`}
+                            key={group.id}
+                            style={{ "--category-color": group.color } as CSSProperties}
+                            onDragOver={(event) => previewIncomeCategoryDrop(event, group.category)}
+                            onDragLeave={(event) => {
+                              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIncomeDropPreview(null);
+                            }}
+                            onDrop={(event) => {
+                              if (!draggingIncomeId) return;
+                              event.preventDefault();
+                              event.stopPropagation();
+                              dropOnIncomeCategory(group.category);
+                            }}
+                          >
+                            <div className="expenseGroupHeader">
+                              <span className="categoryEmoji" aria-hidden="true">
+                                {categoryEmoji(group.category) || group.category.trim().charAt(0).toUpperCase()}
+                              </span>
+                              <input
+                                className="categoryNameInput"
+                                aria-label="Income category name"
+                                defaultValue={group.category}
+                                key={group.category}
+                                onBlur={(event) => {
+                                  const next = event.currentTarget.value.trim();
+                                  if (next && next !== group.category) renameIncomeCategory(group.category, next);
+                                  else event.currentTarget.value = group.category;
+                                }}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter") event.currentTarget.blur();
+                                }}
+                              />
+                              <em>{group.items.length} {group.items.length === 1 ? "source" : "sources"}</em>
+                              <b className={ledger.privacyMode ? "masked" : ""}>{moneyFormatter.format(group.total)}</b>
+                              <span className="categoryActions">
+                                <button
+                                  className="categoryCollapseButton"
+                                  type="button"
+                                  onClick={() => toggleCategoryCollapse(collapseKey)}
+                                  aria-label={`${collapsed ? "Expand" : "Collapse"} ${group.category} income category`}
+                                  aria-expanded={!collapsed}
+                                >
+                                  {collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
+                                </button>
+                                <button
+                                  className="categoryDeleteButton"
+                                  type="button"
+                                  onClick={() => deleteIncomeCategory(group.category)}
+                                  aria-label={`Delete ${group.category} income category`}
+                                  title="Delete category"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </span>
+                            </div>
+                            {!collapsed && group.items.map(renderIncome)}
+                          </div>
+                        );
+                      })
                     ) : currentMonth.incomes.length ? (
                       <EmptyState icon={<Search size={18} />} title="No income matches" text="Clear search to see all income sources." />
                     ) : (
@@ -7050,7 +7237,7 @@ function IncomeRow({
   privacy: boolean;
   symbol: string;
   dragging: boolean;
-  dropState?: "before" | "after";
+  dropState?: ExpenseDropState;
   onDragStart: () => void;
   onDragOver: (event: DragEvent<HTMLDivElement>) => void;
   onDragEnd: () => void;
@@ -7078,7 +7265,7 @@ function IncomeRow({
     onDrop();
   }
 
-  const dropClass = dropState === "before" ? "dropBefore" : dropState === "after" ? "dropAfter" : "";
+  const dropClass = dropState === "before" ? "dropBefore" : dropState === "after" ? "dropAfter" : dropState === "combine" ? "dropCombine" : "";
 
   return (
     <div
@@ -7360,16 +7547,7 @@ function ExpenseRow({
         onEnter={({ currentTarget }) => currentTarget.blur()}
         onChange={(value) => onChange({ amount: Number(value) })}
       />
-      {/* The amount doubles as the way into this row's details: no extra icon in a tight row. */}
-      <button
-        className={privacy ? "rowTotal rowTotalPeek masked" : "rowTotal rowTotalPeek"}
-        type="button"
-        onClick={(event) => onPeek(event.currentTarget)}
-        aria-label={`Open details for ${expense.name || "this expense"}`}
-        data-tip="Details"
-      >
-        {formatter.format(expense.amount)}
-      </button>
+      <span className={privacy ? "rowTotal masked" : "rowTotal"}>{formatter.format(expense.amount)}</span>
       <div className="rowActions">
         {expense.scheduledPayment && (
           <span
@@ -8623,8 +8801,8 @@ function downloadFile(name: string, content: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
-function nextCategoryName(expenses: ExpenseEntry[]) {
-  const names = new Set(expenses.map((expense) => expense.category).filter(Boolean));
+function nextCategoryName(entries: { category?: string }[]) {
+  const names = new Set(entries.map((entry) => (entry.category ?? "").trim()).filter(Boolean));
   let index = 1;
   let name = "New category";
   while (names.has(name)) {
@@ -8634,8 +8812,8 @@ function nextCategoryName(expenses: ExpenseEntry[]) {
   return name;
 }
 
-function randomCategoryColor(expenses: ExpenseEntry[]) {
-  const usedColors = new Set(expenses.filter((expense) => expense.category.trim()).map((expense) => expense.color));
+function randomCategoryColor(entries: { category?: string; color: string }[]) {
+  const usedColors = new Set(entries.filter((entry) => (entry.category ?? "").trim()).map((entry) => entry.color));
   const availableColors = colors.filter((color) => !usedColors.has(color));
   const palette = availableColors.length ? availableColors : colors;
   return palette[Math.floor(Math.random() * palette.length)];

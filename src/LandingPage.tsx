@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { ArrowRight, Check } from "lucide-react";
 import { BANK_GUIDES } from "./generated/bankGuides";
 import { LANDING_COPY, rememberLandingRegion } from "./landingContent";
+import { track } from "./analytics";
 import type { RegionKey } from "./region";
 
 // ─── Scroll scenes ───────────────────────────────────────────────────────────
@@ -188,10 +189,52 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
   const [annualPhase, setAnnualPhase] = useState<"chart" | "proj">("chart");
   const [lockClosed, setLockClosed] = useState(true);
 
-  function enter() {
-    localStorage.setItem("hasSeenLanding", "1");
+  function enter(cta: "hero" | "nav" | "skip" | "closing") {
+    track("landing_cta", { cta, region });
+    try {
+      localStorage.setItem("hasSeenLanding", "1");
+    } catch {
+      // Not remembered: the homepage shows again next visit.
+    }
     onEnter();
   }
+
+  // Conversion tracking (see src/analytics.ts). A view, each section the first time half of it
+  // is on screen (how far down this long page people really get), and clicks on links out to the
+  // static pages, by the part of the page they were in. Nothing about the person or their money.
+  useEffect(() => {
+    track("landing_view", { region });
+    const seen = new Set<string>();
+    const observer =
+      typeof IntersectionObserver === "undefined"
+        ? null
+        : new IntersectionObserver(
+            (entries) => {
+              for (const entry of entries) {
+                const section = (entry.target as HTMLElement).dataset.section;
+                if (!entry.isIntersecting || !section || seen.has(section)) continue;
+                seen.add(section);
+                track("landing_section_seen", { section, region });
+              }
+            },
+            { threshold: 0.4 },
+          );
+    document.querySelectorAll<HTMLElement>("[data-section]").forEach((el) => observer?.observe(el));
+    function onClick(event: MouseEvent) {
+      const link = (event.target as Element | null)?.closest?.("a[href]");
+      if (!link || !link.closest(".lp-nav, .lp-page, .lp-footer")) return;
+      const href = link.getAttribute("href") ?? "";
+      if (!href.startsWith("/")) return;
+      const area = link.closest<HTMLElement>("[data-section]")?.dataset.section ?? (link.closest(".lp-nav") ? "nav" : link.closest(".lp-footer") ? "footer" : "other");
+      const dest = href.split("/")[1]?.replace(/\.html$/, "") || "home";
+      track("landing_link", { area, dest, region });
+    }
+    document.addEventListener("click", onClick, true);
+    return () => {
+      observer?.disconnect();
+      document.removeEventListener("click", onClick, true);
+    };
+  }, [region]);
 
   // Reduced-motion preference
   useEffect(() => {
@@ -364,9 +407,10 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
 
   // ── Derived hero values ───────────────────────────────────────────────────
   const incomeTotal  = 3248.72 + heroIncAdded.reduce((s, r) => s + parseFloat(r.amt), 0);
-  const expenseTotal = heroExpAdded.reduce((s, r) => s + parseFloat(r.amt), 0);
+  const standing = copy.heroStandingExpenses;
+  const expenseTotal = [...standing, ...heroExpAdded].reduce((s, r) => s + parseFloat(r.amt), 0);
   const incomeCount  = 1 + heroIncAdded.length;
-  const expenseCount = heroExpAdded.length;
+  const expenseCount = standing.length + heroExpAdded.length;
   const fmt = (n: number) => n.toLocaleString(copy.locale, { minimumFractionDigits: 2 });
   const miniExpenseTotal = parseFloat(copy.miniFood.amt) + copy.miniRows.reduce((s, r) => s + parseFloat(r.amt), 0);
 
@@ -391,7 +435,7 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
             {copy.nav.map(link => <a key={link.href} href={link.href}>{link.label}</a>)}
             <a href={copy.switchTo.href} hrefLang={copy.switchTo.region === "US" ? "en-US" : "en-GB"} onClick={() => rememberLandingRegion(copy.switchTo.region)}>{copy.switchTo.label}</a>
           </nav>
-          <button className="lp-btn lp-btn--sm lp-btn--onframe" onClick={enter}>
+          <button className="lp-btn lp-btn--sm lp-btn--onframe" onClick={() => enter("nav")}>
             Continue to app <ArrowRight size={14} />
           </button>
         </div>
@@ -400,7 +444,7 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
       <main className="lp-page">
 
         {/* ════ HERO ════ */}
-        <section className="lp-hero" ref={el => { heroRef.current = el; }}>
+        <section data-section="hero" className="lp-hero" ref={el => { heroRef.current = el; }}>
           <div className="lp-hero-copy lp-r">
             <h1 className="lp-h1">
               Track income and spending<br />
@@ -408,10 +452,10 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
             </h1>
             <p className="lp-sub">{copy.heroSub}</p>
             <div className="lp-actions">
-              <button className="lp-btn lp-btn--lg lp-btn--onframe" onClick={enter}>
+              <button className="lp-btn lp-btn--lg lp-btn--onframe" onClick={() => enter("hero")}>
                 Open the ledger <ArrowRight size={18} />
               </button>
-              <button className="lp-skip" onClick={enter}>
+              <button className="lp-skip" onClick={() => enter("skip")}>
                 Already use it? Skip the tour
               </button>
             </div>
@@ -486,6 +530,13 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
                     <span className="lp-mp-total">{cur}{fmt(expenseTotal)}</span>
                   </div>
                   <div className="lp-col-head"><span>Expense</span><span>Amount</span></div>
+                  {/* Standing rows, like the salary on the left: the month already has spending in it. */}
+                  {standing.map(r => (
+                    <div key={r.name} className="lp-mrow">
+                      <span className="lp-mname">{r.name}</span>
+                      <span className="lp-mamt lp-mamt--exp">{cur} {fmt(parseFloat(r.amt))}</span>
+                    </div>
+                  ))}
                   {heroExpAdded.map(r => (
                     <div key={r.name} className="lp-mrow lp-mrow--new">
                       <span className="lp-mname">{r.name}</span>
@@ -530,7 +581,7 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
         </div>
 
         {/* ════ DEMO 1: CSV import ════ */}
-        <section className="lp-feat" ref={el => { csvRef.current = el; }} aria-labelledby="lp-csv-h2">
+        <section data-section="csv" className="lp-feat" ref={el => { csvRef.current = el; }} aria-labelledby="lp-csv-h2">
           <div className="lp-feat-copy">
             <h2 className="lp-feat-h2" id="lp-csv-h2">{copy.csvHeading}</h2>
             <p className="lp-feat-p">{copy.csvBody}</p>
@@ -553,7 +604,7 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
         </section>
 
         {/* ════ DEMO 2: Monthly ledger ════ */}
-        <section className="lp-feat" ref={el => { ledgerRef.current = el; }} aria-labelledby="lp-ledger-h2">
+        <section data-section="ledger" className="lp-feat" ref={el => { ledgerRef.current = el; }} aria-labelledby="lp-ledger-h2">
           <div className="lp-feat-copy">
             <h2 className="lp-feat-h2" id="lp-ledger-h2">See every month side by side</h2>
             <p className="lp-feat-p">
@@ -615,7 +666,7 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
         </section>
 
         {/* ════ DEMO 3: Annual chart ⇄ projection card ════ */}
-        <section className="lp-feat" ref={el => { annualRef.current = el; }} aria-labelledby="lp-annual-h2">
+        <section data-section="annual" className="lp-feat" ref={el => { annualRef.current = el; }} aria-labelledby="lp-annual-h2">
           <div className="lp-feat-copy">
             <h2 className="lp-feat-h2" id="lp-annual-h2">One year, not one month</h2>
             <p className="lp-feat-p">
@@ -709,7 +760,7 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
         </section>
 
         {/* ════ PRIVACY ════ */}
-        <section className="lp-privacy" ref={el => { privacyRef.current = el; }} aria-labelledby="lp-privacy-h2">
+        <section data-section="privacy" className="lp-privacy" ref={el => { privacyRef.current = el; }} aria-labelledby="lp-privacy-h2">
           <span className={`lp-privacy-mark${lockClosed ? " lp-privacy-mark--shut" : ""}`} aria-hidden="true">
             <svg viewBox="0 0 24 24" width="24" height="24">
               <path className="lp-lock-shackle" d="M8 11V8a4 4 0 0 1 8 0v3" />
@@ -727,7 +778,7 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
         </section>
 
         {/* ════ BANKS ════ */}
-        <section className="lp-banks lp-r" aria-labelledby="lp-banks-h2">
+        <section data-section="banks" className="lp-banks lp-r" aria-labelledby="lp-banks-h2">
           <span className="lp-eyebrow">{copy.banksEyebrow}</span>
           {copy.bankNames ? (
             <>
@@ -759,7 +810,7 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
 
         {/* ════ COMPARISON ════ */}
         <div className="lp-band">
-        <section className="lp-cmp lp-r">
+        <section data-section="compare" className="lp-cmp lp-r">
           <h2 className="lp-cmp-h2">How it compares</h2>
           <div className="lp-cmp-table">
             <div className="lp-cmp-head">
@@ -785,7 +836,7 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
         </div>
 
         {/* ════ RESOURCES ════ */}
-        <section className="lp-res lp-r" aria-labelledby="lp-res-h2">
+        <section data-section="resources" className="lp-res lp-r" aria-labelledby="lp-res-h2">
           <span className="lp-eyebrow">Free, with or without the app</span>
           <h2 className="lp-cmp-h2" id="lp-res-h2">Guides, calculators and templates</h2>
           {copy.resourcesNote && <p className="lp-section-p">{copy.resourcesNote}</p>}
@@ -800,7 +851,7 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
         </section>
 
         {/* ════ FAQ ════ */}
-        <section className="lp-faq lp-r" aria-labelledby="lp-faq-h2">
+        <section data-section="faq" className="lp-faq lp-r" aria-labelledby="lp-faq-h2">
           <h2 className="lp-cmp-h2" id="lp-faq-h2">Questions people ask</h2>
           <dl className="lp-faq-list">
             {copy.faq.map(item => (
@@ -818,10 +869,10 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
 
         {/* ════ FINAL CTA + FOOTER, back on the frame colour ════ */}
         <div className="lp-endband">
-        <section className="lp-end">
+        <section data-section="closing" className="lp-end">
           <h2 className="lp-end-h2">Open your first month.</h2>
           <p className="lp-end-deck">It takes about two minutes.</p>
-          <button className="lp-btn lp-btn--lg lp-btn--onframe" onClick={enter}>
+          <button className="lp-btn lp-btn--lg lp-btn--onframe" onClick={() => enter("closing")}>
             Start the ledger <ArrowRight size={18} />
           </button>
           <p className="lp-end-note">Free. No credit card. No bank login.</p>

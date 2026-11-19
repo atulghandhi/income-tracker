@@ -104,6 +104,9 @@ public struct IncomeEntry: Codable, Identifiable, Hashable, Sendable {
     public var color: String
     public var recurring: Bool
     public var date: String?
+    /// Optional grouping the web app makes by dragging one income onto another. nil or ""
+    /// means ungrouped. Kept here so an edit on this device never drops it on sync.
+    public var category: String?
     public var imported: ImportedTransactionMeta?
     /// The account this money landed in; its balance moves with it. See `AccountFlow`.
     public var accountId: String?
@@ -119,6 +122,7 @@ public struct IncomeEntry: Codable, Identifiable, Hashable, Sendable {
         color: String,
         recurring: Bool,
         date: String? = nil,
+        category: String? = nil,
         imported: ImportedTransactionMeta? = nil,
         accountId: String? = nil,
         seededFrom: SeededFromRef? = nil,
@@ -130,6 +134,7 @@ public struct IncomeEntry: Codable, Identifiable, Hashable, Sendable {
         self.color = color
         self.recurring = recurring
         self.date = date
+        self.category = category
         self.imported = imported
         self.accountId = accountId
         self.seededFrom = seededFrom
@@ -137,7 +142,7 @@ public struct IncomeEntry: Codable, Identifiable, Hashable, Sendable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, source, amount, color, recurring, date, imported, accountId, seededFrom, categorySource
+        case id, source, amount, color, recurring, date, category, imported, accountId, seededFrom, categorySource
     }
 
     /// Mirrors `normalizeMonths` in App.tsx. An empty colour is filled in by the
@@ -149,6 +154,7 @@ public struct IncomeEntry: Codable, Identifiable, Hashable, Sendable {
         amount = c.lenientDouble(.amount, default: 0)
         color = c.lenientString(.color) ?? ""
         date = c.lenientNonEmptyString(.date)
+        category = c.lenientNonEmptyString(.category)
         imported = c.lenientValue(ImportedTransactionMeta.self, .imported)
         accountId = c.lenientNonEmptyString(.accountId)
         seededFrom = c.lenientValue(SeededFromRef.self, .seededFrom)

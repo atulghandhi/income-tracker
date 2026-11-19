@@ -780,21 +780,6 @@
   }
 }
 
-.rowTotalPeek {
-  justify-self: end;
-  border: 0;
-  background: transparent;
-  padding: 4px 6px;
-  border-radius: 6px;
-  cursor: pointer;
-  text-align: right;
-}
-
-.rowTotalPeek:hover {
-  color: var(--ink);
-  background: var(--accent-soft);
-}
-
 .monthLabel strong {
   white-space: nowrap;
 }
@@ -1030,6 +1015,14 @@
   background: var(--field);
 }
 
+/* The amount field is one filled box: the input inside it stays clear, or the box shows a
+   second pill inside itself and two focus rings. */
+.addRow .moneyInput input,
+.addRow .moneyInput input:focus {
+  background: transparent;
+  box-shadow: none;
+}
+
 .addRow input:focus,
 .addRow .moneyInput:focus-within {
   background: var(--surface);
@@ -1122,7 +1115,8 @@
   background-color: var(--field);
 }
 
-.contentCanvas :is(input, select, textarea):not([type="checkbox"], [type="radio"], [type="range"]):not(.financeRow *):focus,
+/* An input inside a money field leaves the ring to the field around it (one ring, not two). */
+.contentCanvas :is(input, select, textarea):not([type="checkbox"], [type="radio"], [type="range"]):not(.financeRow *, .moneyInput *):focus,
 .contentCanvas :is(.moneyInput, .selectField):not(.financeRow *):focus-within {
   border-color: transparent;
   box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.45);
@@ -1229,8 +1223,8 @@
   padding: 6px 0 4px;
 }
 
-.panel.expense .expenseGroup,
-.panel.expense .expenseGroup:not(.ungrouped) {
+:is(.panel.expense, .panel.income) .expenseGroup,
+:is(.panel.expense, .panel.income) .expenseGroup:not(.ungrouped) {
   position: relative;
   margin: 0 8px;
   padding: 0;
@@ -1245,13 +1239,13 @@
     transform 220ms var(--ease-out);
 }
 
-.panel.expense .expenseGroup:not(.ungrouped) {
+:is(.panel.expense, .panel.income) .expenseGroup:not(.ungrouped) {
   padding-bottom: 6px;
   margin-bottom: 4px;
 }
 
 /* The category's colour, in one place: a fine rail under the icon, beside its expenses. */
-.panel.expense .expenseGroup:not(.ungrouped)::before {
+:is(.panel.expense, .panel.income) .expenseGroup:not(.ungrouped)::before {
   content: "";
   position: absolute;
   left: 23px;
@@ -1264,11 +1258,11 @@
   pointer-events: none;
 }
 
-.panel.expense .expenseGroup.collapsed::before {
+:is(.panel.expense, .panel.income) .expenseGroup.collapsed::before {
   display: none;
 }
 
-.panel.expense .expenseGroupHeader {
+:is(.panel.expense, .panel.income) .expenseGroupHeader {
   display: grid;
   grid-template-columns: 28px minmax(0, max-content) minmax(0, 1fr) var(--amount-col) minmax(var(--row-actions), auto);
   align-items: center;
@@ -1280,7 +1274,7 @@
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
 }
 
-.panel.expense .categoryEmoji {
+:is(.panel.expense, .panel.income) .categoryEmoji {
   display: grid;
   place-items: center;
   width: 28px;
@@ -1292,7 +1286,7 @@
   background: color-mix(in srgb, var(--category-color) 18%, transparent);
 }
 
-.panel.expense .categoryNameInput {
+:is(.panel.expense, .panel.income) .categoryNameInput {
   /* Sized to its text: the base rule's percentage width has nothing to resolve against here. */
   width: auto;
   min-width: 3ch;
@@ -1308,11 +1302,11 @@
   background: transparent !important;
 }
 
-.panel.expense .categoryNameInput:hover {
+:is(.panel.expense, .panel.income) .categoryNameInput:hover {
   background: var(--field) !important;
 }
 
-.panel.expense .expenseGroupHeader em {
+:is(.panel.expense, .panel.income) .expenseGroupHeader em {
   font-style: normal;
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
   font-size: 12px;
@@ -1321,7 +1315,7 @@
   white-space: nowrap;
 }
 
-.panel.expense .expenseGroupHeader b {
+:is(.panel.expense, .panel.income) .expenseGroupHeader b {
   justify-self: end;
   padding-right: 23px;
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
@@ -1336,8 +1330,8 @@
   gap: 2px;
 }
 
-.panel.expense .categoryCollapseButton,
-.panel.expense .categoryDeleteButton {
+:is(.panel.expense, .panel.income) .categoryCollapseButton,
+:is(.panel.expense, .panel.income) .categoryDeleteButton {
   display: inline-grid;
   place-items: center;
   width: 30px;
@@ -1348,41 +1342,41 @@
   color: var(--muted);
 }
 
-.panel.expense .categoryCollapseButton:hover,
-.panel.expense .categoryDeleteButton:hover {
+:is(.panel.expense, .panel.income) .categoryCollapseButton:hover,
+:is(.panel.expense, .panel.income) .categoryDeleteButton:hover {
   background: var(--field);
   color: var(--ink);
 }
 
-.panel.expense .categoryDeleteButton:hover {
+:is(.panel.expense, .panel.income) .categoryDeleteButton:hover {
   color: var(--red);
 }
 
 /* A category's actions wait for intent with a mouse; a collapsed one keeps its chevron. */
 @media (hover: hover) and (pointer: fine) {
-  .panel.expense .categoryCollapseButton,
-  .panel.expense .categoryDeleteButton {
+  :is(.panel.expense, .panel.income) .categoryCollapseButton,
+  :is(.panel.expense, .panel.income) .categoryDeleteButton {
     opacity: 0;
     transition: opacity 140ms ease;
   }
 
-  .panel.expense .expenseGroup:hover .categoryCollapseButton,
-  .panel.expense .expenseGroup:hover .categoryDeleteButton,
-  .panel.expense .expenseGroupHeader:focus-within .categoryCollapseButton,
-  .panel.expense .expenseGroupHeader:focus-within .categoryDeleteButton,
-  .panel.expense .expenseGroup.collapsed .categoryCollapseButton {
+  :is(.panel.expense, .panel.income) .expenseGroup:hover .categoryCollapseButton,
+  :is(.panel.expense, .panel.income) .expenseGroup:hover .categoryDeleteButton,
+  :is(.panel.expense, .panel.income) .expenseGroupHeader:focus-within .categoryCollapseButton,
+  :is(.panel.expense, .panel.income) .expenseGroupHeader:focus-within .categoryDeleteButton,
+  :is(.panel.expense, .panel.income) .expenseGroup.collapsed .categoryCollapseButton {
     opacity: 1;
   }
 }
 
 /* Rows: one neutral surface, no dividers; the amount appears once. */
-.panel.expense .expenseGroup .expenseRow {
+:is(.panel.expense, .panel.income) .expenseGroup :is(.expenseRow, .incomeRow) {
   border-bottom-color: transparent;
   border-radius: 10px;
   background: transparent;
 }
 
-.panel.expense .expenseGroup .expenseRow:hover {
+:is(.panel.expense, .panel.income) .expenseGroup :is(.expenseRow, .incomeRow):hover {
   background: rgba(var(--ink-rgb), 0.035);
 }
 
@@ -1393,11 +1387,11 @@
     padding-right: var(--row-end);
   }
 
-  .panel.expense .expenseGroup:not(.ungrouped) .expenseRow {
+  :is(.panel.expense, .panel.income) .expenseGroup:not(.ungrouped) :is(.expenseRow, .incomeRow) {
     padding-left: 54px;
   }
 
-  .panel.expense .expenseGroup:not(.ungrouped) .expenseRow > .accountDot {
+  :is(.panel.expense, .panel.income) .expenseGroup:not(.ungrouped) :is(.expenseRow, .incomeRow) > .accountDot {
     left: 32px;
   }
 
@@ -1415,19 +1409,19 @@
 }
 
 /* Colour on intent: the group under your pointer (or focus) takes a soft wash. */
-.panel.expense .expenseGroup:not(.ungrouped):hover,
-.panel.expense .expenseGroup:not(.ungrouped):focus-within {
+:is(.panel.expense, .panel.income) .expenseGroup:not(.ungrouped):hover,
+:is(.panel.expense, .panel.income) .expenseGroup:not(.ungrouped):focus-within {
   background: color-mix(in srgb, var(--category-color) 7%, transparent);
 }
 
 /* While an expense is dragged onto a category, that one lifts and the rest recede. */
-.panel.expense .expenseGroup.categoryDropTarget {
+:is(.panel.expense, .panel.income) .expenseGroup.categoryDropTarget {
   background: color-mix(in srgb, var(--category-color) 12%, var(--surface));
   box-shadow: var(--layer-shadow), 0 0 0 2px color-mix(in srgb, var(--category-color) 45%, transparent);
   transform: translateY(-1px);
 }
 
-.panel.expense .expenseGroups:has(.categoryDropTarget) > .expenseGroup:not(.categoryDropTarget) {
+:is(.panel.expense, .panel.income) .expenseGroups:has(.categoryDropTarget) > .expenseGroup:not(.categoryDropTarget) {
   opacity: 0.5;
 }
 
@@ -1451,7 +1445,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .panel.expense .expenseGroup.categoryDropTarget {
+  :is(.panel.expense, .panel.income) .expenseGroup.categoryDropTarget {
     transform: none;
   }
 }
@@ -1459,33 +1453,33 @@
 /* Phones: the header is name and total (the count is in the rows below), and the rail
    moves under the icon tile with the rows stepping clear of it. */
 @media (max-width: 680px) {
-  .panel.expense .expenseGroupHeader {
+  :is(.panel.expense, .panel.income) .expenseGroupHeader {
     grid-template-columns: 28px minmax(0, 1fr) auto auto;
     padding-left: 4px;
   }
 
-  .panel.expense .categoryNameInput {
+  :is(.panel.expense, .panel.income) .categoryNameInput {
     width: 100%;
     field-sizing: fixed;
   }
 
-  .panel.expense .expenseGroupHeader em {
+  :is(.panel.expense, .panel.income) .expenseGroupHeader em {
     display: none;
   }
 
-  .panel.expense .expenseGroupHeader b {
+  :is(.panel.expense, .panel.income) .expenseGroupHeader b {
     padding-right: 4px;
   }
 
-  .panel.expense .expenseGroup:not(.ungrouped)::before {
+  :is(.panel.expense, .panel.income) .expenseGroup:not(.ungrouped)::before {
     left: 16px;
   }
 
-  .panel.expense .expenseGroup:not(.ungrouped) .expenseRow {
+  :is(.panel.expense, .panel.income) .expenseGroup:not(.ungrouped) :is(.expenseRow, .incomeRow) {
     padding-left: 50px;
   }
 
-  .panel.expense .expenseGroup:not(.ungrouped) .expenseRow > .accountDot {
+  :is(.panel.expense, .panel.income) .expenseGroup:not(.ungrouped) :is(.expenseRow, .incomeRow) > .accountDot {
     left: 26px;
   }
 }

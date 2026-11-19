@@ -22,6 +22,9 @@ export type IncomeEntry = {
   // imported bank rows default to one-off.
   recurring: boolean;
   date?: string;
+  // Optional grouping, made by dragging one income onto another (like expense categories).
+  // Absent or "" means ungrouped. Older ledgers and other clients simply have none.
+  category?: string;
   imported?: ImportedTransactionMeta;
   // The account this money landed in; its balance moves with it. See accountFlow.ts.
   accountId?: string;

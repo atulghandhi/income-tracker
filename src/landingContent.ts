@@ -85,6 +85,8 @@ export type LandingCopy = {
   salaryLabel: string;
   heroIncome: Row;
   heroExpenses: [Row, Row];
+  /** Already in the month before the demo types anything, so the expense column is never empty. */
+  heroStandingExpenses: [Row, Row];
   strip: string;
   csvRows: ReadonlyArray<{ date: string; desc: string; amt: string; cat: string }>;
   csvHeading: string;
@@ -124,6 +126,7 @@ const GB: LandingCopy = {
   salaryLabel: "Salary",
   heroIncome: { name: "Interest", amt: "78.00" },
   heroExpenses: [{ name: "Costa Coffee", amt: "4.20" }, { name: "Work commute", amt: "120.00" }],
+  heroStandingExpenses: [{ name: "Rent", amt: "1150.00" }, { name: "Groceries", amt: "286.40" }],
   strip: "No open banking. No Plaid. No third-party access to your accounts. Just a CSV file you download yourself.",
   csvRows: [
     { date: "13 Jun", desc: "TESCO EXTRA 4261", amt: "42.61", cat: "Food" },
@@ -189,6 +192,7 @@ const US: LandingCopy = {
   salaryLabel: "Paycheck",
   heroIncome: { name: "Interest", amt: "78.00" },
   heroExpenses: [{ name: "Starbucks", amt: "5.45" }, { name: "Gas", amt: "45.00" }],
+  heroStandingExpenses: [{ name: "Rent", amt: "1650.00" }, { name: "Groceries", amt: "312.80" }],
   strip: "No Plaid, no bank passwords and no third-party access to your accounts. You download a file from your bank and import it yourself.",
   csvRows: [
     { date: "Jun 13", desc: "WHOLEFDS MKT 10234", amt: "42.61", cat: "Food" },

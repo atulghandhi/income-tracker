@@ -35,6 +35,7 @@ import { LANDINGS } from "./content/landings.mjs";
 import { COMPARISONS, ROUNDUP } from "./content/comparisons.mjs";
 import { TEMPLATES } from "./content/templates.mjs";
 import { framePalette } from "../src/framePalette.mjs";
+import { UI_VERSION } from "../src/uiVersion.mjs";
 import { CHANGELOG } from "./content/changelog.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -427,20 +428,23 @@ function siteFooter() {
 //  - Vercel Web Analytics: the standard queue shim + script (no-op off Vercel).
 //  - PostHog: only when the build had VITE_POSTHOG_KEY. Same privacy contract as
 //    src/analytics.ts: event names, page path, small categorical props. Nothing
-//    a person types into a calculator is ever sent.
+//    a person types into a calculator is ever sent. Like the app, each event carries
+//    the design version (`ui`), the page's section, the browser user agent (without it
+//    PostHog classes every visit as automation) and any utm_* tags on the URL.
 //  - Any element with data-track="event_name" reports a click (plus data-ref).
 function analyticsScript() {
   return `<script>
 window.va=window.va||function(){(window.vaq=window.vaq||[]).push(arguments)};
 (function(){
-  var PH_KEY=${JSON.stringify(POSTHOG_KEY)},PH_HOST=${JSON.stringify(POSTHOG_HOST)};
+  var PH_KEY=${JSON.stringify(POSTHOG_KEY)},PH_HOST=${JSON.stringify(POSTHOG_HOST)},UI=${JSON.stringify(UI_VERSION)};
   var dnt=typeof navigator!=="undefined"&&navigator.doNotTrack==="1";
   function id(){try{var k="it_analytics_id",v=localStorage.getItem(k);if(!v){v="anon-"+(window.crypto&&crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2));localStorage.setItem(k,v);}return v;}catch(e){return "anon-ephemeral";}}
+  function ctx(){var o={};try{o.$raw_user_agent=navigator.userAgent;o.$current_url=location.origin+location.pathname;o.$pathname=location.pathname;o.$host=location.host;o.section=location.pathname.split("/")[1].replace(/\\.html$/,"")||"home";var q=new URLSearchParams(location.search);["utm_source","utm_medium","utm_campaign"].forEach(function(k){var v=q.get(k);if(v)o[k]=v.slice(0,80);});if(document.referrer){var r=new URL(document.referrer);if(r.host!==location.host)o.$referring_domain=r.host;}}catch(e){}return o;}
   function track(name,props){
     props=props||{};props.page=location.pathname;
     try{window.va("event",{name:name,data:props});}catch(e){}
     if(!PH_KEY||dnt)return;
-    try{fetch(PH_HOST+"/capture/",{method:"POST",keepalive:true,headers:{"content-type":"application/json"},body:JSON.stringify({api_key:PH_KEY,event:name,distinct_id:id(),properties:Object.assign({app:"income-tracker-web",surface:"static"},props),timestamp:new Date().toISOString()})}).catch(function(){});}catch(e){}
+    try{fetch(PH_HOST+"/capture/",{method:"POST",keepalive:true,headers:{"content-type":"application/json"},body:JSON.stringify({api_key:PH_KEY,event:name,distinct_id:id(),properties:Object.assign(ctx(),{app:"income-tracker-web",surface:"static",ui:UI},props),timestamp:new Date().toISOString()})}).catch(function(){});}catch(e){}
   }
   window.itTrack=track;
   document.addEventListener("click",function(ev){
