@@ -1136,3 +1136,75 @@
 .contentCanvas .goalsSurplusField input {
   background-color: transparent;
 }
+
+/* ─── Settings ────────────────────────────────────────────────────────────────
+   Sections in pairs that size to their content: no minimum heights, so nothing
+   stands empty waiting for a taller neighbour. */
+.settingsRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+
+[aria-label="Settings"] .settingsPanel,
+[aria-label="Settings"] .compactSetting,
+[aria-label="Settings"] .dangerPanel {
+  min-height: 0;
+}
+
+/* Import first, export second, side by side. */
+[aria-label="Settings"] .dataActionGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* Financial terms: one line until opened. */
+.financialGlossary {
+  min-height: 0;
+  padding: 0;
+  box-shadow: var(--layer-shadow);
+}
+
+.financialGlossary summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 22px;
+  list-style: none;
+  border-radius: inherit;
+}
+
+.financialGlossary summary::-webkit-details-marker {
+  display: none;
+}
+
+.financialGlossary summary::after {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(45deg) translateY(-3px);
+  transition: transform 200ms var(--ease-out);
+}
+
+.financialGlossary[open] summary::after {
+  transform: rotate(-135deg) translateY(-3px);
+}
+
+.financialGlossary summary:hover {
+  background: var(--field);
+}
+
+.financialGlossary dl {
+  margin: 0;
+  padding: 4px 22px 20px;
+}
+
+@media (max-width: 900px) {
+  .settingsRow,
+  [aria-label="Settings"] .dataActionGrid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -65,6 +65,36 @@ function useScene(cb: ((p: number, e: number) => void) | null, enabled: boolean)
   return ref;
 }
 
+// Holds an element at the tallest height it has reached (measured first in its finished state),
+// so content changing inside it never moves the page. `watch` is the part whose size changes;
+// a change of window width starts the measurement again.
+function useHoldTallest(ref: { current: HTMLElement | null }, watch?: { current: HTMLElement | null }) {
+  useEffect(() => {
+    const el = ref.current;
+    const target = watch?.current ?? el;
+    if (!el || !target) return;
+    let width = window.innerWidth;
+    // Layout height, not the on-screen box: scroll transforms and zoom must not feed back in.
+    const measure = () => el.offsetHeight;
+    let tallest = measure();
+    el.style.minHeight = `${tallest}px`;
+    const observer = new ResizeObserver(() => {
+      if (window.innerWidth !== width) {
+        width = window.innerWidth;
+        el.style.minHeight = "";
+        tallest = 0;
+      }
+      const now = measure();
+      if (now > tallest) {
+        tallest = now;
+        el.style.minHeight = `${tallest}px`;
+      }
+    });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [ref, watch]);
+}
+
 // The entry that types itself into the ledger demo as you scroll.
 const TYPED = { name: "Gym membership", amt: "32.00" };
 
@@ -145,8 +175,10 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
   const [heroAmt,        setHeroAmt]        = useState("");
   const [heroTabBadge,   setHeroTabBadge]   = useState(false);
   const [heroEnterBadge, setHeroEnterBadge] = useState(false);
-  const [heroIncAdded,   setHeroIncAdded]   = useState<{ name: string; amt: string }[]>([]);
-  const [heroExpAdded,   setHeroExpAdded]   = useState<{ name: string; amt: string }[]>([]);
+  // Start finished, like every other demo: the first paint (and the server render) shows the
+  // full window, which is also the height it is held at while the loop replays.
+  const [heroIncAdded,   setHeroIncAdded]   = useState<{ name: string; amt: string }[]>(() => [incomeRow]);
+  const [heroExpAdded,   setHeroExpAdded]   = useState<{ name: string; amt: string }[]>(() => [exp1, exp2]);
 
   // Scroll-driven demos. Each holds the finished state until scroll takes over.
   const csvDone = CSV_ROWS.length * 2;
@@ -222,8 +254,20 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
   const ledgerRef = useScene((p) => {
     const total = TYPED.name.length + TYPED.amt.length;
     setTypedChars(Math.round(span(p, 0.28, 0.5) * total));
-    setTypedCommitted(p > 0.54);
+    // A little hysteresis: a scroll that hovers on the line never flickers the row in and out.
+    setTypedCommitted((was) => (was ? p > 0.51 : p > 0.55));
   }, motion);
+
+  // The hero window, likewise, never shrinks while its typing loop restarts: a page that
+  // shifted by a row every few seconds would jump under anyone scrolling past it.
+  const heroBodyRef = useRef<HTMLDivElement | null>(null);
+  useHoldTallest(heroBodyRef);
+
+  // The ledger frame keeps the height of its fullest state, so the row going in and out
+  // never moves the page under the reader (or feeds back into the scroll position).
+  const miniLedgerRef = useRef<HTMLDivElement | null>(null);
+  const expensePanelRef = useRef<HTMLDivElement | null>(null);
+  useHoldTallest(miniLedgerRef, expensePanelRef);
 
   // Year: the chart walks through the months, then turns into the projection.
   const annualRef = useScene((p) => setAnnualPhase(p > 0.6 ? "proj" : "chart"), motion);
@@ -382,7 +426,7 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
               </div>
 
               {/* Two-column ledger mock */}
-              <div className="lp-mock-body" aria-hidden="true">
+              <div className="lp-mock-body" aria-hidden="true" ref={heroBodyRef}>
 
                 {/* ── Income panel ── */}
                 <div className="lp-mp lp-mp--income">
@@ -518,7 +562,7 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
             </p>
           </div>
           <div className="lp-feat-frame lp-feat-frame--green">
-            <div className="lp-mini-ledger">
+            <div className="lp-mini-ledger" ref={miniLedgerRef}>
               <div className="lp-mini-panel lp-mini-panel--income">
                 <div className="lp-mini-head">
                   <span>Income</span>
@@ -526,7 +570,7 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
                 </div>
                 <div className="lp-mini-row"><span>{copy.miniIncomeLabel}</span><span>{cur}{fmt(3248.72)}</span></div>
               </div>
-              <div className="lp-mini-panel lp-mini-panel--expense">
+              <div className="lp-mini-panel lp-mini-panel--expense" ref={expensePanelRef}>
                 <div className="lp-mini-head">
                   <span>Expenses</span>
                   <span className="lp-mini-total">{cur}{fmt(miniExpenseTotal + (typedCommitted ? parseFloat(TYPED.amt) : 0))}</span>
@@ -539,9 +583,12 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
                 {copy.miniRows.map(r => (
                   <div className="lp-mini-row" key={r.name}><span>{r.name}</span><span>{cur}{r.amt}</span></div>
                 ))}
-                {typedCommitted && (
-                  <div className="lp-mini-row lp-mini-row--new"><span>{TYPED.name}</span><span>{cur}{TYPED.amt}</span></div>
-                )}
+                {/* Always mounted: the row opens and closes in place, the same way in both directions. */}
+                <div className={`lp-mini-commit${typedCommitted ? " is-in" : ""}`} aria-hidden={!typedCommitted}>
+                  <div className="lp-mini-commit-inner">
+                    <div className="lp-mini-row lp-mini-row--new"><span>{TYPED.name}</span><span>{cur}{TYPED.amt}</span></div>
+                  </div>
+                </div>
                 <div className="lp-mini-add" aria-hidden="true">
                   <span className="lp-madd-plus lp-madd-plus--exp">+</span>
                   {(() => {
@@ -1199,7 +1246,13 @@ const CSS = `
 .lp-bar--up { transform-origin: 50% 100%; }
 .lp-bar--down { transform-origin: 50% 0; }
 .lp-mini-add { display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: var(--lp-well); border-top: 1px dashed var(--lp-line-strong); }
-.lp-mini-row--new { animation: lpRowIn 260ms ease both; background: var(--lp-accent-wash); }
+.lp-mini-row--new { background: var(--lp-accent-wash); }
+.lp-mini-commit {
+  display: grid; grid-template-rows: 0fr; opacity: 0;
+  transition: grid-template-rows 280ms var(--lp-ease), opacity 220ms ease;
+}
+.lp-mini-commit.is-in { grid-template-rows: 1fr; opacity: 1; }
+.lp-mini-commit-inner { min-height: 0; overflow: hidden; }
 .lp-privacy-mark svg { overflow: visible; }
 .lp-lock-body { fill: currentColor; }
 .lp-lock-shackle { fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; transform: translateY(-4px) rotate(-14deg); transform-origin: 16px 11px; transition: transform 380ms cubic-bezier(0.2, 0.9, 0.25, 1.3); }
@@ -1348,7 +1401,7 @@ a.lp-bank:hover { border-color: var(--lp-pos); background: var(--lp-accent-wash)
   .lp-cursor { opacity: 1; }
   .lp-hero-copy > *, .lp-hero-mock .lp-browser, .lp-feat-copy, .lp-feat-frame, .lp-feat-frame > *, .lp-bar { transform: none; opacity: 1; }
   .lp-sticker { transform: rotate(-12deg); }
-  .lp-lock-shackle, .lp-privacy-mark, .lp-mini-row--new { transition: none; animation: none; }
+  .lp-lock-shackle, .lp-privacy-mark, .lp-mini-row--new, .lp-mini-commit { transition: none; animation: none; }
   .lp-csv-row { opacity: 1; transform: none; transition: none; }
   .lp-csv-cat { color: var(--lp-accent-ink); border-color: var(--lp-pos); background: var(--lp-accent-wash); }
   .lp-chart-scroll { transform: none; }

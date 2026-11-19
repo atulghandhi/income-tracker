@@ -5314,30 +5314,11 @@ function App() {
                 </article>
               )}
 
-              <section className="settingsGrid">
-                <article className="settingsPanel appearancePanel">
-                  <PanelTitle title="Appearance" icon={<Palette size={17} />} />
-                  <p className="settingsHint">The colour your app sits on. Saved on this device, like light and dark mode.</p>
-                  <FramePicker hue={frameHue} grain={frameGrain} theme={theme} onHue={setFrameHue} onGrain={setFrameGrain} />
-                </article>
+              {/* Ordered by how often people need each part: bringing data in and out, keeping imports
+                  tidy, then one-off preferences, reference, and the irreversible last. */}
                 <article className="settingsPanel dataPanel">
-                  <PanelTitle title="Data control" icon={<Database size={17} />} />
+                  <PanelTitle title="Import & export" icon={<Database size={17} />} />
                   <div className="dataActionGrid">
-                    <div className="dataAction">
-                      <Download size={20} />
-                      <h3>Export vault</h3>
-                      <p>Download a complete snapshot of your ledger and settings.</p>
-                      <div className="buttonRow">
-                        <button className="commandButton" type="button" onClick={exportJson}>
-                          <FileJson size={16} />
-                          Export JSON
-                        </button>
-                        <button className="commandButton" type="button" onClick={exportCsv}>
-                          <Download size={16} />
-                          Export CSV
-                        </button>
-                      </div>
-                    </div>
                     <div className="dataAction">
                       <Upload size={20} />
                       <h3>Import data</h3>
@@ -5354,6 +5335,21 @@ function App() {
                         <button className="commandButton" type="button" onClick={() => fileInputRef.current?.click()}>
                           <Upload size={16} />
                           Import JSON
+                        </button>
+                      </div>
+                    </div>
+                    <div className="dataAction">
+                      <Download size={20} />
+                      <h3>Export vault</h3>
+                      <p>Download a complete snapshot of your ledger and settings.</p>
+                      <div className="buttonRow">
+                        <button className="commandButton" type="button" onClick={exportJson}>
+                          <FileJson size={16} />
+                          Export JSON
+                        </button>
+                        <button className="commandButton" type="button" onClick={exportCsv}>
+                          <Download size={16} />
+                          Export CSV
                         </button>
                       </div>
                     </div>
@@ -5380,34 +5376,7 @@ function App() {
                   )}
                 </article>
 
-                <aside className="settingsSide">
-                  <article className="settingsPanel compactSetting">
-                    <PanelTitle title="Country & currency" icon={<WalletCards size={17} />} />
-                    <p>
-                      {region === "US"
-                        ? "US accounts, tax tools and spelling are on. Currency only changes the symbol."
-                        : "Country picks the account types, tools and spelling; the United States has its own experience. Currency only changes the symbol."}
-                    </p>
-                    <label className="selectField">
-                      <select value={ledger.country} onChange={(event) => changeCountry(event.target.value as CountryCode)} aria-label="Settings country">
-                        {countryOptions.map((option) => (
-                          <option value={option.code} key={option.code}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="selectField">
-                      <select value={ledger.currency} onChange={(event) => changeCurrency(event.target.value as CurrencyCode)} aria-label="Settings currency">
-                        {currencyOptions.map((option) => (
-                          <option value={option.code} key={option.code}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </article>
-
+              <div className="settingsRow">
                   <MonthlyReminderPanel
                     bankSlug={bankSlug}
                     onBankChange={setBankSlug}
@@ -5417,34 +5386,119 @@ function App() {
                     }}
                     onReminderAdded={(method) => track("reminder_added", { method })}
                   />
+              <article className="settingsPanel transferRulesPanel">
+                <PanelTitle title="Transfer rules" icon={<Repeat size={17} />} />
+                <p className="panelSubcopy">
+                  Money moving between your own accounts isn’t income or spending. Mark a payee as a transfer during import — or add one
+                  here — and it’s skipped on every future import and removed from your ledger.
+                </p>
+                <div className="transferRuleAdd">
+                  <input
+                    value={transferRuleInput}
+                    placeholder="Payee to treat as a transfer, e.g. Transfer to Savings"
+                    aria-label="Add a transfer payee"
+                    onChange={(event) => setTransferRuleInput(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") addTransferRule();
+                    }}
+                  />
+                  <button className="commandButton" type="button" onClick={addTransferRule}>
+                    <Plus size={16} />
+                    Add
+                  </button>
+                </div>
+                {transferRules.length ? (
+                  <ShowMoreList
+                    items={[...transferRules].sort((a, b) => b.createdAt.localeCompare(a.createdAt))}
+                    renderItem={(rule) => (
+                      <li key={rule.id}>
+                        <span>{rule.pattern}</span>
+                        <button
+                          className="iconButton"
+                          type="button"
+                          aria-label={`Remove transfer rule ${rule.pattern}`}
+                          onClick={() => removeTransferRule(rule.id)}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </li>
+                    )}
+                  />
+                ) : (
+                  <p className="transferRuleEmpty">
+                    No transfer rules yet. Set a transaction’s type to “Transfer” during import, or add a payee above.
+                  </p>
+                )}
+              </article>
+              </div>
 
-                  <article className="settingsPanel compactSetting">
-                    <PanelTitle title="Sidebar" icon={<SlidersHorizontal size={17} />} />
-                    <p>Choose the pages you use. Hidden ones wait under More tools. Ledger and Settings always stay.</p>
-                    <ul className="sidebarToolsList">
-                      {[...coreNavItems.map((item) => item.id).filter(canHide), ...TOOL_VIEWS].map((view) => {
-                        const shown = inSidebar(view);
-                        const { label } = navEntry(view);
-                        return (
-                          <li key={view}>
-                            <span>{label}</span>
-                            <button
-                              className={shown ? "switch on" : "switch"}
-                              type="button"
-                              role="switch"
-                              aria-checked={shown}
-                              aria-label={`Show ${label} in sidebar`}
-                              onClick={() => setSidebarItem(view, !shown)}
-                            >
-                              <span />
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </article>
-                </aside>
-              </section>
+              <div className="settingsRow">
+              <article className="settingsPanel learnedRulesPanel">
+                <PanelTitle title="Learned category rules" icon={<GraduationCap size={17} />} />
+                <p className="panelSubcopy">
+                  Created automatically when you correct an imported transaction — future imports matching the pattern get the
+                  category instantly. Delete any rule that misfires; the next correction re-learns it.
+                </p>
+                {learnedRules.length ? (
+                  <ShowMoreList
+                    items={learnedRules}
+                    renderItem={({ rule, matches }) => (
+                      <li key={rule.id}>
+                        <code>{rule.pattern}</code>
+                        <span className="learnedRuleTarget">
+                          → {rule.category}
+                          {rule.kind === "debt-payment" ? " (debt payment)" : rule.kind === "income" ? " (income)" : ""}
+                        </span>
+                        <em className="learnedRuleMatches">
+                          {matches} match{matches === 1 ? "" : "es"}
+                        </em>
+                        <button
+                          className="iconButton"
+                          type="button"
+                          aria-label={`Remove rule ${rule.pattern}`}
+                          onClick={() => removeCategoryRule(rule.id)}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </li>
+                    )}
+                  />
+                ) : (
+                  <p className="transferRuleEmpty">No learned rules yet — correct a category on an imported transaction to create one.</p>
+                )}
+              </article>
+              <article className="settingsPanel learnedRulesPanel">
+                <PanelTitle title="Rename rules" icon={<PenLine size={17} />} />
+                <p className="panelSubcopy">
+                  Created when you rename a transaction and choose “Rename all”. Future imports with the old name arrive with your
+                  name instead. Renaming again updates the rule.
+                </p>
+                {ledger.nameRules.length ? (
+                  <ShowMoreList
+                    items={ledger.nameRules}
+                    renderItem={(rule) => (
+                      <li key={rule.id}>
+                        <code>{rule.from}</code>
+                        <span className="learnedRuleTarget">
+                          → {rule.to}
+                          {rule.kind === "income" ? " (income)" : ""}
+                        </span>
+                        <button
+                          className="iconButton"
+                          type="button"
+                          aria-label={`Remove rename rule ${rule.from}`}
+                          onClick={() => removeNameRule(rule.id)}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </li>
+                    )}
+                  />
+                ) : (
+                  <p className="transferRuleEmpty">No rename rules yet — rename a transaction that shares its name with others to create one.</p>
+                )}
+              </article>
+              </div>
 
               {isFeedsEnabled() && feedsReady && (
                 <article className="settingsPanel bankFeedsPanel">
@@ -5507,120 +5561,69 @@ function App() {
                 </article>
               )}
 
-              <article className="settingsPanel transferRulesPanel">
-                <PanelTitle title="Transfer rules" icon={<Repeat size={17} />} />
-                <p className="panelSubcopy">
-                  Money moving between your own accounts isn’t income or spending. Mark a payee as a transfer during import — or add one
-                  here — and it’s skipped on every future import and removed from your ledger.
-                </p>
-                <div className="transferRuleAdd">
-                  <input
-                    value={transferRuleInput}
-                    placeholder="Payee to treat as a transfer, e.g. Transfer to Savings"
-                    aria-label="Add a transfer payee"
-                    onChange={(event) => setTransferRuleInput(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") addTransferRule();
-                    }}
-                  />
-                  <button className="commandButton" type="button" onClick={addTransferRule}>
-                    <Plus size={16} />
-                    Add
-                  </button>
-                </div>
-                {transferRules.length ? (
-                  <ShowMoreList
-                    items={[...transferRules].sort((a, b) => b.createdAt.localeCompare(a.createdAt))}
-                    renderItem={(rule) => (
-                      <li key={rule.id}>
-                        <span>{rule.pattern}</span>
-                        <button
-                          className="iconButton"
-                          type="button"
-                          aria-label={`Remove transfer rule ${rule.pattern}`}
-                          onClick={() => removeTransferRule(rule.id)}
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </li>
-                    )}
-                  />
-                ) : (
-                  <p className="transferRuleEmpty">
-                    No transfer rules yet. Set a transaction’s type to “Transfer” during import, or add a payee above.
-                  </p>
-                )}
-              </article>
+                <article className="settingsPanel appearancePanel">
+                  <PanelTitle title="Appearance" icon={<Palette size={17} />} />
+                  <p className="settingsHint">The colour your app sits on. Saved on this device, like light and dark mode.</p>
+                  <FramePicker hue={frameHue} grain={frameGrain} theme={theme} onHue={setFrameHue} onGrain={setFrameGrain} />
+                </article>
 
-              <article className="settingsPanel learnedRulesPanel">
-                <PanelTitle title="Learned category rules" icon={<GraduationCap size={17} />} />
-                <p className="panelSubcopy">
-                  Created automatically when you correct an imported transaction — future imports matching the pattern get the
-                  category instantly. Delete any rule that misfires; the next correction re-learns it.
-                </p>
-                {learnedRules.length ? (
-                  <ShowMoreList
-                    items={learnedRules}
-                    renderItem={({ rule, matches }) => (
-                      <li key={rule.id}>
-                        <code>{rule.pattern}</code>
-                        <span className="learnedRuleTarget">
-                          → {rule.category}
-                          {rule.kind === "debt-payment" ? " (debt payment)" : rule.kind === "income" ? " (income)" : ""}
-                        </span>
-                        <em className="learnedRuleMatches">
-                          {matches} match{matches === 1 ? "" : "es"}
-                        </em>
-                        <button
-                          className="iconButton"
-                          type="button"
-                          aria-label={`Remove rule ${rule.pattern}`}
-                          onClick={() => removeCategoryRule(rule.id)}
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </li>
-                    )}
-                  />
-                ) : (
-                  <p className="transferRuleEmpty">No learned rules yet — correct a category on an imported transaction to create one.</p>
-                )}
-              </article>
-
-              <article className="settingsPanel learnedRulesPanel">
-                <PanelTitle title="Rename rules" icon={<PenLine size={17} />} />
-                <p className="panelSubcopy">
-                  Created when you rename a transaction and choose “Rename all”. Future imports with the old name arrive with your
-                  name instead. Renaming again updates the rule.
-                </p>
-                {ledger.nameRules.length ? (
-                  <ShowMoreList
-                    items={ledger.nameRules}
-                    renderItem={(rule) => (
-                      <li key={rule.id}>
-                        <code>{rule.from}</code>
-                        <span className="learnedRuleTarget">
-                          → {rule.to}
-                          {rule.kind === "income" ? " (income)" : ""}
-                        </span>
-                        <button
-                          className="iconButton"
-                          type="button"
-                          aria-label={`Remove rename rule ${rule.from}`}
-                          onClick={() => removeNameRule(rule.id)}
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </li>
-                    )}
-                  />
-                ) : (
-                  <p className="transferRuleEmpty">No rename rules yet — rename a transaction that shares its name with others to create one.</p>
-                )}
-              </article>
+              <div className="settingsRow">
+                  <article className="settingsPanel compactSetting">
+                    <PanelTitle title="Country & currency" icon={<WalletCards size={17} />} />
+                    <p>
+                      {region === "US"
+                        ? "US accounts, tax tools and spelling are on. Currency only changes the symbol."
+                        : "Country picks the account types, tools and spelling; the United States has its own experience. Currency only changes the symbol."}
+                    </p>
+                    <label className="selectField">
+                      <select value={ledger.country} onChange={(event) => changeCountry(event.target.value as CountryCode)} aria-label="Settings country">
+                        {countryOptions.map((option) => (
+                          <option value={option.code} key={option.code}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="selectField">
+                      <select value={ledger.currency} onChange={(event) => changeCurrency(event.target.value as CurrencyCode)} aria-label="Settings currency">
+                        {currencyOptions.map((option) => (
+                          <option value={option.code} key={option.code}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </article>
+                  <article className="settingsPanel compactSetting">
+                    <PanelTitle title="Sidebar" icon={<SlidersHorizontal size={17} />} />
+                    <p>Choose the pages you use. Hidden ones wait under More tools. Ledger and Settings always stay.</p>
+                    <ul className="sidebarToolsList">
+                      {[...coreNavItems.map((item) => item.id).filter(canHide), ...TOOL_VIEWS].map((view) => {
+                        const shown = inSidebar(view);
+                        const { label } = navEntry(view);
+                        return (
+                          <li key={view}>
+                            <span>{label}</span>
+                            <button
+                              className={shown ? "switch on" : "switch"}
+                              type="button"
+                              role="switch"
+                              aria-checked={shown}
+                              aria-label={`Show ${label} in sidebar`}
+                              onClick={() => setSidebarItem(view, !shown)}
+                            >
+                              <span />
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </article>
+              </div>
 
               <FinancialGlossary />
 
+              <div className="settingsRow">
               <article className="dangerPanel">
                 <div>
                   <h3>Danger Zone</h3>
@@ -5630,7 +5633,6 @@ function App() {
                   Clear selected month
                 </button>
               </article>
-
               <article className="dangerPanel">
                 <div>
                   <h3>Clear all data</h3>
@@ -5655,6 +5657,7 @@ function App() {
                   </button>
                 )}
               </article>
+              </div>
             </section>
           )}
         </main>
