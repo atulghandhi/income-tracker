@@ -11,6 +11,7 @@
 // browser user agent, the page path, the referring site's domain and any utm_* tags.
 
 import { UI_VERSION } from "./uiVersion.mjs";
+import { scrubErrorMessage } from "./errorScrub";
 
 export { UI_VERSION };
 
@@ -64,6 +65,7 @@ export type AnalyticsEvent =
   | "landing_cta" // { cta: "hero"|"nav"|"skip"|"closing", region } — a button that opens the app
   | "landing_link" // { area: "nav"|"banks"|"resources"|"faq"|"privacy"|"footer"|..., dest } — a link to a static page
   | "landing_section_seen" // { section, region } — how far down the homepage people get, once per section per visit
+  | "client_error" // { kind: "error"|"rejection", message, file, line } — an uncaught error in the browser (scrubbed)
 
 
 let identifiedUserId: string | null = null;
@@ -156,6 +158,31 @@ function anonymousId(): string {
   } catch {
     return "anon-ephemeral";
   }
+}
+
+// Uncaught errors in the browser. The app runs entirely client-side, so without this a crash
+// on someone's device leaves no trace anywhere (Vercel only logs server functions). Messages
+// are scrubbed before sending: digits, emails and anything quoted are masked, so a value
+// from someone's ledger can never ride along. At most five reports per page load, each
+// distinct message once.
+let errorTrackingInstalled = false;
+export function installErrorTracking() {
+  if (errorTrackingInstalled || typeof window === "undefined") return;
+  errorTrackingInstalled = true;
+  const seen = new Set<string>();
+  const report = (kind: "error" | "rejection", raw: unknown, filename?: string, line?: number) => {
+    const text = raw instanceof Error ? `${raw.name}: ${raw.message}` : String(raw ?? "");
+    // Browser extensions, cross-origin scripts and a benign layout warning are not ours.
+    if (!text || text === "Script error." || /ResizeObserver loop/.test(text)) return;
+    if (filename && !filename.startsWith(location.origin)) return;
+    const message = scrubErrorMessage(text);
+    if (seen.has(message) || seen.size >= 5) return;
+    seen.add(message);
+    const file = filename ? filename.split("/").pop()?.split("?")[0] ?? "" : "";
+    track("client_error", { kind, message, file, line: line ?? 0 });
+  };
+  window.addEventListener("error", (event) => report("error", event.error ?? event.message, event.filename, event.lineno));
+  window.addEventListener("unhandledrejection", (event) => report("rejection", event.reason));
 }
 
 // Bucket helper so row counts stay coarse (no exact financial footprints).

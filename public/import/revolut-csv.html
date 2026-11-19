@@ -609,6 +609,12 @@ window.va=window.va||function(){(window.vaq=window.vaq||[]).push(arguments)};
     try{fetch(PH_HOST+"/capture/",{method:"POST",keepalive:true,headers:{"content-type":"application/json"},body:JSON.stringify({api_key:PH_KEY,event:name,distinct_id:id(),properties:Object.assign(ctx(),{app:"income-tracker-web",surface:"static",ui:UI},props),timestamp:new Date().toISOString()})}).catch(function(){});}catch(e){}
   }
   window.itTrack=track;
+  // Uncaught errors on this page (same scrubbing and cap as src/analytics.ts).
+  var errSeen={},errCount=0;
+  function scrub(m){return String(m).replace(/[\w.+-]+@[\w-]+\.[\w.]+/g,"<email>").replace(/(["'])(?:(?!\1).){1,200}\1/g,"<text>").replace(/\d+(?:[.,]\d+)*/g,"#").slice(0,160);}
+  function reportError(kind,raw,file,line){try{var t=raw&&raw.message?(raw.name+": "+raw.message):String(raw||"");if(!t||t==="Script error."||/ResizeObserver loop/.test(t))return;if(file&&file.indexOf(location.origin)!==0)return;var m=scrub(t);if(errSeen[m]||errCount>=5)return;errSeen[m]=1;errCount++;track("client_error",{kind:kind,message:m,file:file?String(file).split("/").pop().split("?")[0]:"",line:line||0});}catch(e){}}
+  window.addEventListener("error",function(e){reportError("error",e.error||e.message,e.filename,e.lineno);});
+  window.addEventListener("unhandledrejection",function(e){reportError("rejection",e.reason);});
   document.addEventListener("click",function(ev){
     var t=ev.target;if(!t||!t.closest)return;var el=t.closest("[data-track]");if(!el)return;
     track(el.getAttribute("data-track"),{ref:el.getAttribute("data-ref")||"",href:el.getAttribute("href")||""});
