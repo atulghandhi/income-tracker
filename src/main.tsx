@@ -2,10 +2,12 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { injectSpeedInsights } from "@vercel/speed-insights";
 import App from "./App";
+import { installErrorTracking } from "./analytics";
 import "./styles.css";
 import "./frame.css";
 
 injectSpeedInsights();
+installErrorTracking();
 
 // Installable, offline-capable shell. Production only: the dev server and the
 // Playwright runs should never be served from a cache.

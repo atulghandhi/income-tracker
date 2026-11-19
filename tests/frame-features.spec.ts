@@ -3,6 +3,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { UI_VERSION } from "../src/uiVersion.mjs";
 import { buildIncomeGroups } from "../src/ledgerGroups";
 import { buildCsvExport } from "../src/finance";
+import { scrubErrorMessage } from "../src/errorScrub";
 import type { IncomeEntry, LedgerState } from "../src/types";
 
 // The frame-and-canvas release: drop-anywhere import, undo, the transaction peek and the
@@ -285,5 +286,18 @@ test.describe("Analytics context", () => {
     expect(html).toContain(`UI=${JSON.stringify(UI_VERSION)}`);
     expect(html).toContain("o.$raw_user_agent=navigator.userAgent");
     expect(html).toContain("o.section=");
+  });
+
+  test("static pages report uncaught errors, scrubbed", () => {
+    const html = readFileSync(new URL("../public/tools/budget-planner-uk.html", import.meta.url), "utf8");
+    expect(html).toContain('track("client_error"');
+    expect(html).toContain('addEventListener("unhandledrejection"');
+  });
+
+  test("error messages lose emails, quoted values and numbers before they are sent", () => {
+    expect(scrubErrorMessage(`TypeError: Cannot read "Tesco Extra" of undefined at row 42 for jo@example.com (£1,234.56)`)).toBe(
+      "TypeError: Cannot read <text> of undefined at row # for <email> (£#)",
+    );
+    expect(scrubErrorMessage("x".repeat(400))).toHaveLength(160);
   });
 });
