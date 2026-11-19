@@ -2,8 +2,14 @@ import { FinancialGlossary } from "./FinancialGlossary";
 import { TutorialOverlay } from "./GuidedTour";
 import { DashboardExportControls } from "./DashboardExportControls";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { Analytics } from "@vercel/analytics/react";
+import { applyFrame, readStoredGrain, readStoredHue, storeFrame } from "./frame";
 import LandingPage from "./LandingPage";
+import FramePicker from "./FramePicker";
+import CommandPalette, { type PaletteItem } from "./CommandPalette";
+import TransactionPeek, { type PeekTarget } from "./TransactionPeek";
+import { isApple, matchShortcut, SHORTCUTS } from "./shortcuts";
 import { hashRequestsHandoff, takeHandoffFile } from "./handoff";
 import Onboarding, { type OnboardingResult } from "./Onboarding";
 import type { CSSProperties, Dispatch, DragEvent, FormEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode, Ref, SetStateAction } from "react";
@@ -60,6 +66,12 @@ import {
   X,
   Upload,
   WalletCards,
+  Palette,
+  PanelLeftClose,
+  PanelLeftOpen,
+  CalendarDays,
+  Tag,
+  PanelRight,
 } from "lucide-react";
 import {
   isDebtClass,
@@ -211,7 +223,7 @@ import { chooseLandingRegion, initialCountry, isLandingPath, LANDING_COPY } from
 import { buildSampleLedger, sampleCountry } from "./sampleData";
 import { WidgetGrid, type WidgetRenderer } from "./WidgetGrid";
 import { INSIGHT_WIDGET_SPECS, InsightWidgetCard } from "./InsightWidgetCard";
-import { buildCategoryRows, buildExpenseGroups, buildMonthlyBars, categoryColor, categoryEmoji } from "./ledgerGroups";
+import { buildCategoryRows, buildExpenseGroups, buildIncomeGroups, buildMonthlyBars, categoryColor, categoryEmoji } from "./ledgerGroups";
 import { buildInsightsModel, visibleSignals } from "./insightsData";
 import { normalizeInsightsState, setWidgetVariant } from "./insightsState";
 import type { WidgetActions } from "./insightWidgets";
@@ -792,6 +804,27 @@ function App() {
   const [activeView, setActiveViewState] = useState<AppView>(() => viewFromPath(window.location.pathname) ?? DEFAULT_VIEW);
   const [layoutEditing, setLayoutEditing] = useState<LayoutPage | null>(null);
   const [theme, setTheme] = useState<ThemeMode>(readStoredTheme);
+  const [frameHue, setFrameHue] = useState<number>(readStoredHue);
+  const [frameGrain, setFrameGrain] = useState<number>(readStoredGrain);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [peek, setPeek] = useState<PeekTarget | null>(null);
+  // Import moment: a statement dragged anywhere over the app, and the rows of a fresh import
+  // arriving one after another. Runs once per import; Esc or a click settles it at once.
+  const [fileDrag, setFileDrag] = useState(false);
+  const [arrivingBatch, setArrivingBatch] = useState<string | null>(null);
+  const peekOriginRef = useRef<HTMLElement | null>(null);
+  // One-step undo for reversible changes. The ledger before the change is kept; the offer
+  // lasts while its toast shows, and lapses the moment anything else changes the ledger, so
+  // undoing never throws away a later edit.
+  const [undoOffer, setUndoOffer] = useState<{ before: LedgerState; after: LedgerState | null; label: string; stamp: number } | null>(null);
+  // Focus mode: the sidebar steps aside on wide screens. Remembered per device.
+  const [focusMode, setFocusMode] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("it_focus") === "1";
+    } catch {
+      return false;
+    }
+  });
   const [tutorialView, setTutorialView] = useState<AppView | null>(null);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [confirmClearAll, setConfirmClearAll] = useState(false);
@@ -855,7 +888,7 @@ function App() {
   const [dropPreview, setDropPreview] = useState<ExpenseDropPreview>(null);
   const [incomeSort, setIncomeSort] = useState<IncomeSortMode>(readStoredIncomeSort);
   const [draggingIncomeId, setDraggingIncomeId] = useState<string | null>(null);
-  const [incomeDropPreview, setIncomeDropPreview] = useState<{ targetId: string; edge: "before" | "after" } | null>(null);
+  const [incomeDropPreview, setIncomeDropPreview] = useState<ExpenseDropPreview>(null);
   const [categoryMenu, setCategoryMenu] = useState<CategoryMenuState | null>(null);
   const [renamePrompt, setRenamePrompt] = useState<RenamePrompt | null>(null);
   const [importReview, setImportReview] = useState<ImportReviewState | null>(null);
@@ -1013,7 +1046,7 @@ function App() {
   const visibleIncomes = useMemo(() => {
     const ordered = orderIncomes(currentMonth.incomes, incomeSort);
     if (!normalizedQuery) return ordered;
-    return ordered.filter((income) => income.source.toLowerCase().includes(normalizedQuery));
+    return ordered.filter((income) => income.source.toLowerCase().includes(normalizedQuery) || (income.category ?? "").toLowerCase().includes(normalizedQuery));
   }, [currentMonth.incomes, incomeSort, normalizedQuery]);
   const visibleExpenseGroups = useMemo(() => {
     if (!normalizedQuery) return expenseGroups;
@@ -1544,6 +1577,20 @@ function App() {
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#051424" : "#eef1f8");
   }, [theme]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem("it_focus", focusMode ? "1" : "0");
+    } catch {
+      // Not remembered; it still works for this visit.
+    }
+  }, [focusMode]);
+
+  // The frame follows the theme and the person's hue. Stored per device, like the theme.
+  useEffect(() => {
+    applyFrame(frameHue, theme, frameGrain);
+    storeFrame(frameHue, frameGrain);
+  }, [theme, frameHue, frameGrain]);
+
   // Static content pages (guides, tools, privacy) link "Contact us" to /#feedback and tag their
   // CTAs with /#ref=<page>. Fragments, not query strings: every /?ref=… was a separate URL to a
   // crawler, each carrying the homepage title, and Bing reported them as duplicate pages. The old
@@ -1791,6 +1838,90 @@ function App() {
     if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
     toastTimerRef.current = window.setTimeout(() => setToastVisible(false), 3200);
   }, [toast]);
+
+  // Drop a statement anywhere on the app. Only file drags count: rows dragged between
+  // categories carry text, not files, and keep their own handling. File drags are caught on
+  // the way down (capture phase), so a statement dropped on a row or a category group imports
+  // instead of being swallowed by that row's own drop handler.
+  // The listener is set up once, so it calls the latest importStatementFile through a ref:
+  // the review must check duplicates and rules against today's ledger, not the one at mount.
+  const importFileRef = useRef(importStatementFile);
+  importFileRef.current = importStatementFile;
+  useEffect(() => {
+    if (showLanding) return;
+    let depth = 0;
+    const hasFiles = (event: globalThis.DragEvent) => Array.from(event.dataTransfer?.types ?? []).includes("Files");
+    function onEnter(event: globalThis.DragEvent) {
+      if (!hasFiles(event)) return;
+      depth += 1;
+      setFileDrag(true);
+    }
+    function onOver(event: globalThis.DragEvent) {
+      if (!hasFiles(event)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+    }
+    function onLeave(event: globalThis.DragEvent) {
+      if (!hasFiles(event)) return;
+      depth = Math.max(0, depth - 1);
+      if (depth === 0) setFileDrag(false);
+    }
+    function onDrop(event: globalThis.DragEvent) {
+      if (!hasFiles(event)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      depth = 0;
+      setFileDrag(false);
+      const file = event.dataTransfer?.files?.[0];
+      if (file) {
+        track("statement_dropped", {});
+        void importFileRef.current(file);
+      }
+    }
+    window.addEventListener("dragenter", onEnter, true);
+    window.addEventListener("dragover", onOver, true);
+    window.addEventListener("dragleave", onLeave, true);
+    window.addEventListener("drop", onDrop, true);
+    return () => {
+      window.removeEventListener("dragenter", onEnter, true);
+      window.removeEventListener("dragover", onOver, true);
+      window.removeEventListener("dragleave", onLeave, true);
+      window.removeEventListener("drop", onDrop, true);
+    };
+  }, [showLanding]);
+
+  useEffect(() => {
+    if (!arrivingBatch) return;
+    const settle = () => setArrivingBatch(null);
+    const timer = window.setTimeout(settle, 2600);
+    const onKey = (event: globalThis.KeyboardEvent) => event.key === "Escape" && settle();
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("pointerdown", settle);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("pointerdown", settle);
+    };
+  }, [arrivingBatch]);
+
+  // The first ledger change after offerUndo() is the action itself; any change after that
+  // withdraws the offer. An offer with no change behind it lapses rather than catching a later edit.
+  const toastNowRef = useRef(toast);
+  toastNowRef.current = toast;
+  useEffect(() => {
+    setUndoOffer((offer) => {
+      if (!offer) return offer;
+      if (offer.after === null) return Date.now() - offer.stamp < 800 ? { ...offer, after: ledger, label: toastNowRef.current } : null;
+      return offer.after === ledger ? offer : null;
+    });
+  }, [ledger]);
+
+  useEffect(() => {
+    if (!undoOffer?.after) return;
+    const timer = window.setTimeout(() => setUndoOffer(null), 7000);
+    return () => window.clearTimeout(timer);
+  }, [undoOffer?.stamp, undoOffer?.after]);
 
   useEffect(() => {
     if (!accountToast) return;
@@ -2068,6 +2199,7 @@ function App() {
   }
 
   function confirmRenameAll(prompt: RenamePrompt) {
+    offerUndo();
     const preview = renameEverywhere(ledger, prompt.kind, prompt.from, prompt.to);
     updateLedger((current) => renameEverywhere(current, prompt.kind, prompt.from, prompt.to).state);
     setRenamePrompt(null);
@@ -2080,12 +2212,97 @@ function App() {
     track("rename_all", { renamed: bucketCount(preview.renamed) });
   }
 
+  function offerUndo() {
+    setUndoOffer({ before: ledger, after: null, label: "", stamp: Date.now() });
+  }
+
+  function performUndo() {
+    if (!undoOffer?.after) return;
+    const { before, label } = undoOffer;
+    setUndoOffer(null);
+    setLedger({ ...before, lastSavedAt: new Date().toISOString() });
+    setToast(label ? `Undone: ${label.charAt(0).toLowerCase()}${label.slice(1)}` : "Undone");
+    track("undo_used", {});
+  }
+
+  // Peeks grow out of the row that opened them and shrink back into it (view transitions;
+  // a plain swap where unsupported or under reduced motion).
+  function withTransition(origin: HTMLElement | null, update: () => void) {
+    const doc = document as Document & { startViewTransition?: (cb: () => void) => { finished: Promise<void> } };
+    const calm = !animationsEnabled || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!doc.startViewTransition || calm) {
+      flushSync(update);
+      return;
+    }
+    if (origin) origin.style.viewTransitionName = "peek";
+    const transition = doc.startViewTransition(() => {
+      if (origin) origin.style.viewTransitionName = "";
+      flushSync(update);
+    });
+    transition.finished.finally(() => {
+      if (origin) origin.style.viewTransitionName = "";
+    });
+  }
+
+  // `trigger` is what gets focus back on close; the row around it is where the peek grows from.
+  const peekVisual = (trigger: HTMLElement | null) => trigger?.closest<HTMLElement>(".financeRow") ?? trigger;
+
+  function openPeek(target: PeekTarget, trigger: HTMLElement | null) {
+    peekOriginRef.current = trigger;
+    withTransition(peekVisual(trigger), () => setPeek(target));
+    track("peek_opened", { kind: target.kind });
+  }
+
+  function closePeek() {
+    const trigger = peekOriginRef.current && document.contains(peekOriginRef.current) ? peekOriginRef.current : null;
+    const origin = peekVisual(trigger);
+    const doc = document as Document & { startViewTransition?: (cb: () => void) => { finished: Promise<void> } };
+    const calm = !animationsEnabled || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!doc.startViewTransition || calm || !origin) {
+      setPeek(null);
+      // Opened from the command bar there is no row to go back to: the command bar's button is
+      // the nearest thing to where the person came from, else the ledger search.
+      const visible = (el: HTMLElement | null) => (el && el.offsetParent !== null ? el : null);
+      (trigger ?? visible(document.querySelector<HTMLElement>(".paletteButton")) ?? visible(document.querySelector<HTMLElement>(".searchShell input")))?.focus();
+      return;
+    }
+    const transition = doc.startViewTransition(() => {
+      flushSync(() => setPeek(null));
+      origin.style.viewTransitionName = "peek";
+    });
+    transition.finished.finally(() => {
+      origin.style.viewTransitionName = "";
+      trigger?.focus();
+    });
+  }
+
+  // "Show in ledger": the peek closes and the row it describes is brought into view.
+  function promotePeek() {
+    if (!peek) return;
+    const target = peek;
+    track("peek_promoted", { kind: target.kind });
+    setPeek(null);
+    setQuery("");
+    updateLedger((current) => (current.months[target.monthKey] ? { ...current, selectedMonth: target.monthKey } : current));
+    setActiveView("ledger");
+    window.setTimeout(() => {
+      const row = document.querySelector<HTMLElement>(target.kind === "income" ? `[data-income-id="${target.id}"]` : `[data-expense-id="${target.id}"]`);
+      if (!row) return;
+      row.scrollIntoView({ block: "center", behavior: animationsEnabled ? "smooth" : "auto" });
+      row.classList.add("rowFlash");
+      row.querySelector<HTMLInputElement>("input")?.focus({ preventScroll: true });
+      window.setTimeout(() => row.classList.remove("rowFlash"), 1400);
+    }, 60);
+  }
+
   function removeNameRule(id: string) {
+    offerUndo();
     updateLedger((current) => ({ ...current, nameRules: current.nameRules.filter((rule) => rule.id !== id) }));
     setToast("Rename rule removed — new imports keep their bank name");
   }
 
   function removeIncome(id: string) {
+    offerUndo();
     const entry = currentMonth.incomes.find((income) => income.id === id);
     updateLedger((current) => stopSeededRepeat(current, entry?.seededFrom, "income"));
     updateCurrentMonth((month) => ({
@@ -2096,6 +2313,7 @@ function App() {
   }
 
   function removeExpense(id: string) {
+    offerUndo();
     const entry = currentMonth.expenses.find((expense) => expense.id === id);
     if (entry?.scheduledPayment && entry.debtAccountId) {
       // A planned debt payment comes from the account, not from last month's row. Removing it
@@ -2203,6 +2421,7 @@ function App() {
   }
 
   function removeAccount(id: string) {
+    offerUndo();
     updateLedger((current) => ({
       ...current,
       accounts: current.accounts.filter((account) => account.id !== id),
@@ -2271,6 +2490,7 @@ function App() {
   }
 
   function removeGoal(id: string) {
+    offerUndo();
     updateLedger((current) => ({
       ...current,
       goals: current.goals.filter((g) => g.id !== id).map((g, i) => ({ ...g, priority: i + 1 })),
@@ -2362,10 +2582,23 @@ function App() {
 
   // Dragging while an automatic order is showing adopts what's on screen as the
   // custom order first, so the row lands where it was dropped and stays there.
+  // Dropping next to a row also adopts that row's group, as expenses do: dragging a grouped
+  // income beside an ungrouped one takes it out of its group.
   function reorderIncome(sourceId: string, targetId: string, edge: "before" | "after") {
     if (sourceId === targetId) return;
-    updateCurrentMonth((month) => ({ ...month, incomes: moveEntry(orderIncomes(month.incomes, incomeSort), sourceId, targetId, edge) }));
-    setToast(incomeSort === "custom" ? "Income reordered" : "Income reordered · now using your order");
+    let leftGroup = false;
+    updateCurrentMonth((month) => {
+      const ordered = orderIncomes(month.incomes, incomeSort);
+      const target = ordered.find((income) => income.id === targetId);
+      const targetCategory = (target?.category ?? "").trim();
+      const adjusted = ordered.map((income) => {
+        if (income.id !== sourceId || (income.category ?? "").trim() === targetCategory) return income;
+        leftGroup = !targetCategory;
+        return { ...income, category: targetCategory || undefined, color: targetCategory && target ? target.color : income.color };
+      });
+      return { ...month, incomes: moveEntry(adjusted, sourceId, targetId, edge) };
+    });
+    setToast(leftGroup ? "Removed from category" : incomeSort === "custom" ? "Income reordered" : "Income reordered · now using your order");
     setIncomeSort("custom");
   }
 
@@ -2378,6 +2611,9 @@ function App() {
     requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-income-id="${id}"] .dragHandle`)?.focus());
   }
 
+  // Income drops work like expense drops: onto a grouped row joins its group, onto the middle
+  // of an ungrouped row makes a new group of the two, and near a row's top or bottom edge
+  // reorders. Only income drags count (their own MIME type), so expenses never land here.
   function previewIncomeDrop(event: DragEvent<HTMLDivElement>, target: IncomeEntry) {
     if (!draggingIncomeId) return;
     event.preventDefault();
@@ -2387,16 +2623,102 @@ function App() {
       setIncomeDropPreview(null);
       return;
     }
+    const targetCategory = (target.category ?? "").trim();
+    if (targetCategory) {
+      setIncomeDropPreview((current) => (current?.type === "category" && current.category === targetCategory ? current : { type: "category", category: targetCategory }));
+      return;
+    }
     const rect = event.currentTarget.getBoundingClientRect();
-    const edge = event.clientY - rect.top < rect.height / 2 ? "before" : "after";
-    setIncomeDropPreview((current) => (current?.targetId === target.id && current.edge === edge ? current : { targetId: target.id, edge }));
+    const y = event.clientY - rect.top;
+    const band = Math.max(16, rect.height * 0.28);
+    const next: ExpenseDropPreview =
+      y <= band ? { type: "reorder", targetId: target.id, edge: "before" } : y >= rect.height - band ? { type: "reorder", targetId: target.id, edge: "after" } : { type: "combine", targetId: target.id };
+    setIncomeDropPreview((current) => (JSON.stringify(current) === JSON.stringify(next) ? current : next));
+  }
+
+  function previewIncomeCategoryDrop(event: DragEvent<HTMLDivElement>, category: string) {
+    if (!draggingIncomeId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = "move";
+    setIncomeDropPreview((current) => (current?.type === "category" && current.category === category ? current : { type: "category", category }));
   }
 
   function dropOnIncome(target: IncomeEntry) {
-    if (draggingIncomeId && incomeDropPreview?.targetId === target.id) {
-      reorderIncome(draggingIncomeId, target.id, incomeDropPreview.edge);
+    const sourceId = draggingIncomeId;
+    const preview = incomeDropPreview;
+    if (sourceId && preview && sourceId !== target.id) {
+      if (preview.type === "reorder" && preview.targetId === target.id) reorderIncome(sourceId, target.id, preview.edge);
+      else if (preview.type === "combine" && preview.targetId === target.id) groupIncomes(sourceId, target.id);
+      else if (preview.type === "category") moveIncomeToCategory(sourceId, preview.category);
     }
     clearIncomeDragState();
+  }
+
+  function dropOnIncomeCategory(category: string) {
+    if (draggingIncomeId) moveIncomeToCategory(draggingIncomeId, category);
+    clearIncomeDragState();
+  }
+
+  // Two ungrouped incomes dropped together become a new group (or join the one either is in).
+  function groupIncomes(sourceId: string, targetId: string) {
+    if (sourceId === targetId) return;
+    updateCurrentMonth((month) => {
+      const source = month.incomes.find((income) => income.id === sourceId);
+      const target = month.incomes.find((income) => income.id === targetId);
+      if (!source || !target) return month;
+      const targetCategory = (target.category ?? "").trim();
+      const sourceCategory = (source.category ?? "").trim();
+      const category = targetCategory || sourceCategory || nextCategoryName(month.incomes);
+      const color = targetCategory ? target.color : sourceCategory ? source.color : randomCategoryColor(month.incomes);
+      return {
+        ...month,
+        incomes: month.incomes.map((income) => (income.id === sourceId || income.id === targetId ? { ...income, category, color } : income)),
+      };
+    });
+    setToast("Category created");
+    track("income_grouped", { action: "create" });
+  }
+
+  function moveIncomeToCategory(sourceId: string, category: string) {
+    updateCurrentMonth((month) => {
+      const source = month.incomes.find((income) => income.id === sourceId);
+      const anchor = month.incomes.find((income) => income.id !== sourceId && (income.category ?? "").trim() === category);
+      if (!source || !anchor || (source.category ?? "").trim() === category) return month;
+      const remaining = month.incomes.filter((income) => income.id !== sourceId);
+      const lastIndex = remaining.map((income) => (income.category ?? "").trim()).lastIndexOf(category);
+      const insertAt = lastIndex >= 0 ? lastIndex + 1 : remaining.length;
+      const moved = { ...source, category, color: anchor.color };
+      return { ...month, incomes: [...remaining.slice(0, insertAt), moved, ...remaining.slice(insertAt)] };
+    });
+    setToast("Moved into category");
+    track("income_grouped", { action: "join" });
+  }
+
+  function renameIncomeCategory(from: string, to: string) {
+    if (from === to) return;
+    updateCurrentMonth((month) => ({
+      ...month,
+      incomes: month.incomes.map((income) => ((income.category ?? "").trim() === from ? { ...income, category: to } : income)),
+    }));
+    setCollapsedCategories((current) => {
+      const key = `income:${from}`;
+      if (!current.has(key)) return current;
+      const next = new Set(current);
+      next.delete(key);
+      next.add(`income:${to}`);
+      return next;
+    });
+  }
+
+  function deleteIncomeCategory(category: string) {
+    offerUndo();
+    updateCurrentMonth((month) => ({
+      ...month,
+      incomes: month.incomes.map((income) => ((income.category ?? "").trim() === category ? { ...income, category: undefined } : income)),
+    }));
+    setIncomeDropPreview(null);
+    setToast("Category removed");
   }
 
   function clearIncomeDragState() {
@@ -2452,6 +2774,7 @@ function App() {
   }
 
   function deleteExpenseCategory(category: string) {
+    offerUndo();
     updateCurrentMonth((month) => ({
       ...month,
       expenses: month.expenses.map((expense) => (expense.category === category ? { ...expense, category: "" } : expense)),
@@ -2942,6 +3265,7 @@ function App() {
     const previewRules = upsertTransferRule(ledger.categoryRules, pattern, new Date().toISOString());
     const removed = sweepTransferEntries(ledger.months, previewRules).removed;
 
+    if (removed) offerUndo();
     updateLedger((current) => {
       const rules = upsertTransferRule(current.categoryRules, pattern, new Date().toISOString());
       const swept = sweepTransferEntries(current.months, rules);
@@ -2953,6 +3277,7 @@ function App() {
   }
 
   function removeTransferRule(id: string) {
+    offerUndo();
     updateLedger((current) => ({
       ...current,
       categoryRules: current.categoryRules.filter((rule) => rule.id !== id),
@@ -2961,6 +3286,7 @@ function App() {
   }
 
   function removeCategoryRule(id: string) {
+    offerUndo();
     updateLedger((current) => ({
       ...current,
       categoryRules: current.categoryRules.filter((rule) => rule.id !== id),
@@ -3110,6 +3436,7 @@ function App() {
     setImportReview(null);
     if (rowsToImport.length) {
       setLastImportAction({ batchId, fileName: importReview.fileName, importedRows: rowsToImport.length });
+      if (animationsEnabled && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) setArrivingBatch(batchId);
     }
     setActiveView("ledger");
 
@@ -3128,6 +3455,7 @@ function App() {
   }
 
   function resolveDuplicateGroup(group: DuplicateGroup, action: "merge" | "keep") {
+    offerUndo();
     updateLedger((current) => (action === "merge" ? mergeDuplicateGroup(current, group) : keepDuplicateGroupApart(current, group)));
     setToast(action === "merge" ? "Merged — counted once now" : "Kept both");
   }
@@ -3139,6 +3467,7 @@ function App() {
   }
 
   function resetMonth() {
+    offerUndo();
     updateCurrentMonth(() => ({ incomes: [], expenses: [], note: "" }));
     setToast("Month cleared");
   }
@@ -3234,40 +3563,43 @@ function App() {
 
   useEffect(() => {
     function handleGlobalShortcuts(event: globalThis.KeyboardEvent) {
-      const key = event.key.toLowerCase();
-      const isCommand = event.metaKey || event.ctrlKey;
       const isEditable = isEditableTarget(event.target);
+      const id = matchShortcut(event, isEditable);
 
-      if (isCommand && key === "k") {
+      if (id === "palette") {
+        event.preventDefault();
+        setPaletteOpen((open) => {
+          if (!open) track("palette_opened", {});
+          return !open;
+        });
+        return;
+      }
+      // While the command bar is open it owns the keyboard.
+      if (paletteOpen) return;
+
+      if (id === "undo" && undoOffer?.after) {
+        event.preventDefault();
+        performUndo();
+        return;
+      }
+      if (id === "focusMode") {
+        event.preventDefault();
+        setFocusMode((on) => !on);
+        return;
+      }
+      if (id === "search") {
         event.preventDefault();
         focusSearch();
         return;
       }
-
-      // Single-key shortcuts only fire with no modifier, so Cmd+C, Cmd+/ and the like stay the browser's.
-      const isPlainKey = !isEditable && !isCommand && !event.altKey;
-
-      if (isPlainKey && event.key === "/") {
-        event.preventDefault();
-        focusSearch();
-        return;
-      }
-
-      if ((isCommand && key === "n") || (isPlainKey && (key === "n" || key === "c"))) {
+      if (id === "newTransaction") {
         event.preventDefault();
         openNewTransaction();
         return;
       }
-
-      if (!isEditable && event.altKey && !event.metaKey && !event.ctrlKey && !event.shiftKey && event.key === "ArrowLeft") {
+      if (id === "prevMonth" || id === "nextMonth") {
         event.preventDefault();
-        changeMonth(-1);
-        return;
-      }
-
-      if (!isEditable && event.altKey && !event.metaKey && !event.ctrlKey && !event.shiftKey && event.key === "ArrowRight") {
-        event.preventDefault();
-        changeMonth(1);
+        changeMonth(id === "prevMonth" ? -1 : 1);
         return;
       }
 
@@ -3282,7 +3614,7 @@ function App() {
 
     window.addEventListener("keydown", handleGlobalShortcuts);
     return () => window.removeEventListener("keydown", handleGlobalShortcuts);
-  }, [categoryMenu, groupingSourceId, query]);
+  }, [categoryMenu, groupingSourceId, query, paletteOpen, undoOffer]);
 
   function changeLayout(page: LayoutPage, action: "move" | "resize" | "remove" | "add" | "reset", updater: (layout: PageLayout) => PageLayout) {
     updateLayout(page, updater);
@@ -3604,6 +3936,92 @@ function App() {
   const hiddenViews = toolPrefs.hidden ?? [];
   const inSidebar = (view: AppView) => (isToolView(view) ? toolPrefs.pinned.includes(view) : !(isHideableView(view) && hiddenViews.includes(view)));
   const navEntry = (view: AppView): NavEntry => (isToolView(view) ? toolNavItems[view] : coreNavItems.find((item) => item.id === view)!);
+  const isAppleDevice = isApple();
+
+  // A row's account dot only earns its place when the money moved through somewhere other
+  // than the usual account; otherwise it waits for hover (rows stay as calm as a list).
+  const usualAccountId = defaultAccountId(ledger);
+  const isUsualAccount = (accountId?: string) => !accountId || accountId === usualAccountId;
+
+  // Order in which a fresh import's rows arrive on screen.
+  const arrivalOrder = new Map<string, number>();
+  if (arrivingBatch) {
+    let order = 0;
+    for (const entry of [...currentMonth.incomes, ...currentMonth.expenses]) {
+      if (entry.imported?.batchId === arrivingBatch) arrivalOrder.set(entry.id, order++);
+    }
+  }
+
+  function goToMonth(monthKey: string) {
+    updateLedger((current) => (current.months[monthKey] ? { ...current, selectedMonth: monthKey } : current));
+    setActiveView("ledger");
+  }
+
+  // Everything the command bar lists before you type. Transactions are searched
+  // only once there is a query (paletteSearch below): there can be thousands.
+  function paletteItems(): PaletteItem[] {
+    const items: PaletteItem[] = [
+      { id: "act-new", group: "Actions", label: "New transaction", icon: <Plus size={16} />, shortcut: "newTransaction", keywords: "add expense income spend", run: openNewTransaction },
+      { id: "act-import", group: "Actions", label: "Import a bank statement", icon: <Upload size={16} />, keywords: "csv pdf ofx qif file upload", run: () => csvInputRef.current?.click() },
+      { id: "act-search", group: "Actions", label: "Search this month\u2019s ledger", icon: <Search size={16} />, shortcut: "search", run: focusSearch },
+      { id: "act-prev", group: "Actions", label: "Previous month", icon: <ChevronLeft size={16} />, shortcut: "prevMonth", run: () => { setActiveView("ledger"); changeMonth(-1); } },
+      { id: "act-next", group: "Actions", label: "Next month", icon: <ChevronRight size={16} />, shortcut: "nextMonth", run: () => { setActiveView("ledger"); changeMonth(1); } },
+      { id: "act-focus", group: "Actions", label: focusMode ? "Show sidebar" : "Hide sidebar (focus mode)", icon: focusMode ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />, shortcut: "focusMode", keywords: "focus distraction full width", run: () => setFocusMode((on) => !on) },
+      { id: "act-theme", group: "Actions", label: theme === "dark" ? "Switch to light mode" : "Switch to dark mode", icon: theme === "dark" ? <Sun size={16} /> : <Moon size={16} />, keywords: "theme appearance", run: () => setTheme((t) => (t === "dark" ? "light" : "dark")) },
+      { id: "act-colour", group: "Actions", label: "Change the app\u2019s colour", icon: <Palette size={16} />, keywords: "colour color hue theme appearance frame", run: () => setActiveView("settings") },
+      { id: "act-privacy", group: "Actions", label: ledger.privacyMode ? "Show amounts" : "Hide amounts", icon: ledger.privacyMode ? <Eye size={16} /> : <EyeOff size={16} />, keywords: "privacy blur", run: () => updateLedger((c) => ({ ...c, privacyMode: !c.privacyMode })) },
+      { id: "act-json", group: "Actions", label: "Export everything (JSON)", icon: <FileJson size={16} />, keywords: "backup download", run: exportJson },
+      { id: "act-csv", group: "Actions", label: "Export transactions (CSV)", icon: <Download size={16} />, keywords: "download spreadsheet", run: exportCsv },
+      { id: "act-setup", group: "Actions", label: "Run quick setup", icon: <Sparkles size={16} />, keywords: "onboarding wizard", run: () => setOnboardingOpen(true) },
+      { id: "act-tour", group: "Actions", label: "Replay this page\u2019s tutorial", icon: <GraduationCap size={16} />, keywords: "help guide tour", run: () => setTutorialView(activeView) },
+      { id: "act-feedback", group: "Actions", label: "Send feedback", icon: <CircleHelp size={16} />, keywords: "contact help bug", run: () => setShowFeedbackModal(true) },
+    ];
+    if (!user) items.push({ id: "act-signin", group: "Actions", label: "Sign in to sync", icon: <LogIn size={16} />, keywords: "account cloud backup", run: () => setShowSignInModal(true) });
+
+    for (const view of APP_VIEWS) {
+      const entry = view === "settings" ? { label: "Settings", icon: <SettingsIcon size={16} /> } : navEntry(view);
+      items.push({ id: `view-${view}`, group: "Go to", label: entry.label, icon: entry.icon, hint: activeView === view ? "You are here" : undefined, run: () => setActiveView(view) });
+    }
+
+    const months = Object.keys(ledger.months).sort().reverse();
+    for (const key of months) {
+      items.push({ id: `month-${key}`, group: "Months", label: formatMonth(key), icon: <CalendarDays size={16} />, hint: key === ledger.selectedMonth ? "Open now" : undefined, run: () => goToMonth(key) });
+    }
+
+    const categories = new Set<string>();
+    for (const key of months) for (const e of ledger.months[key].expenses) if (e.category) categories.add(e.category);
+    for (const category of categories) {
+      items.push({ id: `cat-${category}`, group: "Categories", label: category, icon: <Tag size={16} />, hint: "Show in this month", run: () => { setActiveView("ledger"); setQuery(category); } });
+    }
+    return items;
+  }
+
+  function paletteSearch(q: string): PaletteItem[] {
+    const needle = q.toLowerCase();
+    const found: PaletteItem[] = [];
+    const months = Object.keys(ledger.months).sort().reverse();
+    for (const key of months) {
+      const month = ledger.months[key];
+      const rows: { id: string; name: string; amount: number; kind: "income" | "expense"; raw?: string }[] = [
+        ...month.incomes.map((i) => ({ id: i.id, name: i.source, amount: i.amount, kind: "income" as const, raw: i.imported?.originalDescription })),
+        ...month.expenses.map((e) => ({ id: e.id, name: e.name, amount: e.amount, kind: "expense" as const, raw: e.imported?.originalDescription })),
+      ];
+      for (const row of rows) {
+        if (!row.name.toLowerCase().includes(needle) && !(row.raw ?? "").toLowerCase().includes(needle)) continue;
+        found.push({
+          id: `tx-${key}-${row.id}`,
+          group: "Transactions",
+          label: row.name || "(no name)",
+          keywords: row.raw,
+          icon: <ReceiptText size={16} />,
+          hint: `${formatMonth(key)} \u00b7 ${ledger.privacyMode ? "\u2022\u2022\u2022" : moneyFormatter.format(row.kind === "income" ? row.amount : -row.amount)}`,
+          run: () => openPeek({ kind: row.kind, id: row.id, monthKey: key }, null),
+        });
+        if (found.length >= 40) return found;
+      }
+    }
+    return found;
+  }
   const navItems = [...coreNavItems.map((item) => item.id), ...TOOL_VIEWS].filter(inSidebar).map(navEntry);
   // Everything out of the sidebar, listed under More tools: hidden everyday pages first, then tools.
   // Viewing one (from there, a widget or a link) doesn't add it back; the page's banner offers that.
@@ -3644,7 +4062,9 @@ function App() {
   }
 
   return (
-    <div className={`appShell ${ledger.privacyMode ? "privacy-on" : ""} ${animationsEnabled ? "motion-on" : "motion-off"}`}>
+    <div className={`appShell ${ledger.privacyMode ? "privacy-on" : ""} ${animationsEnabled ? "motion-on" : "motion-off"}${focusMode ? " focusMode" : ""}${fileDrag ? " fileDrag" : ""}${arrivalOrder.size ? " arriving" : ""}`}
+      style={arrivalOrder.size ? ({ "--arrive-n": Math.min(arrivalOrder.size, 24) } as CSSProperties) : undefined}
+    >
       <input
         ref={fileInputRef}
         className="hiddenFile"
@@ -3666,6 +4086,53 @@ function App() {
           if (file) void importStatementFile(file);
         }}
       />
+
+      {fileDrag && (
+        <div className="dropOverlay" aria-hidden="true">
+          <div className="dropOverlayCard">
+            <Upload size={26} />
+            <strong>Drop your statement to import it</strong>
+            <span>CSV, OFX, QIF or PDF. It stays on this device.</span>
+          </div>
+        </div>
+      )}
+
+      {peek && (() => {
+        const month = ledger.months[peek.monthKey];
+        const entry = peek.kind === "income" ? month?.incomes.find((i) => i.id === peek.id) : month?.expenses.find((e) => e.id === peek.id);
+        if (!entry) return null;
+        return (
+          <TransactionPeek
+            kind={peek.kind}
+            entry={entry}
+            monthLabel={formatMonth(peek.monthKey)}
+            account={ledger.accounts.find((a) => a.id === entry.accountId)}
+            formatter={moneyFormatter}
+            privacy={ledger.privacyMode}
+            onClose={closePeek}
+            onShowInLedger={promotePeek}
+            onRemove={
+              peek.monthKey === ledger.selectedMonth
+                ? () => {
+                    const target = peek;
+                    setPeek(null);
+                    if (target.kind === "income") removeIncome(target.id);
+                    else removeExpense(target.id);
+                  }
+                : undefined
+            }
+          />
+        );
+      })()}
+
+      {paletteOpen && (
+        <CommandPalette
+          onClose={() => setPaletteOpen(false)}
+          items={paletteItems()}
+          searchMore={paletteSearch}
+          onRun={(item) => track("palette_action", { group: item.group })}
+        />
+      )}
 
       {mobileNavOpen && <div className="navSheetBackdrop" onClick={() => setMobileNavOpen(false)} aria-hidden="true" />}
 
@@ -3890,6 +4357,17 @@ function App() {
           {/* The page names itself in its own header below, so the bar only carries controls:
               the month switcher on the Ledger, and the country, theme and privacy toggles. */}
           <div className="appBarTitle">
+            <button
+              className="iconButton focusToggle"
+              type="button"
+              onClick={() => setFocusMode((on) => !on)}
+              aria-pressed={focusMode}
+              aria-label={focusMode ? "Show sidebar" : "Hide sidebar"}
+              aria-keyshortcuts={SHORTCUTS.focusMode.aria}
+              data-tip={focusMode ? "Show sidebar" : "Hide sidebar"}
+            >
+              {focusMode ? <PanelLeftOpen size={19} /> : <PanelLeftClose size={19} />}
+            </button>
             <img className="appBarBrand" src="/icon.svg" alt="" width="28" height="28" aria-hidden="true" />
             {activeView !== "ledger" && (
               <span className="appBarPage" aria-hidden="true">
@@ -3920,12 +4398,17 @@ function App() {
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search transactions..."
                 aria-label="Search transactions"
-                aria-keyshortcuts="/ Meta+K Control+K"
+                aria-keyshortcuts={SHORTCUTS.search.aria}
               />
             </label>
           )}
 
           <div className="topActions">
+            <button className="paletteButton" type="button" onClick={() => { setPaletteOpen(true); track("palette_opened", {}); }} aria-keyshortcuts={SHORTCUTS.palette.aria} aria-haspopup="dialog">
+              <Search size={16} aria-hidden="true" />
+              <span>Go to or do anything</span>
+              <kbd>{isAppleDevice ? "⌘" : "Ctrl"} K</kbd>
+            </button>
             <label className="currencyControl countryControl">
               <span>{currencySymbol}</span>
               <select value={ledger.country} onChange={(event) => changeCountry(event.target.value as CountryCode)} aria-label="Country">
@@ -4306,28 +4789,104 @@ function App() {
                     <span>Amount</span>
                     <span />
                   </div>
-                  <div className="rowStack">
+                  <div className="rowStack incomeGroups">
                     {visibleIncomes.length ? (
-                      visibleIncomes.map((income) => (
-                        <IncomeRow
-                          key={income.id}
-                          income={income}
-                          account={accountById.get(income.accountId ?? "")}
-                          onCycleAccount={() => cycleEntryAccount("income", income.id)}
-                          privacy={ledger.privacyMode}
-                          symbol={currencySymbol}
-                          dragging={draggingIncomeId === income.id}
-                          dropState={incomeDropPreview?.targetId === income.id ? incomeDropPreview.edge : undefined}
-                          onDragStart={() => setDraggingIncomeId(income.id)}
-                          onDragOver={(event) => previewIncomeDrop(event, income)}
-                          onDragEnd={clearIncomeDragState}
-                          onDrop={() => dropOnIncome(income)}
-                          onMove={(direction) => moveIncomeByKeyboard(income.id, direction)}
-                          onChange={(patch) => updateIncome(income.id, patch)}
-                          onRenamed={(previousName) => offerRenameAll("income", income.id, previousName)}
-                          onRemove={() => removeIncome(income.id)}
-                        />
-                      ))
+                      buildIncomeGroups(visibleIncomes).map((group) => {
+                        const renderIncome = (income: IncomeEntry) => (
+                          <IncomeRow
+                            key={income.id}
+                            income={income}
+                            account={accountById.get(income.accountId ?? "")}
+                            onCycleAccount={() => cycleEntryAccount("income", income.id)}
+                            privacy={ledger.privacyMode}
+                            symbol={currencySymbol}
+                            dragging={draggingIncomeId === income.id}
+                            dropState={
+                              incomeDropPreview?.type === "reorder" && incomeDropPreview.targetId === income.id
+                                ? incomeDropPreview.edge
+                                : incomeDropPreview?.type === "combine" && incomeDropPreview.targetId === income.id
+                                  ? "combine"
+                                  : undefined
+                            }
+                            onDragStart={() => setDraggingIncomeId(income.id)}
+                            onDragOver={(event) => previewIncomeDrop(event, income)}
+                            onDragEnd={clearIncomeDragState}
+                            onDrop={() => dropOnIncome(income)}
+                            onMove={(direction) => moveIncomeByKeyboard(income.id, direction)}
+                            onChange={(patch) => updateIncome(income.id, patch)}
+                            onRenamed={(previousName) => offerRenameAll("income", income.id, previousName)}
+                            onRemove={() => removeIncome(income.id)}
+                            onPeek={(origin) => openPeek({ kind: "income", id: income.id, monthKey: ledger.selectedMonth }, origin)}
+                            arriveIndex={arrivalOrder.get(income.id)}
+                            quietAccount={isUsualAccount(income.accountId)}
+                          />
+                        );
+                        // Ungrouped income stays a plain row, exactly as before groups existed.
+                        if (!group.category) return group.items.map(renderIncome);
+                        const collapseKey = `income:${group.category}`;
+                        const collapsed = collapsedCategories.has(collapseKey);
+                        const dropActive = incomeDropPreview?.type === "category" && incomeDropPreview.category === group.category;
+                        return (
+                          <div
+                            className={`expenseGroup incomeGroup${dropActive ? " categoryDropTarget" : ""}${collapsed ? " collapsed" : ""}`}
+                            key={group.id}
+                            style={{ "--category-color": group.color } as CSSProperties}
+                            onDragOver={(event) => previewIncomeCategoryDrop(event, group.category)}
+                            onDragLeave={(event) => {
+                              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIncomeDropPreview(null);
+                            }}
+                            onDrop={(event) => {
+                              if (!draggingIncomeId) return;
+                              event.preventDefault();
+                              event.stopPropagation();
+                              dropOnIncomeCategory(group.category);
+                            }}
+                          >
+                            <div className="expenseGroupHeader">
+                              <span className="categoryEmoji" aria-hidden="true">
+                                {categoryEmoji(group.category) || group.category.trim().charAt(0).toUpperCase()}
+                              </span>
+                              <input
+                                className="categoryNameInput"
+                                aria-label="Income category name"
+                                defaultValue={group.category}
+                                key={group.category}
+                                onBlur={(event) => {
+                                  const next = event.currentTarget.value.trim();
+                                  if (next && next !== group.category) renameIncomeCategory(group.category, next);
+                                  else event.currentTarget.value = group.category;
+                                }}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter") event.currentTarget.blur();
+                                }}
+                              />
+                              <em>{group.items.length} {group.items.length === 1 ? "source" : "sources"}</em>
+                              <b className={ledger.privacyMode ? "masked" : ""}>{moneyFormatter.format(group.total)}</b>
+                              <span className="categoryActions">
+                                <button
+                                  className="categoryCollapseButton"
+                                  type="button"
+                                  onClick={() => toggleCategoryCollapse(collapseKey)}
+                                  aria-label={`${collapsed ? "Expand" : "Collapse"} ${group.category} income category`}
+                                  aria-expanded={!collapsed}
+                                >
+                                  {collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
+                                </button>
+                                <button
+                                  className="categoryDeleteButton"
+                                  type="button"
+                                  onClick={() => deleteIncomeCategory(group.category)}
+                                  aria-label={`Delete ${group.category} income category`}
+                                  title="Delete category"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </span>
+                            </div>
+                            {!collapsed && group.items.map(renderIncome)}
+                          </div>
+                        );
+                      })
                     ) : currentMonth.incomes.length ? (
                       <EmptyState icon={<Search size={18} />} title="No income matches" text="Clear search to see all income sources." />
                     ) : (
@@ -4419,20 +4978,11 @@ function App() {
                           >
                             {group.category && (
                               <div className="expenseGroupHeader">
-                                <button
-                                  className="categoryCollapseButton"
-                                  type="button"
-                                  onClick={() => toggleCategoryCollapse(group.category)}
-                                  aria-label={`${categoryCollapsed ? "Expand" : "Collapse"} ${group.category} category`}
-                                  aria-expanded={!categoryCollapsed}
-                                >
-                                  {categoryCollapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
-                                </button>
-                                {categoryEmoji(group.category) && (
-                                  <span className="categoryEmoji" aria-hidden="true">
-                                    {categoryEmoji(group.category)}
-                                  </span>
-                                )}
+                                {/* A folder-style header: icon tile, name, count, total, then its quiet actions.
+                                    Categories without a known emoji show their initial, so every header lines up. */}
+                                <span className="categoryEmoji" aria-hidden="true">
+                                  {categoryEmoji(group.category) || group.category.trim().charAt(0).toUpperCase()}
+                                </span>
                                 <input
                                   className="categoryNameInput"
                                   aria-label="Category name"
@@ -4444,15 +4994,26 @@ function App() {
                                 />
                                 <em>{group.items.length} {group.items.length === 1 ? "expense" : "expenses"}</em>
                                 <b className={ledger.privacyMode ? "masked" : ""}>{moneyFormatter.format(group.total)}</b>
-                                <button
-                                  className="categoryDeleteButton"
-                                  type="button"
-                                  onClick={() => deleteExpenseCategory(group.category)}
-                                  aria-label={`Delete ${group.category} category`}
-                                  title="Delete category"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
+                                <span className="categoryActions">
+                                  <button
+                                    className="categoryCollapseButton"
+                                    type="button"
+                                    onClick={() => toggleCategoryCollapse(group.category)}
+                                    aria-label={`${categoryCollapsed ? "Expand" : "Collapse"} ${group.category} category`}
+                                    aria-expanded={!categoryCollapsed}
+                                  >
+                                    {categoryCollapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
+                                  </button>
+                                  <button
+                                    className="categoryDeleteButton"
+                                    type="button"
+                                    onClick={() => deleteExpenseCategory(group.category)}
+                                    aria-label={`Delete ${group.category} category`}
+                                    title="Delete category"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </span>
                               </div>
                             )}
                             {!categoryCollapsed && group.items.map((expense) => {
@@ -4493,6 +5054,9 @@ function App() {
                                   onChange={(patch) => updateExpense(expense.id, patch)}
                                   onRenamed={(previousName) => offerRenameAll("expense", expense.id, previousName)}
                                   onRemove={() => removeExpense(expense.id)}
+                                  onPeek={(origin) => openPeek({ kind: "expense", id: expense.id, monthKey: ledger.selectedMonth }, origin)}
+                                  arriveIndex={arrivalOrder.get(expense.id)}
+                                  quietAccount={isUsualAccount(expense.accountId)}
                                 />
                               );
                             })}
@@ -4867,6 +5431,7 @@ function App() {
                 setToast(t(`${subscription.label} is active again`));
               }}
               onDelete={(subscription) => {
+                offerUndo();
                 updateLedger((current) => deleteSubscription(current, subscription));
                 setToast(t(`${subscription.label} removed from Subscriptions`));
                 track("subscription_deleted", { status: subscription.status });
@@ -4945,25 +5510,11 @@ function App() {
                 </article>
               )}
 
-              <section className="settingsGrid">
+              {/* Ordered by how often people need each part: bringing data in and out, keeping imports
+                  tidy, then one-off preferences, reference, and the irreversible last. */}
                 <article className="settingsPanel dataPanel">
-                  <PanelTitle title="Data control" icon={<Database size={17} />} />
+                  <PanelTitle title="Import & export" icon={<Database size={17} />} />
                   <div className="dataActionGrid">
-                    <div className="dataAction">
-                      <Download size={20} />
-                      <h3>Export vault</h3>
-                      <p>Download a complete snapshot of your ledger and settings.</p>
-                      <div className="buttonRow">
-                        <button className="commandButton" type="button" onClick={exportJson}>
-                          <FileJson size={16} />
-                          Export JSON
-                        </button>
-                        <button className="commandButton" type="button" onClick={exportCsv}>
-                          <Download size={16} />
-                          Export CSV
-                        </button>
-                      </div>
-                    </div>
                     <div className="dataAction">
                       <Upload size={20} />
                       <h3>Import data</h3>
@@ -4980,6 +5531,21 @@ function App() {
                         <button className="commandButton" type="button" onClick={() => fileInputRef.current?.click()}>
                           <Upload size={16} />
                           Import JSON
+                        </button>
+                      </div>
+                    </div>
+                    <div className="dataAction">
+                      <Download size={20} />
+                      <h3>Export vault</h3>
+                      <p>Download a complete snapshot of your ledger and settings.</p>
+                      <div className="buttonRow">
+                        <button className="commandButton" type="button" onClick={exportJson}>
+                          <FileJson size={16} />
+                          Export JSON
+                        </button>
+                        <button className="commandButton" type="button" onClick={exportCsv}>
+                          <Download size={16} />
+                          Export CSV
                         </button>
                       </div>
                     </div>
@@ -5006,34 +5572,7 @@ function App() {
                   )}
                 </article>
 
-                <aside className="settingsSide">
-                  <article className="settingsPanel compactSetting">
-                    <PanelTitle title="Country & currency" icon={<WalletCards size={17} />} />
-                    <p>
-                      {region === "US"
-                        ? "US accounts, tax tools and spelling are on. Currency only changes the symbol."
-                        : "Country picks the account types, tools and spelling; the United States has its own experience. Currency only changes the symbol."}
-                    </p>
-                    <label className="selectField">
-                      <select value={ledger.country} onChange={(event) => changeCountry(event.target.value as CountryCode)} aria-label="Settings country">
-                        {countryOptions.map((option) => (
-                          <option value={option.code} key={option.code}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="selectField">
-                      <select value={ledger.currency} onChange={(event) => changeCurrency(event.target.value as CurrencyCode)} aria-label="Settings currency">
-                        {currencyOptions.map((option) => (
-                          <option value={option.code} key={option.code}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </article>
-
+              <div className="settingsRow">
                   <MonthlyReminderPanel
                     bankSlug={bankSlug}
                     onBankChange={setBankSlug}
@@ -5043,34 +5582,119 @@ function App() {
                     }}
                     onReminderAdded={(method) => track("reminder_added", { method })}
                   />
+              <article className="settingsPanel transferRulesPanel">
+                <PanelTitle title="Transfer rules" icon={<Repeat size={17} />} />
+                <p className="panelSubcopy">
+                  Money moving between your own accounts isn’t income or spending. Mark a payee as a transfer during import — or add one
+                  here — and it’s skipped on every future import and removed from your ledger.
+                </p>
+                <div className="transferRuleAdd">
+                  <input
+                    value={transferRuleInput}
+                    placeholder="Payee to treat as a transfer, e.g. Transfer to Savings"
+                    aria-label="Add a transfer payee"
+                    onChange={(event) => setTransferRuleInput(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") addTransferRule();
+                    }}
+                  />
+                  <button className="commandButton" type="button" onClick={addTransferRule}>
+                    <Plus size={16} />
+                    Add
+                  </button>
+                </div>
+                {transferRules.length ? (
+                  <ShowMoreList
+                    items={[...transferRules].sort((a, b) => b.createdAt.localeCompare(a.createdAt))}
+                    renderItem={(rule) => (
+                      <li key={rule.id}>
+                        <span>{rule.pattern}</span>
+                        <button
+                          className="iconButton"
+                          type="button"
+                          aria-label={`Remove transfer rule ${rule.pattern}`}
+                          onClick={() => removeTransferRule(rule.id)}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </li>
+                    )}
+                  />
+                ) : (
+                  <p className="transferRuleEmpty">
+                    No transfer rules yet. Set a transaction’s type to “Transfer” during import, or add a payee above.
+                  </p>
+                )}
+              </article>
+              </div>
 
-                  <article className="settingsPanel compactSetting">
-                    <PanelTitle title="Sidebar" icon={<SlidersHorizontal size={17} />} />
-                    <p>Choose the pages you use. Hidden ones wait under More tools. Ledger and Settings always stay.</p>
-                    <ul className="sidebarToolsList">
-                      {[...coreNavItems.map((item) => item.id).filter(canHide), ...TOOL_VIEWS].map((view) => {
-                        const shown = inSidebar(view);
-                        const { label } = navEntry(view);
-                        return (
-                          <li key={view}>
-                            <span>{label}</span>
-                            <button
-                              className={shown ? "switch on" : "switch"}
-                              type="button"
-                              role="switch"
-                              aria-checked={shown}
-                              aria-label={`Show ${label} in sidebar`}
-                              onClick={() => setSidebarItem(view, !shown)}
-                            >
-                              <span />
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </article>
-                </aside>
-              </section>
+              <div className="settingsRow">
+              <article className="settingsPanel learnedRulesPanel">
+                <PanelTitle title="Learned category rules" icon={<GraduationCap size={17} />} />
+                <p className="panelSubcopy">
+                  Created automatically when you correct an imported transaction — future imports matching the pattern get the
+                  category instantly. Delete any rule that misfires; the next correction re-learns it.
+                </p>
+                {learnedRules.length ? (
+                  <ShowMoreList
+                    items={learnedRules}
+                    renderItem={({ rule, matches }) => (
+                      <li key={rule.id}>
+                        <code>{rule.pattern}</code>
+                        <span className="learnedRuleTarget">
+                          → {rule.category}
+                          {rule.kind === "debt-payment" ? " (debt payment)" : rule.kind === "income" ? " (income)" : ""}
+                        </span>
+                        <em className="learnedRuleMatches">
+                          {matches} match{matches === 1 ? "" : "es"}
+                        </em>
+                        <button
+                          className="iconButton"
+                          type="button"
+                          aria-label={`Remove rule ${rule.pattern}`}
+                          onClick={() => removeCategoryRule(rule.id)}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </li>
+                    )}
+                  />
+                ) : (
+                  <p className="transferRuleEmpty">No learned rules yet — correct a category on an imported transaction to create one.</p>
+                )}
+              </article>
+              <article className="settingsPanel learnedRulesPanel">
+                <PanelTitle title="Rename rules" icon={<PenLine size={17} />} />
+                <p className="panelSubcopy">
+                  Created when you rename a transaction and choose “Rename all”. Future imports with the old name arrive with your
+                  name instead. Renaming again updates the rule.
+                </p>
+                {ledger.nameRules.length ? (
+                  <ShowMoreList
+                    items={ledger.nameRules}
+                    renderItem={(rule) => (
+                      <li key={rule.id}>
+                        <code>{rule.from}</code>
+                        <span className="learnedRuleTarget">
+                          → {rule.to}
+                          {rule.kind === "income" ? " (income)" : ""}
+                        </span>
+                        <button
+                          className="iconButton"
+                          type="button"
+                          aria-label={`Remove rename rule ${rule.from}`}
+                          onClick={() => removeNameRule(rule.id)}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </li>
+                    )}
+                  />
+                ) : (
+                  <p className="transferRuleEmpty">No rename rules yet — rename a transaction that shares its name with others to create one.</p>
+                )}
+              </article>
+              </div>
 
               {isFeedsEnabled() && feedsReady && (
                 <article className="settingsPanel bankFeedsPanel">
@@ -5133,120 +5757,69 @@ function App() {
                 </article>
               )}
 
-              <article className="settingsPanel transferRulesPanel">
-                <PanelTitle title="Transfer rules" icon={<Repeat size={17} />} />
-                <p className="panelSubcopy">
-                  Money moving between your own accounts isn’t income or spending. Mark a payee as a transfer during import — or add one
-                  here — and it’s skipped on every future import and removed from your ledger.
-                </p>
-                <div className="transferRuleAdd">
-                  <input
-                    value={transferRuleInput}
-                    placeholder="Payee to treat as a transfer, e.g. Transfer to Savings"
-                    aria-label="Add a transfer payee"
-                    onChange={(event) => setTransferRuleInput(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") addTransferRule();
-                    }}
-                  />
-                  <button className="commandButton" type="button" onClick={addTransferRule}>
-                    <Plus size={16} />
-                    Add
-                  </button>
-                </div>
-                {transferRules.length ? (
-                  <ShowMoreList
-                    items={[...transferRules].sort((a, b) => b.createdAt.localeCompare(a.createdAt))}
-                    renderItem={(rule) => (
-                      <li key={rule.id}>
-                        <span>{rule.pattern}</span>
-                        <button
-                          className="iconButton"
-                          type="button"
-                          aria-label={`Remove transfer rule ${rule.pattern}`}
-                          onClick={() => removeTransferRule(rule.id)}
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </li>
-                    )}
-                  />
-                ) : (
-                  <p className="transferRuleEmpty">
-                    No transfer rules yet. Set a transaction’s type to “Transfer” during import, or add a payee above.
-                  </p>
-                )}
-              </article>
+                <article className="settingsPanel appearancePanel">
+                  <PanelTitle title="Appearance" icon={<Palette size={17} />} />
+                  <p className="settingsHint">The colour your app sits on. Saved on this device, like light and dark mode.</p>
+                  <FramePicker hue={frameHue} grain={frameGrain} theme={theme} onHue={setFrameHue} onGrain={setFrameGrain} />
+                </article>
 
-              <article className="settingsPanel learnedRulesPanel">
-                <PanelTitle title="Learned category rules" icon={<GraduationCap size={17} />} />
-                <p className="panelSubcopy">
-                  Created automatically when you correct an imported transaction — future imports matching the pattern get the
-                  category instantly. Delete any rule that misfires; the next correction re-learns it.
-                </p>
-                {learnedRules.length ? (
-                  <ShowMoreList
-                    items={learnedRules}
-                    renderItem={({ rule, matches }) => (
-                      <li key={rule.id}>
-                        <code>{rule.pattern}</code>
-                        <span className="learnedRuleTarget">
-                          → {rule.category}
-                          {rule.kind === "debt-payment" ? " (debt payment)" : rule.kind === "income" ? " (income)" : ""}
-                        </span>
-                        <em className="learnedRuleMatches">
-                          {matches} match{matches === 1 ? "" : "es"}
-                        </em>
-                        <button
-                          className="iconButton"
-                          type="button"
-                          aria-label={`Remove rule ${rule.pattern}`}
-                          onClick={() => removeCategoryRule(rule.id)}
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </li>
-                    )}
-                  />
-                ) : (
-                  <p className="transferRuleEmpty">No learned rules yet — correct a category on an imported transaction to create one.</p>
-                )}
-              </article>
-
-              <article className="settingsPanel learnedRulesPanel">
-                <PanelTitle title="Rename rules" icon={<PenLine size={17} />} />
-                <p className="panelSubcopy">
-                  Created when you rename a transaction and choose “Rename all”. Future imports with the old name arrive with your
-                  name instead. Renaming again updates the rule.
-                </p>
-                {ledger.nameRules.length ? (
-                  <ShowMoreList
-                    items={ledger.nameRules}
-                    renderItem={(rule) => (
-                      <li key={rule.id}>
-                        <code>{rule.from}</code>
-                        <span className="learnedRuleTarget">
-                          → {rule.to}
-                          {rule.kind === "income" ? " (income)" : ""}
-                        </span>
-                        <button
-                          className="iconButton"
-                          type="button"
-                          aria-label={`Remove rename rule ${rule.from}`}
-                          onClick={() => removeNameRule(rule.id)}
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </li>
-                    )}
-                  />
-                ) : (
-                  <p className="transferRuleEmpty">No rename rules yet — rename a transaction that shares its name with others to create one.</p>
-                )}
-              </article>
+              <div className="settingsRow">
+                  <article className="settingsPanel compactSetting">
+                    <PanelTitle title="Country & currency" icon={<WalletCards size={17} />} />
+                    <p>
+                      {region === "US"
+                        ? "US accounts, tax tools and spelling are on. Currency only changes the symbol."
+                        : "Country picks the account types, tools and spelling; the United States has its own experience. Currency only changes the symbol."}
+                    </p>
+                    <label className="selectField">
+                      <select value={ledger.country} onChange={(event) => changeCountry(event.target.value as CountryCode)} aria-label="Settings country">
+                        {countryOptions.map((option) => (
+                          <option value={option.code} key={option.code}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="selectField">
+                      <select value={ledger.currency} onChange={(event) => changeCurrency(event.target.value as CurrencyCode)} aria-label="Settings currency">
+                        {currencyOptions.map((option) => (
+                          <option value={option.code} key={option.code}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </article>
+                  <article className="settingsPanel compactSetting">
+                    <PanelTitle title="Sidebar" icon={<SlidersHorizontal size={17} />} />
+                    <p>Choose the pages you use. Hidden ones wait under More tools. Ledger and Settings always stay.</p>
+                    <ul className="sidebarToolsList">
+                      {[...coreNavItems.map((item) => item.id).filter(canHide), ...TOOL_VIEWS].map((view) => {
+                        const shown = inSidebar(view);
+                        const { label } = navEntry(view);
+                        return (
+                          <li key={view}>
+                            <span>{label}</span>
+                            <button
+                              className={shown ? "switch on" : "switch"}
+                              type="button"
+                              role="switch"
+                              aria-checked={shown}
+                              aria-label={`Show ${label} in sidebar`}
+                              onClick={() => setSidebarItem(view, !shown)}
+                            >
+                              <span />
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </article>
+              </div>
 
               <FinancialGlossary />
 
+              <div className="settingsRow">
               <article className="dangerPanel">
                 <div>
                   <h3>Danger Zone</h3>
@@ -5256,7 +5829,6 @@ function App() {
                   Clear selected month
                 </button>
               </article>
-
               <article className="dangerPanel">
                 <div>
                   <h3>Clear all data</h3>
@@ -5281,6 +5853,7 @@ function App() {
                   </button>
                 )}
               </article>
+              </div>
             </section>
           )}
         </main>
@@ -5322,10 +5895,19 @@ function App() {
 
         {tutorialView && <TutorialOverlay key={tutorialView} view={tutorialView} tutorial={tutorialsFor(region)[tutorialView]} t={t} onClose={closeTutorial} />}
 
-        {toastVisible && (
-          <div className="statusToast" role="status" aria-live="polite">
-            {toast}
+        {undoOffer?.after ? (
+          <div className="statusToast undoToast" role="status" aria-live="polite" key={undoOffer.stamp}>
+            <span>{undoOffer.label || "Done"}</span>
+            <button className="undoToastBtn" type="button" onClick={performUndo} aria-keyshortcuts={SHORTCUTS.undo.aria}>
+              Undo <kbd>{isAppleDevice ? "⌘" : "Ctrl"} Z</kbd>
+            </button>
           </div>
+        ) : (
+          toastVisible && (
+            <div className="statusToast" role="status" aria-live="polite">
+              {toast}
+            </div>
+          )
         )}
 
         {accountToast && (
@@ -6645,6 +7227,9 @@ function IncomeRow({
   onChange,
   onRenamed,
   onRemove,
+  onPeek,
+  arriveIndex,
+  quietAccount,
 }: {
   income: IncomeEntry;
   account?: Account;
@@ -6652,7 +7237,7 @@ function IncomeRow({
   privacy: boolean;
   symbol: string;
   dragging: boolean;
-  dropState?: "before" | "after";
+  dropState?: ExpenseDropState;
   onDragStart: () => void;
   onDragOver: (event: DragEvent<HTMLDivElement>) => void;
   onDragEnd: () => void;
@@ -6661,6 +7246,9 @@ function IncomeRow({
   onChange: (patch: Partial<IncomeEntry>) => void;
   onRenamed: (previousName: string) => void;
   onRemove: () => void;
+  onPeek: (origin: HTMLElement) => void;
+  arriveIndex?: number;
+  quietAccount?: boolean;
 }) {
   const renameTracking = useRenameTracking(onRenamed);
   // A custom MIME type keeps income drags out of the expense column's drop targets.
@@ -6677,11 +7265,12 @@ function IncomeRow({
     onDrop();
   }
 
-  const dropClass = dropState === "before" ? "dropBefore" : dropState === "after" ? "dropAfter" : "";
+  const dropClass = dropState === "before" ? "dropBefore" : dropState === "after" ? "dropAfter" : dropState === "combine" ? "dropCombine" : "";
 
   return (
     <div
-      className={`financeRow incomeRow ${dragging ? "dragging" : ""} ${dropClass}`}
+      className={`financeRow incomeRow ${dragging ? "dragging" : ""} ${dropClass}${arriveIndex !== undefined ? " rowArrive" : ""}${quietAccount ? " quietAccount" : ""}`}
+      style={arriveIndex !== undefined ? ({ "--arrive-i": arriveIndex } as CSSProperties) : undefined}
       data-income-id={income.id}
       draggable
       onDragStart={handleDragStart}
@@ -6728,6 +7317,15 @@ function IncomeRow({
           kind="income"
           onToggle={() => onChange({ recurring: !income.recurring })}
         />
+        <button
+          className="iconButton rowAction rowPeek"
+          type="button"
+          onClick={(event) => onPeek(event.currentTarget)}
+          aria-label={`Details for ${income.source || "this income"}`}
+          data-tip="Details"
+        >
+          <PanelRight size={16} />
+        </button>
         <button className="iconButton rowAction" type="button" onClick={onRemove} aria-label="Remove income">
           <Trash2 size={17} />
         </button>
@@ -6861,6 +7459,9 @@ function ExpenseRow({
   onChange,
   onRenamed,
   onRemove,
+  onPeek,
+  arriveIndex,
+  quietAccount,
 }: {
   expense: ExpenseEntry;
   account?: Account;
@@ -6882,6 +7483,9 @@ function ExpenseRow({
   onChange: (patch: Partial<ExpenseEntry>) => void;
   onRenamed: (previousName: string) => void;
   onRemove: () => void;
+  onPeek: (origin: HTMLElement) => void;
+  arriveIndex?: number;
+  quietAccount?: boolean;
 }) {
   const renameTracking = useRenameTracking(onRenamed);
   function handleDragStart(event: DragEvent<HTMLElement>) {
@@ -6904,7 +7508,8 @@ function ExpenseRow({
 
   return (
     <div
-      className={`financeRow expenseRow ${expense.scheduledPayment ? "isPlanned" : ""} ${dragging ? "dragging" : ""} ${grouping ? "groupingSource" : ""} ${dropClass}`}
+      className={`financeRow expenseRow ${expense.scheduledPayment ? "isPlanned" : ""} ${dragging ? "dragging" : ""} ${grouping ? "groupingSource" : ""} ${dropClass}${arriveIndex !== undefined ? " rowArrive" : ""}${quietAccount ? " quietAccount" : ""}`}
+      style={arriveIndex !== undefined ? ({ "--arrive-i": arriveIndex } as CSSProperties) : undefined}
       data-expense-name={expense.name}
       data-expense-id={expense.id}
       draggable
@@ -6980,6 +7585,15 @@ function ExpenseRow({
             onToggle={() => onChange({ recurring: !expense.recurring })}
           />
         )}
+        <button
+          className="iconButton rowAction rowPeek rowPeekIcon"
+          type="button"
+          onClick={(event) => onPeek(event.currentTarget)}
+          aria-label={`Details for ${expense.name || "this expense"}`}
+          data-tip="Details"
+        >
+          <PanelRight size={16} />
+        </button>
         <button className="iconButton rowAction" type="button" onClick={onRemove} aria-label="Remove expense">
           <Trash2 size={17} />
         </button>
@@ -8187,8 +8801,8 @@ function downloadFile(name: string, content: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
-function nextCategoryName(expenses: ExpenseEntry[]) {
-  const names = new Set(expenses.map((expense) => expense.category).filter(Boolean));
+function nextCategoryName(entries: { category?: string }[]) {
+  const names = new Set(entries.map((entry) => (entry.category ?? "").trim()).filter(Boolean));
   let index = 1;
   let name = "New category";
   while (names.has(name)) {
@@ -8198,8 +8812,8 @@ function nextCategoryName(expenses: ExpenseEntry[]) {
   return name;
 }
 
-function randomCategoryColor(expenses: ExpenseEntry[]) {
-  const usedColors = new Set(expenses.filter((expense) => expense.category.trim()).map((expense) => expense.color));
+function randomCategoryColor(entries: { category?: string; color: string }[]) {
+  const usedColors = new Set(entries.filter((entry) => (entry.category ?? "").trim()).map((entry) => entry.color));
   const availableColors = colors.filter((color) => !usedColors.has(color));
   const palette = availableColors.length ? availableColors : colors;
   return palette[Math.floor(Math.random() * palette.length)];

@@ -1,0 +1,1539 @@
+/* ─── Frame and canvas ────────────────────────────────────────────────────────
+   On desktop the sidebar sits on a coloured frame and the page is one inset
+   canvas resting on it, the only raised surface. src/frame.ts writes the frame
+   tokens from the person's hue (contrast-checked in src/framePalette.mjs); the
+   values below are the brand hue's, used before that runs.
+   On phones and small tablets the canvas is the whole screen: an inset would
+   cost width the ledger needs. */
+:root {
+  --frame-a: #cdf1eb;
+  --frame-b: #a9cfe4;
+  --frame-ink: rgb(14 24 38);
+  --frame-ink-rgb: 14, 24, 38;
+  --frame-ink-soft: rgb(14 24 38 / 0.76);
+  --frame-hover: rgb(14 24 38 / 0.1);
+  --frame-active: rgb(14 24 38 / 0.16);
+  --frame-line: rgb(14 24 38 / 0.16);
+  --frame-grain-img: none;
+  --frame-inset: 8px;
+  --canvas-radius: 14px;
+  --frame-bg: var(--frame-grain-img), linear-gradient(150deg, var(--frame-a), var(--frame-b) 80%);
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --sidebar-slide: 260ms;
+}
+
+@media (min-width: 901px) {
+  /* The body paints above negative z-index layers, so it steps aside while the app is up. */
+  body:has(.appShell) {
+    background: transparent;
+  }
+
+  .appShell {
+    background: transparent;
+  }
+
+  /* The frame itself, fixed behind everything. */
+  .appShell::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: var(--frame-bg);
+    background-attachment: fixed;
+    pointer-events: none;
+  }
+
+  /* A strip of frame above the canvas, so the page never scrolls into the inset. */
+  .appShell::after {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: var(--nav-width);
+    right: 0;
+    height: var(--frame-inset);
+    z-index: 41;
+    background: var(--frame-bg);
+    background-attachment: fixed;
+    pointer-events: none;
+    transition: left var(--sidebar-slide) var(--ease-out);
+  }
+
+  /* The sidebar lives on the frame: re-point its tokens at the frame ink. */
+  .sideNav {
+    background: transparent;
+    border-right: 0;
+    --ink: var(--frame-ink);
+    --ink-rgb: var(--frame-ink-rgb);
+    --muted: var(--frame-ink-soft);
+    --faint: var(--frame-ink-soft);
+    --line: var(--frame-line);
+    --surface-higher-rgb: var(--frame-ink-rgb);
+    transition: transform var(--sidebar-slide) var(--ease-out), opacity var(--sidebar-slide) var(--ease-out);
+  }
+
+  .sideNav .navItem {
+    color: var(--frame-ink);
+  }
+
+  .sideNav .navItem:hover {
+    background: var(--frame-hover);
+    color: var(--frame-ink);
+  }
+
+  .sideNav .navItem.active {
+    background: var(--frame-active);
+    color: var(--frame-ink);
+    font-weight: 650;
+  }
+
+  .sideNav .navItem.active::after {
+    display: none;
+  }
+
+  .sideNav :focus-visible {
+    outline-color: var(--frame-ink);
+  }
+
+  /* The canvas. Cards inside it stop floating: a hairline does the work. */
+  .workspace {
+    position: relative;
+    margin: var(--frame-inset) var(--frame-inset) var(--frame-inset) var(--nav-width);
+    min-height: calc(100vh - 2 * var(--frame-inset));
+    border-radius: var(--canvas-radius);
+    background: var(--bg);
+    box-shadow: 0 0 0 1px rgba(var(--bg-deep-rgb), 0.06), 0 10px 34px rgba(var(--bg-deep-rgb), 0.16);
+    --shadow-sm: 0 0 0 1px var(--line);
+    transition: margin-left var(--sidebar-slide) var(--ease-out);
+  }
+
+  [data-theme="dark"] .workspace {
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 12px 40px rgba(0, 0, 0, 0.5);
+  }
+
+  .appBar {
+    top: var(--frame-inset);
+    border-radius: var(--canvas-radius) var(--canvas-radius) 0 0;
+  }
+
+  /* Frame-coloured corner pieces keep the canvas's top corners round while it scrolls. */
+  .workspace::before,
+  .workspace::after {
+    content: "";
+    position: fixed;
+    top: var(--frame-inset);
+    width: var(--canvas-radius);
+    height: var(--canvas-radius);
+    z-index: 41;
+    background: var(--frame-bg);
+    background-attachment: fixed;
+    pointer-events: none;
+  }
+
+  .workspace::before {
+    left: var(--nav-width);
+    -webkit-mask: radial-gradient(circle at 100% 100%, transparent calc(var(--canvas-radius) - 0.5px), #000 var(--canvas-radius));
+    mask: radial-gradient(circle at 100% 100%, transparent calc(var(--canvas-radius) - 0.5px), #000 var(--canvas-radius));
+    transition: left var(--sidebar-slide) var(--ease-out);
+  }
+
+  .workspace::after {
+    right: var(--frame-inset);
+    -webkit-mask: radial-gradient(circle at 0 100%, transparent calc(var(--canvas-radius) - 0.5px), #000 var(--canvas-radius));
+    mask: radial-gradient(circle at 0 100%, transparent calc(var(--canvas-radius) - 0.5px), #000 var(--canvas-radius));
+  }
+
+  .bottomRail {
+    left: var(--nav-width);
+    right: var(--frame-inset);
+    bottom: var(--frame-inset);
+    border-radius: 0 0 var(--canvas-radius) var(--canvas-radius);
+    transition: left var(--sidebar-slide) var(--ease-out);
+  }
+
+  /* ── Focus mode: the sidebar steps aside and the canvas takes the width ── */
+  .appShell.focusMode .sideNav {
+    transform: translateX(calc(-1 * var(--nav-width)));
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .appShell.focusMode .workspace {
+    margin-left: var(--frame-inset);
+  }
+
+  .appShell.focusMode::after,
+  .appShell.focusMode .bottomRail {
+    left: var(--frame-inset);
+  }
+
+  .appShell.focusMode .workspace::before {
+    left: var(--frame-inset);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --sidebar-slide: 0ms;
+  }
+}
+
+/* ─── Appearance: the frame picker (Settings) ─────────────────────────────── */
+.appearancePanel .settingsHint {
+  margin: 4px 0 16px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.framePicker {
+  display: grid;
+  grid-template-columns: 168px 1fr;
+  gap: 22px;
+  align-items: start;
+}
+
+.framePreview {
+  position: relative;
+  height: 112px;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: background 120ms linear;
+}
+
+.framePreviewSide {
+  position: absolute;
+  left: 10px;
+  top: 14px;
+  width: 30px;
+  display: grid;
+  gap: 6px;
+  height: 40px;
+  background:
+    linear-gradient(var(--frame-ink-soft), var(--frame-ink-soft)) 0 0 / 100% 4px no-repeat,
+    linear-gradient(var(--frame-ink-soft), var(--frame-ink-soft)) 0 12px / 70% 4px no-repeat,
+    linear-gradient(var(--frame-ink-soft), var(--frame-ink-soft)) 0 24px / 85% 4px no-repeat;
+  opacity: 0.6;
+}
+
+.framePreviewCanvas {
+  position: absolute;
+  inset: 8px 8px 8px 50px;
+  border-radius: 7px;
+  background: var(--bg);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
+}
+
+.framePickerControls {
+  display: grid;
+  gap: 14px;
+}
+
+.frameField {
+  display: grid;
+  gap: 8px;
+}
+
+.frameFieldLabel {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.frameFieldLabel strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.frameHue,
+.frameGrain {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.frameGrain {
+  height: 8px;
+  background: linear-gradient(90deg, var(--surface-high), var(--line-strong));
+}
+
+.frameHue::-webkit-slider-thumb,
+.frameGrain::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--ink);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+.frameHue::-moz-range-thumb,
+.frameGrain::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--ink);
+}
+
+.frameHue:focus-visible,
+.frameGrain:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.frameSwatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.frameSwatch {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+  transition: transform 150ms var(--ease-out), border-color 150ms var(--ease-out);
+}
+
+.frameSwatch:hover {
+  transform: scale(1.08);
+}
+
+.frameSwatch.active {
+  border-color: var(--ink);
+}
+
+@media (max-width: 560px) {
+  .framePicker {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─── Command bar ─────────────────────────────────────────────────────────── */
+.paletteButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 8px 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 13.5px;
+  white-space: nowrap;
+  transition: border-color 150ms var(--ease-out), color 150ms var(--ease-out);
+}
+
+.paletteButton:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.paletteButton kbd,
+.palette kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--surface-high);
+  color: var(--muted);
+  font: 600 11.5px/1 Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+@media (max-width: 1180px) {
+  .paletteButton span {
+    display: none;
+  }
+}
+
+/* Phones have the tab bar, the More sheet and the ledger's own search; the command bar
+   is a keyboard tool, so its button stays on wider screens. */
+@media (max-width: 900px) {
+  .paletteButton {
+    display: none;
+  }
+}
+
+.paletteLayer {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: grid;
+  justify-items: center;
+  align-items: start;
+  padding: min(14vh, 120px) 16px 16px;
+  background: rgba(var(--bg-deep-rgb), 0.32);
+  animation: paletteFade 140ms var(--ease-out) both;
+}
+
+.palette {
+  width: min(640px, 100%);
+  max-height: min(560px, calc(100dvh - 120px));
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.3);
+  animation: paletteIn 180ms var(--ease-out) both;
+  transform-origin: 50% 0;
+}
+
+@keyframes paletteFade {
+  from { opacity: 0; }
+}
+
+@keyframes paletteIn {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+}
+
+.paletteSearch {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.paletteSearch input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 17px;
+}
+
+.paletteList {
+  overflow-y: auto;
+  padding: 6px;
+  overscroll-behavior: contain;
+}
+
+.paletteGroupLabel {
+  padding: 10px 10px 4px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.paletteItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: 9px;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 14.5px;
+}
+
+.paletteItem.active {
+  background: var(--accent-soft);
+}
+
+.paletteIcon {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  color: var(--muted);
+}
+
+.paletteItem.active .paletteIcon {
+  color: var(--accent);
+}
+
+.paletteLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.paletteHint {
+  color: var(--muted);
+  font-size: 12.5px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.paletteKeys {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.paletteEmpty {
+  margin: 0;
+  padding: 24px 12px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.paletteFoot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  padding: 9px 16px;
+  border-top: 1px solid var(--line);
+  color: var(--faint);
+  font-size: 12px;
+}
+
+.paletteFoot span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.paletteFoot kbd {
+  min-width: 18px;
+  height: 18px;
+  font-size: 10.5px;
+}
+
+@media (max-width: 560px) {
+  .paletteLayer {
+    padding-top: calc(12px + env(safe-area-inset-top, 0px));
+  }
+  .paletteFoot {
+    display: none;
+  }
+}
+
+/* Focus toggle lives in the app bar on wide screens only: phones have no sidebar to hide. */
+.focusToggle {
+  display: none;
+}
+
+@media (min-width: 901px) {
+  .focusToggle {
+    display: inline-grid;
+    margin-right: 4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paletteLayer,
+  .palette {
+    animation: none;
+  }
+}
+
+.appBarTitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ─── Undo toast ──────────────────────────────────────────────────────────── */
+.undoToast {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  padding-right: 6px;
+}
+
+.undoToastBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(var(--on-ink-rgb), 0.16);
+  color: inherit;
+  font-weight: 650;
+}
+
+.undoToastBtn:hover {
+  background: rgba(var(--on-ink-rgb), 0.26);
+}
+
+.undoToastBtn kbd {
+  font: 600 11px/1 Inter, ui-sans-serif, system-ui, sans-serif;
+  opacity: 0.75;
+}
+
+/* ─── Peek: a quick look at one transaction ───────────────────────────────── */
+.rowPeek {
+  color: rgba(var(--ink-rgb), 0.5);
+}
+
+.rowPeek:hover {
+  color: var(--accent);
+}
+
+/* With a mouse the details button waits for intent; on touch it is always there. */
+@media (hover: hover) and (pointer: fine) {
+  .rowPeek {
+    opacity: 0;
+    transition: opacity 120ms var(--ease-out);
+  }
+
+  .financeRow:hover .rowPeek,
+  .financeRow:focus-within .rowPeek,
+  .rowPeek:focus-visible {
+    opacity: 1;
+  }
+}
+
+.peekLayer {
+  position: fixed;
+  inset: 0;
+  z-index: 280;
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--frame-inset);
+  background: rgba(var(--bg-deep-rgb), 0.18);
+}
+
+.peek {
+  view-transition-name: peek;
+  width: min(400px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 18px 22px 22px;
+  border-radius: var(--canvas-radius);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.28);
+}
+
+.peekHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.peekKind {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.peekKind.in {
+  color: var(--mint);
+}
+
+.peekName {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.peekRaw {
+  margin: -6px 0 0;
+  display: grid;
+  gap: 2px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.peekRaw code {
+  font: 500 12.5px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.peekAmount {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.peekFacts {
+  margin: 4px 0 0;
+  display: grid;
+  border-top: 1px solid var(--line);
+}
+
+.peekFacts > div {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 10px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+
+.peekFacts dt {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+
+.peekFacts dd {
+  margin: 0;
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.peekActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.peekRemove {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--red);
+}
+
+::view-transition-group(peek) {
+  animation-duration: 340ms;
+  animation-timing-function: cubic-bezier(0.2, 0.9, 0.25, 1.04);
+}
+
+::view-transition-old(peek),
+::view-transition-new(peek) {
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+
+::view-transition-old(peek) {
+  animation: 140ms ease-out both peekOut;
+}
+
+::view-transition-new(peek) {
+  animation: 220ms 70ms ease-out both peekIn;
+}
+
+@keyframes peekOut {
+  to { opacity: 0; }
+}
+
+@keyframes peekIn {
+  from { opacity: 0; }
+}
+
+/* The row a peek was promoted to flashes once so the eye finds it. */
+.rowFlash {
+  animation: rowFlash 1.3s var(--ease-out);
+}
+
+@keyframes rowFlash {
+  0%, 30% { background: var(--accent-soft); }
+  100% { background: transparent; }
+}
+
+@media (max-width: 900px) {
+  .peekLayer {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .peek {
+    width: 100%;
+    max-height: 85dvh;
+    border-radius: 18px 18px 0 0;
+    padding-bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .peekFacts > div {
+    grid-template-columns: 120px 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rowFlash {
+    animation: none;
+    outline: 2px solid var(--accent);
+  }
+}
+
+.monthLabel strong {
+  white-space: nowrap;
+}
+
+/* Income rows carry a details icon too; the amount field gives up a little width for it. */
+@media (min-width: 681px) {
+  .incomeRow {
+    grid-template-columns: 24px 22px minmax(140px, 1fr) 132px auto;
+  }
+}
+
+/* Money flow: the breakdown grows from the band or node that was clicked. */
+.insightCard .flowDetail {
+  transform-origin: var(--flow-ox, 50%) var(--flow-oy, 50%);
+  transform: scale(0.6);
+  transition:
+    opacity 200ms ease,
+    transform 340ms cubic-bezier(0.2, 0.9, 0.25, 1.04);
+}
+
+.insightCard .flowDetail.open {
+  transform: scale(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .insightCard .flowDetail {
+    transform: none;
+    transition: opacity 120ms ease;
+  }
+}
+
+.motion-off .insightCard .flowDetail {
+  transform: none;
+  transition: opacity 120ms ease;
+}
+
+/* ─── Import moment ───────────────────────────────────────────────────────── */
+/* A statement dragged over the app: the frame brightens and the canvas waits for it. */
+.appShell.fileDrag::before {
+  filter: saturate(1.35) brightness(1.06);
+  transition: filter 200ms var(--ease-out);
+}
+
+.dropOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 320;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(var(--bg-deep-rgb), 0.22);
+  pointer-events: none;
+  animation: paletteFade 140ms var(--ease-out) both;
+}
+
+.dropOverlayCard {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 34px 44px;
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--ink);
+  text-align: center;
+  box-shadow: 0 0 0 8px rgba(var(--accent-rgb), 0.18), 0 0 60px rgba(var(--accent-rgb), 0.35), 0 24px 70px rgba(0, 0, 0, 0.25);
+  animation: dropLift 260ms cubic-bezier(0.2, 0.9, 0.25, 1.1) both;
+}
+
+.dropOverlayCard svg {
+  color: var(--accent);
+}
+
+.dropOverlayCard strong {
+  font-size: 19px;
+}
+
+.dropOverlayCard span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+@keyframes dropLift {
+  from { opacity: 0; transform: translateY(10px) scale(0.96); }
+}
+
+/* Each new row slides in after the one before; the month's figure lands last. */
+.rowArrive {
+  animation: rowArrive 420ms cubic-bezier(0.2, 0.9, 0.25, 1.06) both;
+  animation-delay: calc(min(var(--arrive-i, 0), 24) * 55ms);
+}
+
+@keyframes rowArrive {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+    background: var(--accent-soft);
+  }
+  60% {
+    opacity: 1;
+    background: var(--accent-soft);
+  }
+  to {
+    transform: none;
+  }
+}
+
+.appShell.arriving .netBlock strong {
+  animation: netLand 520ms cubic-bezier(0.2, 0.9, 0.25, 1.3) both;
+  animation-delay: calc(var(--arrive-n, 0) * 55ms + 220ms);
+  display: inline-block;
+}
+
+@keyframes netLand {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rowArrive,
+  .appShell.arriving .netBlock strong,
+  .dropOverlay,
+  .dropOverlayCard {
+    animation: none;
+  }
+}
+
+/* ─── Layered, borderless surfaces ────────────────────────────────────────────
+   No outlines. Surfaces separate the way they do in Arc: a slightly deeper canvas,
+   cards that float on it with a soft shadow, and fields and buttons that are
+   filled rather than drawn. Dividers inside a card fade almost to nothing. */
+:root {
+  --layer-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 10px 28px -12px rgba(16, 24, 40, 0.16);
+  --field: rgba(var(--ink-rgb), 0.05);
+  --field-hover: rgba(var(--ink-rgb), 0.085);
+}
+
+[data-theme="dark"] {
+  --layer-shadow: 0 1px 2px rgba(0, 0, 0, 0.28), 0 12px 32px -12px rgba(0, 0, 0, 0.6);
+  --field: rgba(var(--ink-rgb), 0.065);
+  --field-hover: rgba(var(--ink-rgb), 0.11);
+}
+
+/* A touch deeper than the cards, so white cards read as lifted without an outline. */
+[data-theme="light"] .workspace {
+  --bg: #f2f1ed;
+  --bg-rgb: 242, 241, 237;
+}
+
+.workspace {
+  --line: rgba(var(--line-rgb), 0.05);
+  --line-strong: rgba(var(--line-rgb), 0.1);
+}
+
+/* Cards: lifted, never outlined. */
+.panel,
+.miniPanel,
+.settingsPanel,
+.architectureNote,
+.dangerPanel,
+.insightCard,
+.metricCard,
+.quickAddBar,
+.signalCard,
+.takeHomeHeadline,
+.priorityList,
+.planDetails,
+.subsAlert,
+.widgetToolbar,
+.widgetRecs,
+.gettingStarted {
+  border-color: transparent;
+  box-shadow: var(--layer-shadow);
+}
+
+/* Any other card-like article in the canvas loses its outline too. */
+.contentCanvas article {
+  border-color: transparent;
+}
+
+/* Things inside a card are filled, not lifted again. */
+.dataAction,
+.widgetRecs li,
+.subsRow,
+.transferRuleList li,
+.takeHomeHeadline > div,
+.gsItem {
+  border-color: transparent;
+  box-shadow: none;
+  background: var(--field);
+}
+
+/* Buttons and fields: a soft fill that deepens on hover. */
+.commandButton,
+.quietButton,
+.checkButton,
+.currencyControl,
+.searchShell,
+.paletteButton {
+  border-color: transparent;
+  background: var(--field);
+}
+
+.commandButton:hover,
+.quietButton:hover,
+.checkButton:hover,
+.currencyControl:hover,
+.searchShell:hover,
+.paletteButton:hover {
+  border-color: transparent;
+  background: var(--field-hover);
+}
+
+.searchShell:focus-within {
+  border-color: transparent;
+  background: var(--surface);
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.45);
+}
+
+.dangerButton {
+  border-color: transparent;
+  background: var(--red-soft);
+}
+
+.addRow {
+  border-top-color: transparent;
+  background: rgba(var(--ink-rgb), 0.025);
+}
+
+.addRow input,
+.addRow .moneyInput {
+  border-color: transparent;
+  background: var(--field);
+}
+
+/* The amount field is one filled box: the input inside it stays clear, or the box shows a
+   second pill inside itself and two focus rings. */
+.addRow .moneyInput input,
+.addRow .moneyInput input:focus {
+  background: transparent;
+  box-shadow: none;
+}
+
+.addRow input:focus,
+.addRow .moneyInput:focus-within {
+  background: var(--surface);
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.45);
+}
+
+.financeRow {
+  border-bottom-color: rgba(var(--line-rgb), 0.045);
+}
+
+/* Category groups are tinted layers, not boxes. */
+.expenseGroup:not(.ungrouped) {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--category-color, var(--faint)) 7%, transparent);
+}
+
+.palette,
+.peek {
+  border-color: transparent;
+}
+
+.paletteButton kbd,
+.palette kbd {
+  border-color: transparent;
+  background: var(--field);
+}
+
+/* On the frame: translucent fills instead of outlined boxes. */
+@media (min-width: 901px) {
+  .sideNav .sideTutorialBtn,
+  .sideNav .sideSignInBtn {
+    border-color: transparent;
+    background: var(--frame-hover);
+    color: var(--frame-ink);
+  }
+
+  .sideNav .sideTutorialBtn:hover,
+  .sideNav .sideSignInBtn:hover {
+    background: var(--frame-active);
+  }
+}
+
+.gsItem:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--field-hover);
+}
+
+.gsItem.done {
+  border-color: transparent;
+  background: var(--mint-soft);
+}
+
+/* More cards that float on the canvas. */
+.goalCard,
+.goalsPlannerBar,
+.goalsTimeline,
+.debtAccountRow {
+  border-color: transparent;
+  box-shadow: var(--layer-shadow);
+}
+
+/* Account rows sit inside a card, so they are a filled layer rather than a second lift. */
+.contentCanvas article .debtAccountRow {
+  box-shadow: none;
+  background: var(--field);
+}
+
+.goalsHorizonTabs,
+.goalsSurplusInput,
+.goalCard--editing {
+  border-color: transparent;
+}
+
+.goalsHorizonTabs {
+  background: var(--field);
+}
+
+/* Form fields across the canvas: filled, no outline. Ledger rows keep their own quiet
+   inline editing (transparent until hovered). */
+.contentCanvas :is(input, select, textarea):not([type="checkbox"], [type="radio"], [type="range"]) {
+  border-color: transparent;
+}
+
+.contentCanvas :is(.moneyInput, .selectField, .targetInput):not(.financeRow *) {
+  border-color: transparent;
+  background-color: var(--field);
+}
+
+.contentCanvas :is(input, select, textarea):not([type="checkbox"], [type="radio"], [type="range"]):not(.financeRow *, .moneyInput *, .selectField *, .quickAddBar *, .searchShell *) {
+  background-color: var(--field);
+}
+
+/* An input inside a money field leaves the ring to the field around it (one ring, not two). */
+.contentCanvas :is(input, select, textarea):not([type="checkbox"], [type="radio"], [type="range"]):not(.financeRow *, .moneyInput *):focus,
+.contentCanvas :is(.moneyInput, .selectField):not(.financeRow *):focus-within {
+  border-color: transparent;
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.45);
+}
+
+.goalsSurplusField {
+  border-color: transparent;
+  background: var(--field);
+}
+
+.contentCanvas .goalsSurplusField input {
+  background-color: transparent;
+}
+
+/* ─── Settings ────────────────────────────────────────────────────────────────
+   Sections in pairs that size to their content: no minimum heights, so nothing
+   stands empty waiting for a taller neighbour. */
+.settingsRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+
+[aria-label="Settings"] .settingsPanel,
+[aria-label="Settings"] .compactSetting,
+[aria-label="Settings"] .dangerPanel {
+  min-height: 0;
+}
+
+/* Import first, export second, side by side. */
+[aria-label="Settings"] .dataActionGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* Financial terms: one line until opened. */
+.financialGlossary {
+  min-height: 0;
+  padding: 0;
+  box-shadow: var(--layer-shadow);
+}
+
+.financialGlossary summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 22px;
+  list-style: none;
+  border-radius: inherit;
+}
+
+.financialGlossary summary::-webkit-details-marker {
+  display: none;
+}
+
+.financialGlossary summary::after {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(45deg) translateY(-3px);
+  transition: transform 200ms var(--ease-out);
+}
+
+.financialGlossary[open] summary::after {
+  transform: rotate(-135deg) translateY(-3px);
+}
+
+.financialGlossary summary:hover {
+  background: var(--field);
+}
+
+.financialGlossary dl {
+  margin: 0;
+  padding: 4px 22px 20px;
+}
+
+@media (max-width: 900px) {
+  .settingsRow,
+  [aria-label="Settings"] .dataActionGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─── Expense categories as folders ───────────────────────────────────────────
+   One rounded surface (the panel). Inside it, categories are folders like Arc's
+   sidebar: an icon tile, a name, a total, and a fine rail in the category's colour
+   beside its expenses. Colour gathers into a soft wash only on the group you are
+   touching, and a group lifts (the rest dimming) only while something is dragged
+   onto it. Rows and headers share one column grid, so every amount lines up. */
+:root {
+  --amount-col: 124px;
+  --row-actions: 108px;
+  --row-end: 12px;
+}
+
+.panel .tableHeader {
+  display: none;
+}
+
+.expenseGroups {
+  padding: 6px 0 4px;
+}
+
+:is(.panel.expense, .panel.income) .expenseGroup,
+:is(.panel.expense, .panel.income) .expenseGroup:not(.ungrouped) {
+  position: relative;
+  margin: 0 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  box-shadow: none;
+  transition:
+    background-color 200ms var(--ease-out),
+    opacity 200ms var(--ease-out),
+    box-shadow 220ms var(--ease-out),
+    transform 220ms var(--ease-out);
+}
+
+:is(.panel.expense, .panel.income) .expenseGroup:not(.ungrouped) {
+  padding-bottom: 6px;
+  margin-bottom: 4px;
+}
+
+/* The category's colour, in one place: a fine rail under the icon, beside its expenses. */
+:is(.panel.expense, .panel.income) .expenseGroup:not(.ungrouped)::before {
+  content: "";
+  position: absolute;
+  left: 23px;
+  top: 44px;
+  bottom: 12px;
+  width: 3px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, var(--category-color), color-mix(in srgb, var(--category-color) 18%, transparent));
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+:is(.panel.expense, .panel.income) .expenseGroup.collapsed::before {
+  display: none;
+}
+
+:is(.panel.expense, .panel.income) .expenseGroupHeader {
+  display: grid;
+  grid-template-columns: 28px minmax(0, max-content) minmax(0, 1fr) var(--amount-col) minmax(var(--row-actions), auto);
+  align-items: center;
+  column-gap: 10px;
+  min-height: 48px;
+  padding: 8px var(--row-end) 4px 10px;
+  border: 0;
+  background: transparent;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+:is(.panel.expense, .panel.income) .categoryEmoji {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  font-size: 15px;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--category-color) 70%, var(--ink));
+  background: color-mix(in srgb, var(--category-color) 18%, transparent);
+}
+
+:is(.panel.expense, .panel.income) .categoryNameInput {
+  /* Sized to its text: the base rule's percentage width has nothing to resolve against here. */
+  width: auto;
+  min-width: 3ch;
+  max-width: 100%;
+  flex: none;
+  field-sizing: content;
+  padding: 2px 4px;
+  border-radius: 6px;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--ink);
+  background: transparent !important;
+}
+
+:is(.panel.expense, .panel.income) .categoryNameInput:hover {
+  background: var(--field) !important;
+}
+
+:is(.panel.expense, .panel.income) .expenseGroupHeader em {
+  font-style: normal;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+:is(.panel.expense, .panel.income) .expenseGroupHeader b {
+  justify-self: end;
+  padding-right: 23px;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.categoryActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+:is(.panel.expense, .panel.income) .categoryCollapseButton,
+:is(.panel.expense, .panel.income) .categoryDeleteButton {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+}
+
+:is(.panel.expense, .panel.income) .categoryCollapseButton:hover,
+:is(.panel.expense, .panel.income) .categoryDeleteButton:hover {
+  background: var(--field);
+  color: var(--ink);
+}
+
+:is(.panel.expense, .panel.income) .categoryDeleteButton:hover {
+  color: var(--red);
+}
+
+/* A category's actions wait for intent with a mouse; a collapsed one keeps its chevron. */
+@media (hover: hover) and (pointer: fine) {
+  :is(.panel.expense, .panel.income) .categoryCollapseButton,
+  :is(.panel.expense, .panel.income) .categoryDeleteButton {
+    opacity: 0;
+    transition: opacity 140ms ease;
+  }
+
+  :is(.panel.expense, .panel.income) .expenseGroup:hover .categoryCollapseButton,
+  :is(.panel.expense, .panel.income) .expenseGroup:hover .categoryDeleteButton,
+  :is(.panel.expense, .panel.income) .expenseGroupHeader:focus-within .categoryCollapseButton,
+  :is(.panel.expense, .panel.income) .expenseGroupHeader:focus-within .categoryDeleteButton,
+  :is(.panel.expense, .panel.income) .expenseGroup.collapsed .categoryCollapseButton {
+    opacity: 1;
+  }
+}
+
+/* Rows: one neutral surface, no dividers; the amount appears once. */
+:is(.panel.expense, .panel.income) .expenseGroup :is(.expenseRow, .incomeRow) {
+  border-bottom-color: transparent;
+  border-radius: 10px;
+  background: transparent;
+}
+
+:is(.panel.expense, .panel.income) .expenseGroup :is(.expenseRow, .incomeRow):hover {
+  background: rgba(var(--ink-rgb), 0.035);
+}
+
+@media (min-width: 681px) {
+  .panel.expense .expenseGroup .expenseRow,
+  .panel.expense .expenseGroup:not(.ungrouped) .expenseRow {
+    grid-template-columns: 24px minmax(0, 1fr) var(--amount-col) minmax(var(--row-actions), auto);
+    padding-right: var(--row-end);
+  }
+
+  :is(.panel.expense, .panel.income) .expenseGroup:not(.ungrouped) :is(.expenseRow, .incomeRow) {
+    padding-left: 54px;
+  }
+
+  :is(.panel.expense, .panel.income) .expenseGroup:not(.ungrouped) :is(.expenseRow, .incomeRow) > .accountDot {
+    left: 32px;
+  }
+
+  /* The editable amount is the amount: the rounded copy beside it goes. */
+  .panel.expense .expenseRow > .rowTotal {
+    display: none;
+  }
+}
+
+/* Phones too show the amount once: the details icon sits with the row's other actions. */
+@media (max-width: 680px) {
+  .panel.expense .expenseRow > .rowTotal {
+    display: none;
+  }
+}
+
+/* Colour on intent: the group under your pointer (or focus) takes a soft wash. */
+:is(.panel.expense, .panel.income) .expenseGroup:not(.ungrouped):hover,
+:is(.panel.expense, .panel.income) .expenseGroup:not(.ungrouped):focus-within {
+  background: color-mix(in srgb, var(--category-color) 7%, transparent);
+}
+
+/* While an expense is dragged onto a category, that one lifts and the rest recede. */
+:is(.panel.expense, .panel.income) .expenseGroup.categoryDropTarget {
+  background: color-mix(in srgb, var(--category-color) 12%, var(--surface));
+  box-shadow: var(--layer-shadow), 0 0 0 2px color-mix(in srgb, var(--category-color) 45%, transparent);
+  transform: translateY(-1px);
+}
+
+:is(.panel.expense, .panel.income) .expenseGroups:has(.categoryDropTarget) > .expenseGroup:not(.categoryDropTarget) {
+  opacity: 0.5;
+}
+
+/* Add rows: neutral, colour only on their controls. */
+.panel .addRow {
+  background: transparent;
+  border-top: 1px solid rgba(var(--line-rgb), 0.06);
+}
+
+.addIcon,
+.addIcon.expense,
+.checkButton,
+.checkButton.expense {
+  border-color: transparent;
+  background: var(--field);
+}
+
+.addIcon:hover,
+.checkButton:hover {
+  background: var(--field-hover);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.panel.expense, .panel.income) .expenseGroup.categoryDropTarget {
+    transform: none;
+  }
+}
+
+/* Phones: the header is name and total (the count is in the rows below), and the rail
+   moves under the icon tile with the rows stepping clear of it. */
+@media (max-width: 680px) {
+  :is(.panel.expense, .panel.income) .expenseGroupHeader {
+    grid-template-columns: 28px minmax(0, 1fr) auto auto;
+    padding-left: 4px;
+  }
+
+  :is(.panel.expense, .panel.income) .categoryNameInput {
+    width: 100%;
+    field-sizing: fixed;
+  }
+
+  :is(.panel.expense, .panel.income) .expenseGroupHeader em {
+    display: none;
+  }
+
+  :is(.panel.expense, .panel.income) .expenseGroupHeader b {
+    padding-right: 4px;
+  }
+
+  :is(.panel.expense, .panel.income) .expenseGroup:not(.ungrouped)::before {
+    left: 16px;
+  }
+
+  :is(.panel.expense, .panel.income) .expenseGroup:not(.ungrouped) :is(.expenseRow, .incomeRow) {
+    padding-left: 50px;
+  }
+
+  :is(.panel.expense, .panel.income) .expenseGroup:not(.ungrouped) :is(.expenseRow, .incomeRow) > .accountDot {
+    left: 26px;
+  }
+}
+
+/* ─── Quiet rows ──────────────────────────────────────────────────────────────
+   At rest a row is its name, its amount and (if it repeats) a small teal mark.
+   Everything else waits for the pointer or keyboard focus. On touch screens,
+   which have no hover, all of it stays visible. */
+.financeRow .moneyInput {
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+/* The currency sign sits against the number (£950), not a column away from it. */
+.financeRow .moneyInput input {
+  width: auto;
+  max-width: 100%;
+  field-sizing: content;
+  min-width: 2ch;
+  flex: 0 1 auto;
+}
+
+.recurToggle.active {
+  border-color: transparent;
+  background: transparent;
+}
+
+.recurToggle.active:hover {
+  background: var(--field);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .financeRow.quietAccount > .accountDot,
+  .financeRow .dragHandle,
+  .financeRow .rowActions .rowAction,
+  .financeRow .recurToggle:not(.active) {
+    opacity: 0;
+    transition: opacity 140ms ease;
+  }
+
+  .financeRow .dragHandle {
+    opacity: 0.35;
+  }
+
+  .financeRow:hover > .accountDot,
+  .financeRow:focus-within > .accountDot,
+  .financeRow:hover .dragHandle,
+  .financeRow:focus-within .dragHandle,
+  .financeRow:hover .rowActions .rowAction,
+  .financeRow:focus-within .rowActions .rowAction,
+  .financeRow:hover .recurToggle,
+  .financeRow:focus-within .recurToggle,
+  .financeRow .rowAction:focus-visible,
+  .financeRow .recurToggle:focus-visible {
+    opacity: 1;
+  }
+}

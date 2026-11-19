@@ -1119,7 +1119,7 @@ export function buildCsvExport(state: LedgerState): string {
 
   Object.entries(state.months).forEach(([monthKey, month]) => {
     month.incomes.forEach((income) => {
-      rows.push([monthKey, state.currency, "income", income.date ?? "", income.source, "", String(income.amount), ""]);
+      rows.push([monthKey, state.currency, "income", income.date ?? "", income.source, income.category ?? "", String(income.amount), ""]);
     });
 
     month.expenses.forEach((expense) => {

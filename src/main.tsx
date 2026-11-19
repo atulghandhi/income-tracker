@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { injectSpeedInsights } from "@vercel/speed-insights";
 import App from "./App";
 import "./styles.css";
+import "./frame.css";
 
 injectSpeedInsights();
 

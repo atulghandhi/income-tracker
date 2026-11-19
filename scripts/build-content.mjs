@@ -34,6 +34,8 @@ import { CALCULATORS } from "./content/calculators.mjs";
 import { LANDINGS } from "./content/landings.mjs";
 import { COMPARISONS, ROUNDUP } from "./content/comparisons.mjs";
 import { TEMPLATES } from "./content/templates.mjs";
+import { framePalette } from "../src/framePalette.mjs";
+import { UI_VERSION } from "../src/uiVersion.mjs";
 import { CHANGELOG } from "./content/changelog.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -93,39 +95,139 @@ const pageTitle = (base) => (base.length <= 42 ? `${base} · ${BRAND}` : base);
 // Shell: CSS, nav, footer, analytics, JSON-LD graph
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ---------------------------------------------------------------------------
+// Look and feel. Every static page is a neutral "canvas" resting on a tinted
+// "frame". The frame's hue says which part of the site you are in (tools,
+// guides, bank guides, templates, compare); the canvas never changes, so
+// content colours read the same everywhere. Light and dark follow the app's own
+// saved theme (localStorage "it_theme", same origin), falling back to the
+// system setting, so clicking through to the tracker never swaps worlds.
+//
+// The frame colours are generated here and every text colour that sits on them
+// is checked for 4.5:1 contrast at build time. The build fails if one does not.
+// ---------------------------------------------------------------------------
+const SECTION_HUES = {
+  home: { hue: 196, sat: 1 },
+  tools: { hue: 172, sat: 1 },
+  guides: { hue: 22, sat: 0.9 },
+  import: { hue: 208, sat: 1 },
+  templates: { hue: 258, sat: 0.8 },
+  compare: { hue: 218, sat: 0.35 },
+};
+
+function sectionFor(path) {
+  const top = path.split("/")[1] || "";
+  if (top.endsWith(".html") || top === "") return "home";
+  return SECTION_HUES[top] ? top : "home";
+}
+
+// Colour maths and the contrast guarantee live in src/framePalette.mjs, shared with the app.
+function framePaletteFor(name, scheme) {
+  const { hue, sat } = SECTION_HUES[name];
+  const f = framePalette(hue, scheme, sat);
+  const v = f.vars;
+  return {
+    a: f.a,
+    b: f.b,
+    vars: `--frame-a: ${v["--frame-a"]}; --frame-b: ${v["--frame-b"]}; --frame-ink: ${v["--frame-ink"]}; --frame-ink-soft: ${v["--frame-ink-soft"]}; --frame-hover: ${v["--frame-hover"]}; --frame-line: ${v["--frame-line"]};`,
+  };
+}
+
+const FRAMES = Object.fromEntries(
+  Object.keys(SECTION_HUES).map((name) => [name, { light: framePaletteFor(name, "light"), dark: framePaletteFor(name, "dark") }]),
+);
+
+// Canvas tokens. Light first, then the same names for dark.
+const CANVAS_LIGHT = `
+    --canvas: #ffffff; --well: #f4f6f9; --field: #ffffff;
+    --ink-strong: #0e1826; --ink: #233247; --ink-soft: #46556b; --ink-muted: #5b6878;
+    --line: rgb(20 32 51 / 0.11); --line-strong: rgb(20 32 51 / 0.2);
+    --accent: #00dfc1; --accent-ink: #00756a; --on-accent: #051424;
+    --accent-wash: rgb(0 140 124 / 0.08); --accent-line: rgb(0 140 124 / 0.4);
+    --good: #00756a; --warn: #8a5300; --bad: #b42318;
+    --shadow: 0 0 0 1px rgb(14 24 38 / 0.05), 0 8px 30px rgb(14 24 38 / 0.12);
+    color-scheme: light;`;
+const CANVAS_DARK = `
+    --canvas: #0a192a; --well: #0f2236; --field: #06182b;
+    --ink-strong: #ffffff; --ink: #d4e4fa; --ink-soft: #b8c8e0; --ink-muted: #9ea8b7;
+    --line: rgb(212 228 250 / 0.1); --line-strong: rgb(212 228 250 / 0.18);
+    --accent: #00dfc1; --accent-ink: #00dfc1; --on-accent: #051424;
+    --accent-wash: rgb(0 223 193 / 0.08); --accent-line: rgb(0 223 193 / 0.38);
+    --good: #00dfc1; --warn: #ffd479; --bad: #ff8b8b;
+    --shadow: 0 0 0 1px rgb(255 255 255 / 0.04), 0 10px 36px rgb(0 0 0 / 0.45);
+    color-scheme: dark;`;
+
+const frameRules = (scheme, prefix) =>
+  Object.entries(FRAMES)
+    .map(([name, f]) => `  ${prefix}body[data-section="${name}"] { ${f[scheme].vars} }`)
+    .join("\n");
+
 const CSS = `
+  :root {${CANVAS_LIGHT}
+    --inset: 12px; --r-canvas: 18px; --r-item: 10px; --grain: 0.14;
+    --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+${frameRules("light", "")}
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {${CANVAS_DARK}
+    }
+${frameRules("dark", ':root:not([data-theme="light"]) ')}
+  }
+  :root[data-theme="dark"] {${CANVAS_DARK}
+  }
+${frameRules("dark", ':root[data-theme="dark"] ')}
+
   *, *::before, *::after { box-sizing: border-box; }
-  html { -webkit-text-size-adjust: 100%; }
+  html { -webkit-text-size-adjust: 100%; background: var(--frame-b); }
   body {
-    margin: 0; padding: 0 24px 96px; background: #051424; color: #d4e4fa;
+    position: relative; isolation: isolate; min-height: 100vh;
+    margin: 0; padding: 0 24px 40px; background: var(--frame-b); color: var(--frame-ink);
     font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     font-size: 16px; line-height: 1.7;
   }
-  .wrap { max-width: 760px; margin: 0 auto; }
-  a { color: #00dfc1; text-decoration: none; }
+  /* The frame: one gradient from the section hue, with grain so it reads as a material. */
+  body::before, body::after { content: ""; position: fixed; inset: 0; pointer-events: none; }
+  body::before { z-index: -2; background: linear-gradient(150deg, var(--frame-a), var(--frame-b) 70%); }
+  body::after {
+    z-index: -1; opacity: var(--grain); mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23g)'/></svg>");
+  }
+  a { color: var(--accent-ink); text-decoration: none; }
   a:hover { text-decoration: underline; }
-  header.site { max-width: 980px; margin: 0 auto; padding: 18px 0 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
-  header.site .brand { color: #fff; font-weight: 800; letter-spacing: -0.01em; font-size: 1.02rem; margin-right: auto; }
-  header.site .brand:hover { text-decoration: none; color: #00dfc1; }
-  nav.sitenav { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; font-size: 0.88rem; }
-  nav.sitenav a { color: #b8c8e0; padding: 4px 0; }
-  nav.sitenav a:hover { color: #00dfc1; text-decoration: none; }
-  nav.sitenav a.navbtn { background: rgba(0,223,193,0.12); border: 1px solid rgba(0,223,193,0.35); color: #00dfc1; padding: 6px 12px; border-radius: 8px; font-weight: 700; }
-  nav.sitenav a.navbtn:hover { background: rgba(0,223,193,0.2); }
+  :focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 2px; border-radius: 4px; }
+
+  /* Chrome that lives on the frame */
+  header.site { max-width: 920px; margin: 0 auto; padding: 18px 4px 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+  header.site .brand { color: var(--frame-ink); font-weight: 800; letter-spacing: -0.01em; font-size: 1.02rem; margin-right: auto; }
+  header.site .brand:hover { text-decoration: none; opacity: 0.8; }
+  nav.sitenav { display: flex; flex-wrap: wrap; gap: 2px 4px; align-items: center; font-size: 0.88rem; }
+  nav.sitenav a { color: var(--frame-ink-soft); padding: 5px 10px; border-radius: 8px; transition: background-color 150ms var(--ease-out), color 150ms var(--ease-out); }
+  nav.sitenav a:hover, nav.sitenav a[aria-current="page"] { color: var(--frame-ink); background: var(--frame-hover); text-decoration: none; }
+  nav.sitenav a.navbtn { margin-left: 6px; background: var(--canvas); color: var(--ink-strong); font-weight: 700; padding: 6px 14px; box-shadow: 0 1px 2px rgb(0 0 0 / 0.12); }
+  nav.sitenav a.navbtn:hover { background: var(--canvas); color: var(--accent-ink); }
+  header.site :focus-visible, .frame-foot :focus-visible { outline-color: var(--frame-ink); }
+
+  /* The canvas: the only raised surface on the page */
+  .wrap {
+    max-width: 920px; margin: 0 auto; padding: 10px 56px 56px;
+    background: var(--canvas); color: var(--ink); border-radius: var(--r-canvas); box-shadow: var(--shadow);
+  }
+  .wrap > :last-child { margin-bottom: 0; }
   header.top { padding: 22px 0 8px; }
-  nav.crumbs { font-size: 0.85rem; color: #9ea8b7; }
-  nav.crumbs a { color: #9ea8b7; }
-  nav.crumbs a:hover { color: #00dfc1; }
-  h1 { font-size: clamp(1.7rem, 4vw, 2.3rem); font-weight: 800; line-height: 1.15; margin: 18px 0 10px; color: #fff; letter-spacing: -0.02em; }
-  .meta { color: #9ea8b7; font-size: 0.85rem; margin-bottom: 24px; }
-  .lede { font-size: 1.12rem; color: #eaf2ff; line-height: 1.65; margin: 0 0 24px; }
-  .tldr { background: rgba(0,223,193,0.07); border: 1px solid rgba(0,223,193,0.22); border-radius: 12px; padding: 16px 20px; margin: 0 0 28px; }
-  .tldr > strong { color: #00dfc1; letter-spacing: 0.02em; font-size: 0.8rem; text-transform: uppercase; display: block; margin-bottom: 6px; }
-  .tldr p strong { color: #fff; }
-  .tldr p { margin: 0; color: #d4e4fa; }
-  h2 { font-size: 1.3rem; font-weight: 700; color: #fff; margin: 40px 0 12px; letter-spacing: -0.01em; }
-  h3 { font-size: 1.05rem; font-weight: 650; color: #fff; margin: 28px 0 8px; }
-  p, li { color: #c8d8ee; }
+  nav.crumbs { font-size: 0.85rem; color: var(--ink-muted); }
+  nav.crumbs a { color: var(--ink-muted); }
+  nav.crumbs a:hover { color: var(--accent-ink); }
+  h1 { font-size: clamp(1.7rem, 4vw, 2.3rem); font-weight: 800; line-height: 1.15; margin: 18px 0 10px; color: var(--ink-strong); letter-spacing: -0.02em; }
+  .meta { color: var(--ink-muted); font-size: 0.85rem; margin-bottom: 24px; }
+  .lede { font-size: 1.12rem; color: var(--ink-strong); line-height: 1.65; margin: 0 0 24px; }
+  .tldr { border-left: 3px solid var(--accent); background: var(--well); border-radius: 0 var(--r-item) var(--r-item) 0; padding: 14px 20px; margin: 0 0 28px; }
+  .tldr > strong { color: var(--accent-ink); letter-spacing: 0.04em; font-size: 0.76rem; text-transform: uppercase; display: block; margin-bottom: 4px; }
+  .tldr p strong { color: var(--ink-strong); }
+  .tldr p { margin: 0; color: var(--ink); }
+  h2 { font-size: 1.3rem; font-weight: 700; color: var(--ink-strong); margin: 40px 0 12px; letter-spacing: -0.01em; }
+  h3 { font-size: 1.05rem; font-weight: 650; color: var(--ink-strong); margin: 28px 0 8px; }
+  p, li { color: var(--ink); }
+  strong { color: var(--ink-strong); }
   ul, ol { padding-left: 22px; }
   li + li { margin-top: 8px; }
   ol.steps { counter-reset: step; list-style: none; padding-left: 0; }
@@ -133,114 +235,138 @@ const CSS = `
   ol.steps > li::before {
     counter-increment: step; content: counter(step);
     position: absolute; left: 0; top: 0; width: 30px; height: 30px;
-    background: rgba(0,223,193,0.12); border: 1px solid rgba(0,223,193,0.4);
-    color: #00dfc1; border-radius: 50%; display: grid; place-items: center;
+    background: var(--accent-wash); border: 1px solid var(--accent-line);
+    color: var(--accent-ink); border-radius: 50%; display: grid; place-items: center;
     font-weight: 700; font-size: 0.9rem;
   }
-  .note { background: rgba(212,228,250,0.05); border-left: 3px solid rgba(212,228,250,0.25); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 20px 0; font-size: 0.95rem; color: #b8c8e0; }
-  .cta { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin: 34px 0; padding: 24px; background: rgba(8,22,38,0.85); border: 1px solid rgba(0,223,193,0.18); border-radius: 14px; }
+  .note { background: var(--well); border-left: 3px solid var(--line-strong); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 20px 0; font-size: 0.95rem; color: var(--ink-soft); }
+  .note strong { color: var(--ink-strong); }
+  .cta { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin: 34px 0; padding: 20px 22px; background: var(--well); border: 1px solid var(--line); border-radius: 14px; }
   .cta .cta-text { flex: 1; min-width: 220px; }
-  .cta .cta-text strong { color: #fff; display: block; font-size: 1.05rem; margin-bottom: 2px; }
-  .cta .cta-text span { color: #9ea8b7; font-size: 0.9rem; }
-  .btn { display: inline-flex; align-items: center; gap: 8px; background: #00dfc1; color: #051424; font-weight: 700; padding: 13px 22px; border-radius: 10px; white-space: nowrap; border: none; font-size: 1rem; font-family: inherit; cursor: pointer; }
+  .cta .cta-text strong { color: var(--ink-strong); display: block; font-size: 1.05rem; margin-bottom: 2px; }
+  .cta .cta-text span { color: var(--ink-soft); font-size: 0.9rem; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; background: var(--accent); color: var(--on-accent); font-weight: 700; padding: 13px 22px; border-radius: 10px; white-space: nowrap; border: none; font-size: 1rem; font-family: inherit; cursor: pointer; transition: filter 150ms var(--ease-out), background-color 150ms var(--ease-out); }
   .btn:hover { text-decoration: none; filter: brightness(1.06); }
-  .btn.ghost { background: transparent; color: #00dfc1; border: 1px solid rgba(0,223,193,0.4); }
-  .btn.ghost:hover { background: rgba(0,223,193,0.08); }
+  .btn.ghost { background: transparent; color: var(--accent-ink); border: 1px solid var(--accent-line); }
+  .btn.ghost:hover { background: var(--accent-wash); filter: none; }
   .btnrow { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 18px 0; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; margin: 24px 0; }
-  .card { display: block; padding: 16px 18px; background: rgba(8,22,38,0.7); border: 1px solid rgba(212,228,250,0.1); border-radius: 12px; transition: border-color 140ms ease, transform 140ms ease; }
-  .card:hover { text-decoration: none; border-color: rgba(0,223,193,0.4); transform: translateY(-2px); }
-  .card .card-t { color: #fff; font-weight: 650; display: block; margin-bottom: 4px; }
-  .card .card-d { color: #9ea8b7; font-size: 0.88rem; }
-  .faq dt { font-weight: 650; color: #fff; margin-top: 22px; }
-  .faq dd { margin: 6px 0 0; color: #c8d8ee; }
-  .tablewrap { overflow-x: auto; margin: 18px 0; border: 1px solid rgba(212,228,250,0.12); border-radius: 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin: 24px 0; }
+  .card { display: block; padding: 16px 18px; background: var(--canvas); border: 1px solid var(--line); border-radius: 12px; transition: border-color 150ms var(--ease-out), background-color 150ms var(--ease-out); }
+  .card:hover { text-decoration: none; border-color: var(--accent-line); background: var(--well); }
+  .card .card-t { color: var(--ink-strong); font-weight: 650; display: block; margin-bottom: 4px; }
+  .card .card-d { color: var(--ink-soft); font-size: 0.88rem; }
+  .faq dt { font-weight: 650; color: var(--ink-strong); margin-top: 22px; }
+  .faq dd { margin: 6px 0 0; color: var(--ink); }
+  .tablewrap { overflow-x: auto; margin: 18px 0; border: 1px solid var(--line-strong); border-radius: 12px; }
   table { border-collapse: collapse; width: 100%; font-size: 0.93rem; min-width: 460px; }
-  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid rgba(212,228,250,0.1); vertical-align: top; color: #c8d8ee; }
-  th { color: #fff; font-weight: 700; background: rgba(8,22,38,0.9); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--ink); }
+  th { color: var(--ink-strong); font-weight: 700; background: var(--well); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.03em; }
   tr:last-child td { border-bottom: none; }
-  td.hi { color: #00dfc1; font-weight: 600; }
-  .verdict { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin: 20px 0; }
-  .verdict > div { background: rgba(8,22,38,0.7); border: 1px solid rgba(212,228,250,0.1); border-radius: 12px; padding: 16px 18px; }
+  td.hi { color: var(--accent-ink); font-weight: 600; }
+  .verdict { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 20px 0; }
+  .verdict > div { background: var(--well); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
   .verdict h3 { margin: 0 0 8px; font-size: 0.98rem; }
   .verdict ul { margin: 0; padding-left: 18px; }
   .verdict li { font-size: 0.93rem; }
-  .sources { font-size: 0.86rem; color: #9ea8b7; }
+  .sources { font-size: 0.86rem; color: var(--ink-muted); }
   .sources ul { padding-left: 18px; }
-  .sources li { color: #9ea8b7; margin-top: 4px; }
-  .sources a { color: #9ea8b7; text-decoration: underline; }
-  .sources a:hover { color: #00dfc1; }
-  .tag { display: inline-block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #00dfc1; background: rgba(0,223,193,0.1); border: 1px solid rgba(0,223,193,0.3); padding: 2px 8px; border-radius: 999px; margin-right: 8px; vertical-align: middle; }
+  .sources li { color: var(--ink-muted); margin-top: 4px; }
+  .sources a { color: var(--ink-muted); text-decoration: underline; }
+  .sources a:hover { color: var(--accent-ink); }
+  .tag { display: inline-block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent-ink); background: var(--accent-wash); border: 1px solid var(--accent-line); padding: 2px 8px; border-radius: 999px; margin-right: 8px; vertical-align: middle; }
   .changelog li { margin-top: 14px; }
-  .changelog time { color: #9ea8b7; font-size: 0.82rem; display: block; }
-  .changelog strong { color: #fff; }
-  /* Calculator widget */
-  .calc { background: rgba(8,22,38,0.9); border: 1px solid rgba(0,223,193,0.2); border-radius: 16px; padding: 22px; margin: 0 0 14px; }
+  .changelog time { color: var(--ink-muted); font-size: 0.82rem; display: block; }
+  .changelog strong { color: var(--ink-strong); }
+  /* Calculator widget: the one thing on a tool page that should lead the eye */
+  .calc { background: var(--well); border: 1.5px solid var(--accent-line); border-radius: 16px; padding: 22px; margin: 0 0 14px; }
   .calc-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
   .calc-field { display: flex; flex-direction: column; gap: 6px; }
-  .calc-label { font-size: 0.82rem; color: #9ea8b7; font-weight: 600; }
-  .calc-inwrap { display: flex; align-items: center; background: #06182b; border: 1px solid rgba(212,228,250,0.16); border-radius: 10px; padding: 0 12px; }
-  .calc-inwrap:focus-within { border-color: rgba(0,223,193,0.5); }
-  .calc-inwrap i { color: #9ea8b7; font-style: normal; font-size: 0.95rem; }
-  .calc-inwrap select { min-width: 0; width: 100%; padding: 12px; border: 0; background: #102638; color: #d4e4fa; font: inherit; }
-  .calc-inwrap input { flex: 1; min-width: 0; background: none; border: none; color: #fff; font-size: 1.05rem; font-weight: 600; padding: 11px 6px; outline: none; font-family: inherit; }
+  .calc-label { font-size: 0.82rem; color: var(--ink-soft); font-weight: 600; }
+  .calc-inwrap { display: flex; align-items: center; background: var(--field); border: 1px solid var(--line-strong); border-radius: 10px; padding: 0 12px; transition: border-color 150ms var(--ease-out); }
+  .calc-inwrap:focus-within { border-color: var(--accent-ink); }
+  .calc-inwrap i { color: var(--ink-muted); font-style: normal; font-size: 0.95rem; }
+  .calc-inwrap select { min-width: 0; width: 100%; padding: 12px; border: 0; background: var(--field); color: var(--ink-strong); font: inherit; }
+  .calc-inwrap input { flex: 1; min-width: 0; background: none; border: none; color: var(--ink-strong); font-size: 1.05rem; font-weight: 600; padding: 11px 6px; outline: none; font-family: inherit; }
   .calc-inwrap input::-webkit-outer-spin-button, .calc-inwrap input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-  .calc-out { margin-top: 18px; padding-top: 18px; border-top: 1px solid rgba(212,228,250,0.1); }
+  .calc-out { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
   .calc-out p { margin: 8px 0 0; }
-  .calc-headline { font-size: 2rem; font-weight: 800; color: #00dfc1; line-height: 1.1; letter-spacing: -0.02em; }
-  .calc-headline small { font-size: 0.9rem; font-weight: 600; color: #9ea8b7; letter-spacing: 0; }
-  .calc-hint { color: #9ea8b7; }
-  .calc-good { color: #00dfc1; }
-  .calc-warn { color: #ffd479; }
-  .calc-bad { color: #ff8b8b; }
+  .calc-headline { font-size: 2.2rem; font-weight: 800; color: var(--accent-ink); line-height: 1.1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .calc-headline small { font-size: 0.9rem; font-weight: 600; color: var(--ink-muted); letter-spacing: 0; }
+  .calc-hint { color: var(--ink-muted); }
+  .calc-good { color: var(--good); }
+  .calc-warn { color: var(--warn); }
+  .calc-bad { color: var(--bad); }
   .calc-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 16px; }
   .calc-actions .btn { padding: 9px 14px; font-size: 0.88rem; }
-  .calc-share-note { font-size: 0.82rem; color: #9ea8b7; }
+  .calc-share-note { font-size: 0.82rem; color: var(--ink-muted); }
   .sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
   /* Bank guides: at-a-glance answers, file drop zone, result preview */
-  .glance { margin: 0 0 28px; border: 1px solid rgba(212,228,250,0.12); border-radius: 12px; overflow: hidden; }
-  .glance > div { display: grid; grid-template-columns: 168px 1fr; gap: 4px 16px; padding: 11px 16px; border-bottom: 1px solid rgba(212,228,250,0.08); }
+  .glance { margin: 0 0 28px; border: 1px solid var(--line-strong); border-radius: 12px; overflow: hidden; }
+  .glance > div { display: grid; grid-template-columns: 168px 1fr; gap: 4px 16px; padding: 11px 16px; border-bottom: 1px solid var(--line); }
   .glance > div:last-child { border-bottom: none; }
-  .glance dt { color: #9ea8b7; font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; padding-top: 3px; }
-  .glance dd { margin: 0; color: #eaf2ff; font-size: 0.96rem; }
-  .drop { margin: 34px 0; padding: 24px; background: rgba(0,223,193,0.06); border: 2px dashed rgba(0,223,193,0.45); border-radius: 16px; transition: background 140ms ease, border-color 140ms ease; }
-  .drop.over { background: rgba(0,223,193,0.16); border-color: #00dfc1; }
+  .glance dt { color: var(--ink-muted); font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; padding-top: 3px; }
+  .glance dd { margin: 0; color: var(--ink-strong); font-size: 0.96rem; }
+  .drop { margin: 34px 0; padding: 24px; background: var(--accent-wash); border: 2px dashed var(--accent-line); border-radius: 16px; transition: background-color 150ms var(--ease-out), border-color 150ms var(--ease-out); }
+  .drop.over { background: var(--well); border-color: var(--accent-ink); }
   .drop.busy { opacity: 0.7; pointer-events: none; }
-  .drop-text strong { display: block; color: #fff; font-size: 1.15rem; margin-bottom: 4px; }
-  .drop-text span { color: #b8c8e0; font-size: 0.95rem; }
+  .drop-text strong { display: block; color: var(--ink-strong); font-size: 1.15rem; margin-bottom: 4px; }
+  .drop-text span { color: var(--ink-soft); font-size: 0.95rem; }
   .drop-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-top: 16px; }
   .drop-alt { font-size: 0.92rem; font-weight: 600; }
-  .drop-msg { margin: 12px 0 0; font-size: 0.9rem; color: #ffd479; }
+  .drop-msg { margin: 12px 0 0; font-size: 0.9rem; color: var(--warn); }
   .drop-msg:empty { display: none; }
-  .drop input:focus-visible + a, .drop label:focus-within { outline: 2px solid #00dfc1; outline-offset: 3px; }
-  .preview { margin: 18px 0; background: rgba(8,22,38,0.9); border: 1px solid rgba(212,228,250,0.12); border-radius: 14px; overflow: hidden; font-size: 0.93rem; }
-  .preview-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: rgba(0,223,193,0.07); color: #fff; font-weight: 700; }
-  .preview-sur { font-weight: 500; color: #b8c8e0; font-size: 0.88rem; }
-  .preview-sur b { color: #00dfc1; font-size: 1.02rem; margin-left: 4px; }
-  .preview-row { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; padding: 10px 16px; border-top: 1px solid rgba(212,228,250,0.07); }
-  .preview-n { color: #eaf2ff; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .preview-c { color: #00dfc1; background: rgba(0,223,193,0.1); border-radius: 999px; padding: 1px 10px; font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
-  .preview-a { color: #c8d8ee; font-variant-numeric: tabular-nums; text-align: right; min-width: 92px; }
-  .preview-a.in { color: #00dfc1; }
-  .preview-foot { padding: 8px 16px; border-top: 1px solid rgba(212,228,250,0.07); color: #7f8b9c; font-size: 0.78rem; }
-  hr { border: none; border-top: 1px solid rgba(212,228,250,0.1); margin: 48px 0 24px; }
-  footer.site { color: #9ea8b7; font-size: 0.85rem; }
+  .drop input:focus-visible + a, .drop label:focus-within { outline: 2px solid var(--accent-ink); outline-offset: 3px; }
+  .preview { margin: 18px 0; background: var(--canvas); border: 1px solid var(--line-strong); border-radius: 14px; overflow: hidden; font-size: 0.93rem; }
+  .preview-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: var(--well); color: var(--ink-strong); font-weight: 700; }
+  .preview-sur { font-weight: 500; color: var(--ink-soft); font-size: 0.88rem; }
+  .preview-sur b { color: var(--accent-ink); font-size: 1.02rem; margin-left: 4px; }
+  .preview-row { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; padding: 10px 16px; border-top: 1px solid var(--line); }
+  .preview-n { color: var(--ink-strong); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .preview-c { color: var(--accent-ink); background: var(--accent-wash); border-radius: 999px; padding: 1px 10px; font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
+  .preview-a { color: var(--ink); font-variant-numeric: tabular-nums; text-align: right; min-width: 92px; }
+  .preview-a.in { color: var(--accent-ink); }
+  .preview-foot { padding: 8px 16px; border-top: 1px solid var(--line); color: var(--ink-muted); font-size: 0.78rem; }
+  hr { border: none; border-top: 1px solid var(--line); margin: 48px 0 24px; }
+  /* Footer sits back on the frame, below the canvas */
+  .frame-foot { max-width: 920px; margin: 0 auto; padding: 36px 4px 0; }
+  footer.site { color: var(--frame-ink-soft); font-size: 0.85rem; }
   footer.site .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 18px; margin-bottom: 22px; }
-  footer.site h4 { color: #d4e4fa; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 8px; }
+  footer.site h4 { color: var(--frame-ink); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 8px; }
   footer.site ul { list-style: none; padding: 0; margin: 0; }
-  footer.site li { margin: 0 0 6px; color: #9ea8b7; }
-  footer.site a { color: #9ea8b7; }
-  footer.site a:hover { color: #00dfc1; }
-  footer.site .legal { border-top: 1px solid rgba(212,228,250,0.08); padding-top: 14px; }
+  footer.site li { margin: 0 0 6px; color: var(--frame-ink-soft); }
+  footer.site a { color: var(--frame-ink-soft); }
+  footer.site a:hover { color: var(--frame-ink); }
+  footer.site .legal { border-top: 1px solid var(--frame-line); padding-top: 14px; }
+
+  /* The handoff. When a calculator result or a dropped statement goes to the
+     tracker, the box it came from grows into the app (same-origin cross-document
+     view transition). Every other navigation is instant. */
+  @view-transition { navigation: auto; }
+  ::view-transition-group(handoff) { animation-duration: 380ms; animation-timing-function: cubic-bezier(0.2, 0.9, 0.25, 1.04); }
+  ::view-transition-old(handoff), ::view-transition-new(handoff) { height: 100%; object-fit: cover; object-position: top; mix-blend-mode: normal; }
+  ::view-transition-old(handoff) { animation: 120ms ease-out both it-vt-out; }
+  ::view-transition-new(handoff) { animation: 240ms 90ms ease-out both it-vt-in; }
+  @keyframes it-vt-out { to { opacity: 0; } }
+  @keyframes it-vt-in { from { opacity: 0; } }
+
+  @media (max-width: 720px) {
+    .wrap { padding: 4px 28px 40px; }
+  }
   @media (max-width: 560px) {
-    body { padding: 0 16px 72px; }
-    header.site { padding-top: 14px; }
-    nav.sitenav { font-size: 0.84rem; gap: 2px 12px; }
-    .calc { padding: 16px; }
+    body { padding: 0 var(--inset) 32px; }
+    header.site { padding: 14px 6px 10px; }
+    nav.sitenav { font-size: 0.84rem; gap: 2px; margin-left: -10px; }
+    nav.sitenav a.navbtn { margin-left: 0; }
+    .wrap { padding: 2px 18px 32px; border-radius: 14px; }
+    .frame-foot { padding: 28px 8px 0; }
+    .calc { padding: 16px; margin-left: -6px; margin-right: -6px; }
     .glance > div { grid-template-columns: 1fr; }
     .drop { padding: 18px; }
     .preview-row { grid-template-columns: 1fr auto; }
     .preview-c { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { transition: none !important; animation-duration: 1ms !important; }
   }
 `;
 
@@ -252,11 +378,11 @@ const NAV_LINKS = [
   { href: "/templates/", label: "Templates" },
 ];
 
-function siteHeader() {
+function siteHeader(path = "") {
   return `    <header class="site">
       <a class="brand" href="/">${BRAND}</a>
       <nav class="sitenav" aria-label="Site">
-${NAV_LINKS.map((l) => `        <a href="${l.href}">${esc(l.label)}</a>`).join("\n")}
+${NAV_LINKS.map((l) => `        <a href="${l.href}"${path.startsWith(l.href) ? ' aria-current="page"' : ""}>${esc(l.label)}</a>`).join("\n")}
         <a class="navbtn" href="/#ref=nav" data-track="cta_click" data-ref="nav">Open the tracker</a>
       </nav>
     </header>`;
@@ -302,20 +428,23 @@ function siteFooter() {
 //  - Vercel Web Analytics: the standard queue shim + script (no-op off Vercel).
 //  - PostHog: only when the build had VITE_POSTHOG_KEY. Same privacy contract as
 //    src/analytics.ts: event names, page path, small categorical props. Nothing
-//    a person types into a calculator is ever sent.
+//    a person types into a calculator is ever sent. Like the app, each event carries
+//    the design version (`ui`), the page's section, the browser user agent (without it
+//    PostHog classes every visit as automation) and any utm_* tags on the URL.
 //  - Any element with data-track="event_name" reports a click (plus data-ref).
 function analyticsScript() {
   return `<script>
 window.va=window.va||function(){(window.vaq=window.vaq||[]).push(arguments)};
 (function(){
-  var PH_KEY=${JSON.stringify(POSTHOG_KEY)},PH_HOST=${JSON.stringify(POSTHOG_HOST)};
+  var PH_KEY=${JSON.stringify(POSTHOG_KEY)},PH_HOST=${JSON.stringify(POSTHOG_HOST)},UI=${JSON.stringify(UI_VERSION)};
   var dnt=typeof navigator!=="undefined"&&navigator.doNotTrack==="1";
   function id(){try{var k="it_analytics_id",v=localStorage.getItem(k);if(!v){v="anon-"+(window.crypto&&crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2));localStorage.setItem(k,v);}return v;}catch(e){return "anon-ephemeral";}}
+  function ctx(){var o={};try{o.$raw_user_agent=navigator.userAgent;o.$current_url=location.origin+location.pathname;o.$pathname=location.pathname;o.$host=location.host;o.section=location.pathname.split("/")[1].replace(/\\.html$/,"")||"home";var q=new URLSearchParams(location.search);["utm_source","utm_medium","utm_campaign"].forEach(function(k){var v=q.get(k);if(v)o[k]=v.slice(0,80);});if(document.referrer){var r=new URL(document.referrer);if(r.host!==location.host)o.$referring_domain=r.host;}}catch(e){}return o;}
   function track(name,props){
     props=props||{};props.page=location.pathname;
     try{window.va("event",{name:name,data:props});}catch(e){}
     if(!PH_KEY||dnt)return;
-    try{fetch(PH_HOST+"/capture/",{method:"POST",keepalive:true,headers:{"content-type":"application/json"},body:JSON.stringify({api_key:PH_KEY,event:name,distinct_id:id(),properties:Object.assign({app:"income-tracker-web",surface:"static"},props),timestamp:new Date().toISOString()})}).catch(function(){});}catch(e){}
+    try{fetch(PH_HOST+"/capture/",{method:"POST",keepalive:true,headers:{"content-type":"application/json"},body:JSON.stringify({api_key:PH_KEY,event:name,distinct_id:id(),properties:Object.assign(ctx(),{app:"income-tracker-web",surface:"static",ui:UI},props),timestamp:new Date().toISOString()})}).catch(function(){});}catch(e){}
   }
   window.itTrack=track;
   document.addEventListener("click",function(ev){
@@ -329,6 +458,32 @@ window.va=window.va||function(){(window.vaq=window.vaq||[]).push(arguments)};
 </script>
 <script defer src="/_vercel/insights/script.js"></script>`;
 }
+
+// Runs before first paint: use the theme the person picked in the app, if any.
+// With nothing saved, the CSS follows the system setting on its own.
+function themeScript(section) {
+  const f = FRAMES[section];
+  return `<script>(function(){try{var t=localStorage.getItem("it_theme");if(t!=="dark"&&t!=="light")return;document.documentElement.dataset.theme=t;var c=t==="dark"?${JSON.stringify(f.dark.a)}:${JSON.stringify(f.light.a)};document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.setAttribute("content",c);});}catch(e){}})();</script>`;
+}
+
+// The one piece of motion on these pages. itHandoff(el) marks the element that
+// is about to become the tracker, and only that navigation animates; the app's
+// index.html picks up the same flag and names its root so the box grows into it.
+const HANDOFF_SCRIPT = `<script>
+(function(){
+  var KEY="it_vt";
+  function calm(){return !window.matchMedia||matchMedia("(prefers-reduced-motion: reduce)").matches;}
+  window.itHandoff=function(el){try{if(!el||calm()||!document.startViewTransition)return;el.style.viewTransitionName="handoff";sessionStorage.setItem(KEY,"1");}catch(e){}};
+  addEventListener("pageswap",function(e){if(!e.viewTransition)return;var on=false;try{on=sessionStorage.getItem(KEY)==="1";}catch(x){}if(!on)e.viewTransition.skipTransition();});
+  addEventListener("pagereveal",function(e){if(e.viewTransition)e.viewTransition.skipTransition();});
+  addEventListener("pageshow",function(){try{sessionStorage.removeItem(KEY);}catch(x){}document.querySelectorAll("[data-handoff]").forEach(function(n){n.style.viewTransitionName="";});});
+  document.addEventListener("click",function(ev){
+    if(ev.defaultPrevented||ev.button!==0||ev.metaKey||ev.ctrlKey||ev.shiftKey||ev.altKey)return;
+    var a=ev.target&&ev.target.closest&&ev.target.closest("a[data-handoff-from]");if(!a)return;
+    window.itHandoff(document.getElementById(a.getAttribute("data-handoff-from")));
+  });
+})();
+</script>`;
 
 function websiteLd() {
   return [
@@ -373,6 +528,7 @@ function webPageLd({ path, title, description, published, type = "WebPage", trai
 
 function shell({ title, description, path, jsonLd = [], body, script = "", published, ogType = "article", pageType = "WebPage", trail, noindex = false }) {
   const canonical = `${SITE}${path}`;
+  const section = sectionFor(path);
   const graph = {
     "@context": "https://schema.org",
     "@graph": [
@@ -391,7 +547,9 @@ function shell({ title, description, path, jsonLd = [], body, script = "", publi
     <meta name="description" content="${esc(description)}" />
     <meta name="robots" content="${noindex ? "noindex, follow" : "index, follow, max-image-preview:large, max-snippet:-1"}" />
     <meta name="author" content="${BRAND}" />
-    <meta name="theme-color" content="#051424" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="${FRAMES[section].light.a}" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="${FRAMES[section].dark.a}" />
+    ${themeScript(section)}
     <link rel="canonical" href="${canonical}" />
     <meta name="geo.region" content="GB" />
     <meta http-equiv="content-language" content="en-GB" />
@@ -420,14 +578,16 @@ function shell({ title, description, path, jsonLd = [], body, script = "", publi
 ${JSON.stringify(graph, null, 2)}
     </script>
   </head>
-  <body>
-${siteHeader()}
-    <div class="wrap">
+  <body data-section="${section}">
+${siteHeader(path)}
+    <main class="wrap">
 ${body.replaceAll(`Updated ${UPDATED_HUMAN}`, `Updated ${humanDate(modifiedAt(path))}`)}
-      <hr />
+    </main>
+    <div class="frame-foot">
 ${siteFooter()}
     </div>
 ${analyticsScript()}
+${HANDOFF_SCRIPT}
 ${script}
   </body>
 </html>
@@ -565,7 +725,7 @@ ${rows.map(([k, v]) => `        <div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`
 function dropZoneHtml(bank) {
   const ref = `import-${bank.slug}`;
   const kind = bank.pdfOnly ? "PDF" : "file";
-  return `<div class="drop" id="drop" data-ref="${esc(ref)}">
+  return `<div class="drop" id="drop" data-ref="${esc(ref)}" data-handoff>
         <div class="drop-text">
           <strong>Got your ${esc(bank.name)} ${kind}? Drop it here.</strong>
           <span>It opens in the tracker with every transaction sorted by month, ready to categorise. The file stays in your browser and is never uploaded. No account, no bank login.</span>
@@ -604,7 +764,7 @@ const DROP_SCRIPT = `<script>
             var db=open.result,tx=db.transaction("files","readwrite");
             tx.objectStore("files").put({name:file.name,type:file.type||"",bytes:reader.result,at:Date.now()},"pending");
             tx.onerror=manual;
-            tx.oncomplete=function(){db.close();if(window.itTrack)window.itTrack("file_handoff",{ref:ref,format:ext(file.name)});location.href=appUrl+"&handoff=1";};
+            tx.oncomplete=function(){db.close();if(window.itTrack)window.itTrack("file_handoff",{ref:ref,format:ext(file.name)});zone.classList.remove("busy");if(window.itHandoff)window.itHandoff(zone);location.href=appUrl+"&handoff=1";};
           }catch(e){manual();}
         };
       }catch(e){manual();}
@@ -927,7 +1087,7 @@ function calcWidget(calc) {
       return `<label class="calc-field"><span class="calc-label">${esc(f.label)}</span><span class="calc-inwrap">${pre}${control}${suf}</span></label>`;
     })
     .join("\n          ");
-  const html = `<div class="calc">
+  const html = `<div class="calc" id="calc" data-handoff>
         <div class="calc-fields">
           ${fields}
         </div>
@@ -935,7 +1095,7 @@ function calcWidget(calc) {
         <noscript><p>Enable JavaScript to calculate your own result. The formulas and worked examples below are available without it.</p></noscript>
         <div class="calc-actions">
           <button class="btn ghost" type="button" id="calc-share">Share this result</button>
-          <a class="btn" href="/#ref=calc-${esc(calc.slug)}" data-track="cta_click" data-ref="calc-${esc(calc.slug)}">Track it in the app &rarr;</a>
+          <a class="btn" href="/#ref=calc-${esc(calc.slug)}" data-track="cta_click" data-ref="calc-${esc(calc.slug)}" data-handoff-from="calc">Track it in the app &rarr;</a>
           <span class="calc-share-note" id="calc-share-note">Calculated on your device. Shared links include the amounts you enter.</span>
         </div>
       </div>`;

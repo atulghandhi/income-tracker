@@ -6,7 +6,13 @@
 // Privacy contract: event names and small numeric/categorical properties only.
 // Never transaction descriptions, amounts, merchants, categories, or balances.
 // Respects Do Not Track, and trackers identify by Supabase user id (or a random
-// local id) — nothing else about the person.
+// local id) — nothing else about the person. Each event also carries the standard
+// web context PostHog needs to tell people from bots and pages from each other: the
+// browser user agent, the page path, the referring site's domain and any utm_* tags.
+
+import { UI_VERSION } from "./uiVersion.mjs";
+
+export { UI_VERSION };
 
 const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY as string | undefined;
 const POSTHOG_HOST = (import.meta.env.VITE_POSTHOG_HOST as string | undefined) ?? "https://us.i.posthog.com";
@@ -45,7 +51,20 @@ export type AnalyticsEvent =
   | "country_changed" // { country }
   | "layout_changed" // { page, action: "move"|"resize"|"remove"|"add"|"reset" }
   | "allocation_changed" // { field: "priority"|"savings_priority"|"lump_sum"|"horizon"|..., value? }
-  | "nav_tool"; // { tool, action: "add"|"remove" } — a specialist page added to or removed from the sidebar
+  | "nav_tool" // { tool, action: "add"|"remove" } — a specialist page added to or removed from the sidebar
+  | "undo_used" // {} — a reversible change was undone from its toast or Cmd/Ctrl+Z
+  | "palette_opened" // {}
+  | "palette_action" // { group } — which kind of command bar result was used; never what was typed
+  | "peek_opened" // { kind }
+  | "peek_promoted" // { kind }
+  | "statement_dropped" // {} — a statement file dropped anywhere on the app
+  | "income_grouped" // { action: "create"|"join" } — incomes grouped by drag and drop
+  // Homepage conversion (the static pages send static_pageview and cta_click themselves):
+  | "landing_view" // { region } — the homepage was shown
+  | "landing_cta" // { cta: "hero"|"nav"|"skip"|"closing", region } — a button that opens the app
+  | "landing_link" // { area: "nav"|"banks"|"resources"|"faq"|"privacy"|"footer"|..., dest } — a link to a static page
+  | "landing_section_seen" // { section, region } — how far down the homepage people get, once per section per visit
+
 
 let identifiedUserId: string | null = null;
 
@@ -70,7 +89,7 @@ export function track(event: AnalyticsEvent, properties: Record<string, string |
         api_key: POSTHOG_KEY,
         event,
         distinct_id: identifiedUserId ?? anonymousId(),
-        properties: { ...properties, app: "income-tracker-web" },
+        properties: { ...contextProperties(), ...properties, app: "income-tracker-web", ui: UI_VERSION },
         timestamp: new Date().toISOString(),
       }),
     }).catch(() => {
@@ -79,6 +98,52 @@ export function track(event: AnalyticsEvent, properties: Record<string, string |
   } catch {
     // Same: fire-and-forget.
   }
+}
+
+// What PostHog needs to count a visit as a person rather than a script, and to split traffic
+// by page and source: the browser's user agent (without it every event was classed as
+// automation and dropped from bot-filtered views), the path (never the query or the fragment)
+// and where the visit came from (the referring site's domain only, plus utm_* tags).
+const UTM_KEY = "it_utm";
+function contextProperties(): Record<string, string> {
+  const out: Record<string, string> = {};
+  try {
+    out.$raw_user_agent = navigator.userAgent;
+    out.$current_url = `${location.origin}${location.pathname}`;
+    out.$pathname = location.pathname;
+    out.$host = location.host;
+    if (document.referrer) {
+      const ref = new URL(document.referrer);
+      if (ref.host !== location.host) out.$referring_domain = ref.host;
+    }
+    // First touch in this tab wins: the app rewrites its URL, so tags are kept for the visit.
+    let utm: Record<string, string> = {};
+    try {
+      utm = JSON.parse(sessionStorage.getItem(UTM_KEY) || "{}");
+    } catch {
+      utm = {};
+    }
+    const params = new URLSearchParams(location.search);
+    let found = false;
+    for (const key of ["utm_source", "utm_medium", "utm_campaign"]) {
+      const value = params.get(key);
+      if (value && !utm[key]) {
+        utm[key] = value.slice(0, 80);
+        found = true;
+      }
+    }
+    if (found) {
+      try {
+        sessionStorage.setItem(UTM_KEY, JSON.stringify(utm));
+      } catch {
+        // Kept for this event only.
+      }
+    }
+    Object.assign(out, utm);
+  } catch {
+    // Context is a nice-to-have; the event still goes.
+  }
+  return out;
 }
 
 function anonymousId(): string {

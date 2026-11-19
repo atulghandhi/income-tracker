@@ -162,7 +162,23 @@ export function MoneyFlow(props: MoneyFlowProps) {
   const percent = (value: number) => `${((value / Math.max(flow.total, 1)) * 100).toFixed(1)}%`;
 
   return (
-    <div className={`moneyFlow ${variant}`} ref={shellRef} onMouseLeave={hide}>
+    <div
+      className={`moneyFlow ${variant}`}
+      ref={shellRef}
+      onMouseLeave={hide}
+      // The breakdown grows out of the point that was clicked (keyboard picks grow from the centre).
+      onPointerDownCapture={(event) => {
+        const shell = shellRef.current;
+        if (!shell || selected) return;
+        const box = shell.getBoundingClientRect();
+        shell.style.setProperty("--flow-ox", `${Math.round(event.clientX - box.left)}px`);
+        shell.style.setProperty("--flow-oy", `${Math.round(event.clientY - box.top)}px`);
+      }}
+      onKeyDownCapture={() => {
+        shellRef.current?.style.removeProperty("--flow-ox");
+        shellRef.current?.style.removeProperty("--flow-oy");
+      }}
+    >
       <label className="flowExplore" data-export-ignore>
         Explore <select ref={exploreRef} aria-label="Explore money flow" value={path[0]?.id ?? ""} onChange={(event) => setSelected([...flow.sources, ...flow.targets].find((node) => node.id === event.target.value) ?? null)}>
           <option value="">Choose income or spending</option>

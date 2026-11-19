@@ -235,6 +235,30 @@
   ]
 }
     </script>
+    <!-- Handoff from the static calculators and bank guides: the box the person
+         clicked on those pages grows into this one. Only a flagged navigation
+         animates (see HANDOFF_SCRIPT in scripts/build-content.mjs). -->
+    <style>
+      @view-transition { navigation: auto; }
+      ::view-transition-group(handoff) { animation-duration: 380ms; animation-timing-function: cubic-bezier(0.2, 0.9, 0.25, 1.04); }
+      ::view-transition-old(handoff), ::view-transition-new(handoff) { height: 100%; object-fit: cover; object-position: top; mix-blend-mode: normal; }
+      ::view-transition-old(handoff) { animation: 120ms ease-out both it-vt-out; }
+      ::view-transition-new(handoff) { animation: 240ms 90ms ease-out both it-vt-in; }
+      @keyframes it-vt-out { to { opacity: 0; } }
+      @keyframes it-vt-in { from { opacity: 0; } }
+    </style>
+    <script>
+      addEventListener("pageswap", function (e) { if (e.viewTransition) e.viewTransition.skipTransition(); });
+      addEventListener("pagereveal", function (e) {
+        if (!e.viewTransition) return;
+        var on = false;
+        try { on = sessionStorage.getItem("it_vt") === "1"; sessionStorage.removeItem("it_vt"); } catch (x) {}
+        if (!on) { e.viewTransition.skipTransition(); return; }
+        var el = document.getElementById("root") || document.body;
+        el.style.viewTransitionName = "handoff";
+        e.viewTransition.finished.finally(function () { el.style.viewTransitionName = ""; });
+      });
+    </script>
   </head>
   <body>
     <div id="root">

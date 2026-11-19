@@ -1,10 +1,37 @@
 import { calculateProjection, colors } from "./finance";
-import type { ExpenseEntry, LedgerState, MonthBudget, Projection } from "./types";
+import type { ExpenseEntry, IncomeEntry, LedgerState, MonthBudget, Projection } from "./types";
 
 // Pure grouping helpers shared by the ledger, the dashboard and the insights
 // widgets. They used to live in App.tsx; nothing here touches the DOM.
 
 export type ExpenseGroup = { id: string; category: string; color: string; total: number; items: ExpenseEntry[] };
+
+// Income grouped the same way, but in the order the income column is already showing (the
+// person's own order, largest first, or names together): a group sits where its first row
+// would, so grouping never fights the chosen order. Ungrouped rows stay in place.
+export type IncomeGroup = { id: string; category: string; color: string; total: number; items: IncomeEntry[] };
+
+export function buildIncomeGroups(incomes: IncomeEntry[]): IncomeGroup[] {
+  const out: IncomeGroup[] = [];
+  const byCategory = new Map<string, IncomeGroup>();
+  incomes.forEach((income, index) => {
+    const category = (income.category ?? "").trim();
+    if (!category) {
+      out.push({ id: `income-${income.id}`, category: "", color: income.color, total: income.amount, items: [income] });
+      return;
+    }
+    const existing = byCategory.get(category);
+    if (existing) {
+      existing.items.push(income);
+      existing.total += income.amount;
+      return;
+    }
+    const group = { id: `income-category-${category}`, category, color: income.color || categoryColor(category, index), total: income.amount, items: [income] };
+    byCategory.set(category, group);
+    out.push(group);
+  });
+  return out;
+}
 
 export type CategoryRow = { name: string; annual: number; monthly: number; share: number; color: string; count: number };
 
