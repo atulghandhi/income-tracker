@@ -141,7 +141,9 @@ export function InsightWidgetCard({
     <article
       ref={ref}
       className={`insightCard inGrid ${showSample ? "sampleCard" : ""} ${narrow ? "narrow" : ""}`}
-      style={{ height }}
+      // The widget is laid out for this height; it is a minimum so the card still stretches to
+      // the tallest card in its row, and cards side by side always line up top and bottom.
+      style={{ minHeight: height }}
       data-widget-type={spec.type}
       aria-label={title}
     >

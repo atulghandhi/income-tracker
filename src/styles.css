@@ -11058,6 +11058,16 @@ select:not([multiple]):disabled {
   gap: 8px;
 }
 
+/* The widget picks its columns from its width (insightWidgets.tsx): four figures side by side
+   when wide, two by two when narrower. Without these they stacked in one tall column. */
+.insightCard .debtWidget.cols-4 .debtStats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.insightCard .debtWidget.cols-2 .debtStats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .insightCard .debtStats > div {
   display: grid;
   gap: 4px;

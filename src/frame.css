@@ -1537,3 +1537,55 @@
     opacity: 1;
   }
 }
+
+/* ─── Floating Done while customising the dashboard ─────────────────────────
+   Appears once the header's Done button has scrolled away. Bottom right, clear of the
+   toasts (bottom centre) and, on phones, above the tab bar. */
+.floatingLayoutDone {
+  position: fixed;
+  right: max(20px, var(--safe-right, 0px));
+  bottom: calc(24px + var(--tabbar-h, 0px) + var(--safe-bottom, 0px));
+  z-index: 250;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent, #fff);
+  font: 650 15px/1 Inter, ui-sans-serif, system-ui, sans-serif;
+  box-shadow: 0 10px 30px -8px rgba(var(--accent-rgb), 0.6), 0 2px 6px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+  animation: floatingDoneIn 220ms var(--ease-out) both;
+}
+
+/* On wide screens the annual summary rail is fixed along the bottom: sit above it. */
+@media (min-width: 901px) {
+  .floatingLayoutDone {
+    right: 32px;
+    bottom: calc(58px + var(--frame-inset, 8px) + 16px);
+  }
+}
+
+body.hasFloatingDone .widgetGrid.isEditing {
+  margin-bottom: 84px;
+}
+
+.floatingLayoutDone:hover {
+  filter: brightness(1.06);
+}
+
+.floatingLayoutDone:focus-visible {
+  outline: 3px solid rgba(var(--accent-rgb), 0.45);
+  outline-offset: 3px;
+}
+
+@keyframes floatingDoneIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.96); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .floatingLayoutDone { animation: none; }
+}
