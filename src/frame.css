@@ -356,12 +356,11 @@
   }
 }
 
+/* Phones have the tab bar, the More sheet and the ledger's own search; the command bar
+   is a keyboard tool, so its button stays on wider screens. */
 @media (max-width: 900px) {
-  .paletteButton kbd {
-    display: none;
-  }
   .paletteButton {
-    padding: 0 11px;
+    display: none;
   }
 }
 
@@ -541,4 +540,599 @@
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+/* ─── Undo toast ──────────────────────────────────────────────────────────── */
+.undoToast {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  padding-right: 6px;
+}
+
+.undoToastBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(var(--on-ink-rgb), 0.16);
+  color: inherit;
+  font-weight: 650;
+}
+
+.undoToastBtn:hover {
+  background: rgba(var(--on-ink-rgb), 0.26);
+}
+
+.undoToastBtn kbd {
+  font: 600 11px/1 Inter, ui-sans-serif, system-ui, sans-serif;
+  opacity: 0.75;
+}
+
+/* ─── Peek: a quick look at one transaction ───────────────────────────────── */
+.rowPeek {
+  color: rgba(var(--ink-rgb), 0.5);
+}
+
+.rowPeek:hover {
+  color: var(--accent);
+}
+
+/* With a mouse the details button waits for intent; on touch it is always there. */
+@media (hover: hover) and (pointer: fine) {
+  .rowPeek {
+    opacity: 0;
+    transition: opacity 120ms var(--ease-out);
+  }
+
+  .financeRow:hover .rowPeek,
+  .financeRow:focus-within .rowPeek,
+  .rowPeek:focus-visible {
+    opacity: 1;
+  }
+}
+
+.peekLayer {
+  position: fixed;
+  inset: 0;
+  z-index: 280;
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--frame-inset);
+  background: rgba(var(--bg-deep-rgb), 0.18);
+}
+
+.peek {
+  view-transition-name: peek;
+  width: min(400px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 18px 22px 22px;
+  border-radius: var(--canvas-radius);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.28);
+}
+
+.peekHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.peekKind {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.peekKind.in {
+  color: var(--mint);
+}
+
+.peekName {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.peekRaw {
+  margin: -6px 0 0;
+  display: grid;
+  gap: 2px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.peekRaw code {
+  font: 500 12.5px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.peekAmount {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.peekFacts {
+  margin: 4px 0 0;
+  display: grid;
+  border-top: 1px solid var(--line);
+}
+
+.peekFacts > div {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 10px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+
+.peekFacts dt {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+
+.peekFacts dd {
+  margin: 0;
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.peekActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.peekRemove {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--red);
+}
+
+::view-transition-group(peek) {
+  animation-duration: 340ms;
+  animation-timing-function: cubic-bezier(0.2, 0.9, 0.25, 1.04);
+}
+
+::view-transition-old(peek),
+::view-transition-new(peek) {
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+
+::view-transition-old(peek) {
+  animation: 140ms ease-out both peekOut;
+}
+
+::view-transition-new(peek) {
+  animation: 220ms 70ms ease-out both peekIn;
+}
+
+@keyframes peekOut {
+  to { opacity: 0; }
+}
+
+@keyframes peekIn {
+  from { opacity: 0; }
+}
+
+/* The row a peek was promoted to flashes once so the eye finds it. */
+.rowFlash {
+  animation: rowFlash 1.3s var(--ease-out);
+}
+
+@keyframes rowFlash {
+  0%, 30% { background: var(--accent-soft); }
+  100% { background: transparent; }
+}
+
+@media (max-width: 900px) {
+  .peekLayer {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .peek {
+    width: 100%;
+    max-height: 85dvh;
+    border-radius: 18px 18px 0 0;
+    padding-bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .peekFacts > div {
+    grid-template-columns: 120px 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rowFlash {
+    animation: none;
+    outline: 2px solid var(--accent);
+  }
+}
+
+.rowTotalPeek {
+  justify-self: end;
+  border: 0;
+  background: transparent;
+  padding: 4px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: right;
+}
+
+.rowTotalPeek:hover {
+  color: var(--ink);
+  background: var(--accent-soft);
+}
+
+.monthLabel strong {
+  white-space: nowrap;
+}
+
+/* Income rows carry a details icon too; the amount field gives up a little width for it. */
+@media (min-width: 681px) {
+  .incomeRow {
+    grid-template-columns: 24px 22px minmax(140px, 1fr) 132px auto;
+  }
+}
+
+/* Money flow: the breakdown grows from the band or node that was clicked. */
+.insightCard .flowDetail {
+  transform-origin: var(--flow-ox, 50%) var(--flow-oy, 50%);
+  transform: scale(0.6);
+  transition:
+    opacity 200ms ease,
+    transform 340ms cubic-bezier(0.2, 0.9, 0.25, 1.04);
+}
+
+.insightCard .flowDetail.open {
+  transform: scale(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .insightCard .flowDetail {
+    transform: none;
+    transition: opacity 120ms ease;
+  }
+}
+
+.motion-off .insightCard .flowDetail {
+  transform: none;
+  transition: opacity 120ms ease;
+}
+
+/* ─── Import moment ───────────────────────────────────────────────────────── */
+/* A statement dragged over the app: the frame brightens and the canvas waits for it. */
+.appShell.fileDrag::before {
+  filter: saturate(1.35) brightness(1.06);
+  transition: filter 200ms var(--ease-out);
+}
+
+.dropOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 320;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(var(--bg-deep-rgb), 0.22);
+  pointer-events: none;
+  animation: paletteFade 140ms var(--ease-out) both;
+}
+
+.dropOverlayCard {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 34px 44px;
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--ink);
+  text-align: center;
+  box-shadow: 0 0 0 8px rgba(var(--accent-rgb), 0.18), 0 0 60px rgba(var(--accent-rgb), 0.35), 0 24px 70px rgba(0, 0, 0, 0.25);
+  animation: dropLift 260ms cubic-bezier(0.2, 0.9, 0.25, 1.1) both;
+}
+
+.dropOverlayCard svg {
+  color: var(--accent);
+}
+
+.dropOverlayCard strong {
+  font-size: 19px;
+}
+
+.dropOverlayCard span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+@keyframes dropLift {
+  from { opacity: 0; transform: translateY(10px) scale(0.96); }
+}
+
+/* Each new row slides in after the one before; the month's figure lands last. */
+.rowArrive {
+  animation: rowArrive 420ms cubic-bezier(0.2, 0.9, 0.25, 1.06) both;
+  animation-delay: calc(min(var(--arrive-i, 0), 24) * 55ms);
+}
+
+@keyframes rowArrive {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+    background: var(--accent-soft);
+  }
+  60% {
+    opacity: 1;
+    background: var(--accent-soft);
+  }
+  to {
+    transform: none;
+  }
+}
+
+.appShell.arriving .netBlock strong {
+  animation: netLand 520ms cubic-bezier(0.2, 0.9, 0.25, 1.3) both;
+  animation-delay: calc(var(--arrive-n, 0) * 55ms + 220ms);
+  display: inline-block;
+}
+
+@keyframes netLand {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rowArrive,
+  .appShell.arriving .netBlock strong,
+  .dropOverlay,
+  .dropOverlayCard {
+    animation: none;
+  }
+}
+
+/* ─── Layered, borderless surfaces ────────────────────────────────────────────
+   No outlines. Surfaces separate the way they do in Arc: a slightly deeper canvas,
+   cards that float on it with a soft shadow, and fields and buttons that are
+   filled rather than drawn. Dividers inside a card fade almost to nothing. */
+:root {
+  --layer-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 10px 28px -12px rgba(16, 24, 40, 0.16);
+  --field: rgba(var(--ink-rgb), 0.05);
+  --field-hover: rgba(var(--ink-rgb), 0.085);
+}
+
+[data-theme="dark"] {
+  --layer-shadow: 0 1px 2px rgba(0, 0, 0, 0.28), 0 12px 32px -12px rgba(0, 0, 0, 0.6);
+  --field: rgba(var(--ink-rgb), 0.065);
+  --field-hover: rgba(var(--ink-rgb), 0.11);
+}
+
+/* A touch deeper than the cards, so white cards read as lifted without an outline. */
+[data-theme="light"] .workspace {
+  --bg: #f2f1ed;
+  --bg-rgb: 242, 241, 237;
+}
+
+.workspace {
+  --line: rgba(var(--line-rgb), 0.05);
+  --line-strong: rgba(var(--line-rgb), 0.1);
+}
+
+/* Cards: lifted, never outlined. */
+.panel,
+.miniPanel,
+.settingsPanel,
+.architectureNote,
+.dangerPanel,
+.insightCard,
+.metricCard,
+.quickAddBar,
+.signalCard,
+.takeHomeHeadline,
+.priorityList,
+.planDetails,
+.subsAlert,
+.widgetToolbar,
+.widgetRecs,
+.gettingStarted {
+  border-color: transparent;
+  box-shadow: var(--layer-shadow);
+}
+
+/* Any other card-like article in the canvas loses its outline too. */
+.contentCanvas article {
+  border-color: transparent;
+}
+
+/* Things inside a card are filled, not lifted again. */
+.dataAction,
+.widgetRecs li,
+.subsRow,
+.transferRuleList li,
+.takeHomeHeadline > div,
+.gsItem {
+  border-color: transparent;
+  box-shadow: none;
+  background: var(--field);
+}
+
+/* Buttons and fields: a soft fill that deepens on hover. */
+.commandButton,
+.quietButton,
+.checkButton,
+.currencyControl,
+.searchShell,
+.paletteButton {
+  border-color: transparent;
+  background: var(--field);
+}
+
+.commandButton:hover,
+.quietButton:hover,
+.checkButton:hover,
+.currencyControl:hover,
+.searchShell:hover,
+.paletteButton:hover {
+  border-color: transparent;
+  background: var(--field-hover);
+}
+
+.searchShell:focus-within {
+  border-color: transparent;
+  background: var(--surface);
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.45);
+}
+
+.dangerButton {
+  border-color: transparent;
+  background: var(--red-soft);
+}
+
+.addRow {
+  border-top-color: transparent;
+  background: rgba(var(--ink-rgb), 0.025);
+}
+
+.addRow input,
+.addRow .moneyInput {
+  border-color: transparent;
+  background: var(--field);
+}
+
+.addRow input:focus,
+.addRow .moneyInput:focus-within {
+  background: var(--surface);
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.45);
+}
+
+.financeRow {
+  border-bottom-color: rgba(var(--line-rgb), 0.045);
+}
+
+/* Category groups are tinted layers, not boxes. */
+.expenseGroup:not(.ungrouped) {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--category-color, var(--faint)) 7%, transparent);
+}
+
+.palette,
+.peek {
+  border-color: transparent;
+}
+
+.paletteButton kbd,
+.palette kbd {
+  border-color: transparent;
+  background: var(--field);
+}
+
+/* On the frame: translucent fills instead of outlined boxes. */
+@media (min-width: 901px) {
+  .sideNav .sideTutorialBtn,
+  .sideNav .sideSignInBtn {
+    border-color: transparent;
+    background: var(--frame-hover);
+    color: var(--frame-ink);
+  }
+
+  .sideNav .sideTutorialBtn:hover,
+  .sideNav .sideSignInBtn:hover {
+    background: var(--frame-active);
+  }
+}
+
+.gsItem:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--field-hover);
+}
+
+.gsItem.done {
+  border-color: transparent;
+  background: var(--mint-soft);
+}
+
+/* More cards that float on the canvas. */
+.goalCard,
+.goalsPlannerBar,
+.goalsTimeline,
+.debtAccountRow {
+  border-color: transparent;
+  box-shadow: var(--layer-shadow);
+}
+
+/* Account rows sit inside a card, so they are a filled layer rather than a second lift. */
+.contentCanvas article .debtAccountRow {
+  box-shadow: none;
+  background: var(--field);
+}
+
+.goalsHorizonTabs,
+.goalsSurplusInput,
+.goalCard--editing {
+  border-color: transparent;
+}
+
+.goalsHorizonTabs {
+  background: var(--field);
+}
+
+/* Form fields across the canvas: filled, no outline. Ledger rows keep their own quiet
+   inline editing (transparent until hovered). */
+.contentCanvas :is(input, select, textarea):not([type="checkbox"], [type="radio"], [type="range"]) {
+  border-color: transparent;
+}
+
+.contentCanvas :is(.moneyInput, .selectField, .targetInput):not(.financeRow *) {
+  border-color: transparent;
+  background-color: var(--field);
+}
+
+.contentCanvas :is(input, select, textarea):not([type="checkbox"], [type="radio"], [type="range"]):not(.financeRow *, .moneyInput *, .selectField *, .quickAddBar *, .searchShell *) {
+  background-color: var(--field);
+}
+
+.contentCanvas :is(input, select, textarea):not([type="checkbox"], [type="radio"], [type="range"]):not(.financeRow *):focus,
+.contentCanvas :is(.moneyInput, .selectField):not(.financeRow *):focus-within {
+  border-color: transparent;
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.45);
+}
+
+.goalsSurplusField {
+  border-color: transparent;
+  background: var(--field);
+}
+
+.contentCanvas .goalsSurplusField input {
+  background-color: transparent;
 }

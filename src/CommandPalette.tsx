@@ -44,9 +44,10 @@ type Props = {
   items: PaletteItem[];
   /** Searched only once there is a query: too many to list up front. */
   searchMore?: (query: string) => PaletteItem[];
+  onRun?: (item: PaletteItem) => void;
 };
 
-export default function CommandPalette({ onClose, items, searchMore }: Props) {
+export default function CommandPalette({ onClose, items, searchMore, onRun }: Props) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -94,6 +95,7 @@ export default function CommandPalette({ onClose, items, searchMore }: Props) {
 
   function run(item: PaletteItem | undefined) {
     if (!item) return;
+    onRun?.(item);
     onClose();
     // After the palette has gone, so focus moves to wherever the action points.
     requestAnimationFrame(() => item.run());

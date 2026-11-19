@@ -1,5 +1,22 @@
 # Arc-style pass on the ledger web app: plan
 
+> **Status: built** on `claude/admiring-cori-vcln7f`. All eight phases are in. Where the build
+> differs from the plan below, the note under "What changed while building" says why.
+
+## What changed while building
+
+- **No borders anywhere in the canvas.** Cards, fields, buttons and category groups separate by
+  fill, a slightly deeper canvas and soft shadow, never an outline (src/frame.css, "Layered,
+  borderless surfaces"). This came from review, not the original plan.
+- **The expense amount is the way into a row's details.** There was no width for another icon in an
+  expense row, so the amount itself opens the peek. Income rows have room and carry a small icon.
+- **The command bar's button is desktop only.** Phones have the tab bar, the More sheet and the
+  ledger's own search; a second search icon in the phone app bar was clutter.
+- **The personal colour stays in the app.** On the static pages the frame colour names the section,
+  and a personal hue would erase that, so they keep their section hues.
+- **Drill-downs grow from the click point.** The money-flow triggers are SVG shapes, which view
+  transitions cannot name, so the breakdown scales out from where it was clicked instead.
+
 Scope: the React app (`src/App.tsx`, `src/styles.css` and the views). Not the iOS app, and not the static pages, which got their pass in the same PR as this document.
 
 ## The one sentence

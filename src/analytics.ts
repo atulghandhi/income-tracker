@@ -45,7 +45,12 @@ export type AnalyticsEvent =
   | "country_changed" // { country }
   | "layout_changed" // { page, action: "move"|"resize"|"remove"|"add"|"reset" }
   | "allocation_changed" // { field: "priority"|"savings_priority"|"lump_sum"|"horizon"|..., value? }
-  | "nav_tool"; // { tool, action: "add"|"remove" } — a specialist page added to or removed from the sidebar
+  | "nav_tool" // { tool, action: "add"|"remove" } — a specialist page added to or removed from the sidebar
+  | "undo_used" // {} — a reversible change was undone from its toast or Cmd/Ctrl+Z
+  | "palette_opened" // {}
+  | "palette_action" // { group } — which kind of command bar result was used; never what was typed
+  | "peek_opened" // { kind }
+  | "peek_promoted" // { kind }
 
 let identifiedUserId: string | null = null;
 

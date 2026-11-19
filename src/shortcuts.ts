@@ -2,7 +2,7 @@
 // against these, and the command bar shows the same keys beside each action,
 // so what the palette teaches is always what the keyboard does.
 
-export type ShortcutId = "palette" | "search" | "newTransaction" | "prevMonth" | "nextMonth" | "focusMode";
+export type ShortcutId = "palette" | "search" | "newTransaction" | "prevMonth" | "nextMonth" | "focusMode" | "undo";
 
 type Shortcut = {
   /** Keys as shown to people. "Mod" becomes ⌘ on Apple devices and Ctrl elsewhere. */
@@ -26,6 +26,8 @@ export const SHORTCUTS: Record<ShortcutId, Shortcut> = {
   },
   prevMonth: { keys: ["Alt", "←"], aria: "Alt+ArrowLeft", match: (e, ed) => altOnly(e, ed) && e.key === "ArrowLeft" },
   nextMonth: { keys: ["Alt", "→"], aria: "Alt+ArrowRight", match: (e, ed) => altOnly(e, ed) && e.key === "ArrowRight" },
+  // Only outside text fields, where the browser's own undo belongs.
+  undo: { keys: ["Mod", "Z"], aria: "Meta+Z Control+Z", match: (e, ed) => !ed && mod(e) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "z" },
   focusMode: { keys: ["Mod", "\\"], aria: "Meta+Backslash Control+Backslash", match: (e) => mod(e) && (e.key === "\\" || e.code === "Backslash") },
 };
 

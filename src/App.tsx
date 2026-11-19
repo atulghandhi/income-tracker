@@ -2,11 +2,13 @@ import { FinancialGlossary } from "./FinancialGlossary";
 import { TutorialOverlay } from "./GuidedTour";
 import { DashboardExportControls } from "./DashboardExportControls";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { Analytics } from "@vercel/analytics/react";
 import { applyFrame, readStoredGrain, readStoredHue, storeFrame } from "./frame";
 import LandingPage from "./LandingPage";
 import FramePicker from "./FramePicker";
 import CommandPalette, { type PaletteItem } from "./CommandPalette";
+import TransactionPeek, { type PeekTarget } from "./TransactionPeek";
 import { isApple, matchShortcut, SHORTCUTS } from "./shortcuts";
 import { hashRequestsHandoff, takeHandoffFile } from "./handoff";
 import Onboarding, { type OnboardingResult } from "./Onboarding";
@@ -69,6 +71,7 @@ import {
   PanelLeftOpen,
   CalendarDays,
   Tag,
+  PanelRight,
 } from "lucide-react";
 import {
   isDebtClass,
@@ -804,6 +807,16 @@ function App() {
   const [frameHue, setFrameHue] = useState<number>(readStoredHue);
   const [frameGrain, setFrameGrain] = useState<number>(readStoredGrain);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [peek, setPeek] = useState<PeekTarget | null>(null);
+  // Import moment: a statement dragged anywhere over the app, and the rows of a fresh import
+  // arriving one after another. Runs once per import; Esc or a click settles it at once.
+  const [fileDrag, setFileDrag] = useState(false);
+  const [arrivingBatch, setArrivingBatch] = useState<string | null>(null);
+  const peekOriginRef = useRef<HTMLElement | null>(null);
+  // One-step undo for reversible changes. The ledger before the change is kept; the offer
+  // lasts while its toast shows, and lapses the moment anything else changes the ledger, so
+  // undoing never throws away a later edit.
+  const [undoOffer, setUndoOffer] = useState<{ before: LedgerState; after: LedgerState | null; label: string; stamp: number } | null>(null);
   // Focus mode: the sidebar steps aside on wide screens. Remembered per device.
   const [focusMode, setFocusMode] = useState<boolean>(() => {
     try {
@@ -1826,6 +1839,81 @@ function App() {
     toastTimerRef.current = window.setTimeout(() => setToastVisible(false), 3200);
   }, [toast]);
 
+  // Drop a statement anywhere on the app. Only file drags count: rows dragged between
+  // categories carry text, not files, and keep their own handling.
+  useEffect(() => {
+    if (showLanding) return;
+    let depth = 0;
+    const hasFiles = (event: globalThis.DragEvent) => Array.from(event.dataTransfer?.types ?? []).includes("Files");
+    function onEnter(event: globalThis.DragEvent) {
+      if (!hasFiles(event)) return;
+      depth += 1;
+      setFileDrag(true);
+    }
+    function onOver(event: globalThis.DragEvent) {
+      if (!hasFiles(event)) return;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+    }
+    function onLeave(event: globalThis.DragEvent) {
+      if (!hasFiles(event)) return;
+      depth = Math.max(0, depth - 1);
+      if (depth === 0) setFileDrag(false);
+    }
+    function onDrop(event: globalThis.DragEvent) {
+      if (!hasFiles(event)) return;
+      event.preventDefault();
+      depth = 0;
+      setFileDrag(false);
+      const file = event.dataTransfer?.files?.[0];
+      if (file) void importStatementFile(file);
+    }
+    window.addEventListener("dragenter", onEnter);
+    window.addEventListener("dragover", onOver);
+    window.addEventListener("dragleave", onLeave);
+    window.addEventListener("drop", onDrop);
+    return () => {
+      window.removeEventListener("dragenter", onEnter);
+      window.removeEventListener("dragover", onOver);
+      window.removeEventListener("dragleave", onLeave);
+      window.removeEventListener("drop", onDrop);
+    };
+    // importStatementFile only reads stable setters and refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showLanding]);
+
+  useEffect(() => {
+    if (!arrivingBatch) return;
+    const settle = () => setArrivingBatch(null);
+    const timer = window.setTimeout(settle, 2600);
+    const onKey = (event: globalThis.KeyboardEvent) => event.key === "Escape" && settle();
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("pointerdown", settle);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("pointerdown", settle);
+    };
+  }, [arrivingBatch]);
+
+  // The first ledger change after offerUndo() is the action itself; any change after that
+  // withdraws the offer. An offer with no change behind it lapses rather than catching a later edit.
+  const toastNowRef = useRef(toast);
+  toastNowRef.current = toast;
+  useEffect(() => {
+    setUndoOffer((offer) => {
+      if (!offer) return offer;
+      if (offer.after === null) return Date.now() - offer.stamp < 800 ? { ...offer, after: ledger, label: toastNowRef.current } : null;
+      return offer.after === ledger ? offer : null;
+    });
+  }, [ledger]);
+
+  useEffect(() => {
+    if (!undoOffer?.after) return;
+    const timer = window.setTimeout(() => setUndoOffer(null), 7000);
+    return () => window.clearTimeout(timer);
+  }, [undoOffer?.stamp, undoOffer?.after]);
+
   useEffect(() => {
     if (!accountToast) return;
     const timer = window.setTimeout(() => setAccountToast(null), 1400);
@@ -2102,6 +2190,7 @@ function App() {
   }
 
   function confirmRenameAll(prompt: RenamePrompt) {
+    offerUndo();
     const preview = renameEverywhere(ledger, prompt.kind, prompt.from, prompt.to);
     updateLedger((current) => renameEverywhere(current, prompt.kind, prompt.from, prompt.to).state);
     setRenamePrompt(null);
@@ -2114,12 +2203,94 @@ function App() {
     track("rename_all", { renamed: bucketCount(preview.renamed) });
   }
 
+  function offerUndo() {
+    setUndoOffer({ before: ledger, after: null, label: "", stamp: Date.now() });
+  }
+
+  function performUndo() {
+    if (!undoOffer?.after) return;
+    const { before, label } = undoOffer;
+    setUndoOffer(null);
+    setLedger({ ...before, lastSavedAt: new Date().toISOString() });
+    setToast(label ? `Undone: ${label.charAt(0).toLowerCase()}${label.slice(1)}` : "Undone");
+    track("undo_used", {});
+  }
+
+  // Peeks grow out of the row that opened them and shrink back into it (view transitions;
+  // a plain swap where unsupported or under reduced motion).
+  function withTransition(origin: HTMLElement | null, update: () => void) {
+    const doc = document as Document & { startViewTransition?: (cb: () => void) => { finished: Promise<void> } };
+    const calm = !animationsEnabled || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!doc.startViewTransition || calm) {
+      flushSync(update);
+      return;
+    }
+    if (origin) origin.style.viewTransitionName = "peek";
+    const transition = doc.startViewTransition(() => {
+      if (origin) origin.style.viewTransitionName = "";
+      flushSync(update);
+    });
+    transition.finished.finally(() => {
+      if (origin) origin.style.viewTransitionName = "";
+    });
+  }
+
+  // `trigger` is what gets focus back on close; the row around it is where the peek grows from.
+  const peekVisual = (trigger: HTMLElement | null) => trigger?.closest<HTMLElement>(".financeRow") ?? trigger;
+
+  function openPeek(target: PeekTarget, trigger: HTMLElement | null) {
+    peekOriginRef.current = trigger;
+    withTransition(peekVisual(trigger), () => setPeek(target));
+    track("peek_opened", { kind: target.kind });
+  }
+
+  function closePeek() {
+    const trigger = peekOriginRef.current && document.contains(peekOriginRef.current) ? peekOriginRef.current : null;
+    const origin = peekVisual(trigger);
+    const doc = document as Document & { startViewTransition?: (cb: () => void) => { finished: Promise<void> } };
+    const calm = !animationsEnabled || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!doc.startViewTransition || calm || !origin) {
+      setPeek(null);
+      trigger?.focus();
+      return;
+    }
+    const transition = doc.startViewTransition(() => {
+      flushSync(() => setPeek(null));
+      origin.style.viewTransitionName = "peek";
+    });
+    transition.finished.finally(() => {
+      origin.style.viewTransitionName = "";
+      trigger?.focus();
+    });
+  }
+
+  // "Show in ledger": the peek closes and the row it describes is brought into view.
+  function promotePeek() {
+    if (!peek) return;
+    const target = peek;
+    track("peek_promoted", { kind: target.kind });
+    setPeek(null);
+    setQuery("");
+    updateLedger((current) => (current.months[target.monthKey] ? { ...current, selectedMonth: target.monthKey } : current));
+    setActiveView("ledger");
+    window.setTimeout(() => {
+      const row = document.querySelector<HTMLElement>(target.kind === "income" ? `[data-income-id="${target.id}"]` : `[data-expense-id="${target.id}"]`);
+      if (!row) return;
+      row.scrollIntoView({ block: "center", behavior: animationsEnabled ? "smooth" : "auto" });
+      row.classList.add("rowFlash");
+      row.querySelector<HTMLInputElement>("input")?.focus({ preventScroll: true });
+      window.setTimeout(() => row.classList.remove("rowFlash"), 1400);
+    }, 60);
+  }
+
   function removeNameRule(id: string) {
+    offerUndo();
     updateLedger((current) => ({ ...current, nameRules: current.nameRules.filter((rule) => rule.id !== id) }));
     setToast("Rename rule removed — new imports keep their bank name");
   }
 
   function removeIncome(id: string) {
+    offerUndo();
     const entry = currentMonth.incomes.find((income) => income.id === id);
     updateLedger((current) => stopSeededRepeat(current, entry?.seededFrom, "income"));
     updateCurrentMonth((month) => ({
@@ -2130,6 +2301,7 @@ function App() {
   }
 
   function removeExpense(id: string) {
+    offerUndo();
     const entry = currentMonth.expenses.find((expense) => expense.id === id);
     if (entry?.scheduledPayment && entry.debtAccountId) {
       // A planned debt payment comes from the account, not from last month's row. Removing it
@@ -2237,6 +2409,7 @@ function App() {
   }
 
   function removeAccount(id: string) {
+    offerUndo();
     updateLedger((current) => ({
       ...current,
       accounts: current.accounts.filter((account) => account.id !== id),
@@ -2305,6 +2478,7 @@ function App() {
   }
 
   function removeGoal(id: string) {
+    offerUndo();
     updateLedger((current) => ({
       ...current,
       goals: current.goals.filter((g) => g.id !== id).map((g, i) => ({ ...g, priority: i + 1 })),
@@ -2486,6 +2660,7 @@ function App() {
   }
 
   function deleteExpenseCategory(category: string) {
+    offerUndo();
     updateCurrentMonth((month) => ({
       ...month,
       expenses: month.expenses.map((expense) => (expense.category === category ? { ...expense, category: "" } : expense)),
@@ -2976,6 +3151,7 @@ function App() {
     const previewRules = upsertTransferRule(ledger.categoryRules, pattern, new Date().toISOString());
     const removed = sweepTransferEntries(ledger.months, previewRules).removed;
 
+    if (removed) offerUndo();
     updateLedger((current) => {
       const rules = upsertTransferRule(current.categoryRules, pattern, new Date().toISOString());
       const swept = sweepTransferEntries(current.months, rules);
@@ -2987,6 +3163,7 @@ function App() {
   }
 
   function removeTransferRule(id: string) {
+    offerUndo();
     updateLedger((current) => ({
       ...current,
       categoryRules: current.categoryRules.filter((rule) => rule.id !== id),
@@ -2995,6 +3172,7 @@ function App() {
   }
 
   function removeCategoryRule(id: string) {
+    offerUndo();
     updateLedger((current) => ({
       ...current,
       categoryRules: current.categoryRules.filter((rule) => rule.id !== id),
@@ -3144,6 +3322,7 @@ function App() {
     setImportReview(null);
     if (rowsToImport.length) {
       setLastImportAction({ batchId, fileName: importReview.fileName, importedRows: rowsToImport.length });
+      if (animationsEnabled && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) setArrivingBatch(batchId);
     }
     setActiveView("ledger");
 
@@ -3162,6 +3341,7 @@ function App() {
   }
 
   function resolveDuplicateGroup(group: DuplicateGroup, action: "merge" | "keep") {
+    offerUndo();
     updateLedger((current) => (action === "merge" ? mergeDuplicateGroup(current, group) : keepDuplicateGroupApart(current, group)));
     setToast(action === "merge" ? "Merged — counted once now" : "Kept both");
   }
@@ -3173,6 +3353,7 @@ function App() {
   }
 
   function resetMonth() {
+    offerUndo();
     updateCurrentMonth(() => ({ incomes: [], expenses: [], note: "" }));
     setToast("Month cleared");
   }
@@ -3273,12 +3454,20 @@ function App() {
 
       if (id === "palette") {
         event.preventDefault();
-        setPaletteOpen((open) => !open);
+        setPaletteOpen((open) => {
+          if (!open) track("palette_opened", {});
+          return !open;
+        });
         return;
       }
       // While the command bar is open it owns the keyboard.
       if (paletteOpen) return;
 
+      if (id === "undo" && undoOffer?.after) {
+        event.preventDefault();
+        performUndo();
+        return;
+      }
       if (id === "focusMode") {
         event.preventDefault();
         setFocusMode((on) => !on);
@@ -3311,7 +3500,7 @@ function App() {
 
     window.addEventListener("keydown", handleGlobalShortcuts);
     return () => window.removeEventListener("keydown", handleGlobalShortcuts);
-  }, [categoryMenu, groupingSourceId, query, paletteOpen]);
+  }, [categoryMenu, groupingSourceId, query, paletteOpen, undoOffer]);
 
   function changeLayout(page: LayoutPage, action: "move" | "resize" | "remove" | "add" | "reset", updater: (layout: PageLayout) => PageLayout) {
     updateLayout(page, updater);
@@ -3635,6 +3824,15 @@ function App() {
   const navEntry = (view: AppView): NavEntry => (isToolView(view) ? toolNavItems[view] : coreNavItems.find((item) => item.id === view)!);
   const isAppleDevice = isApple();
 
+  // Order in which a fresh import's rows arrive on screen.
+  const arrivalOrder = new Map<string, number>();
+  if (arrivingBatch) {
+    let order = 0;
+    for (const entry of [...currentMonth.incomes, ...currentMonth.expenses]) {
+      if (entry.imported?.batchId === arrivingBatch) arrivalOrder.set(entry.id, order++);
+    }
+  }
+
   function goToMonth(monthKey: string) {
     updateLedger((current) => (current.months[monthKey] ? { ...current, selectedMonth: monthKey } : current));
     setActiveView("ledger");
@@ -3698,10 +3896,7 @@ function App() {
           keywords: row.raw,
           icon: <ReceiptText size={16} />,
           hint: `${formatMonth(key)} \u00b7 ${ledger.privacyMode ? "\u2022\u2022\u2022" : moneyFormatter.format(row.kind === "income" ? row.amount : -row.amount)}`,
-          run: () => {
-            goToMonth(key);
-            setQuery(row.name);
-          },
+          run: () => openPeek({ kind: row.kind, id: row.id, monthKey: key }, null),
         });
         if (found.length >= 40) return found;
       }
@@ -3748,7 +3943,9 @@ function App() {
   }
 
   return (
-    <div className={`appShell ${ledger.privacyMode ? "privacy-on" : ""} ${animationsEnabled ? "motion-on" : "motion-off"}${focusMode ? " focusMode" : ""}`}>
+    <div className={`appShell ${ledger.privacyMode ? "privacy-on" : ""} ${animationsEnabled ? "motion-on" : "motion-off"}${focusMode ? " focusMode" : ""}${fileDrag ? " fileDrag" : ""}${arrivalOrder.size ? " arriving" : ""}`}
+      style={arrivalOrder.size ? ({ "--arrive-n": Math.min(arrivalOrder.size, 24) } as CSSProperties) : undefined}
+    >
       <input
         ref={fileInputRef}
         className="hiddenFile"
@@ -3771,7 +3968,52 @@ function App() {
         }}
       />
 
-      {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} items={paletteItems()} searchMore={paletteSearch} />}
+      {fileDrag && (
+        <div className="dropOverlay" aria-hidden="true">
+          <div className="dropOverlayCard">
+            <Upload size={26} />
+            <strong>Drop your statement to import it</strong>
+            <span>CSV, OFX, QIF or PDF. It stays on this device.</span>
+          </div>
+        </div>
+      )}
+
+      {peek && (() => {
+        const month = ledger.months[peek.monthKey];
+        const entry = peek.kind === "income" ? month?.incomes.find((i) => i.id === peek.id) : month?.expenses.find((e) => e.id === peek.id);
+        if (!entry) return null;
+        return (
+          <TransactionPeek
+            kind={peek.kind}
+            entry={entry}
+            monthLabel={formatMonth(peek.monthKey)}
+            account={ledger.accounts.find((a) => a.id === entry.accountId)}
+            formatter={moneyFormatter}
+            privacy={ledger.privacyMode}
+            onClose={closePeek}
+            onShowInLedger={promotePeek}
+            onRemove={
+              peek.monthKey === ledger.selectedMonth
+                ? () => {
+                    const target = peek;
+                    setPeek(null);
+                    if (target.kind === "income") removeIncome(target.id);
+                    else removeExpense(target.id);
+                  }
+                : undefined
+            }
+          />
+        );
+      })()}
+
+      {paletteOpen && (
+        <CommandPalette
+          onClose={() => setPaletteOpen(false)}
+          items={paletteItems()}
+          searchMore={paletteSearch}
+          onRun={(item) => track("palette_action", { group: item.group })}
+        />
+      )}
 
       {mobileNavOpen && <div className="navSheetBackdrop" onClick={() => setMobileNavOpen(false)} aria-hidden="true" />}
 
@@ -4043,7 +4285,7 @@ function App() {
           )}
 
           <div className="topActions">
-            <button className="paletteButton" type="button" onClick={() => setPaletteOpen(true)} aria-keyshortcuts={SHORTCUTS.palette.aria} aria-haspopup="dialog">
+            <button className="paletteButton" type="button" onClick={() => { setPaletteOpen(true); track("palette_opened", {}); }} aria-keyshortcuts={SHORTCUTS.palette.aria} aria-haspopup="dialog">
               <Search size={16} aria-hidden="true" />
               <span>Go to or do anything</span>
               <kbd>{isAppleDevice ? "⌘" : "Ctrl"} K</kbd>
@@ -4448,6 +4690,8 @@ function App() {
                           onChange={(patch) => updateIncome(income.id, patch)}
                           onRenamed={(previousName) => offerRenameAll("income", income.id, previousName)}
                           onRemove={() => removeIncome(income.id)}
+                          onPeek={(origin) => openPeek({ kind: "income", id: income.id, monthKey: ledger.selectedMonth }, origin)}
+                          arriveIndex={arrivalOrder.get(income.id)}
                         />
                       ))
                     ) : currentMonth.incomes.length ? (
@@ -4615,6 +4859,8 @@ function App() {
                                   onChange={(patch) => updateExpense(expense.id, patch)}
                                   onRenamed={(previousName) => offerRenameAll("expense", expense.id, previousName)}
                                   onRemove={() => removeExpense(expense.id)}
+                                  onPeek={(origin) => openPeek({ kind: "expense", id: expense.id, monthKey: ledger.selectedMonth }, origin)}
+                                  arriveIndex={arrivalOrder.get(expense.id)}
                                 />
                               );
                             })}
@@ -4989,6 +5235,7 @@ function App() {
                 setToast(t(`${subscription.label} is active again`));
               }}
               onDelete={(subscription) => {
+                offerUndo();
                 updateLedger((current) => deleteSubscription(current, subscription));
                 setToast(t(`${subscription.label} removed from Subscriptions`));
                 track("subscription_deleted", { status: subscription.status });
@@ -5449,10 +5696,19 @@ function App() {
 
         {tutorialView && <TutorialOverlay key={tutorialView} view={tutorialView} tutorial={tutorialsFor(region)[tutorialView]} t={t} onClose={closeTutorial} />}
 
-        {toastVisible && (
-          <div className="statusToast" role="status" aria-live="polite">
-            {toast}
+        {undoOffer?.after ? (
+          <div className="statusToast undoToast" role="status" aria-live="polite" key={undoOffer.stamp}>
+            <span>{undoOffer.label || "Done"}</span>
+            <button className="undoToastBtn" type="button" onClick={performUndo} aria-keyshortcuts={SHORTCUTS.undo.aria}>
+              Undo <kbd>{isAppleDevice ? "⌘" : "Ctrl"} Z</kbd>
+            </button>
           </div>
+        ) : (
+          toastVisible && (
+            <div className="statusToast" role="status" aria-live="polite">
+              {toast}
+            </div>
+          )
         )}
 
         {accountToast && (
@@ -6772,6 +7028,8 @@ function IncomeRow({
   onChange,
   onRenamed,
   onRemove,
+  onPeek,
+  arriveIndex,
 }: {
   income: IncomeEntry;
   account?: Account;
@@ -6788,6 +7046,8 @@ function IncomeRow({
   onChange: (patch: Partial<IncomeEntry>) => void;
   onRenamed: (previousName: string) => void;
   onRemove: () => void;
+  onPeek: (origin: HTMLElement) => void;
+  arriveIndex?: number;
 }) {
   const renameTracking = useRenameTracking(onRenamed);
   // A custom MIME type keeps income drags out of the expense column's drop targets.
@@ -6808,7 +7068,8 @@ function IncomeRow({
 
   return (
     <div
-      className={`financeRow incomeRow ${dragging ? "dragging" : ""} ${dropClass}`}
+      className={`financeRow incomeRow ${dragging ? "dragging" : ""} ${dropClass}${arriveIndex !== undefined ? " rowArrive" : ""}`}
+      style={arriveIndex !== undefined ? ({ "--arrive-i": arriveIndex } as CSSProperties) : undefined}
       data-income-id={income.id}
       draggable
       onDragStart={handleDragStart}
@@ -6855,6 +7116,15 @@ function IncomeRow({
           kind="income"
           onToggle={() => onChange({ recurring: !income.recurring })}
         />
+        <button
+          className="iconButton rowAction rowPeek"
+          type="button"
+          onClick={(event) => onPeek(event.currentTarget)}
+          aria-label={`Details for ${income.source || "this income"}`}
+          data-tip="Details"
+        >
+          <PanelRight size={16} />
+        </button>
         <button className="iconButton rowAction" type="button" onClick={onRemove} aria-label="Remove income">
           <Trash2 size={17} />
         </button>
@@ -6988,6 +7258,8 @@ function ExpenseRow({
   onChange,
   onRenamed,
   onRemove,
+  onPeek,
+  arriveIndex,
 }: {
   expense: ExpenseEntry;
   account?: Account;
@@ -7009,6 +7281,8 @@ function ExpenseRow({
   onChange: (patch: Partial<ExpenseEntry>) => void;
   onRenamed: (previousName: string) => void;
   onRemove: () => void;
+  onPeek: (origin: HTMLElement) => void;
+  arriveIndex?: number;
 }) {
   const renameTracking = useRenameTracking(onRenamed);
   function handleDragStart(event: DragEvent<HTMLElement>) {
@@ -7031,7 +7305,8 @@ function ExpenseRow({
 
   return (
     <div
-      className={`financeRow expenseRow ${expense.scheduledPayment ? "isPlanned" : ""} ${dragging ? "dragging" : ""} ${grouping ? "groupingSource" : ""} ${dropClass}`}
+      className={`financeRow expenseRow ${expense.scheduledPayment ? "isPlanned" : ""} ${dragging ? "dragging" : ""} ${grouping ? "groupingSource" : ""} ${dropClass}${arriveIndex !== undefined ? " rowArrive" : ""}`}
+      style={arriveIndex !== undefined ? ({ "--arrive-i": arriveIndex } as CSSProperties) : undefined}
       data-expense-name={expense.name}
       data-expense-id={expense.id}
       draggable
@@ -7069,7 +7344,16 @@ function ExpenseRow({
         onEnter={({ currentTarget }) => currentTarget.blur()}
         onChange={(value) => onChange({ amount: Number(value) })}
       />
-      <span className={privacy ? "rowTotal masked" : "rowTotal"}>{formatter.format(expense.amount)}</span>
+      {/* The amount doubles as the way into this row's details: no extra icon in a tight row. */}
+      <button
+        className={privacy ? "rowTotal rowTotalPeek masked" : "rowTotal rowTotalPeek"}
+        type="button"
+        onClick={(event) => onPeek(event.currentTarget)}
+        aria-label={`Details for ${expense.name || "this expense"}`}
+        data-tip="Details"
+      >
+        {formatter.format(expense.amount)}
+      </button>
       <div className="rowActions">
         {expense.scheduledPayment && (
           <span
