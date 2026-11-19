@@ -1,48 +1,72 @@
-import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Check, Lock } from "lucide-react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { ArrowRight, Check } from "lucide-react";
 import { BANK_GUIDES } from "./generated/bankGuides";
 import { LANDING_COPY, rememberLandingRegion } from "./landingContent";
 import type { RegionKey } from "./region";
 
-// ─── Audio ────────────────────────────────────────────────────────────────────
+// ─── Scroll scenes ───────────────────────────────────────────────────────────
+//
+// The page plays like the app: as a section crosses the screen, its demo runs
+// forwards, and scrolling back up runs it backwards. One passive scroll
+// listener updates every scene once per frame. Each scene gets two numbers:
+//   p, its progress through the viewport (0 entering at the bottom, 1 leaving at the top)
+//   e, how far it has entered (0 at the bottom edge, 1 once its top reaches 35% down)
+// Both are also written to the element as --p and --e for CSS-only layers.
+// Before hydration, without JavaScript and under reduced motion, every scene
+// sits at its finished state, so crawlers and readers see all of the content.
 
-function mkCtx(): AudioContext | null {
-  try { return new AudioContext(); } catch { return null; }
-}
+type Scene = { el: HTMLElement; cb?: (p: number, e: number) => void };
+const scenes = new Set<Scene>();
+let frame = 0;
+const clamp01 = (n: number) => (n < 0 ? 0 : n > 1 ? 1 : n);
+// Progress between two marks: 0 before a, 1 after b.
+const span = (v: number, a: number, b: number) => clamp01((v - a) / (b - a));
 
-function sndHover(ctx: AudioContext) {
-  const o = ctx.createOscillator(), g = ctx.createGain();
-  o.connect(g); g.connect(ctx.destination);
-  o.frequency.setValueAtTime(900, ctx.currentTime);
-  o.frequency.exponentialRampToValueAtTime(1100, ctx.currentTime + 0.055);
-  g.gain.setValueAtTime(0.038, ctx.currentTime);
-  g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.055);
-  o.start(ctx.currentTime); o.stop(ctx.currentTime + 0.055);
-}
-
-function sndClick(ctx: AudioContext) {
-  const o = ctx.createOscillator(), g = ctx.createGain();
-  o.connect(g); g.connect(ctx.destination);
-  o.frequency.setValueAtTime(260, ctx.currentTime);
-  o.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.11);
-  g.gain.setValueAtTime(0.11, ctx.currentTime);
-  g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.11);
-  o.start(ctx.currentTime); o.stop(ctx.currentTime + 0.11);
-}
-
-function sndChime(ctx: AudioContext) {
-  [523, 659, 784].forEach((freq, i) => {
-    const o = ctx.createOscillator(), g = ctx.createGain();
-    o.type = "sine";
-    o.connect(g); g.connect(ctx.destination);
-    const t = ctx.currentTime + i * 0.13;
-    o.frequency.setValueAtTime(freq, t);
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.06, t + 0.04);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
-    o.start(t); o.stop(t + 0.5);
+function tick() {
+  frame = 0;
+  const vh = window.innerHeight || 1;
+  scenes.forEach(({ el, cb }) => {
+    const r = el.getBoundingClientRect();
+    if (r.bottom < -vh || r.top > vh * 2) return;
+    const p = clamp01((vh - r.top) / (vh + r.height));
+    const e = clamp01((vh - r.top) / (vh * 0.65));
+    el.style.setProperty("--p", p.toFixed(4));
+    el.style.setProperty("--e", e.toFixed(4));
+    cb?.(p, e);
   });
 }
+function schedule() { if (!frame) frame = requestAnimationFrame(tick); }
+
+function useScene(cb: ((p: number, e: number) => void) | null, enabled: boolean) {
+  const ref = useRef<HTMLElement | null>(null);
+  const cbRef = useRef(cb);
+  cbRef.current = cb;
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !enabled) return;
+    const scene: Scene = { el, cb: (p, e) => cbRef.current?.(p, e) };
+    scenes.add(scene);
+    if (scenes.size === 1) {
+      window.addEventListener("scroll", schedule, { passive: true });
+      window.addEventListener("resize", schedule);
+    }
+    schedule();
+    return () => {
+      scenes.delete(scene);
+      el.style.removeProperty("--p");
+      el.style.removeProperty("--e");
+      el.style.removeProperty("--s");
+      if (scenes.size === 0) {
+        window.removeEventListener("scroll", schedule);
+        window.removeEventListener("resize", schedule);
+      }
+    };
+  }, [enabled]);
+  return ref;
+}
+
+// The entry that types itself into the ledger demo as you scroll.
+const TYPED = { name: "Gym membership", amt: "32.00" };
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
@@ -108,13 +132,12 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
   const CSV_ROWS = copy.csvRows;
   const incomeRow = copy.heroIncome;
   const [exp1, exp2] = copy.heroExpenses;
-  const ctxRef    = useRef<AudioContext | null>(null);
-  const csvRef    = useRef<HTMLElement | null>(null);
-  const annualRef = useRef<HTMLElement | null>(null);
 
   const [navIn,    setNavIn]    = useState(false);
-  const [reduced,  setReduced]  = useState(false);
-  const [csvStep,  setCsvStep]  = useState(0);
+  // Assume reduced motion until the browser says otherwise: the server render
+  // and the first client render then show every demo in its finished state.
+  const [reduced,  setReduced]  = useState(true);
+  const motion = !reduced;
 
   // Hero animation
   const [heroFocus,      setHeroFocus]      = useState<HeroFocus>(null);
@@ -125,28 +148,17 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
   const [heroIncAdded,   setHeroIncAdded]   = useState<{ name: string; amt: string }[]>([]);
   const [heroExpAdded,   setHeroExpAdded]   = useState<{ name: string; amt: string }[]>([]);
 
-  // Annual chart
-  const [annualPhase,   setAnnualPhase]   = useState<"chart" | "proj">("chart");
-  const [annualVisible, setAnnualVisible] = useState(false);
-  const [chartKey,      setChartKey]      = useState(0);
-
-  function getCtx(): AudioContext | null {
-    if (reduced) return null;
-    if (!ctxRef.current) ctxRef.current = mkCtx();
-    if (ctxRef.current?.state === "suspended") void ctxRef.current.resume();
-    return ctxRef.current;
-  }
+  // Scroll-driven demos. Each holds the finished state until scroll takes over.
+  const csvDone = CSV_ROWS.length * 2;
+  const [csvStep, setCsvStep] = useState(csvDone);
+  const [typedChars, setTypedChars] = useState(TYPED.name.length + TYPED.amt.length);
+  const [typedCommitted, setTypedCommitted] = useState(true);
+  const [annualPhase, setAnnualPhase] = useState<"chart" | "proj">("chart");
+  const [lockClosed, setLockClosed] = useState(true);
 
   function enter() {
-    const c = getCtx();
-    if (c) sndClick(c);
     localStorage.setItem("hasSeenLanding", "1");
     onEnter();
-  }
-
-  function hover() {
-    const c = getCtx();
-    if (c) sndHover(c);
   }
 
   // Reduced-motion preference
@@ -157,6 +169,16 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
     mq.addEventListener("change", h);
     return () => mq.removeEventListener("change", h);
   }, []);
+
+  // Back to the finished state whenever motion is off.
+  useEffect(() => {
+    if (motion) return;
+    setCsvStep(csvDone);
+    setTypedChars(TYPED.name.length + TYPED.amt.length);
+    setTypedCommitted(true);
+    setAnnualPhase("chart");
+    setLockClosed(true);
+  }, [motion, csvDone]);
 
   // Body scroll unlock
   useEffect(() => {
@@ -170,35 +192,44 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
     return () => { html.style.overflow = prevHtml; body.style.overflow = prevBody; };
   }, []);
 
-  // Nav slide-in + opening chime
+  // Nav slide-in
   useEffect(() => {
-    const t1 = setTimeout(() => setNavIn(true), 120);
-    if (reduced) return () => clearTimeout(t1);
-    const t2 = setTimeout(() => {
-      const c = mkCtx();
-      if (c) { ctxRef.current = c; sndChime(c); }
-    }, 480);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
-  }, [reduced]);
+    const t = setTimeout(() => setNavIn(true), 120);
+    return () => clearTimeout(t);
+  }, []);
 
-  // Scroll reveal
+  // Hero copy and window: the opening moment, on load rather than on scroll.
   useEffect(() => {
-    if (reduced) {
-      document.querySelectorAll(".lp-r").forEach(el => {
-        (el as HTMLElement).style.opacity = "1";
-        (el as HTMLElement).style.transform = "none";
-      });
-      return;
-    }
-    const io = new IntersectionObserver(
-      entries => entries.forEach(e => {
-        if (e.isIntersecting) { e.target.classList.add("lp-ri"); io.unobserve(e.target); }
-      }),
-      { threshold: 0.07 }
-    );
-    document.querySelectorAll(".lp-r").forEach(el => io.observe(el));
-    return () => io.disconnect();
-  }, [reduced]);
+    const t = setTimeout(() => document.querySelectorAll(".lp-hero .lp-r").forEach(el => el.classList.add("lp-ri")), 60);
+    return () => clearTimeout(t);
+  }, []);
+
+  // ── Scenes ────────────────────────────────────────────────────────────────
+  // Hero: the window flattens and the stamp turns as you scroll away (CSS reads --p).
+  const heroRef = useScene(() => {
+    heroRef.current?.style.setProperty("--s", span(window.scrollY, 0, window.innerHeight * 0.7).toFixed(4));
+  }, motion);
+
+  // CSV: each row lands, then each gets its category, as the section rises.
+  const csvRef = useScene((p) => {
+    const n = CSV_ROWS.length;
+    const rows = Math.round(span(p, 0.1, 0.28) * n);
+    const cats = Math.round(span(p, 0.3, 0.46) * n);
+    setCsvStep(cats > 0 ? n + cats : rows);
+  }, motion);
+
+  // Ledger: a new expense types itself in, commits, and the total moves.
+  const ledgerRef = useScene((p) => {
+    const total = TYPED.name.length + TYPED.amt.length;
+    setTypedChars(Math.round(span(p, 0.28, 0.5) * total));
+    setTypedCommitted(p > 0.54);
+  }, motion);
+
+  // Year: the chart walks through the months, then turns into the projection.
+  const annualRef = useScene((p) => setAnnualPhase(p > 0.6 ? "proj" : "chart"), motion);
+
+  // Privacy: the padlock closes.
+  const privacyRef = useScene((_p, e) => setLockClosed(e > 0.8), motion);
 
   // ── Hero animation loop ───────────────────────────────────────────────────
   useEffect(() => {
@@ -287,90 +318,6 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
     return () => { alive = false; tids.forEach(clearTimeout); };
   }, [reduced, region]);
 
-  // ── Annual chart: visibility tracking ────────────────────────────────────
-  useEffect(() => {
-    const el = annualRef.current;
-    if (!el || reduced) return;
-    const io = new IntersectionObserver(
-      ([entry]) => setAnnualVisible(entry.isIntersecting),
-      { threshold: 0.15 }
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [reduced]);
-
-  // ── Annual chart: phase loop ──────────────────────────────────────────────
-  useEffect(() => {
-    if (reduced || !annualVisible) return;
-    let alive = true;
-    const tids: ReturnType<typeof setTimeout>[] = [];
-
-    function loop() {
-      setAnnualPhase("chart");
-      setChartKey(k => k + 1);
-      tids.push(setTimeout(() => {
-        if (!alive) return;
-        setAnnualPhase("proj");
-        tids.push(setTimeout(() => { if (alive) loop(); }, 3500));
-      }, 3500));
-    }
-
-    loop();
-    return () => { alive = false; tids.forEach(clearTimeout); };
-  }, [reduced, annualVisible]);
-
-  // ── CSV animation ─────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (reduced) { setCsvStep(99); return; }
-    const el = csvRef.current;
-    if (!el) return;
-    let active = false;
-    const tids: ReturnType<typeof setTimeout>[] = [];
-
-    function run() {
-      if (active) return;
-      active = true;
-      const push = (fn: () => void, ms: number) => { const t = setTimeout(fn, ms); tids.push(t); };
-      CSV_ROWS.forEach((_, i) => push(() => setCsvStep(i + 1), 300 + i * 450));
-      const after = 300 + CSV_ROWS.length * 450 + 400;
-      CSV_ROWS.forEach((_, i) => push(() => setCsvStep(CSV_ROWS.length + i + 1), after + i * 320));
-      push(() => { setCsvStep(0); active = false; }, after + CSV_ROWS.length * 320 + 2400);
-    }
-
-    const io = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting && !active) run();
-    }, { threshold: 0.25 });
-    io.observe(el);
-    return () => { io.disconnect(); tids.forEach(clearTimeout); };
-  }, [reduced]);
-
-  const prevCsvStep = useRef(csvStep);
-  useEffect(() => {
-    if (prevCsvStep.current !== 0 && csvStep === 0 && csvRef.current && !reduced) {
-      const t = setTimeout(() => {
-        const el = csvRef.current;
-        if (el) {
-          const io = new IntersectionObserver(([entry]) => {
-            if (entry.isIntersecting) {
-              let active = true;
-              const tids: ReturnType<typeof setTimeout>[] = [];
-              const push = (fn: () => void, ms: number) => { const t = setTimeout(fn, ms); tids.push(t); };
-              CSV_ROWS.forEach((_, i) => push(() => setCsvStep(i + 1), 300 + i * 450));
-              const after = 300 + CSV_ROWS.length * 450 + 400;
-              CSV_ROWS.forEach((_, i) => push(() => setCsvStep(CSV_ROWS.length + i + 1), after + i * 320));
-              push(() => { setCsvStep(0); active = false; void active; }, after + CSV_ROWS.length * 320 + 2400);
-              io.disconnect();
-            }
-          }, { threshold: 0.25 });
-          io.observe(el);
-          return () => io.disconnect();
-        }
-      }, 800);
-      return () => clearTimeout(t);
-    }
-    prevCsvStep.current = csvStep;
-  }, [csvStep, reduced]);
-
   // ── Derived hero values ───────────────────────────────────────────────────
   const incomeTotal  = 3248.72 + heroIncAdded.reduce((s, r) => s + parseFloat(r.amt), 0);
   const expenseTotal = heroExpAdded.reduce((s, r) => s + parseFloat(r.amt), 0);
@@ -400,7 +347,7 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
             {copy.nav.map(link => <a key={link.href} href={link.href}>{link.label}</a>)}
             <a href={copy.switchTo.href} hrefLang={copy.switchTo.region === "US" ? "en-US" : "en-GB"} onClick={() => rememberLandingRegion(copy.switchTo.region)}>{copy.switchTo.label}</a>
           </nav>
-          <button className="lp-btn lp-btn--sm lp-btn--onframe" onClick={enter} onMouseEnter={hover}>
+          <button className="lp-btn lp-btn--sm lp-btn--onframe" onClick={enter}>
             Continue to app <ArrowRight size={14} />
           </button>
         </div>
@@ -409,7 +356,7 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
       <main className="lp-page">
 
         {/* ════ HERO ════ */}
-        <section className="lp-hero">
+        <section className="lp-hero" ref={el => { heroRef.current = el; }}>
           <div className="lp-hero-copy lp-r">
             <h1 className="lp-h1">
               Track income and spending<br />
@@ -417,7 +364,7 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
             </h1>
             <p className="lp-sub">{copy.heroSub}</p>
             <div className="lp-actions">
-              <button className="lp-btn lp-btn--lg lp-btn--onframe" onClick={enter} onMouseEnter={hover}>
+              <button className="lp-btn lp-btn--lg lp-btn--onframe" onClick={enter}>
                 Open the ledger <ArrowRight size={18} />
               </button>
               <button className="lp-skip" onClick={enter}>
@@ -562,7 +509,7 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
         </section>
 
         {/* ════ DEMO 2: Monthly ledger ════ */}
-        <section className="lp-feat" aria-labelledby="lp-ledger-h2">
+        <section className="lp-feat" ref={el => { ledgerRef.current = el; }} aria-labelledby="lp-ledger-h2">
           <div className="lp-feat-copy">
             <h2 className="lp-feat-h2" id="lp-ledger-h2">See every month side by side</h2>
             <p className="lp-feat-p">
@@ -582,7 +529,7 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
               <div className="lp-mini-panel lp-mini-panel--expense">
                 <div className="lp-mini-head">
                   <span>Expenses</span>
-                  <span className="lp-mini-total">{cur}{fmt(miniExpenseTotal)}</span>
+                  <span className="lp-mini-total">{cur}{fmt(miniExpenseTotal + (typedCommitted ? parseFloat(TYPED.amt) : 0))}</span>
                 </div>
                 <div className="lp-mini-cat">
                   <span className="lp-mini-cat-pip" /><span>{copy.miniFood.label}</span>
@@ -592,6 +539,29 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
                 {copy.miniRows.map(r => (
                   <div className="lp-mini-row" key={r.name}><span>{r.name}</span><span>{cur}{r.amt}</span></div>
                 ))}
+                {typedCommitted && (
+                  <div className="lp-mini-row lp-mini-row--new"><span>{TYPED.name}</span><span>{cur}{TYPED.amt}</span></div>
+                )}
+                <div className="lp-mini-add" aria-hidden="true">
+                  <span className="lp-madd-plus lp-madd-plus--exp">+</span>
+                  {(() => {
+                    const n = TYPED.name.length;
+                    const typing = !typedCommitted && typedChars > 0;
+                    const name = typing ? TYPED.name.slice(0, Math.min(typedChars, n)) : "";
+                    const amt = typing ? TYPED.amt.slice(0, Math.max(0, typedChars - n)) : "";
+                    const onAmt = typing && typedChars > n;
+                    return (
+                      <>
+                        <span className={`lp-madd-field${typing && !onAmt ? " lp-madd-field--focus" : ""}`}>
+                          {name ? <>{name}{!onAmt && <span className="lp-cursor" />}</> : <span className="lp-ph">Expense</span>}
+                        </span>
+                        <span className={`lp-madd-field lp-madd-field--amt${onAmt ? " lp-madd-field--focus" : ""}`}>
+                          {onAmt ? <>{cur}{amt}<span className="lp-cursor" /></> : <span className="lp-ph">{cur}</span>}
+                        </span>
+                      </>
+                    );
+                  })()}
+                </div>
               </div>
             </div>
           </div>
@@ -615,8 +585,7 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
 
                 {/* Scrolling bar chart */}
                 <div
-                  key={chartKey}
-                  className="lp-chart-scroll lp-chart-scroll--run"
+                  className="lp-chart-scroll"
                   style={{ opacity: annualPhase === "proj" ? 0 : 1 }}
                 >
                   <svg
@@ -634,7 +603,8 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
                       return (
                         <g key={i}>
                           <rect x={x} y={y} width={18} height={h} rx={3}
-                            style={{ fill: pos ? "var(--lp-pos)" : "var(--lp-neg-fill)" }} opacity={0.9} />
+                            className={pos ? "lp-bar lp-bar--up" : "lp-bar lp-bar--down"}
+                            style={{ fill: pos ? "var(--lp-pos)" : "var(--lp-neg-fill)", "--i": i } as CSSProperties} opacity={0.9} />
                           {i % 2 === 0 && (
                             <text x={x + 9} y={112} textAnchor="middle" className="lp-chart-lbl">{b.m}</text>
                           )}
@@ -692,8 +662,13 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
         </section>
 
         {/* ════ PRIVACY ════ */}
-        <section className="lp-privacy" aria-labelledby="lp-privacy-h2">
-          <span className="lp-privacy-mark" aria-hidden="true"><Lock size={22} strokeWidth={2.2} /></span>
+        <section className="lp-privacy" ref={el => { privacyRef.current = el; }} aria-labelledby="lp-privacy-h2">
+          <span className={`lp-privacy-mark${lockClosed ? " lp-privacy-mark--shut" : ""}`} aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="24" height="24">
+              <path className="lp-lock-shackle" d="M8 11V8a4 4 0 0 1 8 0v3" />
+              <rect className="lp-lock-body" x="5.5" y="11" width="13" height="9.5" rx="2.2" />
+            </svg>
+          </span>
           <h2 className="lp-feat-h2" id="lp-privacy-h2">Your money stays on your device.</h2>
           <p className="lp-feat-p">
             The ledger lives in your browser. Nothing is uploaded unless you choose to sign in
@@ -799,7 +774,7 @@ export default function LandingPage({ onEnter, onFeedback, region = "GB" }: { on
         <section className="lp-end">
           <h2 className="lp-end-h2">Open your first month.</h2>
           <p className="lp-end-deck">It takes about two minutes.</p>
-          <button className="lp-btn lp-btn--lg lp-btn--onframe" onClick={enter} onMouseEnter={hover}>
+          <button className="lp-btn lp-btn--lg lp-btn--onframe" onClick={enter}>
             Start the ledger <ArrowRight size={18} />
           </button>
           <p className="lp-end-note">Free. No credit card. No bank login.</p>
@@ -987,10 +962,8 @@ const CSS = `
 /* ── Sticker ── */
 .lp-sticker {
   position: absolute; top: -46px; right: -46px; z-index: 3; width: 116px; height: 116px;
-  transform: rotate(-12deg); filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.25));
-  transition: transform 900ms cubic-bezier(0.2, 0.9, 0.25, 1.04);
+  transform: rotate(calc(-12deg + var(--s, 0) * 220deg)); filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.25));
 }
-.lp-sticker:hover { transform: rotate(348deg); }
 .lp-sticker-bg { fill: var(--lp-accent); }
 .lp-sticker-core { fill: #051424; }
 .lp-sticker-text { font: 800 10.6px/1 'Inter', system-ui, sans-serif; fill: #051424; }
@@ -1189,8 +1162,8 @@ const CSS = `
 .lp-chart-pip--neg { background: var(--lp-neg-fill); margin-left: 14px; margin-right: 4px; }
 .lp-chart-stage { position: relative; overflow: hidden; height: 126px; }
 .lp-chart-scroll { position: absolute; top: 0; left: 0; transition: opacity 500ms ease; }
-@keyframes lpBarScroll { from { transform: translateX(0); } to { transform: translateX(-312px); } }
-.lp-chart-scroll--run { animation: lpBarScroll 3.2s ease-in-out forwards; }
+/* The chart walks a year to the left as the section scrolls through. */
+.lp-chart-scroll { transform: translateX(calc(clamp(0, (var(--p, 0.2) - 0.2) / 0.38, 1) * -312px)); }
 .lp-chart-proj {
   position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center;
   transition: opacity 500ms ease; background: var(--lp-surface); padding: 4px 2px;
@@ -1202,6 +1175,37 @@ const CSS = `
 .lp-proj-val { font-variant-numeric: tabular-nums; font-size: 17px; font-weight: 750; color: var(--lp-ink-strong); letter-spacing: -0.02em; }
 .lp-proj-val--pos { color: var(--lp-accent-ink); }
 .lp-proj-dial-wrap { flex-shrink: 0; }
+
+/* ── Scroll layers ────────────────────────────────────────────────────────────
+   Every value below falls back to the finished state when --p, --e or --s is
+   absent (server render, no JavaScript, reduced motion). Transform and opacity
+   only, so scrolling stays on the compositor. */
+/* Copy rises faster than the window behind it. (The wrapper keeps its own opening transform.) */
+.lp-hero-copy > * { transform: translateY(calc(var(--s, 0) * -70px)); opacity: calc(1 - var(--s, 0) * 0.55); }
+.lp-hero-mock .lp-browser {
+  transform: perspective(1600px) rotateX(calc((1 - var(--s, 1)) * 16deg)) scale(calc(0.93 + var(--s, 1) * 0.07));
+  transform-origin: 50% 0;
+}
+.lp-feat-copy {
+  opacity: clamp(0, var(--e, 1) * 1.7 - 0.2, 1);
+  transform: translateY(calc((1 - clamp(0, var(--e, 1) * 1.4, 1)) * 48px));
+}
+.lp-feat-frame {
+  transform: translateY(calc((1 - var(--e, 1)) * 90px)) scale(calc(0.9 + clamp(0, var(--e, 1) * 1.15, 1) * 0.1));
+}
+/* The content inside each frame moves a little slower than the frame: two layers, two speeds. */
+.lp-feat-frame > * { transform: translateY(calc((0.5 - var(--p, 0.5)) * 44px)); }
+.lp-bar { transform-box: fill-box; transform: scaleY(clamp(0, var(--e, 1) * 1.7 - var(--i, 0) * 0.014 - 0.25, 1)); }
+.lp-bar--up { transform-origin: 50% 100%; }
+.lp-bar--down { transform-origin: 50% 0; }
+.lp-mini-add { display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: var(--lp-well); border-top: 1px dashed var(--lp-line-strong); }
+.lp-mini-row--new { animation: lpRowIn 260ms ease both; background: var(--lp-accent-wash); }
+.lp-privacy-mark svg { overflow: visible; }
+.lp-lock-body { fill: currentColor; }
+.lp-lock-shackle { fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; transform: translateY(-4px) rotate(-14deg); transform-origin: 16px 11px; transition: transform 380ms cubic-bezier(0.2, 0.9, 0.25, 1.3); }
+.lp-privacy-mark--shut .lp-lock-shackle { transform: none; }
+.lp-privacy-mark { transition: background-color 300ms ease, transform 380ms cubic-bezier(0.2, 0.9, 0.25, 1.3); }
+.lp-privacy-mark--shut { transform: scale(1.06); }
 
 /* ── Privacy ── */
 .lp-privacy { max-width: 780px; margin: 0 auto; padding: 128px 24px 0; text-align: center; }
@@ -1342,9 +1346,12 @@ a.lp-bank:hover { border-color: var(--lp-pos); background: var(--lp-accent-wash)
   .lp-hero .lp-r { opacity: 1; transform: none; }
   .lp-sticker:hover { transform: rotate(-12deg); }
   .lp-cursor { opacity: 1; }
+  .lp-hero-copy > *, .lp-hero-mock .lp-browser, .lp-feat-copy, .lp-feat-frame, .lp-feat-frame > *, .lp-bar { transform: none; opacity: 1; }
+  .lp-sticker { transform: rotate(-12deg); }
+  .lp-lock-shackle, .lp-privacy-mark, .lp-mini-row--new { transition: none; animation: none; }
   .lp-csv-row { opacity: 1; transform: none; transition: none; }
   .lp-csv-cat { color: var(--lp-accent-ink); border-color: var(--lp-pos); background: var(--lp-accent-wash); }
-  .lp-chart-scroll--run { animation: none; }
+  .lp-chart-scroll { transform: none; }
   .lp-mrow--new { animation: none; opacity: 1; transform: none; }
 }
 `;
