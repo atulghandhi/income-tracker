@@ -2,7 +2,7 @@ import { FinancialGlossary } from "./FinancialGlossary";
 import { TutorialOverlay } from "./GuidedTour";
 import { DashboardExportControls } from "./DashboardExportControls";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { flushSync } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import { Analytics } from "@vercel/analytics/react";
 import { applyFrame, readStoredGrain, readStoredHue, storeFrame } from "./frame";
 import LandingPage from "./LandingPage";
@@ -4656,6 +4656,7 @@ function App() {
                 onAdd={(id) => changeLayout("dashboard", "add", (layout) => addWidget(layout, "dashboard", region, id))}
                 onReset={() => changeLayout("dashboard", "reset", () => starterLayout("dashboard", region))}
               />
+              {layoutEditing === "dashboard" && <FloatingLayoutDone onDone={() => setLayoutEditing(null)} />}
             </section>
           )}
 
@@ -8368,11 +8369,47 @@ function FinancialSignalCard({ signal, t, onDismiss }: { signal: FinancialSignal
   );
 }
 
+// While customising, the Done button in the page header scrolls away with the page. Once it is
+// out of sight this one floats in the corner, so finishing never means scrolling back up.
+// (Every change is saved as it is made; Done only leaves customise mode.)
+function FloatingLayoutDone({ onDone }: { onDone: () => void }) {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const header = document.querySelector<HTMLElement>("[data-layout-edit]");
+    if (!header || typeof IntersectionObserver === "undefined") {
+      setShow(true);
+      return;
+    }
+    // The top bar covers the first ~72px, so a button tucked under it counts as out of sight.
+    const observer = new IntersectionObserver(([entry]) => setShow(!entry.isIntersecting), { rootMargin: "-72px 0px 0px 0px" });
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, []);
+  // Leave room at the foot of the page so the last widget never sits under the button.
+  useEffect(() => {
+    document.body.classList.add("hasFloatingDone");
+    return () => document.body.classList.remove("hasFloatingDone");
+  }, []);
+  if (!show) return null;
+  // Rendered on <body>: the page sections animate with transforms, which would pin a fixed
+  // element to the section instead of the screen.
+  return createPortal(
+    // Named by its own text ("Done"): the header button keeps the longer label, so the two
+    // never read as one control duplicated.
+    <button className="floatingLayoutDone" type="button" onClick={onDone}>
+      <Check size={17} aria-hidden="true" />
+      Done
+    </button>,
+    document.body,
+  );
+}
+
 function LayoutEditButton({ page, editing, onToggle, t }: { page: LayoutPage; editing: boolean; onToggle: () => void; t: (text: string) => string }) {
   return (
     <button
       className={editing ? "commandButton layoutEditButton active" : "commandButton layoutEditButton"}
       type="button"
+      data-layout-edit
       onClick={onToggle}
       aria-pressed={editing}
       aria-label={editing ? t(`Finish customising the ${page}`) : t(`Customise the ${page} layout`)}

@@ -262,6 +262,11 @@ const DEFAULT_IDS: Record<RegionKey, string[]> = {
 // in the widget tray, and the dashboard suggests widgets as the ledger fills (see widgetRecs.ts).
 // Someone who already had data before this keeps the full default above.
 const STARTER_IDS = ["snapshot", "cash-flow", "spending-pace", "categories"];
+// The two small starter cards share a row half and half, so the row is never a third empty.
+const STARTER_SIZES: Record<string, WidgetSize> = { "spending-pace": "m", categories: "m" };
+// The starter layout as it was saved before 2026-11-20 (two third-width cards and an empty third).
+// A stored layout still exactly like this was never customised, so it moves to the current starter.
+const OLD_STARTER = "snapshot:xl,cash-flow:xl,spending-pace:s,categories:s";
 
 // Until 2026-10-19 the Dashboard and Insights were two pages with a layout each, and a few
 // widgets existed on both under different ids. Stored layouts from then still use those ids.
@@ -297,8 +302,11 @@ export function defaultLayout(page: LayoutPage, region: RegionKey): PageLayout {
 }
 
 export function starterLayout(page: LayoutPage, region: RegionKey): PageLayout {
-  return layoutOf(page, region, STARTER_IDS);
+  const layout = layoutOf(page, region, STARTER_IDS);
+  return { ...layout, widgets: layout.widgets.map((widget) => ({ ...widget, size: STARTER_SIZES[widget.id] ?? widget.size })) };
 }
+
+const signature = (layout: PageLayout) => layout.widgets.map((widget) => `${widget.id}:${widget.size}`).join(",");
 
 function layoutOf(page: LayoutPage, region: RegionKey, ids: string[]): PageLayout {
   const available = availableWidgets(page, region);
@@ -423,7 +431,13 @@ function readStored(key: string): unknown {
 export function loadLayout(page: LayoutPage, region: RegionKey): PageLayout {
   try {
     const stored = readStored(layoutStorageKey(page, region)) as { version?: unknown } | null;
-    if (stored && stored.version === LAYOUT_VERSION) return normalizeLayout(stored, page, region);
+    if (stored && stored.version === LAYOUT_VERSION) {
+      const layout = normalizeLayout(stored, page, region);
+      if (signature(layout) !== OLD_STARTER) return layout;
+      const upgraded = starterLayout(page, region);
+      saveLayout(page, region, upgraded);
+      return upgraded;
+    }
     const legacyInsightsKey = `it_layout_insights_${region.toLowerCase()}`;
     const merged = mergeLegacyLayouts(stored, readStored(legacyInsightsKey), region);
     if (stored || localStorage.getItem(legacyInsightsKey)) {
