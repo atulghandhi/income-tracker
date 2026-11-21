@@ -6,7 +6,7 @@
     <title>About The Income Tracker: who makes it and how it is funded</title>
     <meta name="description" content="The Income Tracker is a free, independent, local-first UK budgeting tool. Who makes it, how it is funded, how your data is handled and how to get in touch." />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
-    <meta name="author" content="The Income Tracker" />
+    <meta name="author" content="Atul Ghandhi" />
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#c3e3ef" />
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#16323c" />
     <script>(function(){try{var t=localStorage.getItem("it_theme");if(t!=="dark"&&t!=="light")return;document.documentElement.dataset.theme=t;var c=t==="dark"?"#16323c":"#c3e3ef";document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.setAttribute("content",c);});}catch(e){}})();</script>
@@ -149,6 +149,10 @@
     color: var(--accent-ink); border-radius: 50%; display: grid; place-items: center;
     font-weight: 700; font-size: 0.9rem;
   }
+  .author-card { display: flex; align-items: center; gap: 16px; margin: 4px 0 16px; }
+  .author-card img { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; flex: none; }
+  .author-card strong { display: block; color: var(--ink-strong); }
+  .author-card span { color: var(--ink-muted); font-size: 0.9rem; }
   .note { background: var(--well); border-left: 3px solid var(--line-strong); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 20px 0; font-size: 0.95rem; color: var(--ink-soft); }
   .note strong { color: var(--ink-strong); }
   .cta { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin: 34px 0; padding: 20px 22px; background: var(--well); border: 1px solid var(--line); border-radius: 14px; }
@@ -306,7 +310,24 @@
         "height": 240
       },
       "email": "hello@theincometracker.com",
-      "areaServed": "GB"
+      "areaServed": "GB",
+      "founder": {
+        "@id": "https://www.theincometracker.com/#author"
+      }
+    },
+    {
+      "@type": "Person",
+      "@id": "https://www.theincometracker.com/#author",
+      "name": "Atul Ghandhi",
+      "url": "https://www.theincometracker.com/about.html#author",
+      "image": "https://www.theincometracker.com/atul-ghandhi.webp",
+      "jobTitle": "Founder and developer",
+      "worksFor": {
+        "@id": "https://www.theincometracker.com/#org"
+      },
+      "sameAs": [
+        "https://github.com/atulghandhi"
+      ]
     },
     {
       "@type": "AboutPage",
@@ -373,8 +394,12 @@
       <h2>What it is</h2>
       <p>A month-by-month ledger for income and expenses. You import a bank CSV (or type entries in), drag transactions into categories, mark the recurring ones, and the app works out your surplus, savings rate, annual picture and goal dates. There is an optional sign-in if you want the same data on two devices. That is the whole product, on purpose.</p>
 
-      <h2>Who makes it</h2>
-      <p>It is built and maintained by a small independent team, not a bank, a fintech or a venture-funded start-up. There is no growth team optimising for time in app, and no product roadmap that depends on selling your data. Feedback goes straight to the people who write the code: use the <a href="/#feedback">contact form</a> or email <a href="mailto:hello@theincometracker.com">hello@theincometracker.com</a>.</p>
+      <h2 id="author">Who makes it</h2>
+      <div class="author-card">
+        <img src="/atul-ghandhi.webp" alt="Atul Ghandhi" width="96" height="96" loading="lazy" decoding="async" />
+        <div><strong>Atul Ghandhi</strong><span>Founder and developer</span></div>
+      </div>
+      <p>The Income Tracker is built and run by Atul Ghandhi, an independent developer. It is not a bank, a fintech or a venture-funded start-up. There is no growth team optimising for time in app, and no product roadmap that depends on selling your data. Every guide and calculator on this site is written and checked by Atul, and feedback goes straight to the person who writes the code: use the <a href="/#feedback">contact form</a> or email <a href="mailto:hello@theincometracker.com">hello@theincometracker.com</a>.</p>
 
       <h2>How it is funded</h2>
       <p>Right now, it is not. The core tracker is free and we intend to keep it free. If we ever add paid extras, they will be optional conveniences (for example automatic bank feeds for people who want them), never a paywall on your own data or on the basic ledger. We do not sell data, run adverts or take affiliate payments from the apps we compare ourselves with.</p>

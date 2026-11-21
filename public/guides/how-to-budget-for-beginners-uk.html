@@ -6,7 +6,7 @@
     <title>How to budget: a beginner's guide for the UK (2026)</title>
     <meta name="description" content="How to make your first budget in the UK: find your take-home pay, sort one month of real transactions into ten categories, pick a method and check it monthly." />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
-    <meta name="author" content="The Income Tracker" />
+    <meta name="author" content="Atul Ghandhi" />
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#edd3c5" />
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#3a2418" />
     <script>(function(){try{var t=localStorage.getItem("it_theme");if(t!=="dark"&&t!=="light")return;document.documentElement.dataset.theme=t;var c=t==="dark"?"#3a2418":"#edd3c5";document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.setAttribute("content",c);});}catch(e){}})();</script>
@@ -149,6 +149,10 @@
     color: var(--accent-ink); border-radius: 50%; display: grid; place-items: center;
     font-weight: 700; font-size: 0.9rem;
   }
+  .author-card { display: flex; align-items: center; gap: 16px; margin: 4px 0 16px; }
+  .author-card img { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; flex: none; }
+  .author-card strong { display: block; color: var(--ink-strong); }
+  .author-card span { color: var(--ink-muted); font-size: 0.9rem; }
   .note { background: var(--well); border-left: 3px solid var(--line-strong); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 20px 0; font-size: 0.95rem; color: var(--ink-soft); }
   .note strong { color: var(--ink-strong); }
   .cta { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin: 34px 0; padding: 20px 22px; background: var(--well); border: 1px solid var(--line); border-radius: 14px; }
@@ -306,7 +310,24 @@
         "height": 240
       },
       "email": "hello@theincometracker.com",
-      "areaServed": "GB"
+      "areaServed": "GB",
+      "founder": {
+        "@id": "https://www.theincometracker.com/#author"
+      }
+    },
+    {
+      "@type": "Person",
+      "@id": "https://www.theincometracker.com/#author",
+      "name": "Atul Ghandhi",
+      "url": "https://www.theincometracker.com/about.html#author",
+      "image": "https://www.theincometracker.com/atul-ghandhi.webp",
+      "jobTitle": "Founder and developer",
+      "worksFor": {
+        "@id": "https://www.theincometracker.com/#org"
+      },
+      "sameAs": [
+        "https://github.com/atulghandhi"
+      ]
     },
     {
       "@type": "WebPage",
@@ -362,9 +383,10 @@
       "dateModified": "2026-09-16",
       "inLanguage": "en-GB",
       "author": {
-        "@type": "Organization",
-        "name": "The Income Tracker",
-        "url": "https://www.theincometracker.com"
+        "@type": "Person",
+        "@id": "https://www.theincometracker.com/#author",
+        "name": "Atul Ghandhi",
+        "url": "https://www.theincometracker.com/about.html#author"
       },
       "publisher": {
         "@id": "https://www.theincometracker.com/#org"
@@ -465,7 +487,7 @@
     <main class="wrap">
       <header class="top"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> &rsaquo; <a href="/guides/">Guides</a> &rsaquo; How to budget: a beginner's guide</nav></header>
       <h1>How to budget: a beginner's guide</h1>
-      <p class="meta">By The Income Tracker · Updated 16 September 2026 · 6 min read</p>
+      <p class="meta">By <a href="/about.html#author" rel="author">Atul Ghandhi</a> · Updated 16 September 2026 · 6 min read</p>
       <div class="tldr"><strong>The short answer</strong><p>A budget is your income minus your spending, planned before the month starts and checked after it ends. Start with one month of real bank transactions, not estimates. Sort them into about ten categories and you will know your essentials, your flexible spending and your surplus (or deficit) inside twenty minutes. Then decide three things: what to cut, what to save, and when you will look again.</p></div>
 
       <h2>Step 1: know what actually lands</h2>

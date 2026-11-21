@@ -44,6 +44,16 @@ const PUBLIC = join(ROOT, "public");
 export const SITE = "https://www.theincometracker.com";
 export const BRAND = "The Income Tracker";
 const CONTACT_EMAIL = "hello@theincometracker.com";
+// The person behind the site. Finance is a "your money" topic where search
+// engines weigh who wrote the advice, so pages name him rather than the brand.
+const AUTHOR = {
+  name: "Atul Ghandhi",
+  path: "/about.html#author",
+  image: "/atul-ghandhi.webp",
+  sameAs: ["https://github.com/atulghandhi"],
+};
+const AUTHOR_LD = { "@type": "Person", "@id": `${SITE}/#author`, name: AUTHOR.name, url: `${SITE}${AUTHOR.path}` };
+const BYLINE = `<a href="${AUTHOR.path}" rel="author">${AUTHOR.name}</a>`;
 
 // Historical content date retained until an individual page is revised.
 // Never replace these dates with the build time. See modifiedAt() below.
@@ -239,6 +249,10 @@ ${frameRules("dark", ':root[data-theme="dark"] ')}
     color: var(--accent-ink); border-radius: 50%; display: grid; place-items: center;
     font-weight: 700; font-size: 0.9rem;
   }
+  .author-card { display: flex; align-items: center; gap: 16px; margin: 4px 0 16px; }
+  .author-card img { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; flex: none; }
+  .author-card strong { display: block; color: var(--ink-strong); }
+  .author-card span { color: var(--ink-muted); font-size: 0.9rem; }
   .note { background: var(--well); border-left: 3px solid var(--line-strong); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 20px 0; font-size: 0.95rem; color: var(--ink-soft); }
   .note strong { color: var(--ink-strong); }
   .cta { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin: 34px 0; padding: 20px 22px; background: var(--well); border: 1px solid var(--line); border-radius: 14px; }
@@ -510,6 +524,14 @@ function websiteLd() {
       logo: { "@type": "ImageObject", url: `${SITE}/icon.png`, width: 240, height: 240 },
       email: CONTACT_EMAIL,
       areaServed: "GB",
+      founder: { "@id": `${SITE}/#author` },
+    },
+    {
+      ...AUTHOR_LD,
+      image: `${SITE}${AUTHOR.image}`,
+      jobTitle: "Founder and developer",
+      worksFor: { "@id": `${SITE}/#org` },
+      sameAs: AUTHOR.sameAs,
     },
   ];
 }
@@ -552,7 +574,7 @@ function shell({ title, description, path, jsonLd = [], body, script = "", publi
     <title>${esc(title)}</title>
     <meta name="description" content="${esc(description)}" />
     <meta name="robots" content="${noindex ? "noindex, follow" : "index, follow, max-image-preview:large, max-snippet:-1"}" />
-    <meta name="author" content="${BRAND}" />
+    <meta name="author" content="${AUTHOR.name}" />
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="${FRAMES[section].light.a}" />
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="${FRAMES[section].dark.a}" />
     ${themeScript(section)}
@@ -851,7 +873,7 @@ function bankPage(bank) {
     : `Yes, you can. Log in to ${esc(bank.where)}, open the account, pick a date range and export as <strong>CSV</strong>.${appClause} Then drop that file into ${BRAND} to see it as a budget, free and with no bank login.`;
   const body = `      <header class="top">${breadcrumbHtml(trail)}</header>
       <h1>${esc(h1)}</h1>
-      <p class="meta">By ${BRAND} · Updated ${UPDATED_HUMAN}</p>
+      <p class="meta">By ${BYLINE} · Updated ${UPDATED_HUMAN}</p>
       <div class="tldr"><strong>In short</strong><p>${tldr}</p></div>
       ${glanceHtml(bank)}
 
@@ -929,7 +951,7 @@ function importHub() {
   const groups = BANK_GROUPS.map((g) => ({ g, banks: BANKS.filter((b) => (b.group || BANK_GROUPS[0]) === g) })).filter((x) => x.banks.length);
   const body = `      <header class="top">${breadcrumbHtml(trail)}</header>
       <h1>Export your bank statement as a CSV</h1>
-      <p class="meta">By ${BRAND} · Updated ${UPDATED_HUMAN}</p>
+      <p class="meta">By ${BYLINE} · Updated ${UPDATED_HUMAN}</p>
       <div class="tldr"><strong>In short</strong><p>Pick your bank below for the exact steps to download your transactions as a CSV. Then import that file into ${BRAND} to track your income and spending. Free, no account, no bank login.</p></div>
       <p class="lede">${BRAND} reads standard CSV, OFX and QIF exports from UK banks automatically. No formatting, no open banking, no credentials shared. Just a file you download yourself.</p>
 ${groups
@@ -983,7 +1005,7 @@ function guidePage(guide) {
   ];
   const body = `      <header class="top">${breadcrumbHtml(trail)}</header>
       <h1>${esc(guide.h1)}</h1>
-      <p class="meta">By ${BRAND} · Updated ${UPDATED_HUMAN}${guide.readMinutes ? ` · ${guide.readMinutes} min read` : ""}</p>
+      <p class="meta">By ${BYLINE} · Updated ${UPDATED_HUMAN}${guide.readMinutes ? ` · ${guide.readMinutes} min read` : ""}</p>
       <div class="tldr"><strong>The short answer</strong><p>${esc(guide.tldr)}</p></div>
 
       ${renderSections(guide.sections)}
@@ -1003,7 +1025,7 @@ function guidePage(guide) {
       datePublished: guide.published || FIRST_PUBLISHED,
       dateModified: modifiedAt(path),
       inLanguage: "en-GB",
-      author: { "@type": "Organization", name: BRAND, url: SITE },
+      author: AUTHOR_LD,
       publisher: { "@id": `${SITE}/#org` },
       mainEntityOfPage: `${SITE}${path}`,
       image: `${SITE}/og-image.png`,
@@ -1036,7 +1058,7 @@ function guidesHub() {
   const topics = [...new Set(GUIDES.map((g) => g.topic || "Budgeting basics"))];
   const body = `      <header class="top">${breadcrumbHtml(trail)}</header>
       <h1>Budgeting guides</h1>
-      <p class="meta">By ${BRAND} · Updated ${UPDATED_HUMAN}</p>
+      <p class="meta">By ${BYLINE} · Updated ${UPDATED_HUMAN}</p>
       <p class="lede">Straightforward guides for tracking your money privately. No open banking, no subscription, no jargon. ${GUIDES.length} guides and counting.</p>
 ${topics
   .map(
@@ -1149,7 +1171,7 @@ function calcPage(calc) {
   const widget = calcWidget(calc);
   const body = `      <header class="top">${breadcrumbHtml(trail)}</header>
       <h1>${esc(calc.h1)}</h1>
-      <p class="meta">By ${BRAND} · Updated ${UPDATED_HUMAN}</p>
+      <p class="meta">By ${BYLINE} · Updated ${UPDATED_HUMAN}</p>
       <div class="tldr"><strong>The short answer</strong><p>${esc(calc.tldr)}</p></div>
       ${widget.html}
 
@@ -1202,7 +1224,7 @@ function toolsHub() {
   ];
   const body = `      <header class="top">${breadcrumbHtml(trail)}</header>
       <h1>Free money calculators</h1>
-      <p class="meta">By ${BRAND} · Updated ${UPDATED_HUMAN}</p>
+      <p class="meta">By ${BYLINE} · Updated ${UPDATED_HUMAN}</p>
       <div class="tldr"><strong>In short</strong><p>Quick, free calculators for the money questions that actually come up. No sign-up, nothing stored, and every result has a share link. Pick one below.</p></div>
       <div class="grid">
 ${CALCULATORS.map((c) => `        <a class="card" href="/tools/${c.slug}.html"><span class="card-t">${esc(c.card)}</span><span class="card-d">${esc(c.cardD)}</span></a>`).join("\n")}
@@ -1253,7 +1275,7 @@ function landingPage(l) {
   const extra = l.sections ? `\n\n      ${renderSections(l.sections)}` : "";
   const body = `      <header class="top">${breadcrumbHtml(trail)}</header>
       <h1>${esc(l.h1)}</h1>
-      <p class="meta">By ${BRAND} · Updated ${UPDATED_HUMAN}</p>
+      <p class="meta">By ${BYLINE} · Updated ${UPDATED_HUMAN}</p>
       <div class="tldr"><strong>In short</strong><p>${esc(l.tldr)}</p></div>
 
       ${why}
@@ -1307,7 +1329,7 @@ function comparePage(c) {
       </div>`;
   const body = `      <header class="top">${breadcrumbHtml(trail)}</header>
       <h1>${esc(c.h1)}</h1>
-      <p class="meta">By ${BRAND} · Updated ${UPDATED_HUMAN} · Facts checked ${esc(humanDate(c.checked || UPDATED))}</p>
+      <p class="meta">By ${BYLINE} · Updated ${UPDATED_HUMAN} · Facts checked ${esc(humanDate(c.checked || UPDATED))}</p>
       <div class="tldr"><strong>The short answer</strong><p>${esc(c.tldr)}</p></div>
 
       <h2>Side by side</h2>
@@ -1339,7 +1361,7 @@ function comparePage(c) {
           datePublished: c.published || UPDATED,
           dateModified: modifiedAt(path),
           inLanguage: "en-GB",
-          author: { "@type": "Organization", name: BRAND, url: SITE },
+          author: AUTHOR_LD,
           publisher: { "@id": `${SITE}/#org` },
           mainEntityOfPage: `${SITE}${path}`,
           about: [{ "@type": "SoftwareApplication", name: c.name }, { "@id": `${SITE}/#app` }],
@@ -1375,7 +1397,7 @@ function roundupPage(r) {
     .join("\n\n      ");
   const body = `      <header class="top">${breadcrumbHtml(trail)}</header>
       <h1>${esc(r.h1)}</h1>
-      <p class="meta">By ${BRAND} · Updated ${UPDATED_HUMAN} · Facts checked ${esc(humanDate(r.checked || UPDATED))}</p>
+      <p class="meta">By ${BYLINE} · Updated ${UPDATED_HUMAN} · Facts checked ${esc(humanDate(r.checked || UPDATED))}</p>
       <div class="tldr"><strong>The short answer</strong><p>${esc(r.tldr)}</p></div>
 
       ${renderSections(r.intro)}
@@ -1411,7 +1433,7 @@ function roundupPage(r) {
           datePublished: r.published || UPDATED,
           dateModified: modifiedAt(path),
           inLanguage: "en-GB",
-          author: { "@type": "Organization", name: BRAND, url: SITE },
+          author: AUTHOR_LD,
           publisher: { "@id": `${SITE}/#org` },
           mainEntityOfPage: `${SITE}${path}`,
         },
@@ -1439,7 +1461,7 @@ function compareHub() {
   ];
   const body = `      <header class="top">${breadcrumbHtml(trail)}</header>
       <h1>Compare budgeting apps</h1>
-      <p class="meta">By ${BRAND} · Updated ${UPDATED_HUMAN}</p>
+      <p class="meta">By ${BYLINE} · Updated ${UPDATED_HUMAN}</p>
       <div class="tldr"><strong>In short</strong><p>Every comparison here says plainly where the other app wins. If you want automatic bank feeds and a slick mobile app, several of them beat us. If you want free, private and no bank login, that is our whole reason to exist.</p></div>
       <div class="grid">
         <a class="card" href="/compare/${ROUNDUP.slug}.html"><span class="card-t">${esc(ROUNDUP.card)}</span><span class="card-d">${esc(ROUNDUP.cardD)}</span></a>
@@ -1500,7 +1522,7 @@ function templatePage(t) {
   const columns = `<ul>${t.columns.map((c) => `<li><strong>${esc(c.name)}:</strong> ${esc(c.meaning)}</li>`).join("")}</ul>`;
   const body = `      <header class="top">${breadcrumbHtml(trail)}</header>
       <h1>${esc(t.h1)}</h1>
-      <p class="meta">By ${BRAND} · Updated ${UPDATED_HUMAN}</p>
+      <p class="meta">By ${BYLINE} · Updated ${UPDATED_HUMAN}</p>
       <div class="tldr"><strong>In short</strong><p>${esc(t.tldr)}</p></div>
       <div class="btnrow">
         <a class="btn" href="${filePath}" download data-track="template_download" data-ref="${esc(t.slug)}">Download the CSV template &darr;</a>
@@ -1568,7 +1590,7 @@ function templatesHub() {
   ];
   const body = `      <header class="top">${breadcrumbHtml(trail)}</header>
       <h1>Free budget templates</h1>
-      <p class="meta">By ${BRAND} · Updated ${UPDATED_HUMAN}</p>
+      <p class="meta">By ${BYLINE} · Updated ${UPDATED_HUMAN}</p>
       <div class="tldr"><strong>In short</strong><p>Plain CSV templates you can open in Excel, Google Sheets or Numbers. No macros, no sign-up, no locked cells. Each one also imports straight into ${BRAND}, which does the totals for you.</p></div>
       <div class="grid">
 ${TEMPLATES.map((t) => `        <a class="card" href="/templates/${t.slug}.html"><span class="card-t">${esc(t.card)}</span><span class="card-d">${esc(t.cardD)}</span></a>`).join("\n")}
@@ -1618,8 +1640,12 @@ function aboutPage() {
       <h2>What it is</h2>
       <p>A month-by-month ledger for income and expenses. You import a bank CSV (or type entries in), drag transactions into categories, mark the recurring ones, and the app works out your surplus, savings rate, annual picture and goal dates. There is an optional sign-in if you want the same data on two devices. That is the whole product, on purpose.</p>
 
-      <h2>Who makes it</h2>
-      <p>It is built and maintained by a small independent team, not a bank, a fintech or a venture-funded start-up. There is no growth team optimising for time in app, and no product roadmap that depends on selling your data. Feedback goes straight to the people who write the code: use the <a href="/#feedback">contact form</a> or email <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>.</p>
+      <h2 id="author">Who makes it</h2>
+      <div class="author-card">
+        <img src="${AUTHOR.image}" alt="${AUTHOR.name}" width="96" height="96" loading="lazy" decoding="async" />
+        <div><strong>${AUTHOR.name}</strong><span>Founder and developer</span></div>
+      </div>
+      <p>${BRAND} is built and run by ${AUTHOR.name}, an independent developer. It is not a bank, a fintech or a venture-funded start-up. There is no growth team optimising for time in app, and no product roadmap that depends on selling your data. Every guide and calculator on this site is written and checked by Atul, and feedback goes straight to the person who writes the code: use the <a href="/#feedback">contact form</a> or email <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>.</p>
 
       <h2>How it is funded</h2>
       <p>Right now, it is not. The core tracker is free and we intend to keep it free. If we ever add paid extras, they will be optional conveniences (for example automatic bank feeds for people who want them), never a paywall on your own data or on the basic ledger. We do not sell data, run adverts or take affiliate payments from the apps we compare ourselves with.</p>

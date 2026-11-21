@@ -6,7 +6,7 @@
     <title>Compare UK budgeting apps: honest side-by-sides</title>
     <meta name="description" content="The Income Tracker against Emma, Snoop, YNAB, Plum and Monzo Trends, plus the best free budgeting apps in the UK. Honest, including where we lose." />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
-    <meta name="author" content="The Income Tracker" />
+    <meta name="author" content="Atul Ghandhi" />
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#d1d7e1" />
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#22272f" />
     <script>(function(){try{var t=localStorage.getItem("it_theme");if(t!=="dark"&&t!=="light")return;document.documentElement.dataset.theme=t;var c=t==="dark"?"#22272f":"#d1d7e1";document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.setAttribute("content",c);});}catch(e){}})();</script>
@@ -149,6 +149,10 @@
     color: var(--accent-ink); border-radius: 50%; display: grid; place-items: center;
     font-weight: 700; font-size: 0.9rem;
   }
+  .author-card { display: flex; align-items: center; gap: 16px; margin: 4px 0 16px; }
+  .author-card img { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; flex: none; }
+  .author-card strong { display: block; color: var(--ink-strong); }
+  .author-card span { color: var(--ink-muted); font-size: 0.9rem; }
   .note { background: var(--well); border-left: 3px solid var(--line-strong); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 20px 0; font-size: 0.95rem; color: var(--ink-soft); }
   .note strong { color: var(--ink-strong); }
   .cta { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin: 34px 0; padding: 20px 22px; background: var(--well); border: 1px solid var(--line); border-radius: 14px; }
@@ -306,7 +310,24 @@
         "height": 240
       },
       "email": "hello@theincometracker.com",
-      "areaServed": "GB"
+      "areaServed": "GB",
+      "founder": {
+        "@id": "https://www.theincometracker.com/#author"
+      }
+    },
+    {
+      "@type": "Person",
+      "@id": "https://www.theincometracker.com/#author",
+      "name": "Atul Ghandhi",
+      "url": "https://www.theincometracker.com/about.html#author",
+      "image": "https://www.theincometracker.com/atul-ghandhi.webp",
+      "jobTitle": "Founder and developer",
+      "worksFor": {
+        "@id": "https://www.theincometracker.com/#org"
+      },
+      "sameAs": [
+        "https://github.com/atulghandhi"
+      ]
     },
     {
       "@type": "CollectionPage",
@@ -421,7 +442,7 @@
     <main class="wrap">
       <header class="top"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> &rsaquo; Compare</nav></header>
       <h1>Compare budgeting apps</h1>
-      <p class="meta">By The Income Tracker · Updated 8 September 2026</p>
+      <p class="meta">By <a href="/about.html#author" rel="author">Atul Ghandhi</a> · Updated 8 September 2026</p>
       <div class="tldr"><strong>In short</strong><p>Every comparison here says plainly where the other app wins. If you want automatic bank feeds and a slick mobile app, several of them beat us. If you want free, private and no bank login, that is our whole reason to exist.</p></div>
       <div class="grid">
         <a class="card" href="/compare/best-free-budgeting-apps-uk.html"><span class="card-t">Best free budgeting apps (UK, 2026)</span><span class="card-d">Ten apps, honest verdicts, including where we lose</span></a>
