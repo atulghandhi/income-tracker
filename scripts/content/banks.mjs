@@ -373,7 +373,7 @@ const BASE_BANKS = [
     group: "High street banks",
     published: "2026-09-08",
     checked: "2026-09-08",
-    where: "Metro Bank Internet Banking in a desktop browser (the app offers PDF statements only)",
+    where: "Metro Bank Internet Banking in a desktop browser",
     formats: "CSV and PDF",
     steps: [
       "Log in to Internet Banking in a desktop browser and allow pop-ups for the site. The export opens in a pop-up and fails silently if it is blocked.",
@@ -675,10 +675,26 @@ const BASE_BANKS = [
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ANSWERS = {
+  // 21 November: Search Console showed "barclays csv statement" and "how to
+  // download barclays statements in csv format" at position 85+, while guides
+  // for "export ... CSV" queries sit near 8. The page answered the CSV question
+  // and never mentioned statements, so it now does both.
   "barclays-csv": {
-    title: "How to export Barclays transactions to CSV: step-by-step",
-    description: "A step-by-step guide to downloading your Barclays transactions as a CSV file: where the export is, whether the app can do it, and what to do with the file.",
-    app: "No. The Barclays app cannot export a file. Use Online Banking on a computer.",
+    title: "How to download a Barclays statement as CSV: step-by-step",
+    description: "A step-by-step guide to getting your Barclays statement as a CSV: where the export is, whether the app can do it, and where the older statements are.",
+    app: "No CSV. The app shows your statements under Help/More, then Statements, but the CSV export is only in Online Banking on a computer.",
+    history: "Statements stay online for up to seven years while the account is open. For the CSV, the date picker on View all transactions shows how far back yours goes.",
+    checked: "2026-11-21",
+    updated: "2026-11-21",
+    faqs: [
+      { q: "Can I download a Barclays statement as a CSV?", a: "Not the statement itself, which Barclays provides to view and download as a document. The CSV comes from your transactions instead: in Online Banking on a computer, open the account, click View all transactions, set the dates the statement covers, click Search, then Export all and choose CSV (Excel). You get the same transactions in a file a spreadsheet or budgeting app can read." },
+      { q: "Where are my Barclays statements?", a: "In Online Banking, choose Online Statements from the drop-down menu under your name, then the account. They are also kept in My Barclays documents, from the same menu. In the Barclays app, tap Help/More on the home screen, then Statements. If a statement is all you have, The Income Tracker imports the PDF directly too." },
+      { q: "How far back do Barclays statements go?", a: "Barclays says online statements can be viewed for up to seven years while the account is open. If you close an account but still bank with Barclays, its statements stay available for up to five years." },
+    ],
+    sources: [
+      { t: "Barclays: how can I view Online Statements?", href: "https://www.barclays.co.uk/help/accounts/statements-balances/how-can-i-view-online-statements-/" },
+      { t: "Barclays: how long is my statement available for viewing online?", href: "https://www.barclays.co.uk/help/accounts/statements-balances/how-long-view-online/" },
+    ],
   },
   "hsbc-csv": {
     title: "How to download HSBC statements as CSV: step-by-step guide",
@@ -788,11 +804,20 @@ const ANSWERS = {
     title: "Co-operative Bank CSV download: step-by-step export guide",
     description: "A step-by-step guide to downloading your Co-operative Bank transactions as a CSV, including the one step that makes the download button appear.",
   },
+  // 21 November: "how to download metro bank statement(s)" ranked 43 to 45
+  // while "...statement in csv" ranked 10. Statements now get their own answer.
   "metro-bank-csv": {
-    title: "How to export Metro Bank transactions to CSV: step-by-step",
-    description: "A step-by-step guide to downloading your Metro Bank transactions as a CSV, covering longer date ranges and what to check when Export does nothing.",
-    app: "No. The app offers PDF statements only. Use Internet Banking in a desktop browser.",
+    title: "How to download a Metro Bank statement, PDF or CSV: step-by-step",
+    description: "A step-by-step guide to downloading your Metro Bank statement or exporting transactions as a CSV, with longer date ranges and the fix when nothing happens.",
+    app: "Use Internet Banking in a desktop browser. Metro's help describes statements and the CSV export there, not in the app.",
     history: "Back to when the account opened, using Advanced Search.",
+    checked: "2026-11-21",
+    updated: "2026-11-21",
+    faqs: [
+      { q: "How do I download a Metro Bank statement?", a: "Log in to Internet Banking, click the account, then Documents, then Account Statements. Choose the year, click View for the month you want, and download it. Metro asks you to switch pop-up blockers off first. A posted copy takes about 10 working days; the online one is there straight away." },
+      { q: "Can I get a Metro Bank statement as a CSV?", a: "The statement itself is a document to view and download. For a CSV of the same transactions, open the account's Transaction Summary, use Advanced Search to set the statement's dates, and click Export. Download on the same screen gives a PDF instead. The Income Tracker imports either." },
+    ],
+    sources: [{ t: "Metro Bank: where can I find my statement?", href: "https://www.metrobankonline.co.uk/help-and-support/internet-banking/where-can-i-find-my-statement/" }],
   },
   "wise-csv": {
     title: "How to export all your Wise transactions, even past a year",
@@ -887,7 +912,8 @@ export const BANKS = BASE_BANKS.map((bank) => {
   return {
     ...bank,
     ...answer,
-    updated: ANSWERS_UPDATED,
+    // A page re-checked after the November batch carries its own date.
+    updated: answer.updated || ANSWERS_UPDATED,
     // The entry's own questions first where the answer adds none, otherwise the
     // search questions lead: they are the ones the visitor arrived with.
     faqs: [...(answer.faqs || []), ...(bank.faqs || [])],

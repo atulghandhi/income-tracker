@@ -13,7 +13,7 @@ Index of step-by-step CSV export guides for 27 UK banks and fintechs, with notes
 ## How to export your Barclays statement to CSV
 
 URL: https://www.theincometracker.com/import/barclays-csv.html
-Updated: 2026-11-16
+Updated: 2026-11-21
 
 Where to find the export in Barclays Online Banking on a computer (the app cannot export CSV), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Barclays only offers CSV export on the desktop Online Banking site. The mobile app cannot do it.
 
@@ -132,9 +132,9 @@ Where to find the export in Co-operative Bank online banking in a desktop browse
 ## How to export your Metro Bank statement to CSV
 
 URL: https://www.theincometracker.com/import/metro-bank-csv.html
-Updated: 2026-11-16
+Updated: 2026-11-21
 
-Where to find the export in Metro Bank Internet Banking in a desktop browser (the app offers PDF statements only), the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Advanced Search reaches back to when the account opened. Metro's CSV writes dates like 12-Sep-26 and puts commas in large amounts; the importer handles both.
+Where to find the export in Metro Bank Internet Banking in a desktop browser, the exact steps, formats offered, limits, and how to import the file into The Income Tracker. Advanced Search reaches back to when the account opened. Metro's CSV writes dates like 12-Sep-26 and puts commas in large amounts; the importer handles both.
 
 ## How to export your Wise statement to CSV
 

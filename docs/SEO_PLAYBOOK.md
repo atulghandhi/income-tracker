@@ -85,6 +85,18 @@ Also changed: the savings tracker page now says "spreadsheet" (query: "free savi
 
 Untested and worth an experiment next: every other CTA on the site still goes to the homepage. Sending `#ref=` arrivals straight into the app is the obvious trial, but the homepage also does the explaining for someone with no file, so measure it first.
 
+## 21 November 2026: first Google Search Console export (last 3 months)
+
+84 clicks, 18,657 impressions, average position 24.6 (22.4 in the UI's default view). The average is not a fair score of the site, and chasing it would be a mistake.
+
+- **The average is dragged by head terms the site cannot win yet.** The rent affordability calculator alone (1,116 impressions at position 81, for "how much rent can I get/afford", where Rightmove, Zoopla and MSE own page one, and the first query is landlord intent anyway) adds about 3.4 points. Add the best-free-budgeting-apps round-up (37), the budget planner (50), the overdraft and pro-rata calculators and the templates hub, and the remaining pages average about 13.6. Head terms like "expense tracker" (19), "track expenses" (23) and "budget apps uk" (61) are an authority problem: SE Ranking finds 4 backlinks from 4 domains. Links move those, not on-page edits.
+- **UK 33, US 9.** US impressions rank far better but convert at 0.26%, because a £, UK-titled page rarely gets an American click.
+- **Statement queries rank far worse than CSV queries for the same bank.** "starling export csv" 5, "how to export wise transactions" 9, "how to download metro bank statement in csv" 10, but "how to download metro bank statement" 43, "tide statements" 43 and "barclays csv statement" 87. The Barclays and Metro Bank pages were titled and written for exporting transactions and never answered the statement question. Both now do, with answers from each bank's own help page (titles, `app`, `history`, FAQs, sources). Check them in four weeks; if they move, give Halifax, Lloyds and NatWest the same treatment.
+- **Calculator impressions are mostly hidden queries.** The Christmas calculator (3,639 impressions, position 6, 0.19% CTR) and weekly-to-monthly (2,025, position 6, 0.35%) get most impressions from anonymised queries. The one visible one ("till christmas", position 2) suggests countdown-style searches Google answers itself, so the low CTR is probably not a listing problem. "christmas budget calculator" itself sits at 74.
+- **Long AI-style queries** ("best budgeting tools to track household spending with a free plan") rank 4 to 10 with no clicks. They look like AI-assistant or rank-tracker searches, so treat them as AI visibility, not traffic.
+
+Track clicks and the number of queries in the top 10, not average position. Average position gets worse every time Google starts testing the site on a broader term, which is a good sign.
+
 ## What to write next (in order of expected return)
 
 1. Connect Google Search Console to this domain. Every item below is a guess until there is query data.
