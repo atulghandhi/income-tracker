@@ -4664,31 +4664,31 @@ function App() {
             <section className="viewStack" aria-label="Ledger">
               <div className="pageHeader">
                 <div>
-                  {/* Import sits with the title so the ledger itself answers "how do I bring my bank in?"
-                      without a trip to Settings or the command palette. */}
-                  <div className="pageTitleRow">
-                    <h2>Ledger</h2>
-                    <button
-                      className="commandButton layoutEditButton"
-                      type="button"
-                      onClick={() => {
-                        track("ledger_import_click", {});
-                        csvInputRef.current?.click();
-                      }}
-                      title="Import a CSV, OFX, QIF or PDF bank statement. You can also drop the file anywhere on the page."
-                    >
-                      <Upload size={15} />
-                      Import
-                    </button>
-                  </div>
+                  <h2>Ledger</h2>
                   <p>Money in and money out this month. Rough numbers are fine. Drop a bank statement anywhere to import it.</p>
                 </div>
-                <div className="netBlock">
-                  <span>Left this month</span>
-                  <strong className={projection.monthlySurplus >= 0 ? "positiveText sensitive" : "negativeText sensitive"}>
-                    {projection.monthlySurplus >= 0 ? "+ " : "- "}
-                    <AnimatedCurrency value={Math.abs(projection.monthlySurplus)} formatter={moneyFormatter} />
-                  </strong>
+                {/* Import sits top right so the ledger itself answers "how do I bring my bank in?"
+                    without a trip to Settings or the command palette. */}
+                <div className="pageHeaderSide ledgerHeaderSide">
+                  <button
+                    className="commandButton layoutEditButton"
+                    type="button"
+                    onClick={() => {
+                      track("ledger_import_click", {});
+                      csvInputRef.current?.click();
+                    }}
+                    title="Import a CSV, OFX, QIF or PDF bank statement. You can also drop the file anywhere on the page."
+                  >
+                    <Upload size={15} />
+                    Import
+                  </button>
+                  <div className="netBlock">
+                    <span>Left this month</span>
+                    <strong className={projection.monthlySurplus >= 0 ? "positiveText sensitive" : "negativeText sensitive"}>
+                      {projection.monthlySurplus >= 0 ? "+ " : "- "}
+                      <AnimatedCurrency value={Math.abs(projection.monthlySurplus)} formatter={moneyFormatter} />
+                    </strong>
+                  </div>
                 </div>
               </div>
 

@@ -13639,3 +13639,16 @@ html {
   color: var(--muted);
   line-height: 1.55;
 }
+
+/* Ledger header: Import stacked above "Left this month", both right-aligned. */
+.ledgerHeaderSide {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+@media (max-width: 720px) {
+  .ledgerHeaderSide {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
