@@ -4664,8 +4664,24 @@ function App() {
             <section className="viewStack" aria-label="Ledger">
               <div className="pageHeader">
                 <div>
-                  <h2>Ledger</h2>
-                  <p>Money in and money out this month. Rough numbers are fine.</p>
+                  {/* Import sits with the title so the ledger itself answers "how do I bring my bank in?"
+                      without a trip to Settings or the command palette. */}
+                  <div className="pageTitleRow">
+                    <h2>Ledger</h2>
+                    <button
+                      className="commandButton layoutEditButton"
+                      type="button"
+                      onClick={() => {
+                        track("ledger_import_click", {});
+                        csvInputRef.current?.click();
+                      }}
+                      title="Import a CSV, OFX, QIF or PDF bank statement. You can also drop the file anywhere on the page."
+                    >
+                      <Upload size={15} />
+                      Import
+                    </button>
+                  </div>
+                  <p>Money in and money out this month. Rough numbers are fine. Drop a bank statement anywhere to import it.</p>
                 </div>
                 <div className="netBlock">
                   <span>Left this month</span>

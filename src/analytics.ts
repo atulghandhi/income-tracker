@@ -59,6 +59,7 @@ export type AnalyticsEvent =
   | "peek_opened" // { kind }
   | "peek_promoted" // { kind }
   | "statement_dropped" // {} — a statement file dropped anywhere on the app
+  | "ledger_import_click" // {} — the Import button in the Ledger header
   | "income_grouped" // { action: "create"|"join" } — incomes grouped by drag and drop
   // Homepage conversion (the static pages send static_pageview and cta_click themselves):
   | "landing_view" // { region } — the homepage was shown
