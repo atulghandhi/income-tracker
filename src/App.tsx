@@ -653,6 +653,9 @@ const GETTING_STARTED_KEY = "gettingStartedDismissed";
 const DATA_NOTE_DISMISSED_KEY = "dataNoteDismissed";
 // One-off announcement of PDF statement imports for people who were already using the app.
 const PDF_NOTICE_KEY = "it_pdf_import_notice";
+// The "Suggested for you" widget banner shows on a new user's first visit only, then
+// retires for good; Customise still adds any widget. Existing users never see it again.
+const WIDGET_RECS_SEEN_KEY = "it_widget_recs_seen";
 
 function readFlag(key: string): boolean {
   try {
@@ -1333,6 +1336,8 @@ function App() {
 
   // Widgets the ledger's data now supports, offered on the dashboard until added or dismissed.
   const [dismissedRecs, setDismissedRecs] = useState<string[]>(readDismissedRecs);
+  const [widgetRecsRetired, setWidgetRecsRetired] = useState(() => readFlag(WIDGET_RECS_SEEN_KEY));
+  const widgetRecsCheckedRef = useRef(false);
   const widgetRecs = useMemo(() => {
     const onPage = new Set(dashboardLayout.widgets.map((widget) => widget.id));
     const available = new Set(availableWidgets("dashboard", region).map((widget) => widget.id));
@@ -1472,6 +1477,26 @@ function App() {
     if (returning) setShowPdfNotice(true);
     else writeFlag(PDF_NOTICE_KEY);
   }, [hydrated, showLanding]);
+
+  // The widget suggestions banner is a first-visit thing. Someone who was already using the
+  // app is stamped as having seen it and it goes straight away. A new user keeps it for the
+  // rest of the visit in which they first open the dashboard; from the next visit it is gone.
+  useEffect(() => {
+    if (!hydrated || showLanding || widgetRecsRetired) return;
+    if (user && !cloudHydrated) return;
+    if (!widgetRecsCheckedRef.current) {
+      widgetRecsCheckedRef.current = true;
+      const hasData = setupProgress.income || setupProgress.expenses || setupProgress.account || setupProgress.imported;
+      if (storedLedgerRef.current && (hasData || visitCount > 1)) {
+        writeFlag(WIDGET_RECS_SEEN_KEY);
+        setWidgetRecsRetired(true);
+        return;
+      }
+    }
+    if (activeView === "dashboard") writeFlag(WIDGET_RECS_SEEN_KEY);
+    // Re-evaluated as views change; setupProgress is read once, at the first settled check.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, showLanding, widgetRecsRetired, user?.id, cloudHydrated, activeView]);
 
   function dismissPdfNotice(action: "dismiss" | "import") {
     writeFlag(PDF_NOTICE_KEY);
@@ -3478,7 +3503,7 @@ function App() {
   async function clearAllData() {
     const fresh = { ...createInitialState(ledger.country), lastSavedAt: new Date().toISOString() };
     try {
-      for (const key of [ONBOARDING_KEY, GETTING_STARTED_KEY, TUTORIAL_SEEN_KEY]) localStorage.removeItem(key);
+      for (const key of [ONBOARDING_KEY, GETTING_STARTED_KEY, TUTORIAL_SEEN_KEY, WIDGET_RECS_SEEN_KEY]) localStorage.removeItem(key);
     } catch {
       // localStorage unavailable — nothing was stored there either.
     }
@@ -3490,6 +3515,8 @@ function App() {
     setDashboardLayout(starterLayout("dashboard", region));
     clearDismissedRecs();
     setDismissedRecs([]);
+    setWidgetRecsRetired(false);
+    widgetRecsCheckedRef.current = true;
     setChecklistDismissed(false);
     setConfirmClearAll(false);
     setLedger(fresh);
@@ -4603,7 +4630,7 @@ function App() {
                 />
               )}
 
-              {layoutEditing !== "dashboard" && widgetRecs.length > 0 && (
+              {!widgetRecsRetired && layoutEditing !== "dashboard" && widgetRecs.length > 0 && (
                 <section className="widgetRecs" aria-label="Suggested widgets">
                   <div className="widgetRecsHead">
                     <Sparkles size={15} aria-hidden="true" />

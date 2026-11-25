@@ -5,7 +5,8 @@
 // (light theme) or darker (dark theme) until it passes, so any hue a person
 // picks stays readable.
 
-export const DEFAULT_HUE = 172;
+// Peach: the app's default frame, the same hue as the guides pages.
+export const DEFAULT_HUE = 22;
 export const SOFT_ALPHA = 0.76;
 const INK_DARK = [14, 24, 38];
 const INK_LIGHT = [238, 244, 255];

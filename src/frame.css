@@ -2,12 +2,12 @@
    On desktop the sidebar sits on a coloured frame and the page is one inset
    canvas resting on it, the only raised surface. src/frame.ts writes the frame
    tokens from the person's hue (contrast-checked in src/framePalette.mjs); the
-   values below are the brand hue's, used before that runs.
+   values below are the default (Peach) hue's, used before that runs.
    On phones and small tablets the canvas is the whole screen: an inset would
    cost width the ledger needs. */
 :root {
-  --frame-a: #cdf1eb;
-  --frame-b: #a9cfe4;
+  --frame-a: #f9d0b9;
+  --frame-b: #efe19a;
   --frame-ink: rgb(14 24 38);
   --frame-ink-rgb: 14, 24, 38;
   --frame-ink-soft: rgb(14 24 38 / 0.76);

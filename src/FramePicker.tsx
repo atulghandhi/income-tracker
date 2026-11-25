@@ -10,6 +10,7 @@ type Props = {
 };
 
 const PRESETS = [
+  { hue: 22, name: "Peach" },
   { hue: 172, name: "Teal" },
   { hue: 212, name: "Sky" },
   { hue: 252, name: "Iris" },

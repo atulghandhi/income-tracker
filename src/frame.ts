@@ -16,7 +16,7 @@ export function readStoredHue(): number {
     const n = raw === null ? NaN : Number(raw);
     if (Number.isFinite(n) && n >= 0 && n <= 360) return n;
   } catch {
-    // localStorage unavailable: use the brand hue.
+    // localStorage unavailable: use the default hue.
   }
   return DEFAULT_HUE;
 }
