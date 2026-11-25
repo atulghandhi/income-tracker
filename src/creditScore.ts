@@ -119,3 +119,14 @@ export function interpretCreditScore(estimate: number, region: RegionKey): Credi
           : "Expect higher rates or refusals. Paying on time every month and reducing card balances move this most.",
   };
 }
+
+// A score the person entered themselves, read on their country's main scale without conversion.
+export function knownScoreReading(score: number, region: RegionKey): ScoreReading {
+  const base = interpretCreditScore(region === "US" ? score : 700, region).primary;
+  const value = Math.round(clamp(score, base.min, base.max));
+  return { ...base, score: value, band: bandFor(value, base.bands) };
+}
+
+export function knownScoreScale(region: RegionKey): "Experian" | "FICO" {
+  return region === "US" ? "FICO" : "Experian";
+}

@@ -36,6 +36,7 @@ import type {
   CategoryRule,
   CurrencyCode,
   ImportBatch,
+  KnownCreditScore,
   LedgerState,
   SavingsGoal,
 } from "./types";
@@ -154,10 +155,20 @@ export function normalizeStateFields(rawState: Partial<LedgerState>): LedgerStat
       allocation: keepExtras(state.allocation, normalizeAllocationSettings(state.allocation)),
       // The Insights widgets' own data (looks, dismissed warnings, notes, to-dos).
       insights: keepExtras(state.insights, normalizeInsightsState(state.insights)),
+      ...normalizeKnownCreditScore(state.knownCreditScore),
       lastSavedAt: state.lastSavedAt ?? new Date().toISOString(),
     },
     LEGACY_ROOT_KEYS,
   );
+}
+
+function normalizeKnownCreditScore(raw: unknown): { knownCreditScore?: KnownCreditScore } {
+  const value = raw as Partial<KnownCreditScore> | null | undefined;
+  if (!value || (value.scale !== "Experian" && value.scale !== "FICO")) return {};
+  const [min, max] = value.scale === "Experian" ? [0, 999] : [300, 850];
+  const score = Number(value.score);
+  if (!Number.isFinite(score) || score < min || score > max) return {};
+  return { knownCreditScore: { score: Math.round(score), scale: value.scale, updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : new Date().toISOString() } };
 }
 
 function normalizeMonths(months: LedgerState["months"] | undefined, fallback: LedgerState["months"]): LedgerState["months"] {

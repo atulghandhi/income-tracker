@@ -220,16 +220,15 @@ test.describe("Ledger", () => {
   });
 
 
-  test("the Where your data lives note stays dismissed, and quick setup stays reachable", async ({ page }) => {
+  test("Settings opens on Appearance, with quick setup in the header and storage noted by export", async ({ page }) => {
     await page.goto("/");
     await openView(page, "Settings");
-    const note = page.getByRole("heading", { name: "Where your data lives" });
-    await expect(note).toBeVisible();
-    await page.getByRole("button", { name: "Dismiss where your data lives" }).click();
-    await expect(note).toHaveCount(0);
-    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.getByText("Your data, imports, rules, and preferences.")).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Where your data lives" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Run quick setup" })).toBeVisible();
-    await expect(note).toHaveCount(0);
+    const panels = page.locator("section[aria-label='Settings'] .settingsPanel");
+    await expect(panels.first()).toHaveClass(/appearancePanel/);
+    await expect(page.locator(".dataPanel")).toContainText("Saved in this browser only");
   });
 
   test("long rule lists show three until asked, and a new rule is never tucked away", async ({ page }) => {

@@ -15,6 +15,7 @@ import type {
   GoalSequenceResult,
   GoalStatus,
   HealthPlan,
+  HealthAction,
   HealthScoreBreakdown,
   IncomeEntry,
   LedgerState,
@@ -759,6 +760,7 @@ export function calculateHealthScore({
       summary: "N/A",
       detail: NO_DATA_DETAIL,
       noData: true,
+      actions: [],
     };
   }
 
@@ -767,10 +769,7 @@ export function calculateHealthScore({
   const paymentPressure = income > 0 ? debtSummary.monthlyMinimums / income : debtSummary.monthlyMinimums > 0 ? 1 : 0;
   const cardStats = calculateCreditCardStats(debts);
   const activeHighAprDebt = debts.some((debt) => debt.balance > 0 && debt.rate >= 20 && debt.promoMonths <= 0);
-  const paymentNotReducingDebt = debts.some((debt) => {
-    if (debt.balance <= 0 || debt.rate <= 0 || debt.promoMonths > 0) return false;
-    return debt.minimumPayment <= debt.balance * (debt.rate / 100 / 12);
-  });
+  const paymentNotReducingDebt = debts.some(paymentBelowInterest);
 
   const cashFlowScore = clampPercent(
     income <= 0
@@ -784,22 +783,17 @@ export function calculateHealthScore({
   const paymentPressureScore = clampPercent(100 - paymentPressure * 190);
   const savingsScore = clampPercent(60 + projection.savingsRate * 1.7 - Math.max(0, savingsTarget - projection.savingsRate) * 1.1);
 
-  let score = cashFlowScore * 0.32 + debtLoadScore * 0.16 + utilizationScore * 0.22 + paymentPressureScore * 0.18 + savingsScore * 0.12;
-  if (projection.monthlySurplus < 0) score -= 10;
-  if (cardStats.maxUtilization >= 90) score -= 8;
-  if (cardStats.totalUtilization >= 80) score -= 9;
-  if (paymentPressure >= 0.35) score -= 7;
-  if (activeHighAprDebt) score -= 4;
-  if (paymentNotReducingDebt) score -= 9;
-  score = clampPercent(score);
+  // Each factor counts once. Running a deficit, maxed cards and heavy payments already pull their
+  // own factor down; penalising them again on top used to drive a struggling month to a flat 0.
+  // The two flags below are risks no factor captures on its own.
+  const parts = { cashFlowScore, debtLoadScore, utilizationScore, paymentPressureScore, savingsScore };
+  const flags = { activeHighAprDebt, paymentNotReducingDebt };
+  const score = combineHealthScore(parts, flags);
 
   const estimatedCreditScore = estimateCreditScore({
-    projection,
-    debtSummary,
     totalUtilization: cardStats.totalUtilization,
     maxUtilization: cardStats.maxUtilization,
-    paymentPressure,
-    activeHighAprDebt,
+    hasCards: cardStats.totalLimit > 0,
   });
 
   return {
@@ -810,11 +804,109 @@ export function calculateHealthScore({
     utilizationScore: roundTo(utilizationScore, 0),
     paymentPressureScore: roundTo(paymentPressureScore, 0),
     savingsScore: roundTo(savingsScore, 0),
-    summary: score >= 78 ? "Strong" : score >= 58 ? "Stable" : score >= 38 ? "Tight" : "At risk",
+    summary: score >= 78 ? "Strong" : score >= 58 ? "Stable" : score >= 38 ? "Tight" : "Under pressure",
     detail:
-      "Calculated from income cover, outflow, savings rate, debt balance, monthly payment pressure, card utilisation, active APR exposure, and whether payments appear to reduce balances. The credit score is a rough local estimate, not a bureau score.",
+      "Calculated from income cover, outflow, savings rate, debt balance, monthly payment pressure, card utilisation, active APR exposure, and whether payments appear to reduce balances. Next steps are ranked by how much each would lift the score. The credit score is a rough estimate from card utilisation, not a bureau score.",
     noData: false,
+    actions: healthActions({ projection, debts, cardStats, paymentPressure, savingsTarget, parts, flags, score }),
   };
+}
+
+// A debt whose regular payment doesn't cover its interest, so the balance grows. Student loans
+// repaid from income (UK plans, US federal) are left out: there that is normal, the balance is
+// written off in the end, and overpaying them is often the wrong move.
+function paymentBelowInterest(debt: DebtAccount): boolean {
+  if (debt.balance <= 0 || debt.rate <= 0 || debt.promoMonths > 0) return false;
+  if (debt.type === "student-loan" && debt.studentLoanType !== "private") return false;
+  return debt.minimumPayment <= debt.balance * (debt.rate / 100 / 12);
+}
+
+type HealthParts = { cashFlowScore: number; debtLoadScore: number; utilizationScore: number; paymentPressureScore: number; savingsScore: number };
+type HealthFlags = { activeHighAprDebt: boolean; paymentNotReducingDebt: boolean };
+
+function combineHealthScore(parts: HealthParts, flags: HealthFlags): number {
+  let score =
+    parts.cashFlowScore * 0.32 + parts.debtLoadScore * 0.16 + parts.utilizationScore * 0.22 + parts.paymentPressureScore * 0.18 + parts.savingsScore * 0.12;
+  if (flags.activeHighAprDebt) score -= 4;
+  if (flags.paymentNotReducingDebt) score -= 9;
+  return clampPercent(score);
+}
+
+// The concrete changes that would lift the score most, each with what it is worth (in points out
+// of 10) and the money involved where the ledger can say. A factor already at the 75 target is left alone.
+function healthActions({
+  projection,
+  debts,
+  cardStats,
+  paymentPressure,
+  savingsTarget,
+  parts,
+  flags,
+  score,
+}: {
+  projection: Projection;
+  debts: DebtAccount[];
+  cardStats: ReturnType<typeof calculateCreditCardStats>;
+  paymentPressure: number;
+  savingsTarget: number;
+  parts: HealthParts;
+  flags: HealthFlags;
+  score: number;
+}): HealthAction[] {
+  const income = projection.monthlyIncome;
+  const actions: HealthAction[] = [];
+  const gain = (changes: Partial<HealthParts>, flagChanges: Partial<HealthFlags> = {}) =>
+    roundTo((combineHealthScore({ ...parts, ...changes }, { ...flags, ...flagChanges }) - score) / 10, 1);
+  const TARGET = 75;
+
+  // Minimums that don't cover the interest: the balance grows however long it is paid.
+  if (flags.paymentNotReducingDebt) {
+    const trapped = debts.filter(paymentBelowInterest);
+    const shortfall = trapped.reduce((sum, debt) => sum + debt.balance * (debt.rate / 100 / 12) - debt.minimumPayment, 0);
+    actions.push({ id: "interest-trap", gain: gain({}, { paymentNotReducingDebt: false }), amount: Math.ceil(shortfall + 1), name: trapped[0]?.name });
+  }
+
+  if (parts.cashFlowScore < TARGET) {
+    actions.push({
+      id: "cash-flow",
+      gain: gain({ cashFlowScore: TARGET }),
+      amount: projection.monthlySurplus < 0 ? Math.ceil(-projection.monthlySurplus) : undefined,
+      percent: income > 0 ? Math.round((projection.monthlyExpenses / income) * 100) : undefined,
+    });
+  }
+
+  if (parts.utilizationScore < TARGET && cardStats.totalLimit > 0) {
+    // Getting cards under 30% of their limits is the usual line lenders look for.
+    const payDown = cardStats.totalBalance - cardStats.totalLimit * 0.3;
+    if (payDown > 0) actions.push({ id: "cards", gain: gain({ utilizationScore: clampPercent(100 - 30 * 0.95) }), amount: Math.ceil(payDown), percent: Math.round(cardStats.totalUtilization) });
+  }
+
+  if (parts.paymentPressureScore < TARGET && income > 0) {
+    // Clearing the smallest balance frees its minimum for good.
+    const smallest = [...debts].filter((debt) => debt.balance > 0 && debt.minimumPayment > 0).sort((a, b) => a.balance - b.balance)[0];
+    if (smallest) {
+      const freed = clampPercent(100 - Math.max(0, paymentPressure - smallest.minimumPayment / income) * 190);
+      actions.push({ id: "payments", gain: gain({ paymentPressureScore: freed }), amount: Math.round(smallest.minimumPayment), name: smallest.name, percent: Math.round(paymentPressure * 100) });
+    }
+  }
+
+  if (parts.debtLoadScore < TARGET && income > 0) {
+    const months = debts.reduce((sum, debt) => sum + Math.max(0, debt.balance), 0) / income;
+    actions.push({ id: "debt", gain: gain({ debtLoadScore: TARGET }), percent: Math.round(months) });
+  }
+
+  // Saving more only makes sense once the month isn't already in the red.
+  if (parts.savingsScore < TARGET && projection.monthlySurplus >= 0 && income > 0 && projection.savingsRate < savingsTarget) {
+    actions.push({
+      id: "savings",
+      gain: gain({ savingsScore: clampPercent(60 + savingsTarget * 1.7) }),
+      amount: Math.ceil(((savingsTarget - projection.savingsRate) / 100) * income),
+      percent: savingsTarget,
+    });
+  }
+
+  // Anything worth less than 0.2 of a point isn't worth a place on the card.
+  return actions.filter((action) => action.gain >= 0.2).sort((a, b) => b.gain - a.gain);
 }
 
 export function buildFinancialSignals({
@@ -1066,22 +1158,13 @@ function calculateCreditCardStats(debts: DebtAccount[]) {
   };
 }
 
-function estimateCreditScore({
-  projection,
-  debtSummary,
-  totalUtilization,
-  maxUtilization,
-  paymentPressure,
-  activeHighAprDebt,
-}: {
-  projection: Projection;
-  debtSummary: DebtSummary;
-  totalUtilization: number;
-  maxUtilization: number;
-  paymentPressure: number;
-  activeHighAprDebt: boolean;
-}) {
+// Credit agencies never see income, spending or interest rates, so only card utilisation, the
+// one scoring factor this ledger holds, moves the estimate. The baseline assumes payments are
+// made on time; missed payments, account age and searches (which this app can't see) are why
+// a real score can differ, and why someone can enter theirs instead.
+function estimateCreditScore({ totalUtilization, maxUtilization, hasCards }: { totalUtilization: number; maxUtilization: number; hasCards: boolean }) {
   let estimate = 700;
+  if (!hasCards) return estimate;
 
   if (totalUtilization >= 90) estimate -= 120;
   else if (totalUtilization >= 80) estimate -= 95;
@@ -1091,16 +1174,6 @@ function estimateCreditScore({
 
   if (maxUtilization >= 90) estimate -= 40;
   else if (maxUtilization >= 80) estimate -= 24;
-
-  if (paymentPressure >= 0.35) estimate -= 45;
-  else if (paymentPressure >= 0.2) estimate -= 22;
-
-  if (projection.monthlyIncome <= 0 && debtSummary.totalDebt > 0) estimate -= 70;
-  else if (projection.monthlySurplus < 0) estimate -= 55;
-  else if (projection.savingsRate >= 20) estimate += 20;
-
-  if (activeHighAprDebt) estimate -= 15;
-  if (debtSummary.totalDebt === 0 && projection.monthlyIncome > 0) estimate += 20;
 
   return Math.max(300, Math.min(850, Math.round(estimate)));
 }

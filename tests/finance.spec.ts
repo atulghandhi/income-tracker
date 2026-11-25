@@ -108,6 +108,52 @@ test.describe("finance projections", () => {
     expect(health.estimatedCreditScore).toBeLessThanOrEqual(850);
     expect(health.detail).toContain("not a bureau score");
   });
+
+  test("a struggling month scores low but not zero, with ranked, costed next steps", () => {
+    const month: MonthBudget = {
+      incomes: [{ id: "income-1", source: "Salary", amount: 2000, color: "#12b886", recurring: true }],
+      expenses: [{ id: "expense-1", name: "Bills", amount: 2300, category: "Home", color: "#6c5ce7", recurring: true }],
+      note: "",
+    };
+    // 86% used, and a £25 minimum that doesn't cover ~£89 of monthly interest.
+    const card = debtAccount({ name: "Everyday card", balance: 4300, creditLimit: 5000, rate: 24.9, minimumPayment: 25 });
+    const health = calculateHealthScore({ projection: calculateProjection(month), debtSummary: calculateDebtSummary([card]), accounts: [card], savingsTarget: 20 });
+
+    expect(health.score).toBeGreaterThan(0);
+    expect(health.summary).toBe("Under pressure");
+    const ids = health.actions.map((action) => action.id);
+    expect(ids).toEqual(expect.arrayContaining(["interest-trap", "cash-flow", "cards"]));
+    // Best first, and every step is worth something.
+    expect(health.actions.map((action) => action.gain)).toEqual([...health.actions.map((action) => action.gain)].sort((a, b) => b - a));
+    expect(health.actions.every((action) => action.gain >= 0.2)).toBe(true);
+    // Paying the cards down to 30% of £5,000 means clearing £2,800.
+    expect(health.actions.find((action) => action.id === "cards")?.amount).toBe(2800);
+    expect(health.actions.find((action) => action.id === "cash-flow")?.amount).toBe(300);
+    expect(health.actions.find((action) => action.id === "interest-trap")).toMatchObject({ name: "Everyday card", amount: 66 });
+    // Saving more isn't suggested while the month is in the red.
+    expect(ids).not.toContain("savings");
+  });
+
+  test("a UK student loan whose repayments don't cover interest is not flagged or suggested for overpaying", () => {
+    const month: MonthBudget = { incomes: [{ id: "i", source: "Salary", amount: 3000, color: "#12b886", recurring: true }], expenses: [{ id: "e", name: "Bills", amount: 1800, category: "Home", color: "#6c5ce7", recurring: true }], note: "" };
+    const loan = debtAccount({ name: "Student loan", type: "student-loan", balance: 45000, rate: 7.3, minimumPayment: 60, creditLimit: 0 });
+    const health = calculateHealthScore({ projection: calculateProjection(month), debtSummary: calculateDebtSummary([loan]), accounts: [loan], savingsTarget: 20 });
+    expect(health.actions.map((action) => action.id)).not.toContain("interest-trap");
+    const privateLoan = { ...loan, studentLoanType: "private" as const };
+    const usPrivate = calculateHealthScore({ projection: calculateProjection(month), debtSummary: calculateDebtSummary([privateLoan]), accounts: [privateLoan], savingsTarget: 20 });
+    expect(usPrivate.actions.map((action) => action.id)).toContain("interest-trap");
+  });
+
+  test("the credit estimate follows card utilisation only, which is all an agency would see here", () => {
+    const tight: MonthBudget = { incomes: [{ id: "i", source: "Salary", amount: 2000, color: "#12b886", recurring: true }], expenses: [{ id: "e", name: "Bills", amount: 2600, category: "Home", color: "#6c5ce7", recurring: true }], note: "" };
+    const easy: MonthBudget = { ...tight, expenses: [{ id: "e", name: "Bills", amount: 900, category: "Home", color: "#6c5ce7", recurring: true }] };
+    const card = debtAccount({ balance: 4300, creditLimit: 5000, rate: 24.9 });
+    const score = (month: MonthBudget) =>
+      calculateHealthScore({ projection: calculateProjection(month), debtSummary: calculateDebtSummary([card]), accounts: [card], savingsTarget: 20 }).estimatedCreditScore;
+    // Overspending doesn't move a credit score; 86% utilisation does.
+    expect(score(tight)).toBe(score(easy));
+    expect(score(tight)).toBe(581);
+  });
 });
 
 test.describe("debt balance roll-forward", () => {

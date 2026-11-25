@@ -3304,16 +3304,113 @@ hr {
   letter-spacing: 0;
 }
 
-.healthPanel.good .scoreNumber {
+/* The number stays in plain ink whatever the score: the badge carries the tone, and the
+   next steps underneath say what to do about it. A giant red figure only told people off. */
+.healthPanel .scoreNumber {
+  font-size: 44px;
+}
+
+.healthSteps {
+  margin-top: 18px;
+}
+
+.healthStepsLabel {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.healthSteps ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.healthSteps button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--well);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.healthSteps button:hover {
+  border-color: rgba(var(--mint-rgb), 0.4);
+  background: var(--mint-soft);
+}
+
+.healthSteps button span {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.healthSteps button b {
+  flex: 0 0 auto;
   color: var(--mint);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
 }
 
-.healthPanel.warn .scoreNumber {
-  color: var(--amber);
+.healthSteps button svg {
+  flex: 0 0 auto;
+  color: var(--muted);
 }
 
-.healthPanel.bad .scoreNumber {
-  color: var(--red);
+/* Label and edit on one line, the score under them, so a narrow card never wraps mid-figure. */
+.healthPanel .creditEstimate {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.healthPanel .creditEstimate > strong {
+  grid-column: 1 / -1;
+}
+
+.creditEstimate .creditEdit {
+  grid-column: 2;
+  grid-row: 1;
+  width: 28px;
+  height: 28px;
+  margin: -6px -6px -6px 0;
+}
+
+.creditEntry label {
+  grid-column: 1 / -1;
+}
+
+.creditEntry input {
+  min-width: 0;
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+}
+
+.creditEntry .commandButton {
+  flex: 0 0 auto;
 }
 
 .scoreBadge {
@@ -3753,8 +3850,19 @@ hr {
   height: 24px;
 }
 
+/* No subtitle here, so the header hugs its title instead of leaving a gap above it. */
 .settingsHeader {
-  min-height: 120px;
+  min-height: 0;
+  align-items: center;
+}
+
+.dataPanel .dataHome {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 2px 0 14px;
+  color: var(--muted);
+  font-size: 14px;
 }
 
 .privacyBadge {
@@ -3779,53 +3887,11 @@ hr {
   border-color: rgba(var(--mint-rgb), 0.4);
 }
 
-.architectureNote {
-  gap: 18px;
-  padding: 20px;
-  border-color: rgba(var(--mint-rgb), 0.22);
-  color: var(--mint);
-}
-
-.architectureNote > svg,
-.architectureNoteDismiss {
-  flex-shrink: 0;
-}
-
-.architectureNoteDismiss {
-  height: 38px;
-}
-
 .settingsHeaderActions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-}
-
-.architectureNote h3,
-.architectureNote p {
-  margin: 0;
-}
-
-.architectureNote h3 {
-  color: var(--ink);
-  font-size: 18px;
-}
-
-.architectureNote p {
-  margin-top: 8px;
-  color: rgba(var(--ink-rgb), 0.82);
-  line-height: 1.55;
-}
-
-.architectureNote > div {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.architectureNote .commandButton {
-  flex: 0 0 auto;
-  white-space: nowrap;
 }
 
 /* Rule lists are short; the default panel minimum left them mostly empty. */

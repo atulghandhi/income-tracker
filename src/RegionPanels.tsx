@@ -1093,7 +1093,7 @@ export function CreditScoreWidget({ estimate, noData, region, privacy }: { estim
       <PanelTitle
         title="Credit score estimate"
         icon={<ShieldCheck size={16} />}
-        action={<InfoHint label="About the credit score estimate" text="A rough local estimate from your utilisation, payment pressure and cash flow — not a bureau score. Your real score also depends on payment history, account age and searches, none of which this app can see." />}
+        action={<InfoHint label="About the credit score estimate" text="A rough estimate from your card utilisation, the one scoring factor in your ledger. It is not a bureau score: agencies never see your income or spending, and your real score also depends on payment history, account age and searches, which this app can't see. Enter your real score on the Health score widget to use it instead." />}
       />
       {noData ? (
         <EmptyState icon={<ShieldCheck size={18} />} title="No estimate yet" text="Add income, spending and a credit card or loan to get a rough credit estimate." />

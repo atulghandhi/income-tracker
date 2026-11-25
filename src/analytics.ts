@@ -48,6 +48,8 @@ export type AnalyticsEvent =
   | "new_month_nudge" // { action: "shown"|"import"|"guide"|"dismiss" }
   | "install_prompt" // { action: "shown"|"accepted"|"dismissed"|"ios_hint" }
   | "app_installed"
+  | "credit_score_entered" // { cleared } — the person typed in their real credit score, or cleared it
+  | "health_step_opened" // { destination } — a Health score next step was followed
   | "pdf_notice" // { action: "dismiss"|"import" } — the one-off PDF import announcement
   | "country_changed" // { country }
   | "layout_changed" // { page, action: "move"|"resize"|"remove"|"add"|"reset" }

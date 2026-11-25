@@ -43,12 +43,13 @@
     pointer-events: none;
   }
 
-  /* A strip of frame above the canvas, so the page never scrolls into the inset. */
+  /* A strip of frame above the canvas, so the page never scrolls into the inset. Like the corner
+     pieces below, it starts 1px left of the canvas to cover the canvas's hairline ring. */
   .appShell::after {
     content: "";
     position: fixed;
     top: 0;
-    left: var(--nav-width);
+    left: calc(var(--nav-width) - 1px);
     right: 0;
     height: var(--frame-inset);
     z-index: 41;
@@ -115,31 +116,36 @@
     border-radius: var(--canvas-radius) var(--canvas-radius) 0 0;
   }
 
-  /* Frame-coloured corner pieces keep the canvas's top corners round while it scrolls. */
+  /* Frame-coloured corner pieces keep the canvas's top corners round while it scrolls.
+     Each reaches 1px past the canvas edge, over the hairline ring, which would otherwise run
+     straight up past the curve once the canvas's own top has scrolled away. Their opaque edge
+     sits half a pixel inside the bar's curve, so the two antialiased edges never overlap
+     and leave a see-through seam for the content scrolling underneath. */
   .workspace::before,
   .workspace::after {
     content: "";
     position: fixed;
     top: var(--frame-inset);
-    width: var(--canvas-radius);
+    width: calc(var(--canvas-radius) + 1px);
     height: var(--canvas-radius);
     z-index: 41;
     background: var(--frame-bg);
     background-attachment: fixed;
     pointer-events: none;
+    --corner-mask: transparent calc(var(--canvas-radius) - 1.5px), #000 calc(var(--canvas-radius) - 0.5px);
   }
 
   .workspace::before {
-    left: var(--nav-width);
-    -webkit-mask: radial-gradient(circle at 100% 100%, transparent calc(var(--canvas-radius) - 0.5px), #000 var(--canvas-radius));
-    mask: radial-gradient(circle at 100% 100%, transparent calc(var(--canvas-radius) - 0.5px), #000 var(--canvas-radius));
+    left: calc(var(--nav-width) - 1px);
+    -webkit-mask: radial-gradient(circle at 100% 100%, var(--corner-mask));
+    mask: radial-gradient(circle at 100% 100%, var(--corner-mask));
     transition: left var(--sidebar-slide) var(--ease-out);
   }
 
   .workspace::after {
-    right: var(--frame-inset);
-    -webkit-mask: radial-gradient(circle at 0 100%, transparent calc(var(--canvas-radius) - 0.5px), #000 var(--canvas-radius));
-    mask: radial-gradient(circle at 0 100%, transparent calc(var(--canvas-radius) - 0.5px), #000 var(--canvas-radius));
+    right: calc(var(--frame-inset) - 1px);
+    -webkit-mask: radial-gradient(circle at 0 100%, var(--corner-mask));
+    mask: radial-gradient(circle at 0 100%, var(--corner-mask));
   }
 
   .bottomRail {
@@ -161,13 +167,16 @@
     margin-left: var(--frame-inset);
   }
 
-  .appShell.focusMode::after,
+  .appShell.focusMode::after {
+    left: calc(var(--frame-inset) - 1px);
+  }
+
   .appShell.focusMode .bottomRail {
     left: var(--frame-inset);
   }
 
   .appShell.focusMode .workspace::before {
-    left: var(--frame-inset);
+    left: calc(var(--frame-inset) - 1px);
   }
 }
 

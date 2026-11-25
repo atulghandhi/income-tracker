@@ -201,7 +201,6 @@ import {
 import { buildPlanInputs, comparePlans } from "./allocate";
 import { AllocateView, PayoffWidget } from "./AllocateView";
 import { buildPlanSignals } from "./planSignals";
-import { interpretCreditScore } from "./creditScore";
 import { clearDismissedRecs, readDismissedRecs, recommendWidgets, writeDismissedRecs } from "./widgetRecs";
 import {
   HIDEABLE_VIEWS,
@@ -223,6 +222,7 @@ import { chooseLandingRegion, initialCountry, isLandingPath, LANDING_COPY } from
 import { buildSampleLedger, sampleCountry } from "./sampleData";
 import { WidgetGrid, type WidgetRenderer } from "./WidgetGrid";
 import { INSIGHT_WIDGET_SPECS, InsightWidgetCard } from "./InsightWidgetCard";
+import HealthPanel from "./HealthPanel";
 import { buildCategoryRows, buildExpenseGroups, buildIncomeGroups, buildMonthlyBars, categoryColor, categoryEmoji } from "./ledgerGroups";
 import { buildInsightsModel, visibleSignals } from "./insightsData";
 import { normalizeInsightsState, setWidgetVariant } from "./insightsState";
@@ -253,13 +253,11 @@ import {
   NumberInput,
   PanelTitle,
   ShowMoreList,
-  ProgressRule,
   blurOnEnter,
   focusNextFrame,
   formatDecimal,
   formatShortDate,
   handleDraftEnter,
-  healthTone,
   type NetWorthHorizon,
 } from "./ui";
 import {
@@ -650,7 +648,6 @@ const DEV_AUTO_SAMPLE = import.meta.env.DEV && import.meta.env.VITE_DEV_SAMPLE !
 const TUTORIAL_SEEN_KEY = "tutorialSeenPages";
 const ONBOARDING_KEY = "onboardingComplete";
 const GETTING_STARTED_KEY = "gettingStartedDismissed";
-const DATA_NOTE_DISMISSED_KEY = "dataNoteDismissed";
 // One-off announcement of PDF statement imports for people who were already using the app.
 const PDF_NOTICE_KEY = "it_pdf_import_notice";
 // The "Suggested for you" widget banner shows on a new user's first visit only, then
@@ -832,7 +829,6 @@ function App() {
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [confirmClearAll, setConfirmClearAll] = useState(false);
   const [checklistDismissed, setChecklistDismissed] = useState(() => readFlag(GETTING_STARTED_KEY));
-  const [dataNoteDismissed, setDataNoteDismissed] = useState(() => readFlag(DATA_NOTE_DISMISSED_KEY));
   const [showPdfNotice, setShowPdfNotice] = useState(false);
   // Whether hydration found a saved ledger — the difference between a returning user and a new one.
   const storedLedgerRef = useRef(false);
@@ -1106,7 +1102,6 @@ function App() {
     if (!extra.length) return allSignals;
     return [...allSignals.filter((signal) => signal.id !== "no-urgent-signals"), ...extra].slice(0, 10);
   }, [allSignals, financialSignals, insightsModel]);
-  const creditReading = useMemo(() => interpretCreditScore(healthScore.estimatedCreditScore, region), [healthScore.estimatedCreditScore, region]);
   const takeHome = useMemo(() => computeTakeHome(region, ledger.taxProfile, ledger.accounts), [region, ledger.taxProfile, ledger.accounts]);
   const payrollAccounts = useMemo(
     () => ledger.accounts.filter((account) => account.accountClass !== "debt" && account.contributionSource === "payroll" && Number(account.monthlyContribution) > 0),
@@ -3799,38 +3794,25 @@ function App() {
         return <SubscriptionsWidget report={subscriptionReport} formatter={moneyFormatter} preciseFormatter={preciseFormatter} privacy={ledger.privacyMode} t={t} onOpen={() => setActiveView("subscriptions")} />;
       case "health":
         return (
-          <article className={`miniPanel healthPanel ${healthScore.noData ? "" : healthTone(healthScore.score)}`}>
-            <PanelTitle title="Health score" icon={<Gauge size={16} />} action={<InfoHint label="How health score is calculated" text={t(healthScore.detail)} />} />
-            <div className="scoreHeadline">
-              <div className="scoreNumber">
-                {healthScore.noData ? "N/A" : formatDecimal(healthScore.score)}
-                {!healthScore.noData && <small>/10</small>}
-              </div>
-              {!healthScore.noData && <span className="scoreBadge">{healthScore.summary}</span>}
-            </div>
-            {healthScore.noData && <span className="scoreCaption">Add data to generate a score</span>}
-            {!healthScore.noData && (
-              <>
-                <div className="creditEstimate">
-                  <span>Estimated credit score</span>
-                  <strong>
-                    {creditReading.primary.score}
-                    <small>
-                      {" "}
-                      {creditReading.primary.scale} · {creditReading.primary.band.label}
-                    </small>
-                  </strong>
-                </div>
-                <div className="ruleList">
-                  <ProgressRule label="Cash flow" value={healthScore.cashFlowScore} target={75} />
-                  <ProgressRule label="Debt load" value={healthScore.debtLoadScore} target={75} />
-                  <ProgressRule label="Payments" value={healthScore.paymentPressureScore} target={75} />
-                  <ProgressRule label="Card headroom" value={healthScore.utilizationScore} target={75} />
-                  <ProgressRule label="Savings" value={healthScore.savingsScore} target={75} />
-                </div>
-              </>
-            )}
-          </article>
+          <HealthPanel
+            health={healthScore}
+            region={region}
+            t={t}
+            formatter={moneyFormatter}
+            privacy={ledger.privacyMode}
+            known={ledger.knownCreditScore}
+            onSaveKnown={(known) => {
+              updateLedger((current) => {
+                const { knownCreditScore: _previous, ...rest } = current;
+                return known ? { ...rest, knownCreditScore: known } : rest;
+              });
+              track("credit_score_entered", { cleared: !known });
+            }}
+            onOpen={(destination) => {
+              track("health_step_opened", { destination });
+              setActiveView(destination);
+            }}
+          />
         );
       case "chart":
         return (
@@ -5508,16 +5490,12 @@ function App() {
               <div className="pageHeader settingsHeader">
                 <div>
                   <h2>Settings</h2>
-                  <p>Your data, imports, rules, and preferences.</p>
                 </div>
                 <div className="settingsHeaderActions">
-                  {/* Quick setup lives in the note below, so it moves up here once the note is gone. */}
-                  {dataNoteDismissed && (
-                    <button className="privacyBadge" type="button" onClick={() => setOnboardingOpen(true)}>
-                      <Sparkles size={15} />
-                      Run quick setup
-                    </button>
-                  )}
+                  <button className="privacyBadge" type="button" onClick={() => setOnboardingOpen(true)}>
+                    <Sparkles size={15} />
+                    Run quick setup
+                  </button>
                   <button className="privacyBadge" type="button" onClick={() => setShowFeedbackModal(true)}>
                     <CircleHelp size={15} />
                     Submit feedback
@@ -5525,39 +5503,23 @@ function App() {
                 </div>
               </div>
 
-              {!dataNoteDismissed && (
-                <article className="architectureNote">
-                  <Cloud size={21} />
-                  <div>
-                    <h3>Where your data lives</h3>
-                    <p>
-                      Everything is saved in this browser. Sign in and it also backs up privately to the cloud, so you can pick up on
-                      another device. Export a full copy below any time.
-                    </p>
-                  </div>
-                  <button className="commandButton" type="button" onClick={() => setOnboardingOpen(true)}>
-                    <Sparkles size={15} />
-                    Run quick setup
-                  </button>
-                  <button
-                    className="iconButton architectureNoteDismiss"
-                    type="button"
-                    aria-label="Dismiss where your data lives"
-                    data-tip="Dismiss"
-                    onClick={() => {
-                      writeFlag(DATA_NOTE_DISMISSED_KEY);
-                      setDataNoteDismissed(true);
-                    }}
-                  >
-                    <X size={16} />
-                  </button>
+              {/* Appearance first: it is what people most often open Settings to change. */}
+                <article className="settingsPanel appearancePanel">
+                  <PanelTitle title="Appearance" icon={<Palette size={17} />} />
+                  <p className="settingsHint">The colour your app sits on. Saved on this device, like light and dark mode.</p>
+                  <FramePicker hue={frameHue} grain={frameGrain} theme={theme} onHue={setFrameHue} onGrain={setFrameGrain} />
                 </article>
-              )}
 
-              {/* Ordered by how often people need each part: bringing data in and out, keeping imports
+              {/* Then by how often people need each part: bringing data in and out, keeping imports
                   tidy, then one-off preferences, reference, and the irreversible last. */}
                 <article className="settingsPanel dataPanel">
                   <PanelTitle title="Import & export" icon={<Database size={17} />} />
+                  <p className="settingsHint dataHome">
+                    <Cloud size={14} aria-hidden="true" />
+                    {user
+                      ? "Saved in this browser and backed up privately to your account."
+                      : "Saved in this browser only. Sign in to back it up and pick up on another device."}
+                  </p>
                   <div className="dataActionGrid">
                     <div className="dataAction">
                       <Upload size={20} />
@@ -5801,11 +5763,6 @@ function App() {
                 </article>
               )}
 
-                <article className="settingsPanel appearancePanel">
-                  <PanelTitle title="Appearance" icon={<Palette size={17} />} />
-                  <p className="settingsHint">The colour your app sits on. Saved on this device, like light and dark mode.</p>
-                  <FramePicker hue={frameHue} grain={frameGrain} theme={theme} onHue={setFrameHue} onGrain={setFrameGrain} />
-                </article>
 
               <div className="settingsRow">
                   <article className="settingsPanel compactSetting">

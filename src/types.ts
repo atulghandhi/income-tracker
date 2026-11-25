@@ -442,8 +442,13 @@ export type LedgerState = {
   // The Insights widgets' own data: the look each one uses, dismissed warnings, notes and to-dos.
   // Lives in the ledger so it persists and syncs exactly like transactions do.
   insights?: InsightsState;
+  // The credit score the person read off their agency, shown instead of the estimate. Stored with
+  // its scale (Experian in the UK, FICO in the US) so a change of country never misreads it.
+  knownCreditScore?: KnownCreditScore;
   lastSavedAt: string;
 };
+
+export type KnownCreditScore = { score: number; scale: "Experian" | "FICO"; updatedAt: string };
 
 // ─── Insights dashboard ──────────────────────────────────────────────────────
 
@@ -580,6 +585,19 @@ export type HealthScoreBreakdown = {
   detail: string;
   /** True when there is no income, expense, or debt data to score against. */
   noData: boolean;
+  /** What would lift the score most, best first. */
+  actions: HealthAction[];
+};
+
+export type HealthAction = {
+  id: "interest-trap" | "cash-flow" | "cards" | "payments" | "debt" | "savings";
+  /** Points out of 10 this would add. */
+  gain: number;
+  /** Money involved, per month or once, depending on the action. */
+  amount?: number;
+  percent?: number;
+  /** The debt it concerns, where there is one. */
+  name?: string;
 };
 
 // ─── Goal sequencing ─────────────────────────────────────────────────────────

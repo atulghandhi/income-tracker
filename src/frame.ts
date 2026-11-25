@@ -10,8 +10,21 @@ export const DEFAULT_GRAIN = 0.06;
 const APP_SAT = 1.45;
 export { DEFAULT_HUE };
 
+// Teal (172) was the default until Peach replaced it. Almost everyone on teal simply never
+// changed it (the hue was stored on every load), so they move to Peach once. The marker means
+// anyone who picks Teal again afterwards keeps it.
+const PEACH_MOVE_KEY = "it_hue_peach_move";
+const OLD_DEFAULT_HUE = 172;
+
 export function readStoredHue(): number {
   try {
+    if (!localStorage.getItem(PEACH_MOVE_KEY)) {
+      localStorage.setItem(PEACH_MOVE_KEY, "1");
+      if (Number(localStorage.getItem(HUE_KEY)) === OLD_DEFAULT_HUE) {
+        localStorage.setItem(HUE_KEY, String(DEFAULT_HUE));
+        return DEFAULT_HUE;
+      }
+    }
     const raw = localStorage.getItem(HUE_KEY);
     const n = raw === null ? NaN : Number(raw);
     if (Number.isFinite(n) && n >= 0 && n <= 360) return n;
