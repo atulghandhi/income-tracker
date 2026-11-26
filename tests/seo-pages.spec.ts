@@ -15,13 +15,43 @@ test.describe("Static content pages", () => {
     await expect(page.locator('a[data-track="cta_click"]').first()).toHaveAttribute("href", /ref=/);
   });
 
-  test("snowball vs avalanche simulation reports both orders", async ({ page }) => {
+  test("calculators start empty, explain every box and wait for the numbers they need", async ({ page }) => {
+    await page.goto("/tools/0-percent-credit-card-payoff-calculator-uk.html");
+    await expect(page.locator("#bal")).toHaveValue("");
+    await expect(page.locator("#bal")).toHaveAttribute("placeholder", "e.g. 2,000");
+    await expect(page.locator("#bal-hint")).toContainText("What you still owe");
+    await expect(page.locator("#calc-out")).toContainText("Your answer appears here");
+    await page.fill("#bal", "2000");
+    await expect(page.locator("#calc-out")).toContainText("Now add 0% months remaining");
+    await page.fill("#months", "18");
+    await expect(page.locator("#calc-out")).toContainText("£111.11");
+    await expect(page.locator("#calc-save")).toHaveText(/Add this card to my debt plan/);
+  });
+
+  test("snowball vs avalanche: a list of named debts compared both ways", async ({ page }) => {
     await page.goto("/tools/debt-snowball-vs-avalanche-calculator.html");
+    await expect(page.locator("#calc-out")).toContainText("Your answer appears here");
+    const rows = page.locator("[data-row]");
+    await expect(rows).toHaveCount(2);
+    await rows.nth(0).getByLabel("Debt 1 name").fill("Barclaycard");
+    await rows.nth(0).getByLabel("Debt 1 balance").fill("2500");
+    await expect(page.locator("#calc-out")).toContainText("Add the APR for Barclaycard");
+    await rows.nth(0).getByLabel("Debt 1 APR").fill("22.9");
+    await rows.nth(0).getByLabel("Debt 1 monthly minimum").fill("75");
+    await expect(page.locator("#calc-out")).toContainText("both methods are the same");
+    await page.getByRole("button", { name: "+ Add another debt" }).click();
+    await expect(rows).toHaveCount(3);
+    await rows.nth(1).getByLabel("Debt 2 balance").fill("6000");
+    await rows.nth(1).getByLabel("Debt 2 APR").fill("8.9");
+    await rows.nth(1).getByLabel("Debt 2 monthly minimum").fill("150");
+    await page.fill("#extra", "100");
     await expect(page.locator("#calc-out")).toContainText("Avalanche");
     await expect(page.locator("#calc-out")).toContainText("Snowball");
+    await expect(page.locator(".calc-order")).toContainText("Barclaycard");
+    await page.getByRole("button", { name: "Remove debt 3" }).click();
+    await expect(rows).toHaveCount(2);
     // Starve every debt of payments: interest outruns the minimums, so neither order ever clears.
-    await page.fill("#extra", "0");
-    for (const id of ["#p1", "#p2", "#p3"]) await page.fill(id, "1");
+    await page.goto("/tools/debt-snowball-vs-avalanche-calculator.html?b1=2500&r1=22.9&p1=1&b2=6000&r2=8.9&p2=1&extra=0");
     await expect(page.locator("#calc-out")).toContainText("never clear");
   });
 
@@ -44,22 +74,22 @@ test.describe("Static content pages", () => {
   });
 
   test("budget planner, rent affordability, overdraft and pro rata calculators compute the worked examples", async ({ page }) => {
-    await page.goto("/tools/budget-planner-uk.html");
+    await page.goto("/tools/budget-planner-uk.html?income=2400&housing=900&bills=350&food=320&transport=150&debt=100&subs=40&other=300");
     await expect(page.locator("h1")).toHaveText("Budget planner (UK)");
     await expect(page.locator("#calc-out")).toContainText("£240.00");
     await expect(page.locator("#calc-out")).toContainText("10%");
     await page.fill("#income", "2000");
     await expect(page.locator("#calc-out")).toContainText("short each month");
 
-    await page.goto("/tools/rent-affordability-calculator-uk.html");
+    await page.goto("/tools/rent-affordability-calculator-uk.html?takehome=2200&gross=32000&rent=950");
     await expect(page.locator("#calc-out")).toContainText("43.2%");
     await expect(page.locator("#calc-out")).toContainText("£660.00");
     await expect(page.locator("#calc-out")).toContainText("passes");
 
-    await page.goto("/tools/overdraft-cost-calculator-uk.html");
+    await page.goto("/tools/overdraft-cost-calculator-uk.html?amount=500&days=14&ear=39.9");
     await expect(page.locator("#calc-out")).toContainText("£6.4");
     await page.fill("#days", "0");
-    await expect(page.locator("#calc-out")).toContainText("Enter a valid non-negative number");
+    await expect(page.locator("#calc-out")).toContainText("Use positive numbers only");
 
     await page.goto("/tools/pro-rata-salary-calculator-uk.html?salary=30000&fthours=37.5&hours=22.5");
     await expect(page.locator("#calc-out")).toContainText("£18,000.00");

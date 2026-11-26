@@ -11,6 +11,7 @@ import CommandPalette, { type PaletteItem } from "./CommandPalette";
 import TransactionPeek, { type PeekTarget } from "./TransactionPeek";
 import { isApple, matchShortcut, SHORTCUTS } from "./shortcuts";
 import { hashRequestsHandoff, takeHandoffFile } from "./handoff";
+import { applyCalcHandoff, describeCalcHandoff, hashRequestsCalcHandoff, takeCalcHandoff } from "./calcHandoff";
 import Onboarding, { type OnboardingResult } from "./Onboarding";
 import type { CSSProperties, Dispatch, DragEvent, FormEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode, Ref, SetStateAction } from "react";
 import {
@@ -779,6 +780,11 @@ function App() {
   // Arrived from a bank guide's drop zone with a statement file waiting (src/handoff.ts).
   const [handoffPending, setHandoffPending] = useState(() => hashRequestsHandoff(window.location.hash));
   const handoffImportedRef = useRef(false);
+  // Arrived from a calculator's "Save to my plan" with its figures waiting (src/calcHandoff.ts).
+  const [calcPending, setCalcPending] = useState(() => hashRequestsCalcHandoff(window.location.hash));
+  const calcSavedRef = useRef(false);
+  // The page a calculator's figures landed on, to put in the sidebar once the sidebar has loaded.
+  const [calcPin, setCalcPin] = useState<AppView | null>(null);
   const [session, setSession] = useState<AuthSession | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authWorking, setAuthWorking] = useState(false);
@@ -1249,6 +1255,13 @@ function App() {
     setNavTools(initial);
     writeNavTools(initial);
   }, [hydrated, navTools, setupProgress]);
+  // A calculator's figures landed on a tool page: keep that page in the sidebar so it can be found again.
+  useEffect(() => {
+    if (!calcPin || !navTools) return;
+    if (isToolView(calcPin) && !toolPrefs.pinned.includes(calcPin)) setSidebarItem(calcPin, true);
+    setCalcPin(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calcPin, navTools]);
   // The choice saved in the ledger (so it follows the account) wins over this device's copy.
   const toolPrefs: NavToolsPrefs = { ...(navTools ?? { pinned: [...TOOL_VIEWS], seen: [] }), ...ledger.sidebar };
   // A choice made before it was saved in the ledger moves there, so other devices get it too.
@@ -1637,6 +1650,10 @@ function App() {
       hashParams.delete("handoff");
       changed = true;
     }
+    if (hashParams.has("calc")) {
+      hashParams.delete("calc");
+      changed = true;
+    }
     if (ref !== null) {
       const clean = ref.replace(/[^a-z0-9_-]/gi, "").slice(0, 60);
       if (clean) {
@@ -1652,7 +1669,7 @@ function App() {
     }
     if (changed) {
       const query = params.toString();
-      const hadHashParams = /(^#|&)(ref|feedback|handoff)(=|&|$)/.test(window.location.hash);
+      const hadHashParams = /(^#|&)(ref|feedback|handoff|calc)(=|&|$)/.test(window.location.hash);
       const hash = hadHashParams ? (hashParams.toString() ? `#${hashParams}` : "") : window.location.hash;
       const url = window.location.pathname + (query ? `?${query}` : "") + hash;
       window.history.replaceState(null, "", url);
@@ -1677,6 +1694,8 @@ function App() {
     // Someone who arrived with a statement file gets the import review, not the
     // setup wizard on top of it. If no file turned up, the wizard runs as usual.
     if (handoffPending || handoffImportedRef.current) return;
+    // Someone who just saved a calculator's figures lands on them, not on the setup wizard.
+    if (calcPending || calcSavedRef.current) return;
     if (readFlag(ONBOARDING_KEY)) return;
     if (hasLocalData(ledger)) {
       // Existing user from before the wizard existed — never interrupt them.
@@ -1687,7 +1706,35 @@ function App() {
     // Deliberately not keyed on `ledger`: the gate should only re-evaluate when
     // hydration/auth state settles, not on every keystroke afterwards.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showLanding, hydrated, authLoading, user?.id, cloudHydrated, handoffPending]);
+  }, [showLanding, hydrated, authLoading, user?.id, cloudHydrated, handoffPending, calcPending]);
+
+  // Fold a calculator's figures (debts, goals, salary) into the ledger and open the page they
+  // belong on. Waits for hydration so a returning user's accounts are matched by name, not doubled.
+  useEffect(() => {
+    if (!calcPending || !hydrated || authLoading) return;
+    if (user && !cloudHydrated) return;
+    const handoff = takeCalcHandoff();
+    if (handoff) {
+      calcSavedRef.current = true;
+      const preview = applyCalcHandoff(ledger, handoff);
+      updateLedger((current) => applyCalcHandoff(current, handoff).ledger);
+      try {
+        localStorage.setItem("hasSeenLanding", "1");
+      } catch {
+        // Storage unavailable; the figures are still saved in the ledger.
+      }
+      setShowLanding(false);
+      if (isToolView(handoff.view)) setCalcPin(handoff.view);
+      setActiveView(handoff.view);
+      setToast(describeCalcHandoff(preview));
+      track("calc_handoff", { calc: handoff.source, found: true, debts: preview.debtsAdded + preview.debtsUpdated, goals: preview.goalsAdded + preview.goalsUpdated });
+    } else {
+      track("calc_handoff", { calc: "none", found: false });
+    }
+    setCalcPending(false);
+    // Runs once per arrival; the ledger in this render is the hydrated one, which is the point.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calcPending, hydrated, authLoading, user?.id, cloudHydrated]);
 
   // Collect the statement file a bank guide handed over and open it for review.
   // Waits for the ledger to hydrate so duplicate matching and learned rules apply.

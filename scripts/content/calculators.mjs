@@ -33,14 +33,6 @@ export const CALCULATORS = [
   `,
     sections: [
       {
-        h: "How to use it",
-        ul: [
-          "Balance left: what you still owe on the card.",
-          "0% months remaining: how long until the promotional rate ends.",
-          "APR after 0% ends: the standard rate, shown on your statement. Optional, but it shows the cost of slipping up.",
-        ],
-      },
-      {
         h: "The one rule with 0% cards",
         p: [
           "Clear the balance before the 0% window closes. Set the monthly payment above as a standing order and forget about it. Leave it to the last minute and a single missed deadline can wipe out months of interest-free progress.",
@@ -480,7 +472,7 @@ export const CALCULATORS = [
     var html='<div class="calc-headline calc-'+cls+'">'+gbp(perDay)+' <small>a day</small></div>';
     html+='<p>'+gbp(free)+' spendable over '+d+(d===1?' day':' days')+', or about <strong>'+gbp(perWeek)+' a week</strong>.</p>';
     if(cls==='bad')html+='<p class="calc-bad">Tight. Plan meals from what is in the cupboard and keep the card in the drawer for the non-essentials.</p>';
-    else if(cls==='warn')html+='<p class="calc-warn">Doable, but one unplanned spend eats two days. Decide now what the week's one treat is.</p>';
+    else if(cls==='warn')html+='<p class="calc-warn">Doable, but one unplanned spend eats two days. Decide now what your one treat this week will be.</p>';
     else html+='<p class="calc-good">Comfortable. Consider moving some of it to savings today, before it becomes spending.</p>';
     out.innerHTML=html;
   `,

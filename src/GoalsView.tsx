@@ -1,4 +1,4 @@
-import { useEffect, useState, useId } from "react";
+import { useEffect, useRef, useState, useId } from "react";
 import {
   Target,
   Plus,
@@ -79,10 +79,11 @@ export function GoalsView({
   const [surplusInput, setSurplusInput] = useState<string>(String(Math.round(goalPlannerSurplus)));
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
-  // Follow the ledger figure as it changes (new income, a new account contribution) unless the
-  // user has typed their own.
+  // Follow the figure as it changes (new income, a new account contribution, an override set from
+  // elsewhere such as a calculator's saved goal) unless the user is typing in the box.
+  const surplusFocused = useRef(false);
   useEffect(() => {
-    if (!surplexOverridden) setSurplusInput(String(Math.round(goalPlannerSurplus)));
+    if (!surplusFocused.current) setSurplusInput(String(Math.round(goalPlannerSurplus)));
   }, [goalPlannerSurplus, surplexOverridden]);
 
   const sorted = [...goals].sort((a, b) => a.priority - b.priority);
@@ -150,7 +151,13 @@ export function GoalsView({
               min={0}
               value={surplusInput}
               onChange={(e) => setSurplusInput(e.target.value)}
-              onBlur={handleSurplusBlur}
+              onFocus={() => {
+                surplusFocused.current = true;
+              }}
+              onBlur={() => {
+                surplusFocused.current = false;
+                handleSurplusBlur();
+              }}
               aria-label="Monthly surplus for goals"
             />
             <span>/mo</span>

@@ -3,6 +3,8 @@ import { expect, test } from '@playwright/test';
 test('weekly and four-weekly conversion uses annual equivalents', async ({ page }) => {
   await page.goto('/tools/weekly-to-monthly-budget-calculator.html');
   const out=page.locator('#calc-out');
+  await expect(out).toContainText('Your answer appears here');
+  await page.locator('#amount').fill('100');
   await expect(out).toContainText('£433.33');
   await page.locator('#frequency').selectOption('13');
   await page.locator('#amount').fill('2000');
@@ -12,13 +14,13 @@ test('weekly and four-weekly conversion uses annual equivalents', async ({ page 
   await page.locator('#amount').fill('1300');
   await expect(out).toContainText('£300.00 a week');
   await page.locator('#amount').fill('-10');
-  await expect(out).toContainText('valid non-negative');
+  await expect(out).toContainText('Use positive numbers only');
   await page.locator('#amount').fill('');
   await expect(out).not.toContainText('£');
 });
 
 test('bill split conserves pennies and handles zero or insufficient income', async ({ page }) => {
-  await page.goto('/tools/split-bills-by-income-calculator.html');
+  await page.goto('/tools/split-bills-by-income-calculator.html?income1=3000&income2=2000&bills=1500');
   const out=page.locator('#calc-out');
   await expect(out).toContainText('60% / 40%');
   await expect(out).toContainText('£900.00');
@@ -37,7 +39,7 @@ test('bill split conserves pennies and handles zero or insufficient income', asy
 });
 
 test('Christmas savings plan excludes existing savings and validates paydays', async ({ page }) => {
-  await page.goto('/tools/christmas-budget-savings-calculator.html');
+  await page.goto('/tools/christmas-budget-savings-calculator.html?gifts=300&food=150&travel=100&extras=50&saved=150&paydays=3');
   const out=page.locator('#calc-out');
   await expect(out).toContainText('£150.00 to save each payday');
   await page.locator('#paydays').fill('9');

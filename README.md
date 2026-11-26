@@ -79,6 +79,16 @@ price. Detection runs locally in `src/subscriptions.ts` and handles the awkward 
   from the cancelled list so it disappears from the page. A charge that lands after cancelling is
   called out. Decisions live in the ledger (`subscriptionPrefs`) and sync with it.
 
+## Calculators
+
+The free calculators (`/tools/*.html`, built by `scripts/build-content.mjs` from
+`scripts/content/calculators.mjs` and `budget-tools.mjs`) are laid out like an app page and start
+empty: each box shows a greyed example and a one-line hint (`scripts/content/calc-app.mjs`). Where
+the tracker has the same tool, the main button carries what was typed into it: the page parks the
+figures in localStorage and opens the matching app page with `#calc=1`, and `src/calcHandoff.ts`
+turns them into debts (Allocate, Accounts), goals (Goals) or a salary (Pay & tax). A debt or goal
+with the same name is updated rather than duplicated. Pinned by `tests/calcHandoff.spec.ts`.
+
 ## Repository layout
 
 - `src/` – the React + Vite web app

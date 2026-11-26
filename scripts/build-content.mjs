@@ -31,6 +31,7 @@ import { fileURLToPath } from "node:url";
 import { BANKS } from "./content/banks.mjs";
 import { GUIDES } from "./content/guides.mjs";
 import { CALCULATORS } from "./content/calculators.mjs";
+import { CALC_APP } from "./content/calc-app.mjs";
 import { LANDINGS } from "./content/landings.mjs";
 import { COMPARISONS, ROUNDUP } from "./content/comparisons.mjs";
 import { TEMPLATES } from "./content/templates.mjs";
@@ -139,7 +140,7 @@ const FRAMES = Object.fromEntries(
 
 // Canvas tokens. Light first, then the same names for dark.
 const CANVAS_LIGHT = `
-    --canvas: #ffffff; --well: #f4f6f9; --field: #ffffff;
+    --canvas: #ffffff; --well: #f4f6f9; --field: #ffffff; --fill: #eef1f5;
     --ink-strong: #0e1826; --ink: #233247; --ink-soft: #46556b; --ink-muted: #5b6878;
     --line: rgb(20 32 51 / 0.11); --line-strong: rgb(20 32 51 / 0.2);
     --accent: #00dfc1; --accent-ink: #00756a; --on-accent: #051424;
@@ -148,7 +149,7 @@ const CANVAS_LIGHT = `
     --shadow: 0 0 0 1px rgb(14 24 38 / 0.05), 0 8px 30px rgb(14 24 38 / 0.12);
     color-scheme: light;`;
 const CANVAS_DARK = `
-    --canvas: #0a192a; --well: #0f2236; --field: #06182b;
+    --canvas: #0a192a; --well: #0f2236; --field: #06182b; --fill: #132a42;
     --ink-strong: #ffffff; --ink: #d4e4fa; --ink-soft: #b8c8e0; --ink-muted: #9ea8b7;
     --line: rgb(212 228 250 / 0.1); --line-strong: rgb(212 228 250 / 0.18);
     --accent: #00dfc1; --accent-ink: #00dfc1; --on-accent: #051424;
@@ -277,28 +278,68 @@ ${frameRules("dark", ':root[data-theme="dark"] ')}
   .changelog li { margin-top: 14px; }
   .changelog time { color: var(--ink-muted); font-size: 0.82rem; display: block; }
   .changelog strong { color: var(--ink-strong); }
-  /* Calculator widget: the one thing on a tool page that should lead the eye */
-  .calc { background: var(--well); border: 1.5px solid var(--accent-line); border-radius: 16px; padding: 22px; margin: 0 0 14px; }
-  .calc-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
-  .calc-field { display: flex; flex-direction: column; gap: 6px; }
-  .calc-label { font-size: 0.82rem; color: var(--ink-soft); font-weight: 600; }
-  .calc-inwrap { display: flex; align-items: center; background: var(--field); border: 1px solid var(--line-strong); border-radius: 10px; padding: 0 12px; transition: border-color 150ms var(--ease-out); }
-  .calc-inwrap:focus-within { border-color: var(--accent-ink); }
+  /* Calculator widget: built like a page of the app. A grey well holds white cards, inputs are
+     filled, the answer sits beside them. It is the one thing on a tool page that leads the eye. */
+  .calc-lede { font-size: 1.08rem; color: var(--ink-soft); margin: 0 0 20px; max-width: 62ch; }
+  .calc { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 12px; align-items: start; background: var(--well); border-radius: 18px; padding: 12px; margin: 0 -14px 30px; }
+  .calc-wide { grid-template-columns: minmax(0, 1fr); }
+  .calc-card { background: var(--canvas); border-radius: 14px; padding: 20px 22px; box-shadow: 0 0 0 1px var(--line), 0 1px 3px rgb(14 24 38 / 0.05); min-width: 0; }
+  .calc-title { font-size: 1rem; font-weight: 700; margin: 0 0 14px; letter-spacing: 0; }
+  .calc-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px 14px; }
+  .calc-field { display: flex; flex-direction: column; gap: 5px; }
+  .calc-label { font-size: 0.8rem; color: var(--ink-strong); font-weight: 650; line-height: 1.3; }
+  .calc-opt { font-style: normal; font-weight: 500; color: var(--ink-muted); margin-left: 2px; }
+  .calc-help { font-size: 0.78rem; color: var(--ink-muted); line-height: 1.4; }
+  .calc-lead { margin: -6px 0 14px; font-size: 0.85rem; }
+  .calc-inwrap { display: flex; align-items: center; background: var(--fill); border: 1px solid transparent; border-radius: 10px; padding: 0 12px; transition: border-color 150ms var(--ease-out), background-color 150ms var(--ease-out); }
+  .calc-inwrap:focus-within { border-color: var(--accent-ink); background: var(--field); }
   .calc-inwrap i { color: var(--ink-muted); font-style: normal; font-size: 0.95rem; }
-  .calc-inwrap select { min-width: 0; width: 100%; padding: 12px; border: 0; background: var(--field); color: var(--ink-strong); font: inherit; }
-  .calc-inwrap input { flex: 1; min-width: 0; background: none; border: none; color: var(--ink-strong); font-size: 1.05rem; font-weight: 600; padding: 11px 6px; outline: none; font-family: inherit; }
+  .calc-inwrap select { min-width: 0; width: 100%; padding: 11px 4px; border: 0; background: transparent; color: var(--ink-strong); font: inherit; font-weight: 600; }
+  .calc-inwrap input { flex: 1; min-width: 0; width: 100%; background: none; border: none; color: var(--ink-strong); font-size: 1rem; font-weight: 600; padding: 10px 6px; outline: none; font-family: inherit; }
+  .calc-inwrap input::placeholder { color: var(--ink-muted); opacity: 0.6; font-weight: 500; }
   .calc-inwrap input::-webkit-outer-spin-button, .calc-inwrap input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-  .calc-out { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
-  .calc-out p { margin: 8px 0 0; }
-  .calc-headline { font-size: 2.2rem; font-weight: 800; color: var(--accent-ink); line-height: 1.1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-  .calc-headline small { font-size: 0.9rem; font-weight: 600; color: var(--ink-muted); letter-spacing: 0; }
+  .calc-inwrap input[type=number] { -moz-appearance: textfield; }
+  .calc-result { position: sticky; top: 16px; }
+  .calc-out p { margin: 10px 0 0; font-size: 0.95rem; }
+  .calc-empty { display: flex; flex-direction: column; gap: 4px; padding: 22px 18px; border: 1.5px dashed var(--line-strong); border-radius: 12px; text-align: center; }
+  .calc-empty strong { color: var(--ink-strong); font-size: 0.98rem; }
+  .calc-empty span { color: var(--ink-muted); font-size: 0.88rem; }
+  .calc-headline { font-size: 2.1rem; font-weight: 800; color: var(--accent-ink); line-height: 1.1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .calc-headline small { font-size: 0.88rem; font-weight: 600; color: var(--ink-muted); letter-spacing: 0; }
   .calc-hint { color: var(--ink-muted); }
   .calc-good { color: var(--good); }
   .calc-warn { color: var(--warn); }
   .calc-bad { color: var(--bad); }
-  .calc-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 16px; }
-  .calc-actions .btn { padding: 9px 14px; font-size: 0.88rem; }
-  .calc-share-note { font-size: 0.82rem; color: var(--ink-muted); }
+  .calc-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 18px; }
+  .calc-actions .btn { padding: 11px 16px; font-size: 0.92rem; white-space: normal; text-align: left; }
+  .calc-actions .btn.ghost { padding: 11px 14px; }
+  .calc-share-note { font-size: 0.78rem; color: var(--ink-muted); margin: 8px 0 0; line-height: 1.4; }
+  /* Debt list (snowball vs avalanche) */
+  .calc-dhead, .calc-debt { display: grid; grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(0, 1fr)) 34px; gap: 8px; align-items: center; }
+  .calc-dhead { font-size: 0.78rem; font-weight: 650; color: var(--ink-strong); padding: 0 0 6px; }
+  .calc-debt + .calc-debt { margin-top: 8px; }
+  .calc-dcell { display: block; min-width: 0; }
+  .calc-dlabel { display: none; }
+  .calc-dremove { width: 34px; height: 34px; border-radius: 8px; border: 0; background: transparent; color: var(--ink-muted); font-size: 1.3rem; line-height: 1; cursor: pointer; }
+  .calc-dremove:hover { background: var(--fill); color: var(--bad); }
+  .calc-add { margin: 12px 0 0; background: none; border: 1px dashed var(--line-strong); color: var(--accent-ink); font: inherit; font-weight: 650; font-size: 0.9rem; border-radius: 10px; padding: 9px 14px; cursor: pointer; width: 100%; }
+  .calc-add:hover { background: var(--accent-wash); border-color: var(--accent-line); }
+  .calc-extra { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); max-width: 420px; grid-template-columns: 1fr; }
+  .calc-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+  .calc-tile { position: relative; display: flex; flex-direction: column; gap: 2px; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font-variant-numeric: tabular-nums; }
+  .calc-tile.best { border-color: var(--accent-line); background: var(--accent-wash); }
+  .calc-tile.muted { opacity: 0.8; }
+  .calc-tile-k { font-size: 0.8rem; font-weight: 700; color: var(--ink-strong); }
+  .calc-tile-k em { font-style: normal; font-weight: 500; color: var(--ink-muted); }
+  .calc-tile strong { font-size: 1.55rem; font-weight: 800; letter-spacing: -0.02em; color: var(--ink-strong); line-height: 1.2; margin-top: 4px; }
+  .calc-tile.best strong { color: var(--accent-ink); }
+  .calc-tile span { font-size: 0.84rem; color: var(--ink-soft); }
+  .calc-badge { align-self: flex-start; margin-top: 6px; font-size: 0.72rem; font-weight: 700; color: var(--accent-ink); border: 1px solid var(--accent-line); border-radius: 999px; padding: 1px 8px; background: var(--canvas); }
+  .calc-order { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px 22px; margin-top: 14px; }
+  .calc-order h3 { font-size: 0.8rem; font-weight: 700; margin: 0 0 4px; color: var(--ink-strong); }
+  .calc-order ol { margin: 0; padding-left: 20px; font-size: 0.88rem; }
+  .calc-order li { margin-top: 3px; }
+  .calc-order li em { font-style: normal; color: var(--ink-muted); margin-left: 6px; }
   .sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
   /* Bank guides: at-a-glance answers, file drop zone, result preview */
   .glance { margin: 0 0 28px; border: 1px solid var(--line-strong); border-radius: 12px; overflow: hidden; }
@@ -349,6 +390,18 @@ ${frameRules("dark", ':root[data-theme="dark"] ')}
   @keyframes it-vt-out { to { opacity: 0; } }
   @keyframes it-vt-in { from { opacity: 0; } }
 
+  @media (max-width: 760px) {
+    .calc { grid-template-columns: minmax(0, 1fr); }
+    .calc-result { position: static; }
+    .calc-dhead { display: none; }
+    .calc-debt { position: relative; grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.9fr) minmax(0, 1fr); padding: 14px 0 0; border-top: 1px solid var(--line); }
+    .calc-debt:first-child { border-top: 0; padding-top: 0; }
+    .calc-dname { grid-column: 1 / -1; padding-right: 40px; }
+    .calc-debt .calc-dremove { position: absolute; right: 0; top: 34px; }
+    .calc-debt:first-child .calc-dremove { top: 20px; }
+    .calc-debt .calc-inwrap { padding: 0 8px; }
+    .calc-dlabel { display: block; font-size: 0.74rem; font-weight: 650; color: var(--ink-soft); margin-bottom: 3px; }
+  }
   @media (max-width: 720px) {
     .wrap { padding: 4px 28px 40px; }
   }
@@ -359,7 +412,8 @@ ${frameRules("dark", ':root[data-theme="dark"] ')}
     nav.sitenav a.navbtn { margin-left: 0; }
     .wrap { padding: 2px 18px 32px; border-radius: 14px; }
     .frame-foot { padding: 28px 8px 0; }
-    .calc { padding: 16px; margin-left: -6px; margin-right: -6px; }
+    .calc { padding: 8px; margin-left: -10px; margin-right: -10px; border-radius: 16px; }
+    .calc-card { padding: 16px; }
     .glance > div { grid-template-columns: 1fr; }
     .drop { padding: 18px; }
     .preview-row { grid-template-columns: 1fr auto; }
@@ -1080,62 +1134,276 @@ ${GUIDES.filter((g) => (g.topic || "Budgeting basics") === t)
 // ─────────────────────────────────────────────────────────────────────────────
 // Calculators
 // ─────────────────────────────────────────────────────────────────────────────
+//
+// Each calculator looks like a page of the app: a grey well holding white cards, filled inputs,
+// the answer beside them. Every box starts empty with a greyed example and a one-line hint, so a
+// visitor is never asked to decode someone else's numbers. Where the tracker has the same tool,
+// "Save" carries the figures into it (src/calcHandoff.ts) instead of sending them to the homepage.
 
-function calcWidget(calc) {
-  const ids = calc.fields.map((f) => f.id);
-  const fields = calc.fields
-    .map((f) => {
-      const pre = f.prefix ? `<i>${esc(f.prefix)}</i>` : "";
-      const suf = f.suffix ? `<i>${esc(f.suffix)}</i>` : "";
-      const control = f.options
-        ? `<select id="${esc(f.id)}">${f.options.map(o => `<option value="${esc(o.value)}"${o.value === f.value ? ' selected' : ''}>${esc(o.label)}</option>`).join('')}</select>`
-        : `<input id="${esc(f.id)}" type="number" inputmode="decimal" step="${f.step || 'any'}" value="${f.value}" min="${f.min ?? 0}" max="1000000000000" required />`;
-      return `<label class="calc-field"><span class="calc-label">${esc(f.label)}</span><span class="calc-inwrap">${pre}${control}${suf}</span></label>`;
-    })
-    .join("\n          ");
-  const html = `<div class="calc" id="calc" data-handoff>
-        <div class="calc-fields">
-          ${fields}
-        </div>
-        <div class="calc-out" id="calc-out" role="status" aria-live="polite" aria-atomic="true"></div>
-        <noscript><p>Enable JavaScript to calculate your own result. The formulas and worked examples below are available without it.</p></noscript>
-        <div class="calc-actions">
-          <button class="btn ghost" type="button" id="calc-share">Share this result</button>
-          <a class="btn" href="/#ref=calc-${esc(calc.slug)}" data-track="cta_click" data-ref="calc-${esc(calc.slug)}" data-handoff-from="calc">Track it in the app &rarr;</a>
-          <span class="calc-share-note" id="calc-share-note">Calculated on your device. Shared links include the amounts you enter.</span>
-        </div>
-      </div>`;
-  // Prefill from the query string (shared links), share via Web Share or the
-  // clipboard, and report a single anonymous "calc_used" per page view.
-  const script = `<script>
-(function(){
-  var IDS=${JSON.stringify(ids)},SLUG=${JSON.stringify(calc.slug)},used=false;
-  function n(id){var el=document.getElementById(id);if(!el)return 0;var v=Number(el.value);return Number.isFinite(v)?v:0;}
+const CALC_HANDOFF_KEY = "it_calc_handoff";
+
+function calcMeta(calc) {
+  const meta = CALC_APP[calc.slug] || {};
+  const fields = calc.fields.map((f) => {
+    const m = (meta.fields || {})[f.id] || {};
+    const optional = Boolean(m.optional);
+    const keep = Boolean(m.keep || f.options);
+    return {
+      ...f,
+      label: f.label.replace(/\s*\(optional\)\s*$/i, ""),
+      hint: m.hint || "",
+      optional,
+      keep,
+      example: m.example ?? f.value,
+    };
+  });
+  return { ...meta, fields };
+}
+
+function exampleText(f) {
+  const v = Number(f.example);
+  if (!Number.isFinite(v)) return "";
+  const shown = f.prefix === "£" ? v.toLocaleString("en-GB", { maximumFractionDigits: 2 }) : String(v);
+  return `e.g. ${shown}`;
+}
+
+function calcFieldHtml(f) {
+  const pre = f.prefix ? `<i>${esc(f.prefix)}</i>` : "";
+  const suf = f.suffix ? `<i>${esc(f.suffix)}</i>` : "";
+  const hintId = f.hint ? `${f.id}-hint` : "";
+  const described = hintId ? ` aria-describedby="${hintId}"` : "";
+  const control = f.options
+    ? `<select id="${esc(f.id)}"${described}>${f.options.map((o) => `<option value="${esc(o.value)}"${o.value === f.value ? " selected" : ""}>${esc(o.label)}</option>`).join("")}</select>`
+    : `<input id="${esc(f.id)}" type="number" inputmode="decimal" step="${f.step || "any"}"${f.keep ? ` value="${f.value}"` : ""} placeholder="${esc(exampleText(f))}" min="${f.min ?? 0}" max="1000000000000"${f.optional ? "" : " required"}${described} />`;
+  const opt = f.optional ? ` <em class="calc-opt">optional</em>` : "";
+  const hint = f.hint ? `<span class="calc-help" id="${hintId}">${esc(f.hint)}</span>` : "";
+  return `<label class="calc-field"><span class="calc-label">${esc(f.label)}${opt}</span><span class="calc-inwrap">${pre}${control}${suf}</span>${hint}</label>`;
+}
+
+// The save button and share link, shared by both widget kinds.
+function calcActionsHtml(calc, meta) {
+  const ref = `calc-${esc(calc.slug)}`;
+  const primary = meta.app
+    ? `<button class="btn" type="button" id="calc-save" data-track="cta_click" data-ref="${ref}">${esc(meta.app.emptyLabel)} &rarr;</button>`
+    : `<a class="btn" href="/#ref=${ref}" data-track="cta_click" data-ref="${ref}" data-handoff-from="calc">Track it in the app &rarr;</a>`;
+  const note = meta.app ? "Free, no sign-up. What you typed goes with you and stays in this browser." : "Free, no sign-up. Calculated on your device.";
+  return `<div class="calc-actions">
+            ${primary}
+            <button class="btn ghost" type="button" id="calc-share">Share</button>
+          </div>
+          <p class="calc-share-note" id="calc-share-note">${note}</p>`;
+}
+
+// Browser helpers every calculator script shares. No backticks or template placeholders inside.
+const CALC_HELPERS = `
+  function el(id){return document.getElementById(id);}
+  function n(id){var e=el(id);if(!e)return 0;var v=Number(e.value);return Number.isFinite(v)?v:0;}
+  function filled(id){var e=el(id);return !!e&&String(e.value).trim()!=='';}
   function gbp(x){return '£'+(Math.round(x*100)/100).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});}
+  function gbp0(x){return '£'+Math.round(x).toLocaleString('en-GB');}
   function pct(x){return (Math.round(x*10)/10)+'%';}
-  var out=document.getElementById('calc-out');
-  function render(){
-    if(IDS.some(function(id){var el=document.getElementById(id);return !el||!el.value||!el.checkValidity()||!Number.isFinite(Number(el.value));})){
-      out.innerHTML='<p class="calc-hint">Enter a valid non-negative number in each field. Payment counts must be whole numbers.</p>';return;
-    }
-    ${calc.compute.trim()}
-  }
-  try{var q=new URLSearchParams(location.search);IDS.forEach(function(id){if(q.has(id)){var el=document.getElementById(id);var v=Number(q.get(id));if(el&&Number.isFinite(v))el.value=String(v);}});}catch(e){}
-  IDS.forEach(function(id){var el=document.getElementById(id);if(el)el.addEventListener('input',function(){render();if(!used){used=true;if(window.itTrack)window.itTrack('calc_used',{calc:SLUG});}});});
-  var share=document.getElementById('calc-share'),note=document.getElementById('calc-share-note');
+  function escH(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+  function emptyState(msg){return '<div class="calc-empty"><strong>Your answer appears here</strong><span>'+msg+'</span></div>';}`;
+
+// Save: park the figures for the app, then open the page they belong on. Share: a link that
+// refills the form. Both read the inputs through getParams/getPayload defined by the widget.
+function calcSaveScript(calc, meta) {
+  const app = meta.app;
+  return `
+  var saveBtn=el('calc-save'),share=el('calc-share'),note=el('calc-share-note');
+  var APP=${JSON.stringify(app ? { view: app.view, label: app.label, emptyLabel: app.emptyLabel } : null)};
+  function refreshSave(){if(!saveBtn||!APP)return;var p=getPayload();saveBtn.textContent=(p?APP.label:APP.emptyLabel)+' \\u2192';}
+  if(saveBtn&&APP){saveBtn.addEventListener('click',function(){
+    var p=getPayload(),ok=false;
+    if(p){p.v=1;p.at=Date.now();p.source=SLUG;p.view=APP.view;try{localStorage.setItem(${JSON.stringify(CALC_HANDOFF_KEY)},JSON.stringify(p));ok=true;}catch(e){}}
+    if(window.itTrack)window.itTrack('calc_saved',{calc:SLUG,with_data:ok});
+    if(window.itHandoff)window.itHandoff(el('calc'));
+    location.href='/'+APP.view+'#ref=calc-'+SLUG+(ok?'&calc=1':'');
+  });}
   if(share){share.addEventListener('click',function(){
-    if(IDS.some(function(id){return !document.getElementById(id).checkValidity();})){note.textContent="Check the inputs before sharing.";return;}
-    var q=new URLSearchParams();IDS.forEach(function(id){q.set(id,String(n(id)));});
+    var q=getParams();if(!q){note.textContent='Fill in the boxes first, then share.';return;}
     var url=location.origin+location.pathname+'?'+q.toString();
     if(window.itTrack)window.itTrack('calc_shared',{calc:SLUG});
     if(navigator.share){navigator.share({title:document.title,url:url}).catch(function(){});return;}
-    if(navigator.clipboard){navigator.clipboard.writeText(url).then(function(){note.textContent='Link copied. Paste it anywhere.';}).catch(function(){note.textContent=url;});}
+    if(navigator.clipboard){navigator.clipboard.writeText(url).then(function(){note.textContent='Link copied. It includes the amounts you entered.';}).catch(function(){note.textContent=url;});}
     else{note.textContent=url;}
-  });}
-  render();
+  });}`;
+}
+
+function calcWidget(calc) {
+  const meta = calcMeta(calc);
+  if (calc.slug === "debt-snowball-vs-avalanche-calculator") return debtsWidget(calc, meta);
+  const fields = meta.fields;
+  const ids = fields.map((f) => f.id);
+  const required = fields.filter((f) => !f.optional && !f.keep).map((f) => f.id);
+  const labels = Object.fromEntries(fields.map((f) => [f.id, f.label.toLowerCase()]));
+  const html = `<div class="calc" id="calc" data-handoff>
+        <section class="calc-card" aria-label="Your numbers">
+          <h2 class="calc-title">Your numbers</h2>
+          <div class="calc-fields">
+          ${fields.map(calcFieldHtml).join("\n          ")}
+          </div>
+        </section>
+        <section class="calc-card calc-result" aria-label="Your answer">
+          <div class="calc-out" id="calc-out" role="status" aria-live="polite" aria-atomic="true"></div>
+          <noscript><p>Enable JavaScript to calculate your own result. The formulas and worked examples below are available without it.</p></noscript>
+          ${calcActionsHtml(calc, meta)}
+        </section>
+      </div>`;
+  const handoff = meta.app && meta.app.handoff ? meta.app.handoff : "return null;";
+  const script = `<script>
+(function(){
+  var IDS=${JSON.stringify(ids)},REQ=${JSON.stringify(required)},LABELS=${JSON.stringify(labels)},SLUG=${JSON.stringify(calc.slug)},used=false,valid=false;
+  ${CALC_HELPERS}
+  var out=el('calc-out');
+  function render(){
+    valid=false;
+    if(IDS.some(function(id){var e=el(id);return filled(id)&&(!e.checkValidity()||!Number.isFinite(Number(e.value)));})){
+      out.innerHTML='<p class="calc-bad">Use positive numbers only. Counts like days or paydays must be whole numbers.</p>';return;
+    }
+    var missing=REQ.filter(function(id){return !filled(id);});
+    if(missing.length){
+      var any=IDS.some(function(id){return filled(id)&&REQ.indexOf(id)>=0;});
+      out.innerHTML=emptyState(any?'Now add '+missing.map(function(id){return LABELS[id];}).join(' and ')+'.':'Fill in your numbers and the answer updates as you type.');
+      return;
+    }
+    valid=true;
+    ${calc.compute.trim()}
+  }
+  function getPayload(){if(!valid)return null;try{return (function(){${handoff}})();}catch(e){return null;}}
+  function getParams(){if(!valid)return null;var q=new URLSearchParams();IDS.forEach(function(id){if(filled(id))q.set(id,String(n(id)));});return q;}
+  ${calcSaveScript(calc, meta)}
+  function update(){render();refreshSave();}
+  try{var q=new URLSearchParams(location.search);IDS.forEach(function(id){if(q.has(id)){var e=el(id);var v=Number(q.get(id));if(e&&Number.isFinite(v))e.value=String(v);}});}catch(e){}
+  IDS.forEach(function(id){var e=el(id);if(e)e.addEventListener('input',function(){update();if(!used){used=true;if(window.itTrack)window.itTrack('calc_used',{calc:SLUG});}});});
+  update();
 })();
 </script>`;
-  return { html, script };
+  return { html, script, meta };
+}
+
+// Snowball vs avalanche: a list of named debts, like the Allocate page, rather than nine
+// numbered boxes. Rows are added and removed in the browser; two empty ones to start.
+function debtsWidget(calc, meta) {
+  const row = (i) => `<div class="calc-debt" data-row>
+              <label class="calc-dcell calc-dname"><span class="calc-dlabel">Debt</span><span class="calc-inwrap"><input type="text" data-k="n" maxlength="40" autocomplete="off" placeholder="${i === 1 ? "e.g. Barclaycard" : "e.g. Car finance"}" aria-label="Debt ${i} name" /></span></label>
+              <label class="calc-dcell"><span class="calc-dlabel">Balance</span><span class="calc-inwrap"><i>£</i><input type="number" inputmode="decimal" step="any" min="0" data-k="b" placeholder="${i === 1 ? "e.g. 2,500" : "e.g. 6,000"}" aria-label="Debt ${i} balance" /></span></label>
+              <label class="calc-dcell"><span class="calc-dlabel">APR</span><span class="calc-inwrap"><input type="number" inputmode="decimal" step="any" min="0" max="100" data-k="r" placeholder="${i === 1 ? "e.g. 22.9" : "e.g. 8.9"}" aria-label="Debt ${i} APR" /><i>%</i></span></label>
+              <label class="calc-dcell"><span class="calc-dlabel">Minimum</span><span class="calc-inwrap"><i>£</i><input type="number" inputmode="decimal" step="any" min="0" data-k="p" placeholder="${i === 1 ? "e.g. 75" : "e.g. 150"}" aria-label="Debt ${i} monthly minimum" /></span></label>
+              <button type="button" class="calc-dremove" data-remove aria-label="Remove debt ${i}">&times;</button>
+            </div>`;
+  const html = `<div class="calc calc-wide" id="calc" data-handoff>
+        <section class="calc-card" aria-label="Your debts">
+          <h2 class="calc-title">Your debts</h2>
+          <p class="calc-help calc-lead">The balance, APR and monthly minimum are on each statement or in your banking app. Use 0 as the APR for a 0% deal.</p>
+          <div class="calc-dhead" aria-hidden="true"><span>Debt</span><span>Balance</span><span>APR</span><span>Monthly minimum</span><span></span></div>
+          <div id="calc-debts">
+            ${row(1)}
+            ${row(2)}
+          </div>
+          <button type="button" class="calc-add" id="calc-add">+ Add another debt</button>
+          <div class="calc-fields calc-extra">
+            ${calcFieldHtml({ id: "extra", label: "Extra you can pay each month", prefix: "£", optional: true, keep: false, example: 100, hint: "On top of all the minimums. Leave blank to compare with minimums only." })}
+          </div>
+        </section>
+        <section class="calc-card calc-result" aria-label="Your payoff plan">
+          <div class="calc-out" id="calc-out" role="status" aria-live="polite" aria-atomic="true"></div>
+          <noscript><p>Enable JavaScript to compare your own debts. How each method works is explained below.</p></noscript>
+          ${calcActionsHtml(calc, meta)}
+        </section>
+      </div>`;
+  const script = String.raw`<script>
+(function(){
+  var SLUG=${JSON.stringify(calc.slug)},MAX=10,used=false,plan=null;
+  ${CALC_HELPERS}
+  var list=el('calc-debts'),out=el('calc-out'),tpl=list.querySelector('[data-row]').cloneNode(true);
+  function rows(){return Array.prototype.slice.call(list.querySelectorAll('[data-row]'));}
+  function field(r,k){return r.querySelector('[data-k="'+k+'"]');}
+  function val(r,k){var v=Number(field(r,k).value);return Number.isFinite(v)?v:0;}
+  function has(r,k){return String(field(r,k).value).trim()!=='';}
+  function relabel(){rows().forEach(function(r,i){['n','b','r','p'].forEach(function(k){var e=field(r,k);e.setAttribute('aria-label',e.getAttribute('aria-label').replace(/Debt \d+/,'Debt '+(i+1)));});r.querySelector('[data-remove]').setAttribute('aria-label','Remove debt '+(i+1));});el('calc-add').hidden=rows().length>=MAX;}
+  function addRow(){if(rows().length>=MAX)return null;var r=tpl.cloneNode(true);r.querySelectorAll('input').forEach(function(i){i.value='';});field(r,'n').placeholder='e.g. Loan';field(r,'b').placeholder='';field(r,'r').placeholder='';field(r,'p').placeholder='';list.appendChild(r);relabel();return r;}
+  el('calc-add').addEventListener('click',function(){var r=addRow();if(r)field(r,'n').focus();});
+  list.addEventListener('click',function(e){var b=e.target.closest('[data-remove]');if(!b)return;var r=b.closest('[data-row]');if(rows().length>1)r.remove();else r.querySelectorAll('input').forEach(function(i){i.value='';});relabel();update();});
+  function nameOf(r,i){var t=String(field(r,'n').value).trim();return t||('Debt '+(i+1));}
+  function months(m){if(m<=0)return 'now';var y=Math.floor(m/12),mm=m%12;return (y?y+(y===1?' yr':' yrs'):'')+(y&&mm?' ':'')+(mm?mm+' mo':'');}
+  function when(m){var d=new Date();d.setDate(1);d.setMonth(d.getMonth()+m);return d.toLocaleDateString('en-GB',{month:'short',year:'numeric'});}
+  // Minimums on everything; the extra plus any cleared debt's minimum goes to the target in order.
+  function sim(debts,mode){
+    var ds=debts.map(function(d){return {name:d.name,b:d.b,r:d.r,p:d.p,cleared:null};});
+    if(mode==='aval')ds.sort(function(a,b){return b.r-a.r||a.b-b.b;});
+    if(mode==='snow')ds.sort(function(a,b){return a.b-b.b||b.r-a.r;});
+    var m=0,interest=0,extra=mode==='min'?0:n('extra');
+    while(ds.some(function(d){return d.b>0.005;})){
+      m++;if(m>600)return {months:null,interest:interest,order:ds};
+      var pool=extra;
+      ds.forEach(function(d){
+        if(d.b<=0.005){if(mode!=='min')pool+=d.p;return;}
+        var i=d.b*d.r/100/12;d.b+=i;interest+=i;d.b-=Math.min(d.p,d.b);
+      });
+      if(mode!=='min')for(var j=0;j<ds.length&&pool>0;j++){if(ds[j].b>0.005){var x=Math.min(pool,ds[j].b);ds[j].b-=x;pool-=x;}}
+      ds.forEach(function(d){if(d.b<=0.005&&d.cleared===null)d.cleared=m;});
+    }
+    return {months:m,interest:interest,order:ds.slice().sort(function(a,b){return a.cleared-b.cleared;})};
+  }
+  function tile(title,sub,res,extraHtml,cls){
+    return '<div class="calc-tile '+(cls||'')+'"><span class="calc-tile-k">'+title+' <em>'+sub+'</em></span>'+
+      (res.months===null?'<strong>Never</strong><span>Interest outruns the payments</span>':'<strong>'+when(res.months)+'</strong><span>Debt-free in '+months(res.months)+' · '+gbp0(res.interest)+' interest</span>')+(extraHtml||'')+'</div>';
+  }
+  function orderHtml(title,res){return '<div><h3>'+title+'</h3><ol>'+res.order.map(function(d){return '<li><span>'+escH(d.name)+'</span><em>'+(d.cleared?when(d.cleared):'not cleared')+'</em></li>';}).join('')+'</ol></div>';}
+  function read(){
+    var debts=[],problem=null,any=false;
+    rows().forEach(function(r,i){
+      var touched=['n','b','r','p'].some(function(k){return has(r,k);});if(!touched)return;any=true;
+      if(['b','r','p'].some(function(k){var e=field(r,k);return has(r,k)&&(!e.checkValidity()||!Number.isFinite(Number(e.value)));})){problem=problem||'Use positive numbers only for '+escH(nameOf(r,i))+'.';return;}
+      var nm=escH(nameOf(r,i));
+      if(!has(r,'b')||val(r,'b')<=0){problem=problem||'Add the balance for '+nm+'.';return;}
+      if(!has(r,'r')){problem=problem||'Add the APR for '+nm+' (0 for a 0% deal).';return;}
+      if(!has(r,'p')){problem=problem||'Add the monthly minimum for '+nm+'.';return;}
+      debts.push({name:nameOf(r,i),b:val(r,'b'),r:val(r,'r'),p:val(r,'p')});
+    });
+    var ex=el('extra');if(filled('extra')&&!ex.checkValidity())problem='Use a positive number for the extra.';
+    return {debts:debts,problem:problem,any:any};
+  }
+  function render(){
+    plan=null;var got=read();
+    if(!got.any){out.innerHTML=emptyState('Add a debt or two above. The comparison updates as you type.');return;}
+    if(got.problem){out.innerHTML=emptyState(got.problem);return;}
+    var debts=got.debts,aval=sim(debts,'aval'),snow=sim(debts,'snow'),base=sim(debts,'min');
+    plan={debts:debts,priority:(aval.months!==null&&snow.months!==null&&snow.interest-aval.interest>=1)?'interest':'quick-wins'};
+    if(aval.months===null&&snow.months===null){out.innerHTML='<p class="calc-bad">At these payments the balances never clear: interest is outrunning the minimum on at least one debt. Raise the payments, or the extra, and try again.</p>';return;}
+    var saved=snow.interest-aval.interest,html='';
+    if(debts.length===1){
+      html+='<div class="calc-tiles">'+tile('Your plan','one debt',aval,'','best')+tile('Minimums only','no extra',base,'','muted')+'</div>';
+      html+='<p class="calc-hint">With one debt both methods are the same. Add another to compare them.</p>';
+    }else{
+      var avBest=saved>=1,snBest=saved<=-1;
+      html+='<div class="calc-tiles">'+
+        tile('Avalanche','highest APR first',aval,avBest?'<b class="calc-badge">Saves '+gbp0(saved)+'</b>':'',avBest?'best':'')+
+        tile('Snowball','smallest balance first',snow,snBest?'<b class="calc-badge">Saves '+gbp0(-saved)+'</b>':'',snBest?'best':'')+
+        tile('Minimums only','no extra',base,'','muted')+'</div>';
+      if(Math.abs(saved)<1)html+='<p class="calc-good">Both orders cost about the same here, so take the snowball for the quick wins.</p>';
+      else if(saved>0)html+='<p class="calc-good">Avalanche saves about '+gbp0(saved)+' in interest. If clearing a whole debt early keeps you going, the snowball costs '+gbp0(saved)+' for it.</p>';
+      else html+='<p class="calc-good">Snowball saves about '+gbp0(-saved)+' here, because your smallest debt is also the priciest.</p>';
+      html+='<div class="calc-order">'+orderHtml('Avalanche order',aval)+orderHtml('Snowball order',snow)+'</div>';
+    }
+    if(base.months!==null&&aval.months!==null&&base.interest-aval.interest>=1&&n('extra')>0)html+='<p class="calc-hint">Against paying only the minimums, the extra '+gbp0(n('extra'))+' a month saves '+gbp0(base.interest-aval.interest)+' and '+months(base.months-aval.months)+'.</p>';
+    out.innerHTML=html;
+  }
+  function getPayload(){if(!plan)return null;return {debts:plan.debts.map(function(d){return {name:d.name,type:'other',balance:d.b,apr:d.r,minPayment:d.p};}),extra:n('extra'),priority:plan.priority};}
+  function getParams(){if(!plan)return null;var q=new URLSearchParams();plan.debts.forEach(function(d,i){var k=i+1;if(d.name.indexOf('Debt ')!==0)q.set('n'+k,d.name);q.set('b'+k,d.b);q.set('r'+k,d.r);q.set('p'+k,d.p);});if(filled('extra'))q.set('extra',n('extra'));return q;}
+  ${calcSaveScript(calc, meta)}
+  function update(){render();refreshSave();}
+  try{
+    var q=new URLSearchParams(location.search);
+    for(var k=1;k<=MAX&&q.has('b'+k);k++){var r=rows()[k-1]||addRow();if(!r)break;if(q.has('n'+k))field(r,'n').value=q.get('n'+k).slice(0,40);['b','r','p'].forEach(function(f){var v=Number(q.get(f+k));if(q.has(f+k)&&Number.isFinite(v))field(r,f).value=String(v);});}
+    if(q.has('extra')&&Number.isFinite(Number(q.get('extra'))))el('extra').value=String(Number(q.get('extra')));
+  }catch(e){}
+  el('calc').addEventListener('input',function(){update();if(!used){used=true;if(window.itTrack)window.itTrack('calc_used',{calc:SLUG});}});
+  relabel();update();
+})();
+</script>`;
+  return { html, script, meta };
 }
 
 function calcPage(calc) {
@@ -1147,15 +1415,19 @@ function calcPage(calc) {
     { name: calc.crumb, path },
   ];
   const widget = calcWidget(calc);
+  const lede = widget.meta.lede || calc.tldr.split(/(?<=\.)\s/)[0];
+  // The tool comes first; the explanation is for whoever wants it, below.
   const body = `      <header class="top">${breadcrumbHtml(trail)}</header>
       <h1>${esc(calc.h1)}</h1>
-      <p class="meta">By ${BRAND} · Updated ${UPDATED_HUMAN}</p>
-      <div class="tldr"><strong>The short answer</strong><p>${esc(calc.tldr)}</p></div>
+      <p class="calc-lede">${esc(lede)}</p>
       ${widget.html}
+
+      <div class="tldr"><strong>The short answer</strong><p>${esc(calc.tldr)}</p></div>
+      <p class="meta">By ${BRAND} · Updated ${UPDATED_HUMAN}</p>
 
       ${renderSections(calc.sections)}
 
-      ${ctaHtml(calc.ctaLine, `calc-${calc.slug}`)}
+      ${widget.meta.app ? "" : ctaHtml(calc.ctaLine, `calc-${calc.slug}`)}
 
       ${faqHtml(calc.faqs)}
 
